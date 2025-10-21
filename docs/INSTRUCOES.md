@@ -189,13 +189,9 @@ taskkill /PID [NUMERO_DO_PID] /F
 
 ---
 
-## 🔐 Configuração de Segurança
+## Configuração de Variáveis de Ambiente
 
-### ⚠️ IMPORTANTE: Dados Sensíveis
-
-**NUNCA** inclua tokens, senhas ou dados sensíveis diretamente na documentação ou código fonte. 
-
-### Configuração Segura de Variáveis de Ambiente
+### Método Recomendado: Variáveis de Ambiente
 
 Configure as seguintes variáveis no seu sistema:
 
@@ -207,52 +203,45 @@ $env:API_GRAPHQL_ENDPOINT="/graphql"
 $env:API_DATAEXPORT_TOKEN="seu_token_aqui"
 $env:DB_URL="jdbc:sqlserver://localhost:1433;databaseName=esl_cloud;encrypt=false;"
 $env:DB_USER="sa"
-$env:DB_PASSWORD="sua_senha_segura"
+$env:DB_PASSWORD="SqlDocker!2025"
 ```
 
-### Configuração via Arquivo Seguro
+### Método Alternativo: Arquivo config.properties
 
 **Para desenvolvimento local**, você pode usar o arquivo `config.properties` localizado em `src/main/resources/config.properties`. Este arquivo serve como fallback quando as variáveis de ambiente não estão configuradas.
 
-**⚠️ ATENÇÃO:** Os dados reais de configuração devem ser obtidos do diretório seguro:
-- **Localização dos dados sensíveis**: `docs/arquivos-secretos-gitignore/`
-- Este diretório está protegido pelo `.gitignore` e não é versionado
+Antes de executar o sistema, é necessário configurar o arquivo:
 
-### Exemplo de Configuração (Valores Genéricos)
+1. Abra o arquivo `config.properties` em um editor de texto
+2. Configure os seguintes parâmetros:
 
 ```properties
 # Configurações da API ESL Cloud
-api.baseurl=https://sua-empresa.eslcloud.com.br
+api.baseurl=https://rodogarcia.eslcloud.com.br
 
 # API REST - Token do Usuário do Sistema (Faturas e Ocorrências)
-api.rest.token=SEU_TOKEN_REST_AQUI
+api.rest.token=_Rxcmz7vrmaGvYGy6VeyJxHNy5qHsToRGsPdqA88zgEs3aAFQ8ycxw
 
 # API GraphQL - Token do Usuário API (Coletas)
-api.graphql.token=SEU_TOKEN_GRAPHQL_AQUI
+api.graphql.token=pGsc57wLxCHxTtbp8juDY3Q5BWpB2uurXB3-zoVkkDysMwf5taHqqw
 api.graphql.endpoint=/graphql
 
 # API Data Export - Token do Usuário do Sistema (Manifestos e Localização)
-api.dataexport.token=SEU_TOKEN_DATAEXPORT_AQUI
+api.dataexport.token=_Rxcmz7vrmaGvYGy6VeyJxHNy5qHsToRGsPdqA88zgEs3aAFQ8ycxw
 
 # Configurações do Banco de Dados SQL Server Local
 db.url=jdbc:sqlserver://localhost:1433;databaseName=esl_cloud;encrypt=false;
 db.user=sa
-db.password=SUA_SENHA_SEGURA
+db.password=SqlDocker!2025
 ```
-
-**📁 Para obter os valores reais:**
-1. Consulte o diretório `docs/arquivos-secretos-gitignore/`
-2. Use os arquivos de configuração seguros disponíveis neste diretório
-3. Nunca commite estes valores no controle de versão
 
 ## Execução do Sistema
 
 ### Método 1: Usando o JAR compilado
 
 1. Abra o prompt de comando (CMD) ou PowerShell
-2. Navegue até a pasta do projeto
-3. Execute o comando desejado
-
+2. Navegue até a pasta do projeto:
+   ```
 ## Logs e Monitoramento
 
 - **Logs do Sistema**: `logs/extrator.log`
@@ -269,8 +258,7 @@ script-automacao/
 ├── docs/                        # Documentação técnica
 │   ├── README.md               # Visão técnica
 │   ├── INSTRUCOES.md          # Este arquivo
-│   ├── ARQUITETURA-TECNICA.md # Detalhes técnicos
-│   └── arquivos-secretos-gitignore/ # 🔐 Configurações sensíveis
+│   └── ARQUITETURA-TECNICA.md # Detalhes técnicos
 ├── dashboard-monitoramento/     # Frontend React 18+
 ├── src/main/                   # Código fonte Java 17
 ├── logs/                       # Logs de execução
@@ -286,7 +274,6 @@ script-automacao/
 - 🔧 **Scripts de Teste**: Use `04_testar_api_24h.bat`
 - 📊 **Dashboard**: Monitore em tempo real via http://localhost:3001
 - 📝 **Logs Detalhados**: Verifique `logs/extrator.log`
-- 🔐 **Configurações Seguras**: Consulte `docs/arquivos-secretos-gitignore/`
 
 ### Contato e Suporte
 - **Logs de Erro**: Sempre em `logs/extrator.log`
@@ -297,4 +284,3 @@ script-automacao/
 ---
 
 *Documentação atualizada para Spring Boot 3.5.6 e Java 17 - Janeiro 2025*
-*Configurações sensíveis movidas para diretório seguro protegido pelo .gitignore*

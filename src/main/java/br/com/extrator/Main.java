@@ -558,81 +558,10 @@ public class Main {
                 System.out.println();
             }
 
-            // ========== ETAPA 12/13: EXTRAÇÃO DE COLETAS (API DATA EXPORT) ==========
-            if (testeModo.isTestarDataExport() || testeModo.isModoNormal()) {
-                logger.info("Extraindo coletas da API Data Export");
-                System.out.println("    [ETAPA 12/13] Extraindo Coletas da API Data Export...");
-
-                try {
-                    metricasService.iniciarTimer("extracao_coletas_dataexport");
-                    List<EntidadeDinamica> coletasDataExport = clienteApiDataExport.buscarColetas(dataBusca, modoTeste);
-                    metricasService.pararTimer("extracao_coletas_dataexport");
-                    
-                    totalEntidadesExtraidas += coletasDataExport.size();
-
-                    logger.info("Extração de coletas da API Data Export concluída. Total encontrado: {}", coletasDataExport.size());
-                    System.out.println("    ✓ Coletas extraídas da API Data Export: " + coletasDataExport.size() + " registros");
-
-                    if (!coletasDataExport.isEmpty()) {
-                        logger.info("Salvando coletas da API Data Export no banco de dados");
-                        System.out.println("    ✓ Salvando coletas da API Data Export no banco SQL Server...");
-
-                        int processados = servicoBD.salvarEntidades(coletasDataExport, "coletas_dataexport");
-                        totalEntidadesProcessadas += processados;
-                        metricasService.adicionarRegistrosProcessados("coletas_dataexport", processados);
-
-                        logger.info("Coletas da API Data Export salvas. Total processado: {}", processados);
-                        
-                        if (processados == coletasDataExport.size()) {
-                            System.out.println("    ✓ Coletas da API Data Export salvas com SUCESSO TOTAL! (" + processados + "/" + coletasDataExport.size() + ")");
-                            sucessos.add("API Data Export - Coletas: " + processados + "/" + coletasDataExport.size() + " registros processados com sucesso");
-                        } else {
-                            System.out.println("    ⚠ Coletas da API Data Export salvas com SUCESSO PARCIAL! (" + processados + "/" + coletasDataExport.size() + ")");
-                            avisos.add("API Data Export - Coletas: processamento parcial (" + processados + "/" + coletasDataExport.size() + ")");
-                        }
-                    } else {
-                        System.out.println("    ⚠ Nenhuma coleta encontrada na API Data Export para o período especificado");
-                        avisos.add("API Data Export - Coletas: nenhum registro encontrado para o período");
-                    }
-                    
-                    metricasService.registrarSucesso("API_DataExport_Coletas");
-                } catch (IllegalArgumentException e) {
-                    metricasService.registrarFalha("API_DataExport_Coletas");
-                    logger.error("Erro de parâmetros na extração de Coletas da API Data Export: {}", e.getMessage());
-                    System.out.println("    ❌ ERRO DE PARÂMETROS: Coletas da API Data Export - " + e.getMessage());
-                    erros.add("API Data Export - Coletas: erro de parâmetros - " + e.getMessage());
-                } catch (SecurityException e) {
-                    metricasService.registrarFalha("API_DataExport_Coletas");
-                    logger.error("Erro de autenticação na extração de Coletas da API Data Export: {}", e.getMessage());
-                    System.out.println("    ❌ ERRO DE AUTENTICAÇÃO: Coletas da API Data Export - " + e.getMessage());
-                    erros.add("API Data Export - Coletas: falha na autenticação - " + e.getMessage());
-                } catch (RuntimeException e) {
-                    metricasService.registrarFalha("API_DataExport_Coletas");
-                    logger.error("Falha na extração de Coletas da API Data Export: {}", e.getMessage());
-                    System.out.println("    ❌ ERRO DE EXECUÇÃO: Coletas da API Data Export - " + e.getMessage());
-                    erros.add("API Data Export - Coletas: falha na execução - " + e.getMessage());
-                } catch (Exception e) {
-                    metricasService.registrarFalha("API_DataExport_Coletas");
-                    logger.error("Erro inesperado na extração de Coletas da API Data Export: {}", e.getMessage());
-                    System.out.println("    ❌ ERRO INESPERADO: Coletas da API Data Export - " + e.getMessage());
-                    erros.add("API Data Export - Coletas: erro inesperado - " + e.getMessage());
-                }
-
-                // Pausa obrigatória entre APIs para respeitar o rate limit
-                long throttlingMs = br.com.extrator.util.CarregadorConfig.obterThrottlingPadrao();
-                logger.info("Aguardando {}ms antes da próxima API para respeitar o rate limit...", throttlingMs);
-                System.out.println("    Aguardando " + throttlingMs + "ms antes da próxima API...");
-                Thread.sleep(throttlingMs);
-                System.out.println();
-            } else {
-                System.out.println("    [ETAPA 12/13] Extração de Coletas da API Data Export PULADA (modo de teste específico)");
-                System.out.println();
-            }
-
-            // ========== ETAPA 13/13: EXTRAÇÃO DE LOCALIZAÇÃO DA CARGA (API DATA EXPORT) ==========
+            // ========== ETAPA 12/13: EXTRAÇÃO DE LOCALIZAÇÃO DA CARGA (API DATA EXPORT) ==========
             if (testeModo.isTestarDataExport() || testeModo.isModoNormal()) {
                 logger.info("Extraindo localização da carga da API Data Export");
-                System.out.println("    [ETAPA 13/13] Extraindo Localização da Carga da API Data Export...");
+                System.out.println("    [ETAPA 12/12] Extraindo Localização da Carga da API Data Export...");
 
                 try {
                     metricasService.iniciarTimer("extracao_localizacao_carga");
@@ -696,7 +625,7 @@ public class Main {
                 Thread.sleep(throttlingMs);
                 System.out.println();
             } else {
-                System.out.println("    [ETAPA 13/13] Extração de Localização da Carga PULADA (modo de teste específico)");
+                System.out.println("    [ETAPA 12/12] Extração de Localização da Carga PULADA (modo de teste específico)");
                 System.out.println();
             }
             

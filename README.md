@@ -65,42 +65,18 @@ java -jar target/extrator-script.jar "2024-01-01T00:00:00"
 
 ## ⚙️ Configuração
 
-### 🔐 Configuração Segura
-
-**⚠️ IMPORTANTE:** Nunca inclua tokens, senhas ou dados sensíveis diretamente no código ou documentação.
-
-**Para obter as configurações reais:**
-- Consulte o diretório `docs/arquivos-secretos-gitignore/`
-- Este diretório está protegido pelo `.gitignore` e contém os dados sensíveis
-
-### Método 1: Variáveis de Ambiente (Recomendado)
+Configure as variáveis de ambiente ou edite `src/main/resources/config.properties`:
 
 ```bash
-# Windows PowerShell
+# Variáveis de Ambiente (Recomendado)
 $env:API_BASEURL="https://sua-empresa.eslcloud.com.br"
 $env:API_REST_TOKEN="seu_token_rest"
 $env:API_GRAPHQL_TOKEN="seu_token_graphql"
 $env:API_DATAEXPORT_TOKEN="seu_token_dataexport"
 $env:DB_URL="jdbc:sqlserver://localhost:1433;databaseName=esl_cloud"
 $env:DB_USER="sa"
-$env:DB_PASSWORD="sua_senha_segura"
+$env:DB_PASSWORD="sua_senha"
 ```
-
-### Método 2: Arquivo config.properties
-
-Edite `src/main/resources/config.properties` com valores genéricos:
-
-```properties
-api.baseurl=https://sua-empresa.eslcloud.com.br
-api.rest.token=SEU_TOKEN_REST_AQUI
-api.graphql.token=SEU_TOKEN_GRAPHQL_AQUI
-api.dataexport.token=SEU_TOKEN_DATAEXPORT_AQUI
-db.url=jdbc:sqlserver://localhost:1433;databaseName=esl_cloud
-db.user=sa
-db.password=SUA_SENHA_SEGURA
-```
-
-**📁 Valores reais:** Disponíveis em `docs/arquivos-secretos-gitignore/`
 
 ## 🏗️ Arquitetura
 
