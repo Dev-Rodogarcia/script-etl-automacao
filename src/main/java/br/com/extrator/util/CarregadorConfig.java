@@ -308,6 +308,22 @@ public class CarregadorConfig {
     }
 
     /**
+     * Obtém o timeout para requisições da API REST em Duration.
+     * 
+     * @return Duration com o timeout configurado (padrão: 120 segundos)
+     */
+    public static java.time.Duration obterTimeoutApiRest() {
+        String valor = obterConfiguracao("API_REST_TIMEOUT_SECONDS", "api.rest.timeout.seconds");
+        try {
+            long segundos = Long.parseLong(valor);
+            return java.time.Duration.ofSeconds(segundos);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.rest.timeout.seconds' não encontrada ou inválida. Usando valor padrão: 120 segundos");
+            return java.time.Duration.ofSeconds(120L); // Valor padrão de 120 segundos
+        }
+    }
+
+    /**
      * Obtém o ID da corporação para filtros GraphQL
      * 
      * @return ID da corporação

@@ -2,11 +2,15 @@ package br.com.extrator.api;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,11 +18,17 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import br.com.extrator.modelo.EntidadeDinamica;
+import br.com.extrator.modelo.rest.faturaspagar.FaturaAPagarDTO;
+import br.com.extrator.modelo.rest.faturasreceber.FaturaAReceberDTO;
+import br.com.extrator.modelo.rest.ocorrencias.OcorrenciaDTO;
 import br.com.extrator.util.CarregadorConfig;
+import br.com.extrator.util.GerenciadorRequisicaoHttp;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
 
 /**
  * Classe responsável pela comunicação com a API REST do ESL Cloud
@@ -30,6 +40,8 @@ public class ClienteApiRest {
     private final String token;
     private final HttpClient clienteHttp;
     private final ObjectMapper mapeadorJson;
+    private final Duration timeoutRequisicao;
+    private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
 
     /**
      * Construtor que inicializa o cliente HTTP e carrega as configurações da API
@@ -38,68 +50,116 @@ public class ClienteApiRest {
     public ClienteApiRest() {
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.token = CarregadorConfig.obterTokenApiRest();
+        this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
         this.clienteHttp = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.mapeadorJson = new ObjectMapper();
+        this.mapeadorJson.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
     }
 
     /**
      * Busca faturas a RECEBER da API REST.
      * Endpoint sugerido baseado na documentação do projeto.
      * 
-     * @param dataInicio Data de início para busca (formato ISO:
-     *                   yyyy-MM-dd'T'HH:mm:ss)
-     * @param modoTeste  Se verdadeiro, limita a busca a 5 registros
-     * @return Lista de entidades encontradas
+     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @return Lista de DTOs de faturas a receber
      */
-    public List<EntidadeDinamica> buscarFaturasAReceber(String dataInicio, boolean modoTeste) {
-        return buscarEntidades("/api/accounting/credit/billings", dataInicio, "faturas_a_receber", modoTeste);
+    public List<FaturaAReceberDTO> buscarFaturasAReceber(final LocalDate dataReferencia) {
+        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
+        return buscarEntidadesTipadas("/api/accounting/credit/billings", dataInicioFormatada, "faturas_a_receber", FaturaAReceberDTO.class);
     }
 
     /**
      * Busca faturas a PAGAR da API REST.
      * Endpoint sugerido baseado na documentação do projeto.
      * 
-     * @param dataInicio Data de início para busca (formato ISO:
-     *                   yyyy-MM-dd'T'HH:mm:ss)
-     * @param modoTeste  Se verdadeiro, limita a busca a 5 registros
-     * @return Lista de entidades encontradas
+     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @return Lista de DTOs de faturas a pagar
      */
-    public List<EntidadeDinamica> buscarFaturasAPagar(String dataInicio, boolean modoTeste) {
-        // Endpoint para Faturas a Pagar (ajustar se necessário conforme documentação da
-        // API)
-        return buscarEntidades("/api/accounting/debit/billings", dataInicio, "faturas_a_pagar", modoTeste);
+    public List<FaturaAPagarDTO> buscarFaturasAPagar(final LocalDate dataReferencia) {
+        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
+        return buscarEntidadesTipadas("/api/accounting/debit/billings", dataInicioFormatada, "faturas_a_pagar", FaturaAPagarDTO.class);
     }
 
     /**
      * Busca ocorrências da API REST ESL Cloud com paginação
      * 
-     * @param dataInicio Data de início para busca (formato ISO:
-     *                   yyyy-MM-dd'T'HH:mm:ss)
-     * @param modoTeste  Se verdadeiro, limita a busca a 5 registros
-     * @return Lista de entidades encontradas
+     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @return Lista de DTOs de ocorrências
      */
-    public List<EntidadeDinamica> buscarOcorrencias(String dataInicio, boolean modoTeste) {
-        return buscarEntidades("/api/invoice_occurrences", dataInicio, "ocorrencias", modoTeste);
+    public List<OcorrenciaDTO> buscarOcorrencias(final LocalDate dataReferencia) {
+        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
+        return buscarEntidadesTipadas("/api/invoice_occurrences", dataInicioFormatada, "ocorrencias", OcorrenciaDTO.class);
     }
 
     /**
-     * Busca entidades de um endpoint específico da API REST ESL Cloud com paginação
+     * Busca itens/parcelas de uma fatura a pagar específica.
      * 
-     * @param endpoint     Endpoint específico (ex:
-     *                     "/api/accounting/credit/billings")
-     * @param dataInicio   Data de início para busca (formato ISO:
-     *                     yyyy-MM-dd'T'HH:mm:ss)
-     * @param tipoEntidade Tipo da entidade para logs
-     * @param modoTeste    Se verdadeiro, limita a busca a 5 registros e desativa
-     *                     paginação
-     * @return Lista de entidades encontradas
+     * @param idFatura ID da fatura para buscar os itens
+     * @return JSON bruto dos itens da fatura
      */
-    public List<EntidadeDinamica> buscarEntidades(String endpoint, String dataInicio, String tipoEntidade,
-            boolean modoTeste) {
-        logger.info("Iniciando busca de {} a partir de: {} (Modo Teste: {})", endpoint, dataInicio, modoTeste);
-        List<EntidadeDinamica> entidades = new ArrayList<>();
+    public String buscarItensFaturaAPagar(Long idFatura) {
+        logger.info("Buscando itens da fatura a pagar ID: {}", idFatura);
+        
+        try {
+            String endpoint = String.format("/api/accounting/debit/billings/%d/installments", idFatura);
+            String urlCompleta = urlBase + endpoint;
+            
+            HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(urlCompleta))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .timeout(this.timeoutRequisicao)
+                    .GET()
+                    .build();
+            
+            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "ItensFaturaAPagar-" + idFatura);
+            
+            if (resposta.statusCode() == 200) {
+                logger.debug("Itens da fatura {} obtidos com sucesso", idFatura);
+                return resposta.body();
+            } else {
+                logger.error("Erro ao buscar itens da fatura {}: HTTP {} - {}", 
+                    idFatura, resposta.statusCode(), resposta.body());
+                return "{}";
+            }
+            
+        } catch (Exception e) {
+            logger.error("Erro ao buscar itens da fatura {}: {}", idFatura, e.getMessage(), e);
+            return "{}";
+        }
+    }
+
+    /**
+     * Formata um LocalDate para o formato esperado pela API REST.
+     * Converte para início do dia no fuso horário do Brasil (America/Sao_Paulo) 
+     * e formata como ISO 8601 completo com offset de timezone.
+     * 
+     * @param dataReferencia Data de referência
+     * @return String formatada para API REST (ex: 2025-10-27T00:00:00-03:00)
+     */
+    private String formatarDataParaApiRest(LocalDate dataReferencia) {
+        ZonedDateTime inicioDodia = dataReferencia.atStartOfDay(ZoneId.of("America/Sao_Paulo"));
+        return inicioDodia.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    /**
+     * Busca entidades tipadas de um endpoint específico da API REST ESL Cloud com paginação
+     * 
+     * @param <T>          Tipo da entidade
+     * @param endpoint     Endpoint específico (ex: "/api/accounting/credit/billings")
+     * @param dataInicio   Data de início para busca (formato ISO: yyyy-MM-dd'T'HH:mm:ss)
+     * @param tipoEntidade Tipo da entidade para logs
+     * @param classeEntidade Classe da entidade para deserialização
+     * @return Lista de entidades tipadas
+     */
+    public <T> List<T> buscarEntidadesTipadas(final String endpoint, final String dataInicio,
+            final String tipoEntidade, final Class<T> classeEntidade) {
+        logger.info("Iniciando busca de {} a partir de: {}", endpoint, dataInicio);
+        final List<T> entidades = new ArrayList<>();
 
         String proximoId = null;
         boolean primeiraPagina = true;
@@ -110,80 +170,55 @@ public class ClienteApiRest {
             return entidades;
         }
 
-        // Pausa obrigatória ANTES de iniciar as requisições para respeitar o rate limit
-        // Aplicado apenas uma vez por entidade, não por página
-        try {
-            long throttlingMs = CarregadorConfig.obterThrottlingPadrao();
-            logger.debug("Aguardando {}ms para respeitar o rate limit antes de buscar {}...", throttlingMs, tipoEntidade);
-            Thread.sleep(throttlingMs);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.warn("Throttling interrompido para {}: {}", tipoEntidade, e.getMessage());
-        }
-
         try {
             do {
                 // Constrói a URL com os parâmetros adequados
                 String url;
                 if (primeiraPagina) {
-                    // --- INÍCIO DA CORREÇÃO FINAL ---
-                    // Converte a data de início para o formato YYYY-MM-DD
-                    LocalDateTime dataDeBusca = LocalDateTime.parse(dataInicio);
-                    String dataFim = dataDeBusca.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                    String dataComeco = dataDeBusca.minusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    // Usa diretamente o timestamp formatado com fuso horário
+                    String timestampFormatado = dataInicio;
+                    
+                    // Log detalhado para diagnóstico
+                    logger.info("DIAGNÓSTICO API REST - Timestamp formatado: {}", timestampFormatado);
+                    
+                    // Codifica o timestamp para URL para evitar problemas com caracteres especiais
+                    String timestampCodificado = URLEncoder.encode(timestampFormatado, StandardCharsets.UTF_8);
+                    
+                    logger.debug("Endpoint: {}, Timestamp codificado para URL: {}", endpoint, timestampCodificado);
+                    
+                    url = urlBase + endpoint + "?since=" + timestampCodificado;
 
-                    // Lógica de parâmetros por endpoint
-                    if (endpoint.contains("credit/billings")) { // Faturas a Receber
-                        url = urlBase + endpoint + "?created_at_start=" + dataComeco + "&created_at_end=" + dataFim;
-                    } else if (endpoint.contains("debit/billings")) { // Faturas a Pagar
-                        url = urlBase + endpoint + "?issue_date_start=" + dataComeco + "&issue_date_end=" + dataFim;
-                    } else if (endpoint.contains("invoice_occurrences")) { // Ocorrências
-                        url = urlBase + endpoint + "?date_start=" + dataComeco + "&date_end=" + dataFim;
-                    } else { // Fallback para um padrão antigo, se necessário
-                        url = urlBase + endpoint + "?since=" + dataInicio;
-                    }
-                    // --- FIM DA CORREÇÃO FINAL ---
-
-                    // Adiciona limite se estiver em modo de teste
-                    if (modoTeste) {
-                        url += "&per=5";
-                    }
+                    // OTIMIZAÇÃO: Aumenta o tamanho da página para reduzir chamadas de rede
+                    // Especialmente importante para FATURAS_A_RECEBER que tem alto volume
+                    url += "&per=100";
                     primeiraPagina = false;
                 } else {
                     url = urlBase + endpoint + "?start=" + proximoId;
-                    // Adiciona limite se estiver em modo de teste
-                    if (modoTeste) {
-                        url += "&per=5";
-                    }
+                    // OTIMIZAÇÃO: Mantém o tamanho da página otimizado para páginas subsequentes
+                    url += "&per=100";
                 }
 
-                logger.debug("Fazendo requisição para: {}", url);
+                // Log da URL completa para depuração
+                logger.debug("Fazendo requisição HTTP REST para {}: {}", tipoEntidade, url);
 
-                long inicioMs = System.currentTimeMillis();
+                final long inicioMs = System.currentTimeMillis();
 
-                // Cria a requisição HTTP como um Supplier para ser passada ao utilitário de
-                // retry
-                final String finalUrl = url; // Variável precisa ser final ou efetivamente final para ser usada na
-                                             // lambda
-                java.util.function.Supplier<HttpRequest> fornecedorRequisicao = () -> HttpRequest.newBuilder()
-                        .uri(URI.create(finalUrl))
+                // Constrói a requisição HTTP com timeout configurável
+                final HttpRequest requisicao = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
                         .header("Authorization", "Bearer " + token)
                         .header("Accept", "application/json")
                         .GET()
-                        .timeout(Duration.ofSeconds(30))
+                        .timeout(this.timeoutRequisicao)
                         .build();
 
-                // Executa a requisição usando o novo utilitário com throttling e backoff
-                // exponencial
-                HttpResponse<String> resposta = br.com.extrator.util.UtilitarioHttpRetry.executarComRetry(
-                        this.clienteHttp,
-                        fornecedorRequisicao,
-                        tipoEntidade);
+                // Executa a requisição usando o gerenciador
+                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                        this.clienteHttp, requisicao, tipoEntidade);
 
-                long duracaoMs = System.currentTimeMillis() - inicioMs;
+                final long duracaoMs = System.currentTimeMillis() - inicioMs;
 
-                // A verificação de erro para resposta nula foi corrigida para não usar a
-                // variável inexistente.
+                // Verifica se a resposta da requisição é válida
                 if (resposta == null) {
                     logger.error(
                             "Erro irrecuperável: a resposta da requisição é nula para {} após todas as tentativas.",
@@ -191,55 +226,35 @@ public class ClienteApiRest {
                     throw new RuntimeException("Falha na requisição: resposta é null após todas as tentativas.");
                 }
 
-                // Verifica se a resposta foi bem-sucedida (para outros erros que não são 429)
+                // Verifica se a resposta foi bem-sucedida
                 if (resposta.statusCode() != 200) {
-                    String mensagemErro = criarMensagemErroDetalhada(resposta.statusCode(), tipoEntidade, endpoint);
+                    final String mensagemErro = criarMensagemErroDetalhada(resposta.statusCode(), tipoEntidade,
+                            endpoint);
                     logger.error("Erro ao buscar {}. Código de status: {}, ({} ms) Body: {}", tipoEntidade,
                             resposta.statusCode(), duracaoMs, resposta.body());
                     throw new RuntimeException(mensagemErro);
                 }
 
                 // Processa a resposta JSON
-                JsonNode raizJson = mapeadorJson.readTree(resposta.body());
-                JsonNode dadosJson = raizJson.get("data");
-                JsonNode paginacaoJson = raizJson.get("paging");
+                final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
+                final JsonNode dadosJson = raizJson.get("data");
+                final JsonNode paginacaoJson = raizJson.get("paging");
 
                 // Extrai o próximo ID para paginação
                 proximoId = paginacaoJson != null && paginacaoJson.has("next_id")
                         ? paginacaoJson.get("next_id").asText()
                         : null;
 
-                // Converte os dados JSON em objetos EntidadeDinamica
+                // Converte os dados JSON em objetos tipados
                 int entidadesNestaPagina = 0; // Nova variável para contar
                 if (dadosJson != null && dadosJson.isArray()) {
                     entidadesNestaPagina = dadosJson.size(); // Conta quantos itens vieram
-                    for (JsonNode entidadeJson : dadosJson) {
+                    for (final JsonNode entidadeJson : dadosJson) {
                         try {
-                            // Cria uma nova entidade dinâmica
-                            EntidadeDinamica entidade = new EntidadeDinamica(tipoEntidade);
-
-                            // Processa cada campo do JSON
-                            entidadeJson.properties().forEach(campo -> {
-                                String nomeCampo = campo.getKey();
-                                JsonNode valorCampo = campo.getValue();
-
-                                // Converte o valor do campo para o tipo apropriado
-                                Object valor;
-                                if (valorCampo.isTextual()) {
-                                    valor = valorCampo.asText();
-                                } else if (valorCampo.isNumber()) {
-                                    valor = valorCampo.isInt() ? valorCampo.asInt() : valorCampo.asDouble();
-                                } else if (valorCampo.isBoolean()) {
-                                    valor = valorCampo.asBoolean();
-                                } else {
-                                    valor = valorCampo.toString();
-                                }
-
-                                entidade.adicionarCampo(nomeCampo, valor);
-                            });
-
+                            // Deserializa diretamente para a classe tipada
+                            final T entidade = mapeadorJson.treeToValue(entidadeJson, classeEntidade);
                             entidades.add(entidade);
-                        } catch (Exception e) {
+                        } catch (final JsonProcessingException | IllegalArgumentException e) {
                             logger.warn("Erro ao processar {}: {}", tipoEntidade, e.getMessage());
                         }
                     }
@@ -252,58 +267,15 @@ public class ClienteApiRest {
                     proximoId = null; // Força a paragem do loop se não vierem mais dados
                 }
 
-                // Se estiver em modo de teste, força a parada após a primeira página
-                if (modoTeste) {
-                    logger.info("Modo de teste ativo: parando após primeira página");
-                    proximoId = null;
-                }
-
             } while (proximoId != null);
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.error("Execução interrompida durante a comunicação com a API", e);
-            throw new RuntimeException("Execução interrompida durante comunicação com a API ESL Cloud", e);
-        } catch (IOException e) {
-            logger.error("Erro de I/O durante a comunicação com a API", e);
-            throw new RuntimeException("Erro de I/O ao comunicar com a API ESL Cloud", e);
+        } catch (final IOException e) {
+            logger.error("Erro de I/O ou JSON durante a comunicação com a API", e);
+            throw new RuntimeException("Erro ao comunicar com a API ESL Cloud", e);
         }
 
         logger.info("Busca de {} concluída. Total de entidades encontradas: {}", endpoint, entidades.size());
         return entidades;
-    }
-
-    /**
-     * Busca faturas das últimas 24 horas
-     * 
-     * @return Lista de entidades encontradas
-     */
-    public List<EntidadeDinamica> buscarFaturasUltimas24Horas() {
-        LocalDateTime dataInicio = LocalDateTime.now().minusHours(24);
-        String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        return buscarFaturasAReceber(dataInicioFormatada, false);
-    }
-
-    /**
-     * Busca faturas a PAGAR das últimas 24 horas
-     * 
-     * @return Lista de entidades encontradas
-     */
-    public List<EntidadeDinamica> buscarFaturasAPagarUltimas24Horas() {
-        LocalDateTime dataInicio = LocalDateTime.now().minusHours(24);
-        String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        return buscarFaturasAPagar(dataInicioFormatada, false);
-    }
-
-    /**
-     * Busca ocorrências das últimas 24 horas
-     * 
-     * @return Lista de entidades encontradas
-     */
-    public List<EntidadeDinamica> buscarOcorrenciasUltimas24Horas() {
-        LocalDateTime dataInicio = LocalDateTime.now().minusHours(24);
-        String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        return buscarOcorrencias(dataInicioFormatada, false);
     }
 
     /**
@@ -315,7 +287,7 @@ public class ClienteApiRest {
         logger.info("Validando acesso à API ESL Cloud...");
 
         // Lista de endpoints para testar (do mais específico para o mais geral)
-        String[] endpointsParaTestar = {
+        final String[] endpointsParaTestar = {
                 "/api/v1/invoices?limit=1",
                 "/api/invoices?limit=1",
                 "/invoices?limit=1",
@@ -326,12 +298,12 @@ public class ClienteApiRest {
                 "/"
         };
 
-        for (String endpoint : endpointsParaTestar) {
+        for (final String endpoint : endpointsParaTestar) {
             try {
-                String url = urlBase + endpoint;
+                final String url = urlBase + endpoint;
                 logger.info("Testando endpoint: {}", url);
 
-                HttpRequest requisicao = HttpRequest.newBuilder()
+                final HttpRequest requisicao = HttpRequest.newBuilder()
                         .uri(URI.create(url))
                         .header("Authorization", "Bearer " + token)
                         .header("Accept", "application/json")
@@ -339,7 +311,8 @@ public class ClienteApiRest {
                         .GET()
                         .build();
 
-                HttpResponse<String> resposta = clienteHttp.send(requisicao, HttpResponse.BodyHandlers.ofString());
+                final HttpResponse<String> resposta = clienteHttp.send(requisicao,
+                        HttpResponse.BodyHandlers.ofString());
 
                 logger.info("Resposta do endpoint {}: Status={}, Body_Length={}",
                         endpoint, resposta.statusCode(), resposta.body().length());
@@ -391,7 +364,7 @@ public class ClienteApiRest {
      * @param endpoint     Endpoint que falhou
      * @return Mensagem de erro detalhada
      */
-    private String criarMensagemErroDetalhada(int statusCode, String tipoEntidade, String endpoint) {
+    private String criarMensagemErroDetalhada(final int statusCode, final String tipoEntidade, final String endpoint) {
         return switch (statusCode) {
             case 401 -> String.format("""
                     ❌ ERRO DE AUTENTICAÇÃO (HTTP 401)

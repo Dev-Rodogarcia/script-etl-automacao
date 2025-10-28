@@ -55,15 +55,12 @@ exports/
 data/
 *.bak
 *.backup
-*.dump
-*.sql
+*.dump# Arquivos de banco de dados
 *.db
 *.sqlite
 *.sqlite3
 
-# Arquivos de métricas e monitoramento específicos do projeto
-metricas/*.json
-metricas/metricas-*.json
+# Arquivos de relatórios e monitoramento específicos do projeto
 relatorios-execucao/
 historico-execucoes/
 
@@ -77,9 +74,7 @@ cache/
 *~.nib
 local.properties
 
-# Arquivos específicos do sistema de métricas
-metricas_do_dia.json
-metricas-*.json
+# Arquivos específicos do sistema
 
 # ========================================
 # ARQUIVOS COMPILADOS E BUILD
@@ -331,10 +326,6 @@ apidoc/
 application-local.properties
 application-dev.properties
 application-prod.properties
-
-# Arquivos de métricas específicas do sistema
-sistema-metricas.json
-metricas-sistema-*.json
 
 # Pastas específicas
 docs/arquivos-secretos-gitignore/

@@ -1,23 +1,28 @@
 package br.com.extrator.api;
 
-import br.com.extrator.modelo.EntidadeDinamica;
-import br.com.extrator.util.CarregadorConfig;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
+import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
+import br.com.extrator.util.CarregadorConfig;
+import br.com.extrator.util.GerenciadorRequisicaoHttp;
 
 /**
  * Cliente especializado para comunicação com a API GraphQL do ESL Cloud
@@ -30,6 +35,56 @@ public class ClienteApiGraphQL {
     private final String token;
     private final HttpClient clienteHttp;
     private final ObjectMapper mapeadorJson;
+    private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
+    private final Duration timeoutRequisicao;
+
+    /**
+     * Executa uma query GraphQL com paginação automática
+     * 
+     * @param query Query GraphQL a ser executada
+     * @param nomeEntidade Nome da entidade na resposta GraphQL
+     * @param variaveis Variáveis da query GraphQL
+     * @param tipoClasse Classe para desserialização tipada
+     * @return Lista completa de entidades de todas as páginas
+     */
+    private <T> List<T> executarQueryPaginada(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
+        List<T> todasEntidades = new ArrayList<>();
+        String cursor = null;
+        boolean hasNextPage = true;
+        int paginaAtual = 1;
+
+        while (hasNextPage) {
+            logger.debug("Executando página {} da query GraphQL para {}", paginaAtual, nomeEntidade);
+            
+            // Adicionar cursor às variáveis se não for a primeira página
+            Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
+            if (cursor != null) {
+                variaveisComCursor.put("after", cursor);
+            }
+
+            // Executar a query para esta página
+            PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
+            
+            // Adicionar entidades desta página ao resultado total
+            todasEntidades.addAll(resposta.getEntidades());
+            
+            // Atualizar informações de paginação
+            hasNextPage = resposta.getHasNextPage();
+            cursor = resposta.getEndCursor();
+            
+            logger.debug("Página {} processada: {} entidades encontradas. Próxima página: {}", 
+                        paginaAtual, resposta.getEntidades().size(), hasNextPage);
+            
+            paginaAtual++;
+            
+            // Não é mais necessário pausar entre requisições - o GerenciadorRequisicaoHttp já controla o throttling
+        }
+
+        logger.info("Paginação concluída para {}. Total de páginas: {}, Total de entidades: {}", 
+                   nomeEntidade, paginaAtual - 1, todasEntidades.size());
+        
+        return todasEntidades;
+    }
 
     /**
      * Construtor da classe ClienteApiGraphQL
@@ -39,435 +94,252 @@ public class ClienteApiGraphQL {
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.endpointGraphQL = CarregadorConfig.obterEndpointGraphQL();
         this.token = CarregadorConfig.obterTokenApiGraphQL();
+        this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
         this.clienteHttp = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.mapeadorJson = new ObjectMapper();
+        this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
     }
 
     /**
-     * Busca coletas da API GraphQL
-     * AVISO: A execução desta query depende da liberação de permissão pelo
-     * administrador da API, mas o código está pronto.
+     * Busca coletas via GraphQL para uma data específica
      * 
-     * @param dataInicio Data de início para filtrar as coletas
-     * @param modoTeste  Se true, usa query simplificada para teste
+     * @param dataReferencia Data de referência para buscar as coletas (LocalDate)
      * @return Lista de coletas encontradas
      */
-    public List<EntidadeDinamica> buscarColetas(String dataInicio, boolean modoTeste) {
-        logger.info("Buscando coletas da API GraphQL...");
-
-        try {
-            // Formatação da data para o campo requestDate (API de Coletas espera data única)
-            // CORREÇÃO: Sempre usar a data passada como parâmetro, independente do modo teste
-            LocalDateTime dataReferencia = LocalDateTime.parse(dataInicio);
-            
-            // Formata a data como um valor único YYYY-MM-DD para a API de Coletas
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String dataUnica = dataReferencia.format(formatter);
-
-            // Query GraphQL correta para coletas (baseada na descoberta da estrutura real
-            // da API)
-            String query = """
-                    query BuscarColetas($params: PickInput!, $after: String) {
-                        pick(params: $params, after: $after, first: 100) {
+    public List<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
+        String query = """
+                query BuscarColetas($params: PickInput!, $after: String) {
+                    pick(params: $params, after: $after, first: 100) {
                         edges {
                             cursor
                             node {
-                            id
-                            agentId
-                            cancellationReason
-                            cancellationUserId
-                            cargoClassificationId
-                            comments
-                            costCenterId
-                            destroyReason
-                            destroyUserId
-                            invoicesCubedWeight
-                            invoicesValue
-                            invoicesVolumes
-                            invoicesWeight
-                            lunchBreakEndHour
-                            lunchBreakStartHour
-                            notificationEmail
-                            notificationPhone
-                            pickTypeId
-                            pickupLocationId
-                            requestDate
-                            requestHour
-                            requester
-                            sequenceCode
-                            serviceDate
-                            serviceEndHour
-                            serviceStartHour
-                            status
-                            statusUpdatedAt
-                            taxedWeight
-                            vehicleTypeId
+                                id
+                                accountingCreditId
+                                accountingCreditInstallmentId
+                                adValoremSubtotal
+                                additionalsSubtotal
+                                admFeeSubtotal
+                                calculationType
+                                collectSubtotal
+                                comments
+                                corporationId
+                                costCenterId
+                                createdAt
+                                cubagesCubedWeight
+                                customerPriceTableId
+                                deliveryDeadlineInDays
+                                deliveryPredictionDate
+                                deliveryPredictionHour
+                                deliveryRegionId
+                                deliverySubtotal
+                                destinationCityId
+                                dispatchSubtotal
+                                draftEmissionAt
+                                emergencySubtotal
+                                emissionType
+                                finishedAt
+                                freightClassificationId
+                                freightCubagesCount
+                                freightInvoicesCount
+                                freightWeightSubtotal
+                                globalized
+                                globalizedType
+                                grisSubtotal
+                                insuranceAccountableType
+                                insuranceEnabled
+                                insuranceId
+                                insuredValue
+                                invoicesTotalVolumes
+                                invoicesValue
+                                invoicesWeight
+                                itrSubtotal
+                                km
+                                modal
+                                modalCte
+                                nfseNumber
+                                nfseSeries
+                                otherFees
+                                paymentAccountableType
+                                paymentType
+                                previousDocumentType
+                                priceTableAccountableType
+                                productsValue
+                                realWeight
+                                redispatchSubtotal
+                                referenceNumber
+                                secCatSubtotal
+                                serviceAt
+                                serviceDate
+                                serviceType
+                                status
+                                subtotal
+                                suframaSubtotal
+                                taxedWeight
+                                tdeSubtotal
+                                tollSubtotal
+                                total
+                                totalCubicVolume
+                                trtSubtotal
+                                type
                             }
                         }
                         pageInfo {
                             hasNextPage
                             endCursor
                         }
-                        }
-                    }""";
-            Map<String, Object> variaveis = Map.of("params", Map.of("requestDate", dataUnica));
+                    }
+                }""";
 
-            logger.info("Executando query GraphQL para coletas com requestDate = {}", dataUnica);
-            List<EntidadeDinamica> resultado = executarQueryGraphQL(query, "pick", variaveis);
+        // Construir variáveis usando exclusivamente requestDate
+        String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
+        Map<String, Object> variaveis = Map.of(
+            "params", Map.of("requestDate", dataFormatada)
+        );
 
-            logger.info("Query GraphQL concluída para coletas. Total encontrado: {}", resultado.size());
-            return resultado;
+        logger.debug("Executando query GraphQL para coletas - URL: {}{}, Variáveis: {}", 
+                    urlBase, endpointGraphQL, variaveis);
 
-        } catch (Exception e) {
-            logger.error("Erro ao buscar coletas: {}", e.getMessage(), e);
-            return new ArrayList<>();
-        }
+        return executarQueryPaginada(query, "pick", variaveis, ColetaNodeDTO.class);
     }
 
+
+
+
+
     /**
-     * Busca coletas das últimas 24 horas
+     * Busca fretes via GraphQL para uma data específica
      * 
-     * @return Lista de coletas das últimas 24 horas
-     */
-    public List<EntidadeDinamica> buscarColetasUltimas24Horas() {
-        LocalDateTime agora = LocalDateTime.now();
-        String dataInicio = agora.minusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        return buscarColetas(dataInicio, false);
-    }
-
-    /**
-     * Realiza introspecção GraphQL para descobrir os campos disponíveis em um tipo
-     * específico
-     * 
-     * @param nomeDoTipo Nome do tipo GraphQL a ser inspecionado (ex:
-     *                   "FreightInput")
-     * @return Lista de campos disponíveis no tipo
-     */
-    public List<String> inspecionarTipoGraphQL(String nomeDoTipo) {
-        logger.info("Realizando introspecção detalhada do tipo GraphQL: {}", nomeDoTipo);
-
-        try {
-            // Query de introspecção mais detalhada para descobrir campos de um tipo
-            // específico
-            String queryIntrospeccao = "query IntrospectType($typeName: String!) { " +
-                    "__type(name: $typeName) { " +
-                    "name " +
-                    "kind " +
-                    "description " +
-                    "inputFields { " +
-                    "name " +
-                    "description " +
-                    "type { " +
-                    "name " +
-                    "kind " +
-                    "ofType { " +
-                    "name " +
-                    "kind " +
-                    "} " +
-                    "} " +
-                    "defaultValue " +
-                    "} " +
-                    "fields { " +
-                    "name " +
-                    "description " +
-                    "type { " +
-                    "name " +
-                    "kind " +
-                    "ofType { " +
-                    "name " +
-                    "kind " +
-                    "} " +
-                    "} " +
-                    "} " +
-                    "} " +
-                    "}";
-
-            // Construir variáveis para a query de introspecção
-            Map<String, Object> variaveis = Map.of("typeName", nomeDoTipo);
-
-            // Executar query de introspecção
-            String urlCompleta = urlBase + endpointGraphQL;
-
-            ObjectNode requestBody = mapeadorJson.createObjectNode();
-            requestBody.put("query", queryIntrospeccao);
-            requestBody.set("variables", mapeadorJson.valueToTree(variaveis));
-
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlCompleta))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
-                    .build();
-
-            HttpResponse<String> resposta = clienteHttp.send(requisicao, HttpResponse.BodyHandlers.ofString());
-
-            if (resposta.statusCode() != 200) {
-                logger.error("Erro HTTP na introspecção: {} - {}", resposta.statusCode(), resposta.body());
-                return new ArrayList<>();
-            }
-
-            JsonNode jsonResposta = mapeadorJson.readTree(resposta.body());
-
-            // Verificar se há erros GraphQL
-            if (jsonResposta.has("errors")) {
-                logger.error("Erros GraphQL na introspecção: {}", jsonResposta.get("errors"));
-                return new ArrayList<>();
-            }
-
-            // Extrair campos do tipo
-            List<String> campos = new ArrayList<>();
-            JsonNode tipoNode = jsonResposta.path("data").path("__type");
-
-            if (tipoNode.isNull() || tipoNode.isMissingNode()) {
-                logger.warn("Tipo '{}' não encontrado na API GraphQL", nomeDoTipo);
-                return campos;
-            }
-
-            String tipoKind = tipoNode.path("kind").asText();
-            String tipoDescricao = tipoNode.path("description").asText("");
-
-            logger.info("Tipo encontrado: {} (kind: {}) - {}", nomeDoTipo, tipoKind, tipoDescricao);
-
-            // Processar inputFields (para INPUT_OBJECT)
-            if (tipoNode.has("inputFields") && !tipoNode.get("inputFields").isNull()) {
-                JsonNode inputFields = tipoNode.get("inputFields");
-                logger.info("Processando {} inputFields para {}", inputFields.size(), nomeDoTipo);
-
-                for (JsonNode campo : inputFields) {
-                    String nomeCampo = campo.path("name").asText();
-                    String descricaoCampo = campo.path("description").asText("");
-                    String valorPadrao = campo.path("defaultValue").asText("");
-
-                    JsonNode tipoCampoNode = campo.path("type");
-                    String tipoCampo = obterTipoCompleto(tipoCampoNode);
-
-                    campos.add(nomeCampo);
-                    logger.info("  ✓ Campo: {} (tipo: {}) - {} [padrão: {}]",
-                            nomeCampo, tipoCampo, descricaoCampo, valorPadrao);
-                }
-            }
-
-            // Processar fields (para OBJECT)
-            if (tipoNode.has("fields") && !tipoNode.get("fields").isNull()) {
-                JsonNode fields = tipoNode.get("fields");
-                logger.info("Processando {} fields para {}", fields.size(), nomeDoTipo);
-
-                for (JsonNode campo : fields) {
-                    String nomeCampo = campo.path("name").asText();
-                    String descricaoCampo = campo.path("description").asText("");
-
-                    JsonNode tipoCampoNode = campo.path("type");
-                    String tipoCampo = obterTipoCompleto(tipoCampoNode);
-
-                    campos.add(nomeCampo);
-                    logger.info("  ✓ Campo: {} (tipo: {}) - {}", nomeCampo, tipoCampo, descricaoCampo);
-                }
-            }
-
-            logger.info("Introspecção concluída. Encontrados {} campos no tipo {} (kind: {})",
-                    campos.size(), nomeDoTipo, tipoKind);
-            return campos;
-
-        } catch (Exception e) {
-            logger.error("Erro na introspecção do tipo {}: {}", nomeDoTipo, e.getMessage(), e);
-            return new ArrayList<>();
-        }
-    }
-
-    /**
-     * Extrai o tipo completo de um nó de tipo GraphQL, incluindo tipos aninhados
-     */
-    private String obterTipoCompleto(JsonNode tipoNode) {
-        if (tipoNode.isNull() || tipoNode.isMissingNode()) {
-            return "Unknown";
-        }
-
-        String nome = tipoNode.path("name").asText();
-        String kind = tipoNode.path("kind").asText();
-
-        if (!nome.isEmpty()) {
-            return nome + " (" + kind + ")";
-        }
-
-        // Se não tem nome, pode ser um tipo wrapper (NON_NULL, LIST)
-        JsonNode ofType = tipoNode.path("ofType");
-        if (!ofType.isNull() && !ofType.isMissingNode()) {
-            String tipoInterno = obterTipoCompleto(ofType);
-            if ("NON_NULL".equals(kind)) {
-                return tipoInterno + "!";
-            } else if ("LIST".equals(kind)) {
-                return "[" + tipoInterno + "]";
-            }
-            return tipoInterno + " (" + kind + ")";
-        }
-
-        return kind;
-    }
-
-    /**
-     * Busca fretes da API GraphQL
-     * 
-     * @param dataInicio Data de início para filtrar os fretes
-     * @param modoTeste  Se está em modo de teste
+     * @param dataReferencia Data de referência para buscar os fretes (LocalDate)
      * @return Lista de fretes encontradas
      */
-    public List<EntidadeDinamica> buscarFretes(String dataInicio, boolean modoTeste) {
-        logger.info("Iniciando busca de fretes via GraphQL a partir de: {} (Modo Teste: {})", dataInicio, modoTeste);
-
-        
-
-        try {
-            // Código corrigido que trata dataInicio como data final e calcula um dia anterior como data inicial
-            LocalDateTime dataReferencia = LocalDateTime.parse(dataInicio);
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-            // Calcula a data inicial (um dia antes) e usa dataInicio como data final
-            LocalDateTime dataInicialCalculada = dataReferencia.minusDays(1);
-            String dataInicialFormatada = dataInicialCalculada.format(formatter);
-            String dataFinalFormatada = dataReferencia.format(formatter);
-            String intervaloDatas = dataInicialFormatada + " - " + dataFinalFormatada;
-
-            // Query GraphQL correta para fretes (baseada na análise dos logs - única que
-            // funciona)
-            String query = """
-                    query BuscarFretes($params: FreightInput!, $after: String) {
-                        freight(params: $params, after: $after, first: 100) {
+    public List<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
+        // Query GraphQL para fretes
+        String query = """
+                query BuscarFretes($params: FreightInput!, $after: String) {
+                    freight(params: $params, after: $after, first: 100) {
                         edges {
                             cursor
                             node {
-                            id
-                            accountingCreditId
-                            accountingCreditInstallmentId
-                            adValoremSubtotal
-                            additionalsSubtotal
-                            admFeeSubtotal
-                            calculationType
-                            collectSubtotal
-                            comments
-                            corporationId
-                            costCenterId
-                            createdAt
-                            cubagesCubedWeight
-                            customerPriceTableId
-                            deliveryDeadlineInDays
-                            deliveryPredictionDate
-                            deliveryPredictionHour
-                            deliveryRegionId
-                            deliverySubtotal
-                            destinationCityId
-                            dispatchSubtotal
-                            draftEmissionAt
-                            emergencySubtotal
-                            emissionType
-                            finishedAt
-                            freightClassificationId
-                            freightCubagesCount
-                            freightInvoicesCount
-                            freightWeightSubtotal
-                            globalized
-                            globalizedType
-                            grisSubtotal
-                            insuranceAccountableType
-                            insuranceEnabled
-                            insuranceId
-                            insuredValue
-                            invoicesTotalVolumes
-                            invoicesValue
-                            invoicesWeight
-                            itrSubtotal
-                            km
-                            modal
-                            modalCte
-                            nfseNumber
-                            nfseSeries
-                            otherFees
-                            paymentAccountableType
-                            paymentType
-                            previousDocumentType
-                            priceTableAccountableType
-                            productsValue
-                            realWeight
-                            redispatchSubtotal
-                            referenceNumber
-                            secCatSubtotal
-                            serviceAt
-                            serviceDate
-                            serviceType
-                            status
-                            subtotal
-                            suframaSubtotal
-                            taxedWeight
-                            tdeSubtotal
-                            tollSubtotal
-                            total
-                            totalCubicVolume
-                            trtSubtotal
-                            type
+                                id
+                                accountingCreditId
+                                accountingCreditInstallmentId
+                                adValoremSubtotal
+                                additionalsSubtotal
+                                admFeeSubtotal
+                                calculationType
+                                collectSubtotal
+                                comments
+                                corporationId
+                                costCenterId
+                                createdAt
+                                cubagesCubedWeight
+                                customerPriceTableId
+                                deliveryDeadlineInDays
+                                deliveryPredictionDate
+                                deliveryPredictionHour
+                                deliveryRegionId
+                                deliverySubtotal
+                                destinationCityId
+                                dispatchSubtotal
+                                draftEmissionAt
+                                emergencySubtotal
+                                emissionType
+                                finishedAt
+                                freightClassificationId
+                                freightCubagesCount
+                                freightInvoicesCount
+                                freightWeightSubtotal
+                                globalized
+                                globalizedType
+                                grisSubtotal
+                                insuranceAccountableType
+                                insuranceEnabled
+                                insuranceId
+                                insuredValue
+                                invoicesTotalVolumes
+                                invoicesValue
+                                invoicesWeight
+                                itrSubtotal
+                                km
+                                modal
+                                modalCte
+                                nfseNumber
+                                nfseSeries
+                                otherFees
+                                paymentAccountableType
+                                paymentType
+                                previousDocumentType
+                                priceTableAccountableType
+                                productsValue
+                                realWeight
+                                redispatchSubtotal
+                                referenceNumber
+                                secCatSubtotal
+                                serviceAt
+                                serviceDate
+                                serviceType
+                                status
+                                subtotal
+                                suframaSubtotal
+                                taxedWeight
+                                tdeSubtotal
+                                tollSubtotal
+                                total
+                                totalCubicVolume
+                                trtSubtotal
+                                type
                             }
                         }
                         pageInfo {
                             hasNextPage
                             endCursor
                         }
-                        }
-                    }""";
-            
-            // Converte o corporationId de String para Integer
-            String corporationIdStr = CarregadorConfig.obterCorporationId();
-            Integer corporationIdInt = Integer.parseInt(corporationIdStr);
+                    }
+                }""";
 
-            Map<String, Object> variaveis = Map.of("params", Map.of(
-                "serviceAt", intervaloDatas,       // Envia o intervalo de texto
-                "corporationId", corporationIdInt // Envia o ID como número
-            ));
+        // Construir variáveis usando serviceAt e corporationId
+        String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
+        int corporationIdInt = Integer.parseInt(CarregadorConfig.obterCorporationId());
+        
+        Map<String, Object> variaveis = Map.of(
+            "params", Map.of(
+                "serviceAt", dataFormatada,
+                "corporationId", corporationIdInt
+            )
+        );
 
-            logger.info("Executando query GraphQL para fretes com serviceAt = {} e corporationId = {}", intervaloDatas, corporationIdInt);
-            List<EntidadeDinamica> resultado = executarQueryGraphQL(query, "freight", variaveis);
+        logger.debug("Executando query GraphQL para fretes - URL: {}{}, Variáveis: {}", 
+                    urlBase, endpointGraphQL, variaveis);
 
-            logger.info("Query GraphQL concluída para fretes. Total encontrado: {}", resultado.size());
-            return resultado;
-
-        } catch (Exception e) {
-            logger.error("Erro ao buscar fretes: {}", e.getMessage(), e);
-            return new ArrayList<>();
-        }
+        return executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
     }
 
     /**
-     * Busca fretes das últimas 24 horas usando a API GraphQL.
-     * 
-     * @return Lista de fretes encontrados
-     */
-    public List<EntidadeDinamica> buscarFretesUltimas24Horas() {
-        LocalDateTime agora = LocalDateTime.now();
-        LocalDateTime ontemMesmaHora = agora.minusHours(24);
-        String dataInicio = ontemMesmaHora.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-
-        return buscarFretes(dataInicio, false);
-    }
-
-    /**
-     * Executa uma query GraphQL de forma genérica e robusta
+     * Executa uma query GraphQL de forma genérica e robusta com desserialização tipada
      * 
      * @param query        A query GraphQL a ser executada
      * @param nomeEntidade Nome da entidade para logs e tratamento de erros
-     * @return Lista de entidades encontradas
+     * @param variaveis    Variáveis da query GraphQL
+     * @param tipoClasse   Classe para desserialização tipada
+     * @return Resposta paginada contendo entidades tipadas e informações de paginação
      */
-    private List<EntidadeDinamica> executarQueryGraphQL(String query, String nomeEntidade,
-            Map<String, Object> variaveis) {
-        logger.info("Executando query GraphQL para {}", nomeEntidade);
-        List<EntidadeDinamica> entidades = new ArrayList<>();
+    private <T> PaginatedGraphQLResponse<T> executarQueryGraphQLTipado(String query, String nomeEntidade,
+            Map<String, Object> variaveis, Class<T> tipoClasse) {
+        logger.debug("Executando query GraphQL tipada para {} - URL: {}{}, Variáveis: {}", 
+                    nomeEntidade, urlBase, endpointGraphQL, variaveis);
+        List<T> entidades = new ArrayList<>();
+        boolean hasNextPage = false;
+        String endCursor = null;
 
         // Validação básica de configuração
         if (urlBase == null || urlBase.isBlank() || token == null || token.isBlank()) {
             logger.error("Configurações inválidas para chamada GraphQL (urlBase/token)");
-            return entidades;
+            return new PaginatedGraphQLResponse<>(entidades, false, null);
         }
 
         try {
-
             // Construir o corpo da requisição GraphQL usando ObjectMapper
             ObjectNode corpoJson = mapeadorJson.createObjectNode();
             corpoJson.put("query", query);
@@ -476,72 +348,42 @@ public class ClienteApiGraphQL {
             }
             final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
 
-            logger.info("Corpo JSON exato da requisição: {}", corpoRequisicao);
-
-            
-            // Cria a requisição HTTP como um Supplier para ser passada ao utilitário de
-            // retry
-            final String finalUrl = urlBase + endpointGraphQL;
-            java.util.function.Supplier<HttpRequest> fornecedorRequisicao = () -> HttpRequest.newBuilder()
-                    .uri(URI.create(finalUrl))
-                    .header("Authorization", "Bearer " + token)
+            // Construir a requisição HTTP
+            HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(urlBase + endpointGraphQL))
                     .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
                     .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(this.timeoutRequisicao)
                     .build();
 
-            // Executa a requisição usando o novo utilitário com throttling e backoff
-            // exponencial
-            HttpResponse<String> resposta = br.com.extrator.util.UtilitarioHttpRetry.executarComRetry(
-                    this.clienteHttp,
-                    fornecedorRequisicao,
-                    nomeEntidade // Nome da operação para os logs
-            );
+            // Executar a requisição usando o gerenciador central
+            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-" + nomeEntidade);
 
-            // Se a resposta for nula ou o status não for 200, retorna lista vazia.
-            // O UtilitarioHttpRetry já cuidou de logar os erros.
-            if (resposta == null || resposta.statusCode() != 200) {
-                if (resposta != null) { // Log adicional se o erro não for 429
-                    logger.error("Erro HTTP {} ao buscar {}: {}", resposta.statusCode(), nomeEntidade, resposta.body());
-                }
-                return entidades;
-            }
-
-            // Processar a resposta JSON
+            // Parsear a resposta JSON
             JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
 
             // Verificar se há erros na resposta GraphQL
             if (respostaJson.has("errors")) {
                 JsonNode erros = respostaJson.get("errors");
-                logger.error("Erros GraphQL ao buscar {}: {}", nomeEntidade, erros.toString());
-                return entidades; // Retorna lista vazia em caso de erro
+                logger.error("Erros na query GraphQL para {}: {}", nomeEntidade, erros.toString());
+                return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
 
-            // Verificar se há dados na resposta
+            // Extrair os dados da resposta
             if (!respostaJson.has("data")) {
                 logger.warn("Resposta GraphQL sem campo 'data' para {}", nomeEntidade);
-                return entidades;
+                return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
 
             JsonNode dados = respostaJson.get("data");
-
-            // Tentar encontrar os dados da entidade (pode ter nomes diferentes)
-            JsonNode dadosEntidade = null;
-            String[] possiveisNomes = { nomeEntidade, nomeEntidade + "s",
-                    nomeEntidade.toLowerCase(), nomeEntidade.toLowerCase() + "s" };
-
-            for (String nome : possiveisNomes) {
-                if (dados.has(nome)) {
-                    dadosEntidade = dados.get(nome);
-                    break;
-                }
-            }
-
-            if (dadosEntidade == null) {
+            if (!dados.has(nomeEntidade)) {
                 logger.warn("Campo '{}' não encontrado na resposta GraphQL. Campos disponíveis: {}",
                         nomeEntidade, dados.fieldNames());
-                return entidades;
+                return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
+
+            JsonNode dadosEntidade = dados.get(nomeEntidade);
 
             // Verificar se a resposta segue o padrão paginado com edges/node
             if (dadosEntidade.has("edges")) {
@@ -553,39 +395,27 @@ public class ClienteApiGraphQL {
                         if (edge.has("node")) {
                             JsonNode node = edge.get("node");
                             try {
-                                // Cria uma nova entidade dinâmica
-                                EntidadeDinamica entidade = new EntidadeDinamica();
-                                entidade.setTipoEntidade(nomeEntidade);
-
-                                // Processa cada campo do node
-                                node.properties().forEach(campo -> {
-                                    String nomeCampo = campo.getKey();
-                                    JsonNode valorCampo = campo.getValue();
-
-                                    // Converte o valor do campo para o tipo apropriado
-                                    Object valor;
-                                    if (valorCampo.isTextual()) {
-                                        valor = valorCampo.asText();
-                                    } else if (valorCampo.isNumber()) {
-                                        valor = valorCampo.isInt() ? valorCampo.asInt() : valorCampo.asDouble();
-                                    } else if (valorCampo.isBoolean()) {
-                                        valor = valorCampo.asBoolean();
-                                    } else if (valorCampo.isObject() || valorCampo.isArray()) {
-                                        // Para objetos aninhados, converte para string JSON
-                                        valor = valorCampo.toString();
-                                    } else {
-                                        valor = valorCampo.toString();
-                                    }
-
-                                    entidade.adicionarCampo(nomeCampo, valor);
-                                });
-
+                                // Deserializa diretamente para a classe tipada usando Jackson
+                                T entidade = mapeadorJson.treeToValue(node, tipoClasse);
                                 entidades.add(entidade);
-                            } catch (Exception e) {
-                                logger.warn("Erro ao processar node de {}: {}", nomeEntidade, e.getMessage());
+                            } catch (JsonProcessingException | IllegalArgumentException e) {
+                                logger.warn("Erro ao deserializar node de {} para {}: {}", 
+                                          nomeEntidade, tipoClasse.getSimpleName(), e.getMessage());
                             }
                         }
                     }
+                }
+                
+                // Extrair informações de paginação do pageInfo
+                if (dadosEntidade.has("pageInfo")) {
+                    JsonNode pageInfo = dadosEntidade.get("pageInfo");
+                    if (pageInfo.has("hasNextPage")) {
+                        hasNextPage = pageInfo.get("hasNextPage").asBoolean();
+                    }
+                    if (pageInfo.has("endCursor") && !pageInfo.get("endCursor").isNull()) {
+                        endCursor = pageInfo.get("endCursor").asText();
+                    }
+                    logger.debug("Informações de paginação extraídas - hasNextPage: {}, endCursor: {}", hasNextPage, endCursor);
                 }
             } else {
                 // Processar resposta no formato antigo (array direto) para compatibilidade
@@ -594,51 +424,26 @@ public class ClienteApiGraphQL {
                 if (dadosEntidade.isArray()) {
                     for (JsonNode item : dadosEntidade) {
                         try {
-                            // Cria uma nova entidade dinâmica
-                            EntidadeDinamica entidade = new EntidadeDinamica();
-                            entidade.setTipoEntidade(nomeEntidade);
-
-                            // Processa cada campo do JSON
-                            item.properties().forEach(campo -> {
-                                String nomeCampo = campo.getKey();
-                                JsonNode valorCampo = campo.getValue();
-
-                                // Converte o valor do campo para o tipo apropriado
-                                Object valor;
-                                if (valorCampo.isTextual()) {
-                                    valor = valorCampo.asText();
-                                } else if (valorCampo.isNumber()) {
-                                    valor = valorCampo.isInt() ? valorCampo.asInt() : valorCampo.asDouble();
-                                } else if (valorCampo.isBoolean()) {
-                                    valor = valorCampo.asBoolean();
-                                } else if (valorCampo.isObject() || valorCampo.isArray()) {
-                                    // Para objetos aninhados (como cliente, endereco), converte para string JSON
-                                    valor = valorCampo.toString();
-                                } else {
-                                    valor = valorCampo.toString();
-                                }
-
-                                entidade.adicionarCampo(nomeCampo, valor);
-                            });
-
+                            // Deserializa diretamente para a classe tipada usando Jackson
+                            T entidade = mapeadorJson.treeToValue(item, tipoClasse);
                             entidades.add(entidade);
-                        } catch (Exception e) {
-                            logger.warn("Erro ao processar item de {}: {}", nomeEntidade, e.getMessage());
+                        } catch (JsonProcessingException | IllegalArgumentException e) {
+                            logger.warn("Erro ao deserializar item de {} para {}: {}", 
+                                      nomeEntidade, tipoClasse.getSimpleName(), e.getMessage());
                         }
                     }
                 }
             }
 
-            logger.info("Query GraphQL concluída para {}. Total encontrado: {}", nomeEntidade, entidades.size());
+            logger.debug("Query GraphQL tipada concluída para {}. Total encontrado: {}", nomeEntidade, entidades.size());
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.error("Thread interrompida durante execução da query GraphQL para {}", nomeEntidade);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
+            logger.error("Erro de processamento JSON durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
+        } catch (RuntimeException e) {
             logger.error("Erro durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
         }
 
-        return entidades;
+        return new PaginatedGraphQLResponse<>(entidades, hasNextPage, endCursor);
     }
 
     /**
@@ -684,9 +489,19 @@ public class ClienteApiGraphQL {
                 return false;
             }
 
-        } catch (Exception e) {
+        } catch (java.io.IOException | InterruptedException e) {
             logger.error("❌ Erro durante validação da API GraphQL: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    /**
+     * Formatar LocalDate para o formato esperado pela API GraphQL (YYYY-MM-DD).
+     * 
+     * @param data A data a ser formatada
+     * @return String no formato YYYY-MM-DD
+     */
+    private String formatarDataParaApiGraphQL(LocalDate data) {
+        return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 }

@@ -1,27 +1,21 @@
 # Extrator de Dados ESL Cloud
 
-Sistema de automação em Java que extrai dados de múltiplas APIs do ESL Cloud e carrega em SQL Server, com dashboard de monitoramento em tempo real.
+Script de automação em Java que extrai dados de múltiplas APIs do ESL Cloud e carrega em SQL Server, com coleta automática de métricas de execução.
 
 ## 🚀 Início Rápido
 
 ### Scripts de Automação (.bat)
-Para facilitar o uso, utilize os scripts prontos:
+Para facilitar o uso e executar cada API de forma independente:
 
 ```bash
-# 1. Iniciar dashboard completo (backend + frontend)
-01_iniciar_dashboard_completo.bat
+# Testar API REST (Faturas e Ocorrências)
+testar_api_rest.bat
 
-# 2. Extrair dados das últimas 24 horas
-02_extrair_dados_24h.bat
+# Testar API GraphQL (Coletas e Fretes)
+testar_api_graphql.bat
 
-# 3. Extrair dados de uma data específica
-03_extrair_dados_por_data.bat
-
-# 4. Testar APIs das últimas 24 horas
-04_testar_api_24h.bat
-
-# 5. Testar APIs de uma data específica
-05_testar_api_por_data.bat
+# Testar API Data Export (Manifestos, Cotações, Localização da Carga)
+testar_api_dataexport.bat
 ```
 
 ### Execução Manual
@@ -31,37 +25,24 @@ Para facilitar o uso, utilize os scripts prontos:
 mvn clean package
 ```
 
-#### 2. Executar o Dashboard (Servidor Web)
+#### 2. Executar Script de Extração
 ```bash
-# Iniciar backend na porta 7070
-java -jar target/extrator-esl-cloud-1.0-SNAPSHOT-dashboard.jar
-
-# Em outro terminal, iniciar frontend na porta 3001
-cd dashboard-monitoramento
-npm install
-$env:PORT=3001; npm start
-```
-
-**Acesse:** http://localhost:3001
-
-#### 3. Executar Script de Extração
-```bash
-# Extrair dados das últimas 24 horas
-java -jar target/extrator-script.jar
-
-# Extrair dados de uma data específica
-java -jar target/extrator-script.jar "2024-01-01T00:00:00"
+# Executar uma API específica (janela padrão: últimas 24 horas)
+java -jar target/extrator-script.jar --testar-api rest
+java -jar target/extrator-script.jar --testar-api graphql
+java -jar target/extrator-script.jar --testar-api dataexport
 ```
 
 ## 📋 Funcionalidades
 
 - **3 APIs Integradas**: REST, GraphQL e Data Export
-- **Dashboard em Tempo Real**: Monitoramento visual das extrações
-- **Scripts de Automação**: 5 scripts .bat para facilitar operações
-- **Dois Executáveis**: Servidor web e script de linha de comando
+- **Script de Linha de Comando**: Execução única para extração de dados
+- **Scripts de Automação**: 4 scripts .bat para facilitar operações
 - **Prevenção de Duplicatas**: Sistema MERGE para evitar dados duplicados
 - **Logs Detalhados**: Acompanhamento completo das operações
-- **Métricas Automáticas**: Coleta de performance e estatísticas
+- **Métricas Automáticas**: Coleta de performance e estatísticas salvas em JSON
+- **Validação de APIs**: Teste de conectividade sem executar extração
+- **Introspecção GraphQL**: Descoberta de tipos e campos disponíveis
 
 ## ⚙️ Configuração
 
@@ -86,30 +67,38 @@ $env:DB_PASSWORD="sua_senha"
 - **API Data Export**: Manifestos e Localização da Carga
 
 ### Componentes
-- **Script de Extração** (`Main.java`): Execução única para extrair dados
-- **Servidor Dashboard** (`WebApplication.java`): API REST + interface web
-- **Frontend React**: Dashboard de monitoramento visual
+- **Runners Independentes** (`runners/*.java`): Execução desacoplada por API
+- **Script de Entrada** (`Main.java`): Apenas despacha por `--testar-api`
+- **Serviços de Logging** (`LoggingService.java`): Sistema de logs estruturados
+- **Clientes de API**: Integração com REST, GraphQL e Data Export
 
 ## 📚 Documentação
 
 - **[Guia de Instalação](docs/INSTRUCOES.md)**: Configuração detalhada
 - **[Arquitetura Técnica](docs/ARQUITETURA-TECNICA.md)**: Detalhes técnicos
-- **[Dashboard](dashboard-monitoramento/COMO-INICIAR.md)**: Instruções do frontend
+## 📊 Monitoramento e Logs
+
+- **Sistema de Auditoria**: Validação automática de integridade de dados
+- **Logs Estruturados**: Rastreamento detalhado de execuções
+- **Relatórios**: Geração automática de relatórios de execução
+
+### Documentação Técnica
+
+- **Auditoria**: `docs/auditoria/` - Validação de integridade de dados
+- **Configuração**: `docs/configuracao/` - Guias de setup e configuração
+- **Desenvolvimento**: `docs/desenvolvimento/` - Padrões e práticas de código
 
 ## 🔧 Requisitos Técnicos
 
 - **Java 17** (LTS)
-- **Spring Boot 3.5.6**
 - **Maven 3.6+**
-- **Node.js 16+** (para o dashboard)
 - **SQL Server** com JDBC Driver 13.2.0.jre11
 - **Acesso às APIs ESL Cloud**
 
 ### Dependências Principais
-- Spring Boot 3.5.6
-- Jackson (com correções de depreciação)
+- Jackson (processamento JSON)
 - SQL Server JDBC Driver 13.2.0.jre11
-- React 18+ (frontend)
+- SLF4J (logging)
 
 ## 📊 Métricas e Monitoramento
 
@@ -131,8 +120,9 @@ Para problemas ou dúvidas:
 
 ## 🔄 Atualizações Recentes
 
-- ✅ **Upgrade para Spring Boot 3.5.6** (compatível com Java 17)
-- ✅ **Correção de métodos depreciados** (Jackson JsonNode.fields → properties)
-- ✅ **Remoção de código não utilizado** (limpeza técnica)
+- ✅ **Refatoração para Script de Linha de Comando** (remoção do dashboard web)
+- ✅ **Remoção de dependências web** (Spring Boot Web, Actuator)
+- ✅ **Otimização do JAR final** (redução significativa do tamanho)
+- ✅ **Métricas aprimoradas** com salvamento automático em JSON
 - ✅ **Scripts de automação** (.bat) para facilitar operações
-- ✅ **Métricas aprimoradas** com coleta automática de performance
+- ✅ **Validação e introspecção** de APIs integradas

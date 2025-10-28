@@ -17,19 +17,15 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-        <!-- Spring Boot Starter Web -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
         <!-- Jackson para processamento de JSON -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- Jackson JSR310 para suporte a LocalDate, LocalDateTime e OffsetDateTime -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
         <!-- Driver JDBC para SQL Server -->
         <dependency>
@@ -60,6 +56,7 @@
         </dependency>
     </dependencies>
     <build>
+        <finalName>extrator</finalName>
         <plugins>
             <!-- Plugin do compilador com configurações de warnings -->
             <plugin>
@@ -75,31 +72,14 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-            <!-- Plugin do Spring Boot para gerar o JAR da aplicação web -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <mainClass>br.com.extrator.WebApplication</mainClass>
-                    <classifier>dashboard</classifier>
-                </configuration>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+            <!-- Plugin do Spring Boot removido - não é mais necessário para script de linha de comando -->
             <!-- Plugin para executar a aplicação -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.1</version>
-                <configuration>
-                    <mainClass>br.com.extrator.Main</mainClass>
-                </configuration>
             </plugin>
+
             <!-- Plugin para gerar JAR do script de extração -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -114,7 +94,6 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
-                    <finalName>extrator-script</finalName>
                     <appendAssemblyId>false</appendAssemblyId>
                 </configuration>
                 <executions>
