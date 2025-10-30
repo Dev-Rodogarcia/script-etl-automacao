@@ -13,7 +13,11 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +40,16 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
  */
 public class ClienteApiRest {
     private static final Logger logger = LoggerFactory.getLogger(ClienteApiRest.class);
+    
+    // Limites configuráveis para paginação
+    private final int maxPaginasPorExecucao;
+    private final int intervaloPaginasLog;
+    
+    // Circuit Breaker - Controle de falhas consecutivas
+    private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
+    private final Set<String> entidadesComCircuitAberto = new HashSet<>();
+    private static final int MAX_FALHAS_CONSECUTIVAS = 5;
+    
     private final String urlBase;
     private final String token;
     private final HttpClient clienteHttp;
@@ -51,6 +65,8 @@ public class ClienteApiRest {
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.token = CarregadorConfig.obterTokenApiRest();
         this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
+        this.maxPaginasPorExecucao = CarregadorConfig.obterLimitePaginasApiRest();
+        this.intervaloPaginasLog = 10; // Valor padrão para log de progresso a cada 10 páginas
         this.clienteHttp = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -66,9 +82,9 @@ public class ClienteApiRest {
      * @param dataReferencia Data de referência para busca (dia de hoje)
      * @return Lista de DTOs de faturas a receber
      */
-    public List<FaturaAReceberDTO> buscarFaturasAReceber(final LocalDate dataReferencia) {
+    public ResultadoExtracao<FaturaAReceberDTO> buscarFaturasAReceber(final LocalDate dataReferencia) {
         String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesTipadas("/api/accounting/credit/billings", dataInicioFormatada, "faturas_a_receber", FaturaAReceberDTO.class);
+        return buscarEntidadesComResultado("/api/accounting/credit/billings", dataInicioFormatada, "faturas_a_receber", FaturaAReceberDTO.class);
     }
 
     /**
@@ -78,9 +94,9 @@ public class ClienteApiRest {
      * @param dataReferencia Data de referência para busca (dia de hoje)
      * @return Lista de DTOs de faturas a pagar
      */
-    public List<FaturaAPagarDTO> buscarFaturasAPagar(final LocalDate dataReferencia) {
+    public ResultadoExtracao<FaturaAPagarDTO> buscarFaturasAPagar(final LocalDate dataReferencia) {
         String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesTipadas("/api/accounting/debit/billings", dataInicioFormatada, "faturas_a_pagar", FaturaAPagarDTO.class);
+        return buscarEntidadesComResultado("/api/accounting/debit/billings", dataInicioFormatada, "faturas_a_pagar", FaturaAPagarDTO.class);
     }
 
     /**
@@ -89,9 +105,9 @@ public class ClienteApiRest {
      * @param dataReferencia Data de referência para busca (dia de hoje)
      * @return Lista de DTOs de ocorrências
      */
-    public List<OcorrenciaDTO> buscarOcorrencias(final LocalDate dataReferencia) {
+    public ResultadoExtracao<OcorrenciaDTO> buscarOcorrencias(final LocalDate dataReferencia) {
         String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesTipadas("/api/invoice_occurrences", dataInicioFormatada, "ocorrencias", OcorrenciaDTO.class);
+        return buscarEntidadesComResultado("/api/invoice_occurrences", dataInicioFormatada, "ocorrencias", OcorrenciaDTO.class);
     }
 
     /**
@@ -147,31 +163,48 @@ public class ClienteApiRest {
     }
 
     /**
-     * Busca entidades tipadas de um endpoint específico da API REST ESL Cloud com paginação
+     * Busca entidades tipadas com resultado detalhado incluindo informações de paginação
      * 
-     * @param <T>          Tipo da entidade
-     * @param endpoint     Endpoint específico (ex: "/api/accounting/credit/billings")
-     * @param dataInicio   Data de início para busca (formato ISO: yyyy-MM-dd'T'HH:mm:ss)
-     * @param tipoEntidade Tipo da entidade para logs
-     * @param classeEntidade Classe da entidade para deserialização
-     * @return Lista de entidades tipadas
+     * @param <T> Tipo da entidade
+     * @param endpoint Endpoint da API
+     * @param dataInicio Data de início formatada
+     * @param tipoEntidade Nome do tipo de entidade para logs
+     * @param classeEntidade Classe da entidade
+     * @return ResultadoExtracao com dados e informações de paginação
      */
-    public <T> List<T> buscarEntidadesTipadas(final String endpoint, final String dataInicio,
+    public <T> ResultadoExtracao<T> buscarEntidadesComResultado(final String endpoint, final String dataInicio,
             final String tipoEntidade, final Class<T> classeEntidade) {
         logger.info("Iniciando busca de {} a partir de: {}", endpoint, dataInicio);
+        
+        // Circuit Breaker - Verifica se o circuit está aberto para esta entidade
+        if (entidadesComCircuitAberto.contains(tipoEntidade)) {
+            logger.warn("Circuit Breaker ABERTO para {}. Retornando resultado vazio.", tipoEntidade);
+            return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
+        }
+        
         final List<T> entidades = new ArrayList<>();
 
         String proximoId = null;
         boolean primeiraPagina = true;
+        int paginasProcessadas = 0;
+        boolean interrompidoPorLimite = false;
 
         // Validação básica de configuração
         if (urlBase == null || urlBase.isBlank() || token == null || token.isBlank()) {
             logger.error("Configurações inválidas para chamada REST (urlBase/token)");
-            return entidades;
+            return ResultadoExtracao.completo(entidades, paginasProcessadas, entidades.size());
         }
 
         try {
             do {
+                // Verifica limite de páginas
+                if (paginasProcessadas >= maxPaginasPorExecucao) {
+                    logger.warn("Limite de páginas atingido para {}: {} páginas processadas. Interrompendo extração.", 
+                               tipoEntidade, paginasProcessadas);
+                    interrompidoPorLimite = true;
+                    break;
+                }
+
                 // Constrói a URL com os parâmetros adequados
                 String url;
                 if (primeiraPagina) {
@@ -260,6 +293,14 @@ public class ClienteApiRest {
                     }
                 }
 
+                paginasProcessadas++;
+                
+                // Log de progresso a cada intervalo configurado
+                if (paginasProcessadas % intervaloPaginasLog == 0) {
+                    logger.info("Progresso {}: {} páginas processadas, {} entidades coletadas", 
+                               tipoEntidade, paginasProcessadas, entidades.size());
+                }
+
                 logger.info("Processadas {} entidades nesta página ({} ms)", entidadesNestaPagina, duracaoMs);
 
                 // CONDIÇÃO DE PARAGEM MELHORADA
@@ -271,11 +312,34 @@ public class ClienteApiRest {
 
         } catch (final IOException e) {
             logger.error("Erro de I/O ou JSON durante a comunicação com a API", e);
+            
+            // Circuit Breaker - Incrementa contador de falhas
+            incrementarFalhasConsecutivas(tipoEntidade);
+            
             throw new RuntimeException("Erro ao comunicar com a API ESL Cloud", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro durante a busca de {}: {}", tipoEntidade, e.getMessage());
+            
+            // Circuit Breaker - Incrementa contador de falhas
+            incrementarFalhasConsecutivas(tipoEntidade);
+            
+            throw e;
         }
 
-        logger.info("Busca de {} concluída. Total de entidades encontradas: {}", endpoint, entidades.size());
-        return entidades;
+        // Circuit Breaker - Reset contador de falhas em caso de sucesso
+        resetarFalhasConsecutivas(tipoEntidade);
+
+        logger.info("Busca de {} concluída. Páginas processadas: {}, Total de entidades encontradas: {}", 
+                   endpoint, paginasProcessadas, entidades.size());
+        
+        // Retorna resultado apropriado baseado se foi interrompido ou não
+        if (interrompidoPorLimite) {
+            return ResultadoExtracao.incompleto(entidades, 
+                ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
+                paginasProcessadas, entidades.size());
+        } else {
+            return ResultadoExtracao.completo(entidades, paginasProcessadas, entidades.size());
+        }
     }
 
     /**
@@ -423,6 +487,41 @@ public class ClienteApiRest {
                     Solução: Verifique os logs para mais detalhes e consulte a documentação da API""",
                     statusCode, endpoint, tipoEntidade);
         };
+    }
+
+    /**
+     * Incrementa o contador de falhas consecutivas para uma entidade.
+     * Se atingir o limite máximo, abre o circuit breaker.
+     * 
+     * @param tipoEntidade Tipo da entidade
+     */
+    private void incrementarFalhasConsecutivas(String tipoEntidade) {
+        int falhasAtuais = contadorFalhasConsecutivas.getOrDefault(tipoEntidade, 0);
+        falhasAtuais++;
+        contadorFalhasConsecutivas.put(tipoEntidade, falhasAtuais);
+        
+        logger.warn("Falha #{} para entidade '{}' (limite: {})", 
+                   falhasAtuais, tipoEntidade, MAX_FALHAS_CONSECUTIVAS);
+        
+        if (falhasAtuais >= MAX_FALHAS_CONSECUTIVAS) {
+            entidadesComCircuitAberto.add(tipoEntidade);
+            logger.error("Circuit Breaker ABERTO para '{}' após {} falhas consecutivas", 
+                        tipoEntidade, falhasAtuais);
+        }
+    }
+
+    /**
+     * Reseta o contador de falhas consecutivas para uma entidade.
+     * Remove a entidade do conjunto de circuits abertos.
+     * 
+     * @param tipoEntidade Tipo da entidade
+     */
+    private void resetarFalhasConsecutivas(String tipoEntidade) {
+        if (contadorFalhasConsecutivas.containsKey(tipoEntidade)) {
+            contadorFalhasConsecutivas.remove(tipoEntidade);
+            entidadesComCircuitAberto.remove(tipoEntidade);
+            logger.debug("Circuit Breaker RESETADO para '{}'", tipoEntidade);
+        }
     }
 
 }

@@ -3,7 +3,9 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,8 +76,8 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata, data_extracao)
             ON target.sequence_number = source.sequence_number
             WHEN MATCHED THEN
                 UPDATE SET
@@ -86,10 +88,10 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     origin_location_name = source.origin_location_name,
                     destination_location_name = source.destination_location_name,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata)
-                VALUES (source.sequence_number, source.service_at, source.status, source.total_value, source.predicted_delivery_at, source.origin_location_name, source.destination_location_name, source.metadata);
+                INSERT (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata, data_extracao)
+                VALUES (source.sequence_number, source.service_at, source.status, source.total_value, source.predicted_delivery_at, source.origin_location_name, source.destination_location_name, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -103,6 +105,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             statement.setString(paramIndex++, carga.getOriginLocationName());
             statement.setString(paramIndex++, carga.getDestinationLocationName());
             statement.setString(paramIndex++, carga.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Localização de Carga sequence_number {}: {} linha(s) afetada(s)", carga.getSequenceNumber(), rowsAffected);

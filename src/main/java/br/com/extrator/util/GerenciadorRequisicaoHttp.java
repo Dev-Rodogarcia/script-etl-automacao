@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * - Rate Limit: 2 segundos entre requisições
  * - Tratamento de HTTP 429: espera 2 segundos e retenta
  * - Tratamento de erros 5xx: backoff exponencial
+ * PROBLEMA 5 CORRIGIDO: Retry seletivo implementado
  */
 public class GerenciadorRequisicaoHttp {
     private static final Logger logger = LoggerFactory.getLogger(GerenciadorRequisicaoHttp.class);
@@ -28,17 +29,20 @@ public class GerenciadorRequisicaoHttp {
     private final long delayBaseMs;
     private final double multiplicador;
     
+    // Configuração de throttling
+    private final long throttlingMinimoMs;
+    
     // Constantes da API
-    private static final long THROTTLING_MINIMO_MS = 2000L; // 2 segundos
     private static final long DELAY_HTTP_429_MS = 2000L; // 2 segundos para 429
     
     public GerenciadorRequisicaoHttp() {
         this.maxTentativas = CarregadorConfig.obterMaxTentativasRetry();
         this.delayBaseMs = CarregadorConfig.obterDelayBaseRetry();
         this.multiplicador = CarregadorConfig.obterMultiplicadorRetry();
+        this.throttlingMinimoMs = CarregadorConfig.obterThrottlingMinimo();
         
-        logger.info("GerenciadorRequisicaoHttp inicializado - Max tentativas: {}, Delay base: {}ms, Multiplicador: {}", 
-                   maxTentativas, delayBaseMs, multiplicador);
+        logger.info("GerenciadorRequisicaoHttp inicializado - Max tentativas: {}, Delay base: {}ms, Multiplicador: {}, Throttling mínimo: {}ms", 
+                   maxTentativas, delayBaseMs, multiplicador, throttlingMinimoMs);
     }
     
     /**
@@ -58,7 +62,44 @@ public class GerenciadorRequisicaoHttp {
     }
     
     /**
+     * PROBLEMA 5 CORRIGIDO: Verifica se um código de status HTTP deve ser retentado
+     * 
+     * @param statusCode Código de status HTTP
+     * @return true se deve retentar, false caso contrário
+     */
+    private boolean deveRetentar(int statusCode) {
+        // PROBLEMA 5: 404, 401, 403 são erros definitivos - NÃO retente
+        if (statusCode == 404 || statusCode == 401 || statusCode == 403) {
+            return false;
+        }
+        
+        // PROBLEMA 5: 500, 502, 503 devem ser retentados com backoff exponencial
+        if (statusCode == 500 || statusCode == 502 || statusCode == 503) {
+            return true;
+        }
+        
+        // PROBLEMA 5: 429 deve ser retentado com delay fixo de 2s
+        if (statusCode == 429) {
+            return true;
+        }
+        
+        // Outros códigos 5xx também podem ser retentados
+        if (statusCode >= 500 && statusCode <= 599) {
+            return true;
+        }
+        
+        // Outros códigos 4xx são erros definitivos
+        if (statusCode >= 400 && statusCode <= 499) {
+            return false;
+        }
+        
+        // Códigos 2xx e 3xx são sucessos/redirecionamentos
+        return false;
+    }
+    
+    /**
      * Executa uma requisição HTTP com throttling, retry e backoff exponencial.
+     * PROBLEMA 5 CORRIGIDO: Implementa retry seletivo baseado no código de status
      * 
      * @param cliente Cliente HTTP configurado
      * @param requisicao Requisição HTTP a ser enviada
@@ -80,74 +121,75 @@ public class GerenciadorRequisicaoHttp {
                 
                 // Sucesso (200-299)
                 if (statusCode >= 200 && statusCode < 300) {
-                    logger.debug("Requisição bem-sucedida para {} - Status: {}", 
+                    logger.debug("✓ Requisição bem-sucedida para {} - Status: {}", 
                                tipoEntidade != null ? tipoEntidade : "API", statusCode);
                     return resposta;
                 }
                 
-                // Rate Limit (429) - Espera fixa de 2 segundos
+                // PROBLEMA 5 CORRIGIDO: Verifica se deve retentar baseado no código de status
+                if (!deveRetentar(statusCode)) {
+                    String mensagemErro = String.format(
+                        "✗ Erro definitivo na requisição para %s - HTTP %d (não será retentado). Resposta: %s",
+                        tipoEntidade != null ? tipoEntidade : "API",
+                        statusCode,
+                        resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body()
+                    );
+                    logger.error(mensagemErro);
+                    return resposta; // Retorna a resposta com erro ao invés de lançar exceção
+                }
+                
+                // PROBLEMA 5: Rate Limit (429) - Espera fixa de 2 segundos
                 if (statusCode == 429) {
-                    logger.warn("Rate limit atingido (HTTP 429) para {} - Tentativa {}/{}. Aguardando {} segundos...", 
+                    logger.warn("⚠️ Rate limit atingido (HTTP 429) para {} - Tentativa {}/{}. Aguardando {} segundos...", 
                               tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, DELAY_HTTP_429_MS / 1000);
                     
                     if (tentativa < maxTentativas) {
                         aguardarComTratamentoInterrupcao(DELAY_HTTP_429_MS, "retry após HTTP 429");
                     }
                 }
-                // Erros de servidor (5xx) - Backoff exponencial
+                // PROBLEMA 5: Erros de servidor (500, 502, 503, outros 5xx) - Backoff exponencial
                 else if (statusCode >= 500 && statusCode <= 599) {
-                    logger.error("Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}", 
+                    logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}", 
                                statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, 
                                resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
                     
                     if (tentativa < maxTentativas) {
                         long delayMs = calcularDelayBackoffExponencial(tentativa);
-                        logger.info("Aguardando {}ms antes da próxima tentativa...", delayMs);
+                        logger.info("🕒 Aguardando {}ms antes da próxima tentativa (backoff exponencial)...", delayMs);
                         aguardarComTratamentoInterrupcao(delayMs, "backoff exponencial");
                     }
                 }
-                // Outros erros (4xx, etc.) - Não recuperáveis
-                else {
-                    String mensagemErro = String.format(
-                        "Erro não recuperável na requisição para %s - HTTP %d. Resposta: %s",
-                        tipoEntidade != null ? tipoEntidade : "API",
-                        statusCode,
-                        resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body()
-                    );
-                    logger.error(mensagemErro);
-                    throw new RuntimeException(mensagemErro);
-                }
                 
             } catch (HttpTimeoutException e) {
-                logger.error("Timeout na requisição para {} - Tentativa {}/{}", 
+                logger.error("✗ Timeout na requisição para {} - Tentativa {}/{}", 
                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
                 
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
-                    logger.info("Aguardando {}ms antes da próxima tentativa após timeout...", delayMs);
+                    logger.info("🕒 Aguardando {}ms antes da próxima tentativa após timeout...", delayMs);
                     aguardarComTratamentoInterrupcao(delayMs, "retry após timeout");
                 }
                 
-            } catch (IOException | InterruptedException e) {
-                logger.error("Exceção na requisição para {} - Tentativa {}/{}", 
-                           tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
-                
-                if (e instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Thread interrompida durante requisição", e);
-                }
+            } catch (IOException e) {
+                // PROBLEMA 5: IOException deve ser retentado normalmente
+                logger.error("✗ IOException na requisição para {} - Tentativa {}/{}: {}", 
+                           tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
                 
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
-                    logger.info("Aguardando {}ms antes da próxima tentativa após exceção...", delayMs);
-                    aguardarComTratamentoInterrupcao(delayMs, "retry após exceção");
+                    logger.info("🕒 Aguardando {}ms antes da próxima tentativa após IOException...", delayMs);
+                    aguardarComTratamentoInterrupcao(delayMs, "retry após IOException");
                 }
+                
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Thread interrompida durante requisição", e);
             }
         }
         
         // Se chegou aqui, todas as tentativas falharam
         String mensagemFalha = String.format(
-            "Requisição para %s falhou após %d tentativas. Verifique conectividade e configurações da API.",
+            "✗ Requisição para %s falhou após %d tentativas. Verifique conectividade e configurações da API.",
             tipoEntidade != null ? tipoEntidade : "API",
             maxTentativas
         );
@@ -156,18 +198,23 @@ public class GerenciadorRequisicaoHttp {
     }
     
     /**
-     * Aplica throttling garantindo intervalo mínimo de 2 segundos entre requisições.
+     * Aplica throttling para respeitar o rate limit da API.
+     * Garante que haja pelo menos o intervalo mínimo configurado entre requisições.
      */
     private void aplicarThrottling() {
         long agora = System.currentTimeMillis();
         long ultimaRequisicao = ultimaRequisicaoTimestamp.get();
         long tempoDecorrido = agora - ultimaRequisicao;
         
-        if (tempoDecorrido < THROTTLING_MINIMO_MS) {
-            long tempoEspera = THROTTLING_MINIMO_MS - tempoDecorrido;
-            logger.debug("Aplicando throttling - Aguardando {}ms para respeitar rate limit", tempoEspera);
+        if (tempoDecorrido < throttlingMinimoMs) {
+            long tempoEspera = throttlingMinimoMs - tempoDecorrido;
+            logger.debug("🕒 Throttling aplicado - Espera: {}ms | Limite configurado: {}ms | Tempo decorrido: {}ms", 
+                        tempoEspera, throttlingMinimoMs, tempoDecorrido);
             
             aguardarComTratamentoInterrupcao(tempoEspera, "throttling");
+        } else {
+            logger.debug("✅ Throttling OK - Tempo decorrido: {}ms | Limite: {}ms", 
+                        tempoDecorrido, throttlingMinimoMs);
         }
         
         // Atualiza timestamp da última requisição

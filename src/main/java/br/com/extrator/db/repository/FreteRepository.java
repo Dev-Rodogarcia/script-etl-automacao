@@ -3,7 +3,9 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +81,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
         String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -96,10 +98,10 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     id_cidade_destino = source.id_cidade_destino,
                     data_previsao_entrega = source.data_previsao_entrega,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, metadata)
-                VALUES (source.id, source.servico_em, source.criado_em, source.status, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega, source.metadata);
+                INSERT (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, metadata, data_extracao)
+                VALUES (source.id, source.servico_em, source.criado_em, source.status, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -118,6 +120,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setObject(paramIndex++, frete.getIdCidadeDestino(), Types.BIGINT);
             statement.setObject(paramIndex++, frete.getDataPrevisaoEntrega(), Types.DATE);
             statement.setString(paramIndex++, frete.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Frete ID {}: {} linha(s) afetada(s)", frete.getId(), rowsAffected);

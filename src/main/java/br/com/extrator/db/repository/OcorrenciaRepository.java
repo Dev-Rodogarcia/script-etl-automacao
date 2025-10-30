@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 /**
  * Repositório para operações de persistência da entidade OcorrenciaEntity.
@@ -75,8 +77,8 @@ public class OcorrenciaRepository extends AbstractRepository<OcorrenciaEntity> {
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (id, occurrence_at, occurrence_code, occurrence_description, freight_id, cte_key, invoice_id, invoice_key, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (id, occurrence_at, occurrence_code, occurrence_description, freight_id, cte_key, invoice_id, invoice_key, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -88,10 +90,10 @@ public class OcorrenciaRepository extends AbstractRepository<OcorrenciaEntity> {
                     invoice_id = source.invoice_id,
                     invoice_key = source.invoice_key,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, occurrence_at, occurrence_code, occurrence_description, freight_id, cte_key, invoice_id, invoice_key, metadata)
-                VALUES (source.id, source.occurrence_at, source.occurrence_code, source.occurrence_description, source.freight_id, source.cte_key, source.invoice_id, source.invoice_key, source.metadata);
+                INSERT (id, occurrence_at, occurrence_code, occurrence_description, freight_id, cte_key, invoice_id, invoice_key, metadata, data_extracao)
+                VALUES (source.id, source.occurrence_at, source.occurrence_code, source.occurrence_description, source.freight_id, source.cte_key, source.invoice_id, source.invoice_key, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -106,6 +108,7 @@ public class OcorrenciaRepository extends AbstractRepository<OcorrenciaEntity> {
             statement.setObject(paramIndex++, ocorrencia.getInvoiceId(), Types.BIGINT);
             statement.setString(paramIndex++, ocorrencia.getInvoiceKey());
             statement.setString(paramIndex++, ocorrencia.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Ocorrência ID {}: {} linha(s) afetada(s)", ocorrencia.getId(), rowsAffected);

@@ -1,16 +1,20 @@
 package br.com.extrator.runners;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import br.com.extrator.api.ClienteApiDataExport;
+import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.db.entity.CotacaoEntity;
 import br.com.extrator.db.entity.LocalizacaoCargaEntity;
 import br.com.extrator.db.entity.ManifestoEntity;
+import br.com.extrator.db.entity.LogExtracaoEntity;
 import br.com.extrator.db.repository.CotacaoRepository;
 import br.com.extrator.db.repository.LocalizacaoCargaRepository;
 import br.com.extrator.db.repository.ManifestoRepository;
+import br.com.extrator.db.repository.LogExtracaoRepository;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoDTO;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoMapper;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
@@ -34,49 +38,167 @@ public final class DataExportRunner {
         final ManifestoRepository manifestoRepository = new ManifestoRepository();
         final CotacaoRepository cotacaoRepository = new CotacaoRepository();
         final LocalizacaoCargaRepository localizacaoRepository = new LocalizacaoCargaRepository();
+        final LogExtracaoRepository logExtracaoRepository = new LogExtracaoRepository();
 
         final ManifestoMapper manifestoMapper = new ManifestoMapper();
         final CotacaoMapper cotacaoMapper = new CotacaoMapper();
         final LocalizacaoCargaMapper localizacaoMapper = new LocalizacaoCargaMapper();
 
+        // Garante que a tabela log_extracoes existe
+        logExtracaoRepository.criarTabelaSeNaoExistir();
+
         // Manifestos
-        System.out.println("\n🧾 Extraindo Manifestos...");
-        final List<ManifestoDTO> manifestosDTO = clienteApiDataExport.buscarManifestos(dataInicio);
-        System.out.println("✓ Extraídos: " + manifestosDTO.size() + " manifestos");
-        if (!manifestosDTO.isEmpty()) {
-            final List<ManifestoEntity> manifestosEntities = manifestosDTO.stream()
-                .map(manifestoMapper::toEntity)
-                .collect(Collectors.toList());
-            final int processados = manifestoRepository.salvar(manifestosEntities);
-            System.out.println("✓ Salvos: " + processados + "/" + manifestosDTO.size() + " manifestos");
+        System.out.println("\n🧾 Extraindo Manifestos (últimas 24h)...");
+        LocalDateTime inicioManifestos = LocalDateTime.now();
+        try {
+            final ResultadoExtracao<ManifestoDTO> resultadoManifestos = clienteApiDataExport.buscarManifestos();
+            final List<ManifestoDTO> manifestosDTO = resultadoManifestos.getDados();
+            System.out.println("✓ Extraídos: " + manifestosDTO.size() + " manifestos" + 
+                              (resultadoManifestos.isCompleto() ? "" : " (INCOMPLETO: " + resultadoManifestos.getMotivoInterrupcao() + ")"));
+            
+            int registrosSalvos = 0;
+            if (!manifestosDTO.isEmpty()) {
+                final List<ManifestoEntity> manifestosEntities = manifestosDTO.stream()
+                    .map(manifestoMapper::toEntity)
+                    .collect(Collectors.toList());
+                registrosSalvos = manifestoRepository.salvar(manifestosEntities);
+                System.out.println("✓ Salvos: " + registrosSalvos + "/" + manifestosDTO.size() + " manifestos");
+            }
+
+            // Registrar no log
+            String status = resultadoManifestos.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+            String mensagem = resultadoManifestos.isCompleto() ? 
+                "Extração completa" : 
+                "Extração incompleta: " + resultadoManifestos.getMotivoInterrupcao();
+            
+            LogExtracaoEntity logManifestos = new LogExtracaoEntity(
+                "manifestos",
+                inicioManifestos,
+                LocalDateTime.now(),
+                status,
+                registrosSalvos,
+                resultadoManifestos.getPaginasProcessadas(),
+                mensagem
+            );
+            logExtracaoRepository.gravarLogExtracao(logManifestos);
+
+        } catch (RuntimeException | java.sql.SQLException e) {
+            // Registrar erro no log
+            LogExtracaoEntity logErro = new LogExtracaoEntity(
+                "manifestos",
+                inicioManifestos,
+                LocalDateTime.now(),
+                "ERRO_API",
+                0,
+                0,
+                "Erro: " + e.getMessage()
+            );
+            logExtracaoRepository.gravarLogExtracao(logErro);
+            throw new RuntimeException("Falha na extração de manifestos", e);
         }
 
         Thread.sleep(2000);
 
         // Cotações
-        System.out.println("\n💹 Extraindo Cotações...");
-        final List<CotacaoDTO> cotacoesDTO = clienteApiDataExport.buscarCotacoes(dataInicio);
-        System.out.println("✓ Extraídas: " + cotacoesDTO.size() + " cotações");
-        if (!cotacoesDTO.isEmpty()) {
-            final List<CotacaoEntity> cotacoesEntities = cotacoesDTO.stream()
-                .map(cotacaoMapper::toEntity)
-                .collect(Collectors.toList());
-            final int processados = cotacaoRepository.salvar(cotacoesEntities);
-            System.out.println("✓ Salvas: " + processados + "/" + cotacoesDTO.size() + " cotações");
+        System.out.println("\n💹 Extraindo Cotações (últimas 24h)...");
+        LocalDateTime inicioCotacoes = LocalDateTime.now();
+        try {
+            final ResultadoExtracao<CotacaoDTO> resultadoCotacoes = clienteApiDataExport.buscarCotacoes();
+            final List<CotacaoDTO> cotacoesDTO = resultadoCotacoes.getDados();
+            System.out.println("✓ Extraídas: " + cotacoesDTO.size() + " cotações" + 
+                              (resultadoCotacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoCotacoes.getMotivoInterrupcao() + ")"));
+            
+            int registrosSalvos = 0;
+            if (!cotacoesDTO.isEmpty()) {
+                final List<CotacaoEntity> cotacoesEntities = cotacoesDTO.stream()
+                    .map(cotacaoMapper::toEntity)
+                    .collect(Collectors.toList());
+                registrosSalvos = cotacaoRepository.salvar(cotacoesEntities);
+                System.out.println("✓ Salvas: " + registrosSalvos + "/" + cotacoesDTO.size() + " cotações");
+            }
+
+            // Registrar no log
+            String status = resultadoCotacoes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+            String mensagem = resultadoCotacoes.isCompleto() ? 
+                "Extração completa" : 
+                "Extração incompleta: " + resultadoCotacoes.getMotivoInterrupcao();
+            
+            LogExtracaoEntity logCotacoes = new LogExtracaoEntity(
+                "cotacoes",
+                inicioCotacoes,
+                LocalDateTime.now(),
+                status,
+                registrosSalvos,
+                resultadoCotacoes.getPaginasProcessadas(),
+                mensagem
+            );
+            logExtracaoRepository.gravarLogExtracao(logCotacoes);
+
+        } catch (RuntimeException | java.sql.SQLException e) {
+            // Registrar erro no log
+            LogExtracaoEntity logErro = new LogExtracaoEntity(
+                "cotacoes",
+                inicioCotacoes,
+                LocalDateTime.now(),
+                "ERRO_API",
+                0,
+                0,
+                "Erro: " + e.getMessage()
+            );
+            logExtracaoRepository.gravarLogExtracao(logErro);
+            throw new RuntimeException("Falha na extração de cotações", e);
         }
 
         Thread.sleep(2000);
 
         // Localização de Carga
-        System.out.println("\n📍 Extraindo Localização de Carga...");
-        final List<LocalizacaoCargaDTO> localizacoesDTO = clienteApiDataExport.buscarLocalizacaoCarga(dataInicio);
-        System.out.println("✓ Extraídas: " + localizacoesDTO.size() + " localizações");
-        if (!localizacoesDTO.isEmpty()) {
-            final List<LocalizacaoCargaEntity> localizacoesEntities = localizacoesDTO.stream()
-                .map(localizacaoMapper::toEntity)
-                .collect(Collectors.toList());
-            final int processados = localizacaoRepository.salvar(localizacoesEntities);
-            System.out.println("✓ Salvas: " + processados + "/" + localizacoesDTO.size() + " localizações");
+        System.out.println("\n📍 Extraindo Localização de Carga (últimas 24h)...");
+        LocalDateTime inicioLocalizacoes = LocalDateTime.now();
+        try {
+            final ResultadoExtracao<LocalizacaoCargaDTO> resultadoLocalizacoes = clienteApiDataExport.buscarLocalizacaoCarga();
+            final List<LocalizacaoCargaDTO> localizacoesDTO = resultadoLocalizacoes.getDados();
+            System.out.println("✓ Extraídas: " + localizacoesDTO.size() + " localizações" + 
+                              (resultadoLocalizacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoLocalizacoes.getMotivoInterrupcao() + ")"));
+            
+            int registrosSalvos = 0;
+            if (!localizacoesDTO.isEmpty()) {
+                final List<LocalizacaoCargaEntity> localizacoesEntities = localizacoesDTO.stream()
+                    .map(localizacaoMapper::toEntity)
+                    .collect(Collectors.toList());
+                registrosSalvos = localizacaoRepository.salvar(localizacoesEntities);
+                System.out.println("✓ Salvas: " + registrosSalvos + "/" + localizacoesDTO.size() + " localizações");
+            }
+
+            // Registrar no log
+            String status = resultadoLocalizacoes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+            String mensagem = resultadoLocalizacoes.isCompleto() ? 
+                "Extração completa" : 
+                "Extração incompleta: " + resultadoLocalizacoes.getMotivoInterrupcao();
+            
+            LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
+                "localizacao_cargas",
+                inicioLocalizacoes,
+                LocalDateTime.now(),
+                status,
+                registrosSalvos,
+                resultadoLocalizacoes.getPaginasProcessadas(),
+                mensagem
+            );
+            logExtracaoRepository.gravarLogExtracao(logLocalizacoes);
+
+        } catch (RuntimeException | java.sql.SQLException e) {
+            // Registrar erro no log
+            LogExtracaoEntity logErro = new LogExtracaoEntity(
+                "localizacao_cargas",
+                inicioLocalizacoes,
+                LocalDateTime.now(),
+                "ERRO_API",
+                0,
+                0,
+                "Erro: " + e.getMessage()
+            );
+            logExtracaoRepository.gravarLogExtracao(logErro);
+            throw new RuntimeException("Falha na extração de localização de cargas", e);
         }
     }
 }

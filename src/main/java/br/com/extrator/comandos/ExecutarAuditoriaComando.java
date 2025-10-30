@@ -1,6 +1,7 @@
 package br.com.extrator.comandos;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.LocalDate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,11 +25,15 @@ public class ExecutarAuditoriaComando implements Comando {
             // Verificar se foi especificado um período customizado
             if (args.length >= 4 && "--periodo".equals(args[1])) {
                 try {
-                    final LocalDateTime dataInicio = LocalDateTime.parse(args[2] + "T00:00:00");
-                    final LocalDateTime dataFim = LocalDateTime.parse(args[3] + "T23:59:59");
+                    final LocalDate dataInicioLocal = LocalDate.parse(args[2]);
+                    final LocalDate dataFimLocal = LocalDate.parse(args[3]);
+                    
+                    // Converter para Instant (início do dia e fim do dia em UTC)
+                    final Instant dataInicio = dataInicioLocal.atStartOfDay().toInstant(java.time.ZoneOffset.UTC);
+                    final Instant dataFim = dataFimLocal.atTime(23, 59, 59).toInstant(java.time.ZoneOffset.UTC);
                     
                     System.out.printf("📅 Executando auditoria para período: %s até %s%n", 
-                                    dataInicio.toLocalDate(), dataFim.toLocalDate());
+                                    dataInicioLocal, dataFimLocal);
                     
                     resultado = auditoriaService.executarAuditoriaPorPeriodo(dataInicio, dataFim);
                     

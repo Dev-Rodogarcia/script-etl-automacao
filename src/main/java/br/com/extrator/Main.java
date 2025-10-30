@@ -9,9 +9,12 @@ import br.com.extrator.comandos.Comando;
 import br.com.extrator.comandos.ExibirAjudaComando;
 import br.com.extrator.comandos.ExecutarAuditoriaComando;
 import br.com.extrator.comandos.ExecutarFluxoCompletoComando;
+import br.com.extrator.comandos.LimparTabelasComando;
 import br.com.extrator.comandos.RealizarIntrospeccaoGraphQLComando;
 import br.com.extrator.comandos.TestarApiComando;
 import br.com.extrator.comandos.ValidarAcessoComando;
+import br.com.extrator.comandos.VerificarTimestampsComando;
+import br.com.extrator.comandos.VerificarTimezoneComando;
 import br.com.extrator.servicos.LoggingService;
 
 /**
@@ -43,7 +46,10 @@ public class Main {
         "--help", new ExibirAjudaComando(),
         "--introspeccao", new RealizarIntrospeccaoGraphQLComando(),
         "--auditoria", new ExecutarAuditoriaComando(),
-        "--testar-api", new TestarApiComando()
+        "--testar-api", new TestarApiComando(),
+        "--limpar-tabelas", new LimparTabelasComando(),
+        "--verificar-timestamps", new VerificarTimestampsComando(),
+        "--verificar-timezone", new VerificarTimezoneComando()
     );
 
     public static void main(final String[] args) {

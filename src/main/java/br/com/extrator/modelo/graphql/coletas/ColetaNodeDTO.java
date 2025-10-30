@@ -10,36 +10,102 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * DTO (Data Transfer Object) para representar um "node" de Coleta,
  * conforme retornado pela API GraphQL.
- * Mapeia os campos essenciais solicitados na query e inclui um contêiner
+ * Mapeia todos os campos válidos do tipo Pick e inclui um contêiner
  * dinâmico para garantir a captura de quaisquer outros campos que a query
  * possa vir a retornar no futuro.
  */
 public class ColetaNodeDTO {
 
-    // --- Campos Essenciais Mapeados ---
+    // --- Campos Essenciais do Tipo Pick ---
     @JsonProperty("id")
-    private String id; // O ID é uma String, não um número.
+    private String id;
 
-    @JsonProperty("sequenceCode")
-    private Long sequenceCode;
+    @JsonProperty("agentId")
+    private Long agentId;
 
-    @JsonProperty("requestDate")
-    private String requestDate; // Recebido como String YYYY-MM-DD
+    @JsonProperty("cancellationReason")
+    private String cancellationReason;
 
-    @JsonProperty("serviceDate")
-    private String serviceDate; // Recebido como String YYYY-MM-DD
+    @JsonProperty("cancellationUserId")
+    private Long cancellationUserId;
 
-    @JsonProperty("status")
-    private String status;
+    @JsonProperty("cargoClassificationId")
+    private Long cargoClassificationId;
+
+    @JsonProperty("comments")
+    private String comments;
+
+    @JsonProperty("costCenterId")
+    private Long costCenterId;
+
+    @JsonProperty("destroyReason")
+    private String destroyReason;
+
+    @JsonProperty("destroyUserId")
+    private Long destroyUserId;
+
+    @JsonProperty("invoicesCubedWeight")
+    private BigDecimal invoicesCubedWeight;
 
     @JsonProperty("invoicesValue")
     private BigDecimal invoicesValue;
 
+    @JsonProperty("invoicesVolumes")
+    private Integer invoicesVolumes;
+
     @JsonProperty("invoicesWeight")
     private BigDecimal invoicesWeight;
 
-    @JsonProperty("invoicesVolumes")
-    private Integer invoicesVolumes;
+    @JsonProperty("lunchBreakEndHour")
+    private String lunchBreakEndHour;
+
+    @JsonProperty("lunchBreakStartHour")
+    private String lunchBreakStartHour;
+
+    @JsonProperty("notificationEmail")
+    private String notificationEmail;
+
+    @JsonProperty("notificationPhone")
+    private String notificationPhone;
+
+    @JsonProperty("pickTypeId")
+    private Long pickTypeId;
+
+    @JsonProperty("pickupLocationId")
+    private Long pickupLocationId;
+
+    @JsonProperty("requestDate")
+    private String requestDate; // Recebido como String YYYY-MM-DD
+
+    @JsonProperty("requestHour")
+    private String requestHour;
+
+    @JsonProperty("requester")
+    private String requester;
+
+    @JsonProperty("sequenceCode")
+    private Long sequenceCode;
+
+    @JsonProperty("serviceDate")
+    private String serviceDate; // Recebido como String YYYY-MM-DD
+
+    @JsonProperty("serviceEndHour")
+    private String serviceEndHour;
+
+    @JsonProperty("serviceStartHour")
+    private String serviceStartHour;
+
+    @JsonProperty("status")
+    private String status;
+
+    @JsonProperty("statusUpdatedAt")
+    private String statusUpdatedAt;
+
+    @JsonProperty("taxedWeight")
+    private BigDecimal taxedWeight;
+
+    @JsonProperty("vehicleTypeId")
+    private Long vehicleTypeId;
 
     // --- Contêiner Dinâmico ("Resto") ---
     private final Map<String, Object> otherProperties = new HashMap<>();
@@ -59,36 +125,76 @@ public class ColetaNodeDTO {
         this.id = id;
     }
 
-    public Long getSequenceCode() {
-        return sequenceCode;
+    public Long getAgentId() {
+        return agentId;
     }
 
-    public void setSequenceCode(final Long sequenceCode) {
-        this.sequenceCode = sequenceCode;
+    public void setAgentId(final Long agentId) {
+        this.agentId = agentId;
     }
 
-    public String getRequestDate() {
-        return requestDate;
+    public String getCancellationReason() {
+        return cancellationReason;
     }
 
-    public void setRequestDate(final String requestDate) {
-        this.requestDate = requestDate;
+    public void setCancellationReason(final String cancellationReason) {
+        this.cancellationReason = cancellationReason;
     }
 
-    public String getServiceDate() {
-        return serviceDate;
+    public Long getCancellationUserId() {
+        return cancellationUserId;
     }
 
-    public void setServiceDate(final String serviceDate) {
-        this.serviceDate = serviceDate;
+    public void setCancellationUserId(final Long cancellationUserId) {
+        this.cancellationUserId = cancellationUserId;
     }
 
-    public String getStatus() {
-        return status;
+    public Long getCargoClassificationId() {
+        return cargoClassificationId;
     }
 
-    public void setStatus(final String status) {
-        this.status = status;
+    public void setCargoClassificationId(final Long cargoClassificationId) {
+        this.cargoClassificationId = cargoClassificationId;
+    }
+
+    public String getComments() {
+        return comments;
+    }
+
+    public void setComments(final String comments) {
+        this.comments = comments;
+    }
+
+    public Long getCostCenterId() {
+        return costCenterId;
+    }
+
+    public void setCostCenterId(final Long costCenterId) {
+        this.costCenterId = costCenterId;
+    }
+
+    public String getDestroyReason() {
+        return destroyReason;
+    }
+
+    public void setDestroyReason(final String destroyReason) {
+        this.destroyReason = destroyReason;
+    }
+
+    public Long getDestroyUserId() {
+        return destroyUserId;
+    }
+
+    public void setDestroyUserId(final Long destroyUserId) {
+        this.destroyUserId = destroyUserId;
+    }
+
+    public BigDecimal getInvoicesCubedWeight() {
+        return invoicesCubedWeight;
+    }
+
+    public void setInvoicesCubedWeight(final BigDecimal invoicesCubedWeight) {
+        this.invoicesCubedWeight = invoicesCubedWeight;
     }
 
     public BigDecimal getInvoicesValue() {
@@ -99,6 +205,14 @@ public class ColetaNodeDTO {
         this.invoicesValue = invoicesValue;
     }
 
+    public Integer getInvoicesVolumes() {
+        return invoicesVolumes;
+    }
+
+    public void setInvoicesVolumes(final Integer invoicesVolumes) {
+        this.invoicesVolumes = invoicesVolumes;
+    }
+
     public BigDecimal getInvoicesWeight() {
         return invoicesWeight;
     }
@@ -107,12 +221,140 @@ public class ColetaNodeDTO {
         this.invoicesWeight = invoicesWeight;
     }
 
-    public Integer getInvoicesVolumes() {
-        return invoicesVolumes;
+    public String getLunchBreakEndHour() {
+        return lunchBreakEndHour;
     }
 
-    public void setInvoicesVolumes(final Integer invoicesVolumes) {
-        this.invoicesVolumes = invoicesVolumes;
+    public void setLunchBreakEndHour(final String lunchBreakEndHour) {
+        this.lunchBreakEndHour = lunchBreakEndHour;
+    }
+
+    public String getLunchBreakStartHour() {
+        return lunchBreakStartHour;
+    }
+
+    public void setLunchBreakStartHour(final String lunchBreakStartHour) {
+        this.lunchBreakStartHour = lunchBreakStartHour;
+    }
+
+    public String getNotificationEmail() {
+        return notificationEmail;
+    }
+
+    public void setNotificationEmail(final String notificationEmail) {
+        this.notificationEmail = notificationEmail;
+    }
+
+    public String getNotificationPhone() {
+        return notificationPhone;
+    }
+
+    public void setNotificationPhone(final String notificationPhone) {
+        this.notificationPhone = notificationPhone;
+    }
+
+    public Long getPickTypeId() {
+        return pickTypeId;
+    }
+
+    public void setPickTypeId(final Long pickTypeId) {
+        this.pickTypeId = pickTypeId;
+    }
+
+    public Long getPickupLocationId() {
+        return pickupLocationId;
+    }
+
+    public void setPickupLocationId(final Long pickupLocationId) {
+        this.pickupLocationId = pickupLocationId;
+    }
+
+    public String getRequestDate() {
+        return requestDate;
+    }
+
+    public void setRequestDate(final String requestDate) {
+        this.requestDate = requestDate;
+    }
+
+    public String getRequestHour() {
+        return requestHour;
+    }
+
+    public void setRequestHour(final String requestHour) {
+        this.requestHour = requestHour;
+    }
+
+    public String getRequester() {
+        return requester;
+    }
+
+    public void setRequester(final String requester) {
+        this.requester = requester;
+    }
+
+    public Long getSequenceCode() {
+        return sequenceCode;
+    }
+
+    public void setSequenceCode(final Long sequenceCode) {
+        this.sequenceCode = sequenceCode;
+    }
+
+    public String getServiceDate() {
+        return serviceDate;
+    }
+
+    public void setServiceDate(final String serviceDate) {
+        this.serviceDate = serviceDate;
+    }
+
+    public String getServiceEndHour() {
+        return serviceEndHour;
+    }
+
+    public void setServiceEndHour(final String serviceEndHour) {
+        this.serviceEndHour = serviceEndHour;
+    }
+
+    public String getServiceStartHour() {
+        return serviceStartHour;
+    }
+
+    public void setServiceStartHour(final String serviceStartHour) {
+        this.serviceStartHour = serviceStartHour;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(final String status) {
+        this.status = status;
+    }
+
+    public String getStatusUpdatedAt() {
+        return statusUpdatedAt;
+    }
+
+    public void setStatusUpdatedAt(final String statusUpdatedAt) {
+        this.statusUpdatedAt = statusUpdatedAt;
+    }
+
+    public BigDecimal getTaxedWeight() {
+        return taxedWeight;
+    }
+
+    public void setTaxedWeight(final BigDecimal taxedWeight) {
+        this.taxedWeight = taxedWeight;
+    }
+
+    public Long getVehicleTypeId() {
+        return vehicleTypeId;
+    }
+
+    public void setVehicleTypeId(final Long vehicleTypeId) {
+        this.vehicleTypeId = vehicleTypeId;
     }
 
     public Map<String, Object> getOtherProperties() {

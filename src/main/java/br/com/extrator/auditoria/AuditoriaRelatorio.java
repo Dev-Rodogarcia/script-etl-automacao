@@ -5,7 +5,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -49,7 +50,7 @@ public class AuditoriaRelatorio {
      */
     public Path gerarRelatorioCompleto(final List<String> resultados, final String diretorioSaida) throws IOException {
         final String nomeArquivo = String.format("auditoria_completa_%s.txt", 
-                                                LocalDateTime.now().format(FORMATTER_ARQUIVO));
+                                                Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_ARQUIVO));
         final Path caminhoArquivo = Paths.get(diretorioSaida, nomeArquivo);
         
         // Criar diretório se não existir
@@ -85,7 +86,7 @@ public class AuditoriaRelatorio {
         }
         
         final String nomeArquivo = String.format("auditoria_problemas_%s.txt", 
-                                                LocalDateTime.now().format(FORMATTER_ARQUIVO));
+                                                Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_ARQUIVO));
         final Path caminhoArquivo = Paths.get(diretorioSaida, nomeArquivo);
         
         // Criar diretório se não existir
@@ -95,7 +96,7 @@ public class AuditoriaRelatorio {
             writer.write("=".repeat(80) + "\n");
             writer.write("RELATÓRIO DE PROBLEMAS - AUDITORIA ESL CLOUD\n");
             writer.write("=".repeat(80) + "\n");
-            writer.write(String.format("Data/Hora: %s\n", LocalDateTime.now().format(FORMATTER_RELATORIO)));
+            writer.write(String.format("Data/Hora: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
             writer.write(String.format("Total de problemas encontrados: %d\n\n", problemas.size()));
             
             for (final ResultadoValidacaoEntidade resultado : problemas) {
@@ -120,18 +121,22 @@ public class AuditoriaRelatorio {
         System.out.println("\n" + "=".repeat(60));
         System.out.println("📊 RESUMO DA AUDITORIA DE DADOS");
         System.out.println("=".repeat(60));
-        System.out.println("⏰ Data/Hora: " + LocalDateTime.now().format(FORMATTER_RELATORIO));
+        System.out.println("⏰ Data/Hora: " + Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO));
         System.out.println("📋 Total de resultados: " + resultados.size());
         
         final long erros = resultados.stream()
-                .filter(r -> r.toLowerCase().contains("erro"))
+                .filter(r -> r.contains("ERRO") || r.contains("❌"))
                 .count();
         final long alertas = resultados.stream()
-                .filter(r -> r.toLowerCase().contains("alerta") || r.toLowerCase().contains("warning"))
+                .filter(r -> r.contains("ALERTA") || r.contains("⚠️"))
+                .count();
+        final long sucessos = resultados.stream()
+                .filter(r -> r.contains("OK") || r.contains("✅"))
                 .count();
         
-        System.out.println("❌ Erros encontrados: " + erros);
-        System.out.println("⚠️  Alertas encontrados: " + alertas);
+        System.out.println("✅ Sucessos: " + sucessos);
+        System.out.println("⚠️  Alertas: " + alertas);
+        System.out.println("❌ Erros: " + erros);
         
         if (erros == 0 && alertas == 0) {
             System.out.println("✅ Status: AUDITORIA APROVADA");
@@ -165,7 +170,7 @@ public class AuditoriaRelatorio {
         writer.write("=".repeat(80) + "\n");
         writer.write("RELATÓRIO COMPLETO DE AUDITORIA - ESL CLOUD DATA EXTRACTOR\n");
         writer.write("=".repeat(80) + "\n");
-        writer.write(String.format("Data/Hora da Auditoria: %s\n", LocalDateTime.now().format(FORMATTER_RELATORIO)));
+        writer.write(String.format("Data/Hora da Auditoria: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
         writer.write("Sistema: ESL Cloud Data Extraction\n");
         writer.write("Versão: 1.0-SNAPSHOT\n\n");
     }
@@ -176,18 +181,22 @@ public class AuditoriaRelatorio {
     private void escreverResumoGeral(final FileWriter writer, final List<String> resultados) throws IOException {
         writer.write("RESUMO GERAL\n");
         writer.write("-".repeat(40) + "\n");
-        writer.write("Data/Hora da Auditoria: " + LocalDateTime.now().format(FORMATTER_RELATORIO) + "\n");
+        writer.write("Data/Hora da Auditoria: " + Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO) + "\n");
         writer.write("Total de Resultados: " + resultados.size() + "\n");
         
         final long erros = resultados.stream()
-                .filter(r -> r.toLowerCase().contains("erro"))
+                .filter(r -> r.contains("ERRO") || r.contains("❌"))
                 .count();
         final long alertas = resultados.stream()
-                .filter(r -> r.toLowerCase().contains("alerta") || r.toLowerCase().contains("warning"))
+                .filter(r -> r.contains("ALERTA") || r.contains("⚠️"))
+                .count();
+        final long sucessos = resultados.stream()
+                .filter(r -> r.contains("OK") || r.contains("✅"))
                 .count();
         
-        writer.write("Erros Encontrados: " + erros + "\n");
-        writer.write("Alertas Encontrados: " + alertas + "\n");
+        writer.write("Sucessos: " + sucessos + "\n");
+        writer.write("Alertas: " + alertas + "\n");
+        writer.write("Erros: " + erros + "\n");
         writer.write("\n");
     }
     
@@ -226,7 +235,8 @@ public class AuditoriaRelatorio {
                                   resultado.getTotalRegistros(), resultado.getRegistrosUltimas24h()));
         
         if (resultado.getUltimaExtracao() != null) {
-            writer.write(String.format("   Última extração: %s\n", resultado.getUltimaExtracao().format(FORMATTER_RELATORIO)));
+            writer.write(String.format("   Última extração: %s\n", 
+                resultado.getUltimaExtracao().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
         }
         
         writer.write("\n" + "-".repeat(60) + "\n\n");
@@ -238,7 +248,7 @@ public class AuditoriaRelatorio {
     private void escreverRodapeRelatorio(final FileWriter writer) throws IOException {
         writer.write("=".repeat(80) + "\n");
         writer.write("FIM DO RELATÓRIO DE AUDITORIA\n");
-        writer.write(String.format("Gerado em: %s\n", LocalDateTime.now().format(FORMATTER_RELATORIO)));
+        writer.write(String.format("Gerado em: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
         writer.write("=".repeat(80) + "\n");
     }
 }

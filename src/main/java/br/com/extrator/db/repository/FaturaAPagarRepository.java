@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 /**
  * Repositório para operações de persistência da entidade FaturaAPagarEntity.
@@ -85,8 +87,8 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
 
         String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata, data_extracao)
             %s
             WHEN MATCHED THEN
                 UPDATE SET
@@ -98,10 +100,10 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
                     invoice_type = source.invoice_type,
                     header_metadata = source.header_metadata,
                     installments_metadata = source.installments_metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata)
-                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value, source.receiver_cnpj, source.receiver_name, source.invoice_type, source.header_metadata, source.installments_metadata);
+                INSERT (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata, data_extracao)
+                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value, source.receiver_cnpj, source.receiver_name, source.invoice_type, source.header_metadata, source.installments_metadata, source.data_extracao);
             """, NOME_TABELA, onClause);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -117,6 +119,7 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
             statement.setString(paramIndex++, fatura.getInvoiceType());
             statement.setString(paramIndex++, fatura.getHeaderMetadata());
             statement.setString(paramIndex++, fatura.getInstallmentsMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Fatura a Pagar ID {}: {} linha(s) afetada(s)", fatura.getId(), rowsAffected);

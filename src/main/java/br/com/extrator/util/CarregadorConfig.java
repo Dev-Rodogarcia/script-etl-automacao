@@ -331,4 +331,65 @@ public class CarregadorConfig {
     public static String obterCorporationId() {
         return obterConfiguracao("API_CORPORATION_ID", "api.corporation.id");
     }
+
+    /**
+     * Obtém o intervalo mínimo de throttling (padrão: 2200ms)
+     * Usado para evitar erros HTTP 429 (Rate Limit)
+     * 
+     * @return O intervalo mínimo de throttling em ms
+     */
+    public static long obterThrottlingMinimo() {
+        String valor = obterConfiguracao("API_THROTTLING_MINIMO_MS", "api.throttling.minimo_ms");
+        try {
+            return Long.parseLong(valor);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.throttling.minimo_ms' não encontrada ou inválida. Usando valor padrão: 2200ms");
+            return 2200L; // Valor padrão de 2.2 segundos (10% de margem sobre 2s)
+        }
+    }
+
+    /**
+     * Obtém o limite máximo de páginas por execução para API REST
+     * 
+     * @return Limite máximo de páginas (padrão: 500)
+     */
+    public static int obterLimitePaginasApiRest() {
+        String valor = obterConfiguracao("API_REST_MAX_PAGINAS", "api.rest.max.paginas");
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.rest.max.paginas' não encontrada ou inválida. Usando valor padrão: 500");
+            return 500; // Valor padrão aumentado de 100 para 500
+        }
+    }
+
+    /**
+     * Obtém o limite máximo de páginas por execução para API GraphQL
+     * 
+     * @return Limite máximo de páginas (padrão: 2000)
+     */
+    public static int obterLimitePaginasApiGraphQL() {
+        String valor = obterConfiguracao("API_GRAPHQL_MAX_PAGINAS", "api.graphql.max.paginas");
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.graphql.max.paginas' não encontrada ou inválida. Usando valor padrão: 2000");
+            return 2000; // Valor padrão aumentado de 1000 para 2000
+        }
+    }
+
+    /**
+     * Obtém o limite máximo de páginas por execução para API DataExport
+     * 
+     * @return Limite máximo de páginas (padrão: 500)
+     */
+    public static int obterLimitePaginasApiDataExport() {
+        String valor = obterConfiguracao("API_DATAEXPORT_MAX_PAGINAS", "api.dataexport.max.paginas");
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.dataexport.max.paginas' não encontrada ou inválida. Usando valor padrão: 500");
+            return 500; // Valor padrão aumentado de 100 para 500
+        }
+    }
 }

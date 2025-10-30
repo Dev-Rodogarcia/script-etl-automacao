@@ -1,6 +1,6 @@
 package br.com.extrator.auditoria;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,19 +10,74 @@ import java.util.List;
  */
 public class ResultadoValidacaoEntidade {
     private String nomeEntidade;
-    private LocalDateTime dataInicio;
-    private LocalDateTime dataFim;
+    private Instant dataInicio;
+    private Instant dataFim;
     private long totalRegistros;
     private long registrosUltimas24h;
     private long registrosComNulos;
-    private LocalDateTime ultimaExtracao;
+    private Instant ultimaExtracao;
     private StatusValidacao status;
     private String erro;
     private List<String> observacoes;
     
+    // Novos campos para debug e causa raiz
+    private String colunaUtilizada;
+    private String queryExecutada;
+    
     public ResultadoValidacaoEntidade() {
         this.observacoes = new ArrayList<>();
         this.status = StatusValidacao.PENDENTE;
+    }
+    
+    // ✅ MÉTODOS ESTÁTICOS PARA CRIAÇÃO PADRONIZADA
+    
+    /**
+     * Cria um resultado de validação com status de ERRO.
+     * 
+     * @param entidade Nome da entidade
+     * @param registros Número de registros encontrados
+     * @param mensagem Mensagem de erro
+     * @return ResultadoValidacaoEntidade com status ERRO
+     */
+    public static ResultadoValidacaoEntidade erro(String entidade, long registros, String mensagem) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(registros);
+        resultado.setStatus(StatusValidacao.ERRO);
+        resultado.setErro(mensagem);
+        return resultado;
+    }
+    
+    /**
+     * Cria um resultado de validação com status de ALERTA.
+     * 
+     * @param entidade Nome da entidade
+     * @param registros Número de registros encontrados
+     * @param mensagem Mensagem de alerta
+     * @return ResultadoValidacaoEntidade com status ALERTA
+     */
+    public static ResultadoValidacaoEntidade alerta(String entidade, long registros, String mensagem) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(registros);
+        resultado.setStatus(StatusValidacao.ALERTA);
+        resultado.adicionarObservacao(mensagem);
+        return resultado;
+    }
+    
+    /**
+     * Cria um resultado de validação com status OK.
+     * 
+     * @param entidade Nome da entidade
+     * @param registros Número de registros encontrados
+     * @return ResultadoValidacaoEntidade com status OK
+     */
+    public static ResultadoValidacaoEntidade ok(String entidade, long registros) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(registros);
+        resultado.setStatus(StatusValidacao.OK);
+        return resultado;
     }
     
     // Getters e Setters
@@ -34,19 +89,19 @@ public class ResultadoValidacaoEntidade {
         this.nomeEntidade = nomeEntidade;
     }
     
-    public LocalDateTime getDataInicio() {
+    public Instant getDataInicio() {
         return dataInicio;
     }
     
-    public void setDataInicio(final LocalDateTime dataInicio) {
+    public void setDataInicio(final Instant dataInicio) {
         this.dataInicio = dataInicio;
     }
     
-    public LocalDateTime getDataFim() {
+    public Instant getDataFim() {
         return dataFim;
     }
     
-    public void setDataFim(final LocalDateTime dataFim) {
+    public void setDataFim(final Instant dataFim) {
         this.dataFim = dataFim;
     }
     
@@ -74,11 +129,11 @@ public class ResultadoValidacaoEntidade {
         this.registrosComNulos = registrosComNulos;
     }
     
-    public LocalDateTime getUltimaExtracao() {
+    public Instant getUltimaExtracao() {
         return ultimaExtracao;
     }
     
-    public void setUltimaExtracao(final LocalDateTime ultimaExtracao) {
+    public void setUltimaExtracao(final Instant ultimaExtracao) {
         this.ultimaExtracao = ultimaExtracao;
     }
     
@@ -137,6 +192,22 @@ public class ResultadoValidacaoEntidade {
      */
     public boolean temErro() {
         return status == StatusValidacao.ERRO;
+    }
+    
+    public String getColunaUtilizada() {
+        return colunaUtilizada;
+    }
+    
+    public void setColunaUtilizada(final String colunaUtilizada) {
+        this.colunaUtilizada = colunaUtilizada;
+    }
+    
+    public String getQueryExecutada() {
+        return queryExecutada;
+    }
+    
+    public void setQueryExecutada(final String queryExecutada) {
+        this.queryExecutada = queryExecutada;
     }
     
     /**

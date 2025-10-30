@@ -3,7 +3,9 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,8 +80,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_code, status, created_at, departured_at, finished_at, total_cost, traveled_km, vehicle_plate, driver_name, origin_branch, mdfe_status, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_code, status, created_at, departured_at, finished_at, total_cost, traveled_km, vehicle_plate, driver_name, origin_branch, mdfe_status, metadata, data_extracao)
             ON target.sequence_code = source.sequence_code
             WHEN MATCHED THEN
                 UPDATE SET
@@ -94,10 +96,10 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     origin_branch = source.origin_branch,
                     mdfe_status = source.mdfe_status,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_code, status, created_at, departured_at, finished_at, total_cost, traveled_km, vehicle_plate, driver_name, origin_branch, mdfe_status, metadata)
-                VALUES (source.sequence_code, source.status, source.created_at, source.departured_at, source.finished_at, source.total_cost, source.traveled_km, source.vehicle_plate, source.driver_name, source.origin_branch, source.mdfe_status, source.metadata);
+                INSERT (sequence_code, status, created_at, departured_at, finished_at, total_cost, traveled_km, vehicle_plate, driver_name, origin_branch, mdfe_status, metadata, data_extracao)
+                VALUES (source.sequence_code, source.status, source.created_at, source.departured_at, source.finished_at, source.total_cost, source.traveled_km, source.vehicle_plate, source.driver_name, source.origin_branch, source.mdfe_status, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -115,6 +117,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             statement.setString(paramIndex++, manifesto.getOriginBranch());
             statement.setString(paramIndex++, manifesto.getMdfeStatus());
             statement.setString(paramIndex++, manifesto.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Manifesto sequence_code {}: {} linha(s) afetada(s)", manifesto.getSequenceCode(), rowsAffected);

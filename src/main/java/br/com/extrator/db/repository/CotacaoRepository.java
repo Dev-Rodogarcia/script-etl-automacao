@@ -3,7 +3,9 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,8 +79,8 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata, data_extracao)
             ON target.sequence_code = source.sequence_code
             WHEN MATCHED THEN
                 UPDATE SET
@@ -92,10 +94,10 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     destination_state = source.destination_state,
                     customer_doc = source.customer_doc,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata)
-                VALUES (source.sequence_code, source.requested_at, source.total_value, source.taxed_weight, source.invoices_value, source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.customer_doc, source.metadata);
+                INSERT (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata, data_extracao)
+                VALUES (source.sequence_code, source.requested_at, source.total_value, source.taxed_weight, source.invoices_value, source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.customer_doc, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -112,6 +114,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             statement.setString(paramIndex++, cotacao.getDestinationState());
             statement.setString(paramIndex++, cotacao.getCustomerDoc());
             statement.setString(paramIndex++, cotacao.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Cotação sequence_code {}: {} linha(s) afetada(s)", cotacao.getSequenceCode(), rowsAffected);

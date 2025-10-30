@@ -7,7 +7,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
 
 /**
  * Repositório para operações de persistência da entidade ColetaEntity.
@@ -76,8 +78,8 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes, metadata)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -89,10 +91,10 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     total_weight = source.total_weight,
                     total_volumes = source.total_volumes,
                     metadata = source.metadata,
-                    data_extracao = GETDATE()
+                    data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes, metadata)
-                VALUES (source.id, source.sequence_code, source.request_date, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes, source.metadata);
+                INSERT (id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes, metadata, data_extracao)
+                VALUES (source.id, source.sequence_code, source.request_date, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -107,6 +109,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             statement.setBigDecimal(paramIndex++, coleta.getTotalWeight());
             statement.setObject(paramIndex++, coleta.getTotalVolumes(), Types.INTEGER);
             statement.setString(paramIndex++, coleta.getMetadata());
+            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Coleta ID {}: {} linha(s) afetada(s)", coleta.getId(), rowsAffected);

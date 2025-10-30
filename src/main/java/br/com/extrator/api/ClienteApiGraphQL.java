@@ -8,8 +8,11 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +30,20 @@ import br.com.extrator.util.GerenciadorRequisicaoHttp;
 /**
  * Cliente especializado para comunicação com a API GraphQL do ESL Cloud
  * Responsável por buscar dados de Coletas através de queries GraphQL
+ * com proteções contra loops infinitos e circuit breaker.
  */
 public class ClienteApiGraphQL {
     private static final Logger logger = LoggerFactory.getLogger(ClienteApiGraphQL.class);
+    
+    // PROTEÇÕES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
+    private static final int MAX_REGISTROS_POR_EXECUCAO = 50000;
+    private static final int INTERVALO_LOG_PROGRESSO = 50;
+    
+    // CIRCUIT BREAKER - Controle de falhas consecutivas
+    private static final int MAX_FALHAS_CONSECUTIVAS = 5;
+    private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
+    private final Set<String> entidadesComCircuitAberto = new HashSet<>();
+    
     private final String urlBase;
     private final String endpointGraphQL;
     private final String token;
@@ -39,51 +53,109 @@ public class ClienteApiGraphQL {
     private final Duration timeoutRequisicao;
 
     /**
-     * Executa uma query GraphQL com paginação automática
+     * Executa uma query GraphQL com paginação automática e proteções contra loops infinitos
      * 
      * @param query Query GraphQL a ser executada
      * @param nomeEntidade Nome da entidade na resposta GraphQL
      * @param variaveis Variáveis da query GraphQL
      * @param tipoClasse Classe para desserialização tipada
-     * @return Lista completa de entidades de todas as páginas
+     * @return ResultadoExtracao indicando se a extração foi completa ou interrompida
      */
-    private <T> List<T> executarQueryPaginada(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
+    private <T> ResultadoExtracao<T> executarQueryPaginada(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
+        String chaveEntidade = "GraphQL-" + nomeEntidade;
+        
+        // CIRCUIT BREAKER - Verificar se a entidade está com circuit aberto
+        if (entidadesComCircuitAberto.contains(chaveEntidade)) {
+            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Entidade {} temporariamente desabilitada devido a falhas consecutivas", nomeEntidade);
+            return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
+        }
+        
+        logger.info("🔍 Executando query GraphQL paginada para entidade: {}", nomeEntidade);
+        
         List<T> todasEntidades = new ArrayList<>();
         String cursor = null;
         boolean hasNextPage = true;
         int paginaAtual = 1;
+        int totalRegistrosProcessados = 0;
+        boolean interrompido = false; // NOVO: Rastrear se foi interrompido
 
         while (hasNextPage) {
-            logger.debug("Executando página {} da query GraphQL para {}", paginaAtual, nomeEntidade);
-            
-            // Adicionar cursor às variáveis se não for a primeira página
-            Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
-            if (cursor != null) {
-                variaveisComCursor.put("after", cursor);
-            }
+            try {
+                // PROTEÇÃO 1: Limite máximo de páginas
+                int limitePaginas = CarregadorConfig.obterLimitePaginasApiGraphQL();
+                if (paginaAtual > limitePaginas) {
+                    logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
+                            nomeEntidade, limitePaginas);
+                    interrompido = true; // NOVO: Marcar como interrompido
+                    break;
+                }
 
-            // Executar a query para esta página
-            PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
-            
-            // Adicionar entidades desta página ao resultado total
-            todasEntidades.addAll(resposta.getEntidades());
-            
-            // Atualizar informações de paginação
-            hasNextPage = resposta.getHasNextPage();
-            cursor = resposta.getEndCursor();
-            
-            logger.debug("Página {} processada: {} entidades encontradas. Próxima página: {}", 
-                        paginaAtual, resposta.getEntidades().size(), hasNextPage);
-            
-            paginaAtual++;
-            
-            // Não é mais necessário pausar entre requisições - o GerenciadorRequisicaoHttp já controla o throttling
+                // PROTEÇÃO 2: Limite máximo de registros
+                if (totalRegistrosProcessados >= MAX_REGISTROS_POR_EXECUCAO) {
+                    logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
+                            nomeEntidade, MAX_REGISTROS_POR_EXECUCAO);
+                    interrompido = true; // NOVO: Marcar como interrompido
+                    break;
+                }
+
+                // Log de progresso a cada intervalo definido
+                if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
+                    logger.info("📊 Progresso GraphQL {}: Página {}, {} registros processados", 
+                            nomeEntidade, paginaAtual, totalRegistrosProcessados);
+                }
+
+                logger.debug("Executando página {} da query GraphQL para {}", paginaAtual, nomeEntidade);
+                
+                // Adicionar cursor às variáveis se não for a primeira página
+                Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
+                if (cursor != null) {
+                    variaveisComCursor.put("after", cursor);
+                }
+
+                // Executar a query para esta página
+                PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
+                
+                // Adicionar entidades desta página ao resultado total
+                todasEntidades.addAll(resposta.getEntidades());
+                totalRegistrosProcessados += resposta.getEntidades().size();
+                
+                // Reset do contador de falhas em caso de sucesso
+                contadorFalhasConsecutivas.put(chaveEntidade, 0);
+                
+                // Atualizar informações de paginação
+                hasNextPage = resposta.getHasNextPage();
+                cursor = resposta.getEndCursor();
+                
+                logger.debug("✅ Página {} processada: {} entidades encontradas. Próxima página: {} (Total: {})", 
+                            paginaAtual, resposta.getEntidades().size(), hasNextPage, totalRegistrosProcessados);
+                
+                paginaAtual++;
+                
+                // Não é mais necessário pausar entre requisições - o GerenciadorRequisicaoHttp já controla o throttling
+                
+            } catch (Exception e) {
+                logger.error("💥 Erro ao executar query GraphQL para entidade {} página {}: {}", 
+                        nomeEntidade, paginaAtual, e.getMessage(), e);
+                incrementarContadorFalhas(chaveEntidade, nomeEntidade);
+                break;
+            }
         }
 
-        logger.info("Paginação concluída para {}. Total de páginas: {}, Total de entidades: {}", 
-                   nomeEntidade, paginaAtual - 1, todasEntidades.size());
-        
-        return todasEntidades;
+        // NOVO: Retornar ResultadoExtracao baseado na flag de interrupção
+        if (interrompido) {
+            logger.warn("⚠️ Query GraphQL INCOMPLETA - Entidade {}: {} registros extraídos em {} páginas (INTERROMPIDA por proteções)", 
+                    nomeEntidade, totalRegistrosProcessados, paginaAtual - 1);
+            return ResultadoExtracao.incompleto(todasEntidades, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, paginaAtual - 1, totalRegistrosProcessados);
+        } else {
+            // Log final com resultado claro e diferenciado
+            if (todasEntidades.isEmpty()) {
+                logger.info("❌ Query GraphQL concluída - Entidade {}: Nenhum registro encontrado", nomeEntidade);
+            } else {
+                logger.info("✅ Query GraphQL COMPLETA - Entidade {}: {} registros extraídos em {} páginas (Proteções: ✓ Ativas)", 
+                        nomeEntidade, totalRegistrosProcessados, paginaAtual - 1);
+            }
+            return ResultadoExtracao.completo(todasEntidades, paginaAtual - 1, totalRegistrosProcessados);
+        }
     }
 
     /**
@@ -106,9 +178,9 @@ public class ClienteApiGraphQL {
      * Busca coletas via GraphQL para uma data específica
      * 
      * @param dataReferencia Data de referência para buscar as coletas (LocalDate)
-     * @return Lista de coletas encontradas
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
+    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
         String query = """
                 query BuscarColetas($params: PickInput!, $after: String) {
                     pick(params: $params, after: $after, first: 100) {
@@ -116,73 +188,35 @@ public class ClienteApiGraphQL {
                             cursor
                             node {
                                 id
-                                accountingCreditId
-                                accountingCreditInstallmentId
-                                adValoremSubtotal
-                                additionalsSubtotal
-                                admFeeSubtotal
-                                calculationType
-                                collectSubtotal
+                                agentId
+                                cancellationReason
+                                cancellationUserId
+                                cargoClassificationId
                                 comments
-                                corporationId
                                 costCenterId
-                                createdAt
-                                cubagesCubedWeight
-                                customerPriceTableId
-                                deliveryDeadlineInDays
-                                deliveryPredictionDate
-                                deliveryPredictionHour
-                                deliveryRegionId
-                                deliverySubtotal
-                                destinationCityId
-                                dispatchSubtotal
-                                draftEmissionAt
-                                emergencySubtotal
-                                emissionType
-                                finishedAt
-                                freightClassificationId
-                                freightCubagesCount
-                                freightInvoicesCount
-                                freightWeightSubtotal
-                                globalized
-                                globalizedType
-                                grisSubtotal
-                                insuranceAccountableType
-                                insuranceEnabled
-                                insuranceId
-                                insuredValue
-                                invoicesTotalVolumes
+                                destroyReason
+                                destroyUserId
+                                invoicesCubedWeight
                                 invoicesValue
+                                invoicesVolumes
                                 invoicesWeight
-                                itrSubtotal
-                                km
-                                modal
-                                modalCte
-                                nfseNumber
-                                nfseSeries
-                                otherFees
-                                paymentAccountableType
-                                paymentType
-                                previousDocumentType
-                                priceTableAccountableType
-                                productsValue
-                                realWeight
-                                redispatchSubtotal
-                                referenceNumber
-                                secCatSubtotal
-                                serviceAt
+                                lunchBreakEndHour
+                                lunchBreakStartHour
+                                notificationEmail
+                                notificationPhone
+                                pickTypeId
+                                pickupLocationId
+                                requestDate
+                                requestHour
+                                requester
+                                sequenceCode
                                 serviceDate
-                                serviceType
+                                serviceEndHour
+                                serviceStartHour
                                 status
-                                subtotal
-                                suframaSubtotal
+                                statusUpdatedAt
                                 taxedWeight
-                                tdeSubtotal
-                                tollSubtotal
-                                total
-                                totalCubicVolume
-                                trtSubtotal
-                                type
+                                vehicleTypeId
                             }
                         }
                         pageInfo {
@@ -198,8 +232,7 @@ public class ClienteApiGraphQL {
             "params", Map.of("requestDate", dataFormatada)
         );
 
-        logger.debug("Executando query GraphQL para coletas - URL: {}{}, Variáveis: {}", 
-                    urlBase, endpointGraphQL, variaveis);
+        logger.info("Buscando coletas via GraphQL - Data: {}", dataFormatada);
 
         return executarQueryPaginada(query, "pick", variaveis, ColetaNodeDTO.class);
     }
@@ -209,13 +242,13 @@ public class ClienteApiGraphQL {
 
 
     /**
-     * Busca fretes via GraphQL para uma data específica
+     * Busca fretes via GraphQL para as últimas 24 horas a partir de uma data de referência.
      * 
-     * @param dataReferencia Data de referência para buscar os fretes (LocalDate)
-     * @return Lista de fretes encontradas
+     * @param dataReferencia Data de referência que representa o FIM do intervalo de busca.
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
-        // Query GraphQL para fretes
+    public ResultadoExtracao<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
+        // A query GraphQL permanece a mesma, pois já está correta.
         String query = """
                 query BuscarFretes($params: FreightInput!, $after: String) {
                     freight(params: $params, after: $after, first: 100) {
@@ -299,21 +332,35 @@ public class ClienteApiGraphQL {
                     }
                 }""";
 
-        // Construir variáveis usando serviceAt e corporationId
-        String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
-        int corporationIdInt = Integer.parseInt(CarregadorConfig.obterCorporationId());
-        
+        // --- INÍCIO DAS MUDANÇAS ---
+
+        // 1. Calcular o intervalo de 24 horas
+        LocalDate dataInicio = dataReferencia.minusDays(1);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
+
+        // 2. Construir variáveis SEM o corporationId, usando o intervalo de datas
         Map<String, Object> variaveis = Map.of(
-            "params", Map.of(
-                "serviceAt", dataFormatada,
-                "corporationId", corporationIdInt
-            )
+            "params", Map.of("serviceAt", intervaloServiceAt)
         );
 
+        // 3. Atualizar os logs para refletir a nova busca
+        logger.info("🔍 Buscando fretes via GraphQL - Período: {}", intervaloServiceAt);
         logger.debug("Executando query GraphQL para fretes - URL: {}{}, Variáveis: {}", 
                     urlBase, endpointGraphQL, variaveis);
 
-        return executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
+        ResultadoExtracao<FreteNodeDTO> resultado = executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
+        
+        // 4. Atualizar o log de resultado
+        if (resultado.getDados().isEmpty()) {
+            logger.warn("❌ Sem fretes encontrados para o período {}", intervaloServiceAt);
+        } else {
+            logger.info("✅ Encontrados {} fretes para o período {}", resultado.getDados().size(), intervaloServiceAt);
+        }
+        
+        // --- FIM DAS MUDANÇAS ---
+        
+        return resultado;
     }
 
     /**
@@ -503,5 +550,24 @@ public class ClienteApiGraphQL {
      */
     private String formatarDataParaApiGraphQL(LocalDate data) {
         return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    }
+
+    /**
+     * Incrementa o contador de falhas consecutivas e ativa o circuit breaker se necessário.
+     * 
+     * @param chaveEntidade Chave identificadora da entidade GraphQL
+     * @param nomeEntidade Nome amigável da entidade para logs
+     */
+    private void incrementarContadorFalhas(String chaveEntidade, String nomeEntidade) {
+        int falhas = contadorFalhasConsecutivas.getOrDefault(chaveEntidade, 0) + 1;
+        contadorFalhasConsecutivas.put(chaveEntidade, falhas);
+        
+        if (falhas >= MAX_FALHAS_CONSECUTIVAS) {
+            entidadesComCircuitAberto.add(chaveEntidade);
+            logger.error("🚨 CIRCUIT BREAKER ATIVADO - Entidade {} ({}): {} falhas consecutivas. Entidade temporariamente desabilitada.", 
+                    chaveEntidade, nomeEntidade, falhas);
+        } else {
+            logger.warn("⚠️ Falha {}/{} para entidade {} ({})", falhas, MAX_FALHAS_CONSECUTIVAS, chaveEntidade, nomeEntidade);
+        }
     }
 }

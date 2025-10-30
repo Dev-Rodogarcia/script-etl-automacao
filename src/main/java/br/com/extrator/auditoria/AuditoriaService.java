@@ -2,8 +2,7 @@ package br.com.extrator.auditoria;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Instant;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -37,8 +36,8 @@ public class AuditoriaService {
     public ResultadoAuditoria executarAuditoriaCompleta() {
         logger.info("🔍 Iniciando auditoria completa dos dados extraídos");
         
-        final LocalDateTime agora = LocalDateTime.now();
-        final LocalDateTime inicio24h = agora.minusHours(24);
+        final Instant agora = Instant.now();
+        final Instant inicio24h = agora.minusSeconds(24 * 60 * 60); // 24 horas em segundos
         
         return executarAuditoriaPorPeriodo(inicio24h, agora);
     }
@@ -50,15 +49,15 @@ public class AuditoriaService {
      * @param dataFim Data de fim do período
      * @return ResultadoAuditoria com o resultado da auditoria
      */
-    public ResultadoAuditoria executarAuditoriaPorPeriodo(final LocalDateTime dataInicio, final LocalDateTime dataFim) {
+    public ResultadoAuditoria executarAuditoriaPorPeriodo(final Instant dataInicio, final Instant dataFim) {
         logger.info("🔍 Executando auditoria para período: {} até {}", 
-                   dataInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                   dataFim.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                   dataInicio.toString(),
+                   dataFim.toString());
         
         final ResultadoAuditoria resultado = new ResultadoAuditoria();
         resultado.setDataInicio(dataInicio);
         resultado.setDataFim(dataFim);
-        resultado.setDataExecucao(LocalDateTime.now());
+        resultado.setDataExecucao(Instant.now());
         
         try (final Connection conexao = GerenciadorConexao.obterConexao()) {
             // Validar cada entidade
@@ -103,8 +102,8 @@ public class AuditoriaService {
         logger.info("⚡ Executando auditoria rápida");
         
         try (final Connection conexao = GerenciadorConexao.obterConexao()) {
-            final LocalDateTime agora = LocalDateTime.now();
-            final LocalDateTime inicio24h = agora.minusHours(24);
+            final Instant agora = Instant.now();
+            final Instant inicio24h = agora.minusSeconds(24 * 60 * 60); // 24 horas em segundos
             
             return validator.verificarExistenciaDadosRecentes(conexao, inicio24h, agora);
             
@@ -124,8 +123,8 @@ public class AuditoriaService {
         logger.info("🔍 Validando entidade específica: {}", nomeEntidade);
         
         try (final Connection conexao = GerenciadorConexao.obterConexao()) {
-            final LocalDateTime agora = LocalDateTime.now();
-            final LocalDateTime inicio24h = agora.minusHours(24);
+            final Instant agora = Instant.now();
+            final Instant inicio24h = agora.minusSeconds(24 * 60 * 60);
             
             return validator.validarEntidade(conexao, nomeEntidade, inicio24h, agora);
             

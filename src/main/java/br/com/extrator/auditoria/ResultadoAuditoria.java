@@ -1,42 +1,42 @@
 package br.com.extrator.auditoria;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ResultadoAuditoria {
 
-    private LocalDateTime dataInicio;
-    private LocalDateTime dataFim;
+    private Instant dataInicio;
+    private Instant dataFim;
     private List<String> resultadosValidacao;
     private StatusAuditoria statusGeral;
     private String erro;
 
     public ResultadoAuditoria() {
-        this.dataInicio = LocalDateTime.now();
+        this.dataInicio = Instant.now();
         this.resultadosValidacao = new ArrayList<>();
     }
 
-    public ResultadoAuditoria(LocalDateTime dataInicio, LocalDateTime dataFim, List<String> resultadosValidacao) {
+    public ResultadoAuditoria(Instant dataInicio, Instant dataFim, List<String> resultadosValidacao) {
         this.dataInicio = dataInicio;
         this.dataFim = dataFim;
         this.resultadosValidacao = resultadosValidacao != null ? resultadosValidacao : new ArrayList<>();
     }
 
     // Getters e Setters
-    public LocalDateTime getDataInicio() {
+    public Instant getDataInicio() {
         return dataInicio;
     }
 
-    public void setDataInicio(LocalDateTime dataInicio) {
+    public void setDataInicio(Instant dataInicio) {
         this.dataInicio = dataInicio;
     }
 
-    public LocalDateTime getDataFim() {
+    public Instant getDataFim() {
         return dataFim;
     }
 
-    public void setDataFim(LocalDateTime dataFim) {
+    public void setDataFim(Instant dataFim) {
         this.dataFim = dataFim;
     }
 
@@ -64,7 +64,7 @@ public class ResultadoAuditoria {
         this.erro = erro;
     }
 
-    public void setDataExecucao(LocalDateTime dataExecucao) {
+    public void setDataExecucao(Instant dataExecucao) {
         this.dataInicio = dataExecucao;
     }
 

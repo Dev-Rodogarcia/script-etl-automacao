@@ -1,25 +1,31 @@
 package br.com.extrator.api;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoDTO;
+import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.util.CarregadorConfig;
 import br.com.extrator.util.GerenciadorRequisicaoHttp;
@@ -32,7 +38,7 @@ import br.com.extrator.util.GerenciadorRequisicaoHttp;
  */
 public class ClienteApiDataExport {
     private static final Logger logger = LoggerFactory.getLogger(ClienteApiDataExport.class);
-    
+
     // Atributos da classe
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -43,40 +49,49 @@ public class ClienteApiDataExport {
     private final int templateIdCotacoes;
     private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
     private final Duration timeoutRequisicao;
-    
-    // Constantes para template IDs da API Data Export
+
+    // PROTEÇÕES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
+    private static final int MAX_REGISTROS_POR_EXECUCAO = 10000;
+    private static final int INTERVALO_LOG_PROGRESSO = 10; // A cada 10 páginas
+
+    // CIRCUIT BREAKER
+    private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
+    private final Set<String> templatesComCircuitAberto = new HashSet<>();
+    private static final int MAX_FALHAS_CONSECUTIVAS = 5;
+
+    // Template IDs padrão para cada tipo de dados
     private static final int TEMPLATE_ID_MANIFESTOS = 6399;
     private static final int TEMPLATE_ID_LOCALIZACAO_CARGA = 8656;
     private static final int TEMPLATE_ID_COTACOES = 6906;
-    
-    // Constantes para nomes das tabelas e campos de filtro
-    private static final String TABELA_MANIFESTOS = "manifests";
+
+    // Campos de data corretos para cada template (descobertos via Postman)
     private static final String CAMPO_MANIFESTOS = "service_date";
-    
-    private static final String TABELA_LOCALIZACAO_CARGA = "freights";
+    private static final String CAMPO_COTACOES = "requested_at";
     private static final String CAMPO_LOCALIZACAO_CARGA = "service_at";
     
+    // Constantes para nomes de// Nomes das tabelas conforme API DataExport
+    private static final String TABELA_MANIFESTOS = "manifests";
     private static final String TABELA_COTACOES = "quotes";
-    private static final String CAMPO_COTACOES = "requested_at";
-    
+    private static final String TABELA_LOCALIZACAO_CARGA = "freights";
+
     /**
      * Construtor que inicializa o cliente da API Data Export.
      * Carrega as configurações necessárias e inicializa os componentes HTTP.
      */
     public ClienteApiDataExport() {
         logger.info("Inicializando cliente da API Data Export");
-        
+
         // Inicializa HttpClient e ObjectMapper
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
         this.objectMapper = new ObjectMapper();
-        
+
         // Carrega configurações usando CarregadorConfig
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.token = CarregadorConfig.obterTokenApiDataExport();
         this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
-        
+
         // Valida configurações obrigatórias
         if (urlBase == null || urlBase.trim().isEmpty()) {
             throw new IllegalStateException("URL base da API não configurada");
@@ -87,305 +102,328 @@ public class ClienteApiDataExport {
 
         // Inicializa IDs de template permitindo sobrescrita via env/properties
         this.templateIdManifestos = carregarTemplateId(
-            "API_DATAEXPORT_TEMPLATE_MANIFESTOS",
-            "api.dataexport.template.manifestos",
-            TEMPLATE_ID_MANIFESTOS
-        );
+                "API_DATAEXPORT_TEMPLATE_MANIFESTOS",
+                "api.dataexport.template.manifestos",
+                TEMPLATE_ID_MANIFESTOS);
         this.templateIdLocalizacaoCarga = carregarTemplateId(
-            "API_DATAEXPORT_TEMPLATE_LOCALIZACAO",
-            "api.dataexport.template.localizacao",
-            TEMPLATE_ID_LOCALIZACAO_CARGA
-        );
+                "API_DATAEXPORT_TEMPLATE_LOCALIZACAO",
+                "api.dataexport.template.localizacao",
+                TEMPLATE_ID_LOCALIZACAO_CARGA);
         this.templateIdCotacoes = carregarTemplateId(
-            "API_DATAEXPORT_TEMPLATE_COTACOES",
-            "api.dataexport.template.cotacoes",
-            TEMPLATE_ID_COTACOES
-        );
+                "API_DATAEXPORT_TEMPLATE_COTACOES",
+                "api.dataexport.template.cotacoes",
+                TEMPLATE_ID_COTACOES);
         logger.debug(
-            "Template IDs configurados: manifestos={}, localizacao={}, cotacoes={}",
-            templateIdManifestos, templateIdLocalizacaoCarga, templateIdCotacoes
-        );
-        
+                "Template IDs configurados: manifestos={}, localizacao={}, cotacoes={}",
+                templateIdManifestos, templateIdLocalizacaoCarga, templateIdCotacoes);
+
         // Inicializa o gerenciador de requisições HTTP
         this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
-        
+
         logger.info("Cliente da API Data Export inicializado com sucesso");
         logger.debug("URL base configurada: {}", urlBase);
     }
-    
+
     /**
-     * Busca dados de manifestos da API Data Export usando fluxo síncrono (resposta JSON).
+     * Busca dados de manifestos da API Data Export usando fluxo síncrono (resposta
+     * JSON).
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
-     * @return Lista de manifestos
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<ManifestoDTO> buscarManifestos(LocalDate dataReferencia) {
-        logger.info("Buscando manifestos da API DataExport para data: {}", dataReferencia);
-        return buscarDadosGenericos(
-            templateIdManifestos,
-            TABELA_MANIFESTOS,
-            CAMPO_MANIFESTOS,
-            dataReferencia,
-            ManifestoDTO.class
-        );
+    public ResultadoExtracao<ManifestoDTO> buscarManifestos() {
+        logger.info("Buscando manifestos da API DataExport (últimas 24h)");
+        Instant agora = Instant.now();
+        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        return buscarDadosGenericos(templateIdManifestos, TABELA_MANIFESTOS, CAMPO_MANIFESTOS,
+                new TypeReference<List<ManifestoDTO>>() {}, ontem, agora);
     }
-    
+
     /**
-     * Busca dados de cotações da API Data Export usando fluxo síncrono (resposta JSON).
+     * Busca dados de cotações da API Data Export usando fluxo síncrono (resposta
+     * JSON).
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
-     * @return Lista de cotações
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<CotacaoDTO> buscarCotacoes(LocalDate dataReferencia) {
-        logger.info("Buscando cotações da API DataExport para data: {}", dataReferencia);
-        return buscarDadosGenericos(
-            templateIdCotacoes,
-            TABELA_COTACOES,
-            CAMPO_COTACOES,
-            dataReferencia,
-            CotacaoDTO.class
-        );
+    public ResultadoExtracao<CotacaoDTO> buscarCotacoes() {
+        logger.info("Buscando cotações da API DataExport (últimas 24h)");
+        Instant agora = Instant.now();
+        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        return buscarDadosGenericos(templateIdCotacoes, TABELA_COTACOES, CAMPO_COTACOES,
+                new TypeReference<List<CotacaoDTO>>() {}, ontem, agora);
     }
-    
+
     /**
-     * Busca dados de localização de carga da API Data Export usando fluxo síncrono (resposta JSON).
+     * Busca dados de localização de carga da API Data Export usando fluxo síncrono
+     * (resposta JSON).
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
-     * @return Lista de localizações de carga
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<LocalizacaoCargaDTO> buscarLocalizacaoCarga(LocalDate dataReferencia) {
-        logger.info("Buscando localização de carga da API DataExport para data: {}", dataReferencia);
-        return buscarDadosGenericos(
-            templateIdLocalizacaoCarga,
-            TABELA_LOCALIZACAO_CARGA,
-            CAMPO_LOCALIZACAO_CARGA,
-            dataReferencia,
-            LocalizacaoCargaDTO.class
-        );
+    public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga() {
+        logger.info("Buscando localização de carga da API DataExport (últimas 24h)");
+        Instant agora = Instant.now();
+        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        return buscarDadosGenericos(templateIdLocalizacaoCarga, TABELA_LOCALIZACAO_CARGA, CAMPO_LOCALIZACAO_CARGA,
+                new TypeReference<List<LocalizacaoCargaDTO>>() {}, ontem, agora);
     }
-    
+
     /**
-     * Busca dados de manifestos usando fluxo síncrono (resposta JSON direta).
-     * Este método faz uma requisição GET direta para o endpoint /data e recebe os dados como JSON.
+     * Método genérico para buscar dados de qualquer template da API Data Export
+     * com proteções contra loops infinitos e circuit breaker.
      * 
-     * @param dataInicio Data de início para filtro no formato ISO (YYYY-MM-DD)
-     * @return Lista de manifestos
+     * @param templateId   ID do template na API Data Export
+     * @param nomeTabela   Nome da tabela para filtros
+     * @param campoData    Campo de data para filtros
+     * @param typeReference Referência de tipo para desserialização
+     * @param dataInicio   Data de início do período
+     * @param dataFim      Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public List<ManifestoDTO> buscarManifestosSincrono(String dataInicio) {
-        logger.info("Iniciando busca de manifestos (fluxo síncrono - resposta JSON) com data de início: {}", dataInicio);
+    private <T> ResultadoExtracao<T> buscarDadosGenericos(int templateId, String nomeTabela, String campoData,
+            TypeReference<List<T>> typeReference, Instant dataInicio, Instant dataFim) {
         
-        return buscarDadosGenericos(
-            templateIdManifestos,
-            TABELA_MANIFESTOS,
-            CAMPO_MANIFESTOS,
-            LocalDate.parse(dataInicio),
-            ManifestoDTO.class
-        );
-    }
-    
-    /**
-     * Método genérico consolidado para buscar dados da API Data Export.
-     * Implementa o fluxo síncrono com formatação correta de data para buscar dados do dia especificado.
-     * 
-     * @param templateId ID do template do relatório
-     * @param tabelaFiltro Nome da tabela para filtro
-     * @param campoFiltro Nome do campo para filtro de data
-     * @param dataReferencia Data de referência (dia de hoje)
-     * @param tipoClasse Classe para desserialização tipada
-     * @return Lista de entidades tipadas extraídas do JSON de resposta
-     */
-    private <T> List<T> buscarDadosGenericos(int templateId, String tabelaFiltro, 
-            String campoFiltro, LocalDate dataReferencia, Class<T> tipoClasse) {
+        // Determina o nome amigável do tipo de dados baseado na tabela
+        String tipoAmigavel = obterNomeAmigavelTipo(nomeTabela);
+        String chaveTemplate = "Template-" + templateId;
         
-        // Formatar data para API Data Export (YYYY-MM-DD)
-        String dataFormatada = formatarDataParaApiDataExport(dataReferencia);
+        // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
+        if (templatesComCircuitAberto.contains(chaveTemplate)) {
+            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado devido a falhas consecutivas", 
+                    templateId, tipoAmigavel);
+            return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
+        }
         
-        logger.info("Executando busca genérica - Template: {}, Tabela: {}, Campo: {}, Data: {}, Tipo: {}", 
-                templateId, tabelaFiltro, campoFiltro, dataFormatada, tipoClasse.getSimpleName());
-        
-        try {
-            // Constrói a URL final para fluxo síncrono (obrigatório incluir /data)
-            String urlFinal = urlBase + "/api/analytics/reports/" + templateId + "/data";
-            logger.debug("URL da requisição síncrona: {}", urlFinal);
-            
-            // Constrói o corpo da requisição JSON usando a mesma data para início e fim
-            String corpoRequisicao = construirCorpoRequisicaoSincrona(tabelaFiltro, campoFiltro, dataFormatada, dataFormatada);
-            logger.debug("Endpoint: {}, Payload: {}", urlFinal, corpoRequisicao);
-            
-            // Constrói a requisição HTTP
-            final String urlFinalParaLambda = urlFinal; // Variável final para uso na lambda
-            final String corpoRequisicaoFinal = corpoRequisicao; // Variável final para uso na lambda
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlFinalParaLambda))
-                    .method("GET", HttpRequest.BodyPublishers.ofString(corpoRequisicaoFinal))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .timeout(this.timeoutRequisicao)
-                    .build();
-            
-            // Executa a requisição usando GerenciadorRequisicaoHttp para garantir throttling e retry
-            logger.debug("Enviando requisição GET com corpo para template {} usando GerenciadorRequisicaoHttp", templateId);
-            HttpResponse<String> response = gerenciadorRequisicao.executarRequisicao(
-                    httpClient, 
-                    requisicao, 
-                    "DataExport-Template-" + templateId);
-            
-            // Verifica o status da resposta
-            int statusCode = response.statusCode();
-            logger.debug("Status da resposta: {}", statusCode);
-            
-            if (statusCode == 200) {
-                String responseBody = response.body();
-                logger.debug("Resposta recebida com sucesso. Tamanho: {} caracteres", responseBody.length());
-                
-                // Processa a resposta JSON e retorna as entidades tipadas
-                List<T> entidades = processarRespostaJsonTipada(responseBody, tipoClasse);
-                
-                // Log de diagnóstico para respostas vazias
-                if (entidades.isEmpty()) {
-                    logger.warn("API retornou status 200 mas nenhuma entidade foi processada. Resposta completa: {}", responseBody);
+        logger.info("🔍 Executando busca genérica - Template: {} ({}), Período: {} a {}", 
+                templateId, tipoAmigavel, 
+                dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate(), 
+                dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate());
+
+        List<T> resultadosFinais = new ArrayList<>();
+        int paginaAtual = 1;
+        boolean haMaisPaginas;
+        int totalRegistrosProcessados = 0;
+        boolean interrompido = false; // Rastrear se a extração foi interrompida
+
+        do {
+            try {
+                // PROTEÇÃO 1: Limite máximo de páginas
+                int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
+                if (paginaAtual > limitePaginas) {
+                    logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
+                            templateId, tipoAmigavel, limitePaginas);
+                    interrompido = true;
+                    break;
                 }
-                
-                return entidades;
-            } else {
-                logger.error("Erro na requisição para template {}. Status: {}, Resposta: {}", 
-                        templateId, statusCode, response.body());
-                return new ArrayList<>();
+
+                // PROTEÇÃO 2: Limite máximo de registros
+                if (totalRegistrosProcessados >= MAX_REGISTROS_POR_EXECUCAO) {
+                    logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
+                            templateId, tipoAmigavel, MAX_REGISTROS_POR_EXECUCAO);
+                    interrompido = true;
+                    break;
+                }
+
+                // Log de progresso a cada intervalo definido
+                if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
+                    logger.info("📊 Progresso Template {} ({}): Página {}, {} registros processados", 
+                            templateId, tipoAmigavel, paginaAtual, totalRegistrosProcessados);
+                }
+
+                // URL base limpa sem parâmetros de query (filtros e paginação vão no corpo JSON)
+                String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+
+                // Constrói o corpo JSON com search, page, per conforme formato do Postman
+                String corpoJson = construirCorpoRequisicao(nomeTabela, campoData, dataInicio, dataFim, paginaAtual);
+
+                logger.debug("Enviando requisição para URL: {} com corpo: {}", url, corpoJson);
+
+                HttpRequest requisicao = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .header("Authorization", "Bearer " + token)
+                        .header("Content-Type", "application/json")
+                        .timeout(this.timeoutRequisicao)
+                        .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson)) // GET com corpo JSON
+                        .build();
+
+                HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, 
+                        "DataExport-Template-" + templateId + "-Page-" + paginaAtual);
+
+                List<T> resultadosDaPagina = Collections.emptyList();
+                if (resposta.statusCode() == 200) {
+                    JsonNode raizJson = objectMapper.readTree(resposta.body());
+                    JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
+
+                    if (dadosNode != null && dadosNode.isArray() && dadosNode.size() > 0) {
+                        resultadosDaPagina = objectMapper.convertValue(dadosNode, typeReference);
+                        resultadosFinais.addAll(resultadosDaPagina);
+                        totalRegistrosProcessados += resultadosDaPagina.size();
+                        
+                        // Reset do contador de falhas em caso de sucesso
+                        contadorFalhasConsecutivas.put(chaveTemplate, 0);
+                        
+                        logger.debug("✅ Página {} processada: {} registros (Total: {})", 
+                                paginaAtual, resultadosDaPagina.size(), totalRegistrosProcessados);
+                    } else {
+                        logger.info("📄 Página {}: sem dados, fim da paginação", paginaAtual);
+                    }
+                } else {
+                    logger.error("❌ A requisição para a página {} do template {} falhou com status {}. Body: {}", 
+                            paginaAtual, templateId, resposta.statusCode(), resposta.body());
+                    
+                    // Incrementar contador de falhas
+                    incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                    break;
+                }
+
+                haMaisPaginas = !resultadosDaPagina.isEmpty();
+                paginaAtual++;
+
+            } catch (java.io.IOException e) {
+                logger.error("💥 Erro de I/O ou processamento JSON ao buscar dados do template {} página {}: {}", 
+                        templateId, paginaAtual, e.getMessage(), e);
+                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                break;
+            } catch (IllegalArgumentException e) {
+                logger.error("💥 Argumento inválido ao buscar dados do template {} página {}: {}", 
+                        templateId, paginaAtual, e.getMessage(), e);
+                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                break;
+            } catch (RuntimeException e) {
+                logger.error("💥 Erro de execução ao buscar dados do template {} página {}: {}", 
+                        templateId, paginaAtual, e.getMessage(), e);
+                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                break;
             }
-            
-        } catch (Exception e) {
-            logger.error("Erro inesperado ao buscar dados do template {}: {}", templateId, e.getMessage(), e);
-            return new ArrayList<>();
+        } while (haMaisPaginas);
+
+        // Log final com resultado claro e diferenciado
+        if (resultadosFinais.isEmpty()) {
+            logger.info("❌ Busca concluída - Template {}: Nenhum {} encontrado no período especificado", 
+                    templateId, tipoAmigavel.toLowerCase());
+        } else {
+            String statusExtracao = interrompido ? "INCOMPLETA" : "COMPLETA";
+            logger.info("✅ Busca {} - Template {}: {} {} extraídos em {} páginas (Proteções: ✓ Ativas)", 
+                    statusExtracao, templateId, totalRegistrosProcessados, tipoAmigavel.toLowerCase(), paginaAtual - 1);
+        }
+        
+        // Retornar ResultadoExtracao baseado no status da interrupção
+        if (interrompido) {
+            return ResultadoExtracao.incompleto(resultadosFinais, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
+                    paginaAtual - 1, totalRegistrosProcessados);
+        } else {
+            return ResultadoExtracao.completo(resultadosFinais, paginaAtual - 1, totalRegistrosProcessados);
         }
     }
 
     /**
-     * Formatar LocalDate para o formato esperado pela API Data Export (YYYY-MM-DD).
+     * Incrementa o contador de falhas consecutivas e ativa o circuit breaker se necessário.
      * 
-     * @param data Data a ser formatada
-     * @return String no formato YYYY-MM-DD
+     * @param chaveTemplate Chave identificadora do template
+     * @param tipoAmigavel Nome amigável do tipo para logs
      */
-    private String formatarDataParaApiDataExport(LocalDate data) {
-        return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-    }
-
-    /**
-     * Processa a resposta JSON da API Data Export e deserializa para entidades tipadas.
-     * 
-     * @param responseBody Corpo da resposta JSON
-     * @param tipoClasse Classe para desserialização tipada
-     * @return Lista de entidades tipadas
-     */
-    private <T> List<T> processarRespostaJsonTipada(String responseBody, Class<T> tipoClasse) {
-        List<T> entidades = new ArrayList<>();
+    private void incrementarContadorFalhas(String chaveTemplate, String tipoAmigavel) {
+        int falhas = contadorFalhasConsecutivas.getOrDefault(chaveTemplate, 0) + 1;
+        contadorFalhasConsecutivas.put(chaveTemplate, falhas);
         
-        try {
-            logger.debug("Iniciando processamento da resposta JSON para tipo {}", tipoClasse.getSimpleName());
-            
-            // Parse do JSON de resposta
-            JsonNode rootNode = objectMapper.readTree(responseBody);
-            
-            // Verifica se há dados na resposta
-            if (rootNode == null || !rootNode.has("data")) {
-                logger.warn("Resposta JSON não contém campo 'data'");
-                return entidades;
-            }
-            
-            JsonNode dataNode = rootNode.get("data");
-            if (!dataNode.isArray()) {
-                logger.warn("Campo 'data' não é um array");
-                return entidades;
-            }
-            
-            // Processa cada item do array de dados
-            for (JsonNode itemNode : dataNode) {
-                try {
-                    // Deserializa diretamente para a classe tipada usando Jackson
-                    T entidade = objectMapper.treeToValue(itemNode, tipoClasse);
-                    entidades.add(entidade);
-                } catch (JsonProcessingException | IllegalArgumentException e) {
-                    logger.warn("Erro ao deserializar item para {}: {}", tipoClasse.getSimpleName(), e.getMessage());
-                }
-            }
-            
-            logger.info("Processamento concluído. {} entidades {} extraídas", entidades.size(), tipoClasse.getSimpleName());
-            
-        } catch (IOException e) {
-            logger.error("Erro ao processar resposta JSON para tipo {}: {}", tipoClasse.getSimpleName(), e.getMessage(), e);
+        if (falhas >= MAX_FALHAS_CONSECUTIVAS) {
+            templatesComCircuitAberto.add(chaveTemplate);
+            logger.error("🚨 CIRCUIT BREAKER ATIVADO - Template {} ({}): {} falhas consecutivas. Template temporariamente desabilitado.", 
+                    chaveTemplate, tipoAmigavel, falhas);
+        } else {
+            logger.warn("⚠️ Falha {}/{} para template {} ({})", falhas, MAX_FALHAS_CONSECUTIVAS, chaveTemplate, tipoAmigavel);
         }
-        
-        return entidades;
     }
 
     /**
-     * Processa um arquivo Excel e deserializa para entidades tipadas.
+     * Determina o nome amigável do tipo de dados baseado no nome da tabela.
      * 
-     * @param dadosArquivo Dados binários do arquivo Excel
-     * @param tipoClasse Classe para desserialização tipada
-    /**
-     * Constrói o corpo da requisição JSON para o fluxo síncrono.
-     * 
-     * @param tabelaFiltro Nome da tabela para filtro
-     * @param campoFiltro Nome do campo para filtro de data
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
-     * @return String JSON do corpo da requisição
+     * @param nomeTabela Nome da tabela da API
+     * @return Nome amigável para logs
      */
-    private String construirCorpoRequisicaoSincrona(String tabelaFiltro, String campoFiltro, 
-            String dataInicio, String dataFim) {
+    private String obterNomeAmigavelTipo(String nomeTabela) {
+        return switch (nomeTabela) {
+            case TABELA_MANIFESTOS -> "Manifestos";
+            case TABELA_COTACOES -> "Cotações";
+            case TABELA_LOCALIZACAO_CARGA -> "Localizações de Carga";
+            default -> "Dados";
+        };
+    }
+
+    /**
+     * Carrega o ID do template a partir de variáveis de ambiente ou propriedades do sistema.
+     * 
+     * @param envName Nome da variável de ambiente
+     * @param propKey Chave da propriedade do sistema
+     * @param padrao  Valor padrão caso não seja encontrado
+     * @return ID do template configurado ou valor padrão
+     */
+    private int carregarTemplateId(String envName, String propKey, int padrao) {
+        // Tenta primeiro obter da variável de ambiente
+        String valorEnv = System.getenv(envName);
+        if (valorEnv != null && !valorEnv.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(valorEnv.trim());
+            } catch (NumberFormatException e) {
+                logger.warn("Valor inválido na variável de ambiente {}: '{}'. Tentando arquivo de configuração.",
+                        envName, valorEnv);
+            }
+        }
+
+        // Fallback para o arquivo config.properties usando CarregadorConfig
+        String valorProp = CarregadorConfig.obterPropriedade(propKey);
+        if (valorProp != null && !valorProp.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(valorProp.trim());
+            } catch (NumberFormatException e) {
+                logger.warn("Valor inválido na propriedade {}: '{}'. Usando valor padrão {}.",
+                        propKey, valorProp, padrao);
+            }
+        }
+
+        logger.info("Template ID não configurado (env: {}, prop: {}). Usando valor padrão: {}",
+                envName, propKey, padrao);
+        return padrao;
+    }
+
+    /**
+     * Constrói o corpo JSON da requisição conforme formato esperado pela API DataExport.
+     * Formato: {"search": {"nomeTabela": {"campoData": "yyyy-MM-dd - yyyy-MM-dd"}}, "page": "1", "per": "100"}
+     * 
+     * @param nomeTabela Nome da tabela para o campo search
+     * @param campoData Nome do campo de data específico do template
+     * @param dataInicio Data de início do filtro
+     * @param dataFim Data de fim do filtro
+     * @param pagina Número da página atual
+     * @return String JSON formatada para o corpo da requisição
+     */
+    private String construirCorpoRequisicao(String nomeTabela, String campoData, 
+            Instant dataInicio, Instant dataFim, int pagina) {
         try {
-            var objectNode = objectMapper.createObjectNode();
-            var filtersArray = objectMapper.createArrayNode();
-            
-            var filterObject = objectMapper.createObjectNode();
-            filterObject.put("table", tabelaFiltro);
-            filterObject.put("field", campoFiltro);
-            filterObject.put("operator", "between");
-            
-            var valuesArray = objectMapper.createArrayNode();
-            valuesArray.add(dataInicio);
-            valuesArray.add(dataFim);
-            
-            filterObject.set("values", valuesArray);
-            filtersArray.add(filterObject);
-            objectNode.set("filters", filtersArray);
-            
-            // Log de diagnóstico para mostrar o formato exato enviado para a API
-            logger.debug("Filtro construído: tabela={}, campo={}, intervalo=[{} - {}]", 
-                    tabelaFiltro, campoFiltro, dataInicio, dataFim);
-            
-            return objectMapper.writeValueAsString(objectNode);
+            ObjectNode corpo = objectMapper.createObjectNode();
+            ObjectNode search = objectMapper.createObjectNode();
+            ObjectNode table = objectMapper.createObjectNode();
+
+            // Formata as datas no formato yyyy-MM-dd - yyyy-MM-dd
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            String range = dataInicioStr + " - " + dataFimStr;
+
+            // Constrói a estrutura JSON conforme formato do Postman
+            table.put(campoData, range);
+            search.set(nomeTabela, table);
+
+            corpo.set("search", search);
+            corpo.put("page", String.valueOf(pagina));
+            corpo.put("per", "100");
+
+            String corpoJson = objectMapper.writeValueAsString(corpo);
+            logger.debug("Corpo JSON construído: {}", corpoJson);
+            return corpoJson;
             
         } catch (JsonProcessingException e) {
             logger.error("Erro ao construir corpo da requisição: {}", e.getMessage(), e);
             return "{}";
         }
     }
-
-    /**
-     * Carrega o ID de template permitindo sobrescrita por variável de ambiente ou propriedade.
-     * Prioriza variável de ambiente. Se inválido, retorna valor padrão.
-     *
-     * @param envName nome da variável de ambiente
-     * @param propKey chave da propriedade no arquivo de configuração
-     * @param padrao valor padrão em caso de ausência/erro
-     * @return id de template resolvido
-     */
-    private int carregarTemplateId(String envName, String propKey, int padrao) {
-        try {
-            String valorEnv = System.getenv(envName);
-            String valor = (valorEnv != null && !valorEnv.trim().isEmpty())
-                ? valorEnv
-                : CarregadorConfig.obterPropriedade(propKey);
-            if (valor != null && !valor.trim().isEmpty()) {
-                return Integer.parseInt(valor.trim());
-            }
-        } catch (NumberFormatException | SecurityException e) {
-            logger.warn("Template ID inválido para '{}'. Usando padrão {}. Detalhes: {}", propKey, padrao, e.getMessage());
-        }
-        return padrao;
-    }
-    
 
 }
