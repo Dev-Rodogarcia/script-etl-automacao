@@ -4,6 +4,8 @@ import br.com.extrator.db.entity.ManifestoEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -15,6 +17,8 @@ import java.time.format.DateTimeParseException;
  * dados na coluna de metadados.
  */
 public class ManifestoMapper {
+
+    private static final Logger logger = LoggerFactory.getLogger(ManifestoMapper.class);
 
     private final ObjectMapper objectMapper;
 
@@ -46,20 +50,22 @@ public class ManifestoMapper {
 
         // 2. Conversão segura de tipos de dados
         try {
-            if (dto.getCreatedAt() != null) {
+            if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
                 entity.setCreatedAt(OffsetDateTime.parse(dto.getCreatedAt()));
             }
-            if (dto.getDeparturedAt() != null) {
+            if (dto.getDeparturedAt() != null && !dto.getDeparturedAt().trim().isEmpty()) {
                 entity.setDeparturedAt(OffsetDateTime.parse(dto.getDeparturedAt()));
             }
-            if (dto.getFinishedAt() != null) {
+            if (dto.getFinishedAt() != null && !dto.getFinishedAt().trim().isEmpty()) {
                 entity.setFinishedAt(OffsetDateTime.parse(dto.getFinishedAt()));
             }
-            if (dto.getTotalCost() != null) {
+            if (dto.getTotalCost() != null && !dto.getTotalCost().trim().isEmpty()) {
                 entity.setTotalCost(new BigDecimal(dto.getTotalCost()));
             }
         } catch (DateTimeParseException | NumberFormatException e) {
-            System.err.println("Erro ao converter dados para o manifesto: " + dto.getSequenceCode() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter dados para manifesto {}: createdAt='{}', departuredAt='{}', finishedAt='{}', totalCost='{}' - {}", 
+                dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getFinishedAt(), dto.getTotalCost(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -67,7 +73,9 @@ public class ManifestoMapper {
             String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
             entity.setMetadata(metadata);
         } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para manifesto {}: {}", 
+                dto.getSequenceCode(), e.getMessage(), e);
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
         }
 
         return entity;

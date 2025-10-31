@@ -24,6 +24,11 @@ public class ResultadoValidacaoEntidade {
     private String colunaUtilizada;
     private String queryExecutada;
     
+    // Novos campos para comparação API vs Banco
+    private int registrosEsperadosApi;
+    private int diferencaRegistros;
+    private double percentualCompletude;
+    
     public ResultadoValidacaoEntidade() {
         this.observacoes = new ArrayList<>();
         this.status = StatusValidacao.PENDENTE;
@@ -77,6 +82,69 @@ public class ResultadoValidacaoEntidade {
         resultado.setNomeEntidade(entidade);
         resultado.setTotalRegistros(registros);
         resultado.setStatus(StatusValidacao.OK);
+        return resultado;
+    }
+    
+    /**
+     * Cria um resultado de validação para dados COMPLETOS (API = Banco).
+     * 
+     * @param entidade Nome da entidade
+     * @param esperadosApi Registros esperados da API
+     * @param extraidosBanco Registros extraídos do banco
+     * @return ResultadoValidacaoEntidade com status OK e dados de comparação
+     */
+    public static ResultadoValidacaoEntidade completo(String entidade, int esperadosApi, int extraidosBanco) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(extraidosBanco);
+        resultado.setRegistrosEsperadosApi(esperadosApi);
+        resultado.setDiferencaRegistros(extraidosBanco - esperadosApi);
+        resultado.setPercentualCompletude(100.0);
+        resultado.setStatus(StatusValidacao.OK);
+        resultado.adicionarObservacao(String.format("Dados completos: %d registros (API: %d, Banco: %d)", 
+            extraidosBanco, esperadosApi, extraidosBanco));
+        return resultado;
+    }
+    
+    /**
+     * Cria um resultado de validação para dados INCOMPLETOS (Banco < API).
+     * 
+     * @param entidade Nome da entidade
+     * @param esperadosApi Registros esperados da API
+     * @param extraidosBanco Registros extraídos do banco
+     * @return ResultadoValidacaoEntidade com status ALERTA e dados de comparação
+     */
+    public static ResultadoValidacaoEntidade incompleto(String entidade, int esperadosApi, int extraidosBanco) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(extraidosBanco);
+        resultado.setRegistrosEsperadosApi(esperadosApi);
+        resultado.setDiferencaRegistros(extraidosBanco - esperadosApi);
+        resultado.setPercentualCompletude((extraidosBanco * 100.0) / esperadosApi);
+        resultado.setStatus(StatusValidacao.ALERTA);
+        resultado.adicionarObservacao(String.format("Dados incompletos: %d/%d registros (%.1f%% - faltam %d)", 
+            extraidosBanco, esperadosApi, resultado.getPercentualCompletude(), esperadosApi - extraidosBanco));
+        return resultado;
+    }
+    
+    /**
+     * Cria um resultado de validação para dados DUPLICADOS (Banco > API).
+     * 
+     * @param entidade Nome da entidade
+     * @param esperadosApi Registros esperados da API
+     * @param extraidosBanco Registros extraídos do banco
+     * @return ResultadoValidacaoEntidade com status ALERTA e dados de comparação
+     */
+    public static ResultadoValidacaoEntidade duplicados(String entidade, int esperadosApi, int extraidosBanco) {
+        ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
+        resultado.setNomeEntidade(entidade);
+        resultado.setTotalRegistros(extraidosBanco);
+        resultado.setRegistrosEsperadosApi(esperadosApi);
+        resultado.setDiferencaRegistros(extraidosBanco - esperadosApi);
+        resultado.setPercentualCompletude((esperadosApi * 100.0) / extraidosBanco);
+        resultado.setStatus(StatusValidacao.ALERTA);
+        resultado.adicionarObservacao(String.format("Possíveis duplicados: %d registros (esperado: %d, excesso: %d)", 
+            extraidosBanco, esperadosApi, extraidosBanco - esperadosApi));
         return resultado;
     }
     
@@ -210,6 +278,30 @@ public class ResultadoValidacaoEntidade {
         this.queryExecutada = queryExecutada;
     }
     
+    public int getRegistrosEsperadosApi() {
+        return registrosEsperadosApi;
+    }
+    
+    public void setRegistrosEsperadosApi(final int registrosEsperadosApi) {
+        this.registrosEsperadosApi = registrosEsperadosApi;
+    }
+    
+    public int getDiferencaRegistros() {
+        return diferencaRegistros;
+    }
+    
+    public void setDiferencaRegistros(final int diferencaRegistros) {
+        this.diferencaRegistros = diferencaRegistros;
+    }
+    
+    public double getPercentualCompletude() {
+        return percentualCompletude;
+    }
+    
+    public void setPercentualCompletude(final double percentualCompletude) {
+        this.percentualCompletude = percentualCompletude;
+    }
+    
     /**
      * Retorna um resumo textual do resultado da validação.
      * 
@@ -240,7 +332,14 @@ public class ResultadoValidacaoEntidade {
     
     @Override
     public String toString() {
-        return String.format("ResultadoValidacaoEntidade{entidade='%s', status=%s, registros=%d, erro='%s'}", 
-                           nomeEntidade, status, totalRegistros, erro);
+        // Se tem dados de comparação API vs Banco, mostra formato detalhado
+        if (registrosEsperadosApi > 0) {
+            return String.format("ResultadoValidacaoEntidade{entidade='%s', status=%s, esperado=%d, extraido=%d, diferenca=%d, completude=%.1f%%}", 
+                               nomeEntidade, status, registrosEsperadosApi, (int)totalRegistros, diferencaRegistros, percentualCompletude);
+        } else {
+            // Formato antigo para compatibilidade
+            return String.format("ResultadoValidacaoEntidade{entidade='%s', status=%s, registros=%d, erro='%s'}", 
+                               nomeEntidade, status, totalRegistros, erro);
+        }
     }
 }

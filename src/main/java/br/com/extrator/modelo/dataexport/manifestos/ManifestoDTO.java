@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -171,6 +172,7 @@ public class ManifestoDTO {
         this.mdfeStatus = mdfeStatus;
     }
 
+    @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {
         return otherProperties;
     }

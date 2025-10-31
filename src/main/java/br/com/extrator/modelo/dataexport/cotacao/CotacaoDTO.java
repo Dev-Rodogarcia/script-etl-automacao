@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -159,6 +160,7 @@ public class CotacaoDTO {
         this.customerDocument = customerDocument;
     }
 
+    @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {
         return otherProperties;
     }

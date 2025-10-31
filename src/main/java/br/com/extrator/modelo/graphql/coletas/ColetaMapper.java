@@ -4,6 +4,8 @@ import br.com.extrator.db.entity.ColetaEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 
 /**
@@ -13,6 +15,8 @@ import java.time.LocalDate;
  * 100% dos dados originais sejam preservados na coluna de metadados.
  */
 public class ColetaMapper {
+
+    private static final Logger logger = LoggerFactory.getLogger(ColetaMapper.class);
 
     private final ObjectMapper objectMapper;
 
@@ -43,15 +47,16 @@ public class ColetaMapper {
 
         // 2. Conversão segura de tipos de data
         try {
-            if (dto.getRequestDate() != null) {
+            if (dto.getRequestDate() != null && !dto.getRequestDate().trim().isEmpty()) {
                 entity.setRequestDate(LocalDate.parse(dto.getRequestDate()));
             }
-            if (dto.getServiceDate() != null) {
+            if (dto.getServiceDate() != null && !dto.getServiceDate().trim().isEmpty()) {
                 entity.setServiceDate(LocalDate.parse(dto.getServiceDate()));
             }
         } catch (Exception e) {
-            // Logar o erro de parsing, se necessário
-            System.err.println("Erro ao converter data para a coleta ID: " + dto.getId() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter data para coleta ID {}: requestDate='{}', serviceDate='{}' - {}", 
+                dto.getId(), dto.getRequestDate(), dto.getServiceDate(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -60,7 +65,9 @@ public class ColetaMapper {
             String metadata = objectMapper.writeValueAsString(dto);
             entity.setMetadata(metadata);
         } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para coleta ID {}: {}", 
+                dto.getId(), e.getMessage(), e);
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":\"%s\"}", dto.getId()));
         }
 
         return entity;

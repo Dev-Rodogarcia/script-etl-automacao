@@ -1,12 +1,15 @@
 package br.com.extrator.modelo.rest.ocorrencias;
 
+import java.time.OffsetDateTime;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import br.com.extrator.db.entity.OcorrenciaEntity;
-
-import java.time.OffsetDateTime;
 
 /**
  * Mapper (Tradutor) que transforma o DTO aninhado de Ocorrência em uma
@@ -15,6 +18,7 @@ import java.time.OffsetDateTime;
  * e armazena o DTO original completo como metadados.
  */
 public class OcorrenciaMapper {
+    private static final Logger logger = LoggerFactory.getLogger(OcorrenciaMapper.class);
     private final ObjectMapper objectMapper;
 
     public OcorrenciaMapper() {
@@ -28,12 +32,12 @@ public class OcorrenciaMapper {
      * @param dto O objeto DTO com os dados da ocorrência.
      * @return Um objeto OcorrenciaEntity pronto para ser salvo.
      */
-    public OcorrenciaEntity toEntity(OcorrenciaDTO dto) {
+    public OcorrenciaEntity toEntity(final OcorrenciaDTO dto) {
         if (dto == null) {
             return null;
         }
 
-        OcorrenciaEntity entity = new OcorrenciaEntity();
+        final OcorrenciaEntity entity = new OcorrenciaEntity();
 
         // 1. Mapeamento do ID principal
         entity.setId(dto.getId());
@@ -54,21 +58,26 @@ public class OcorrenciaMapper {
 
         // 3. Conversão e tratamento de tipos de data/hora com fuso horário
         try {
-            if (dto.getOccurrenceAt() != null) {
+            if (dto.getOccurrenceAt() != null && !dto.getOccurrenceAt().trim().isEmpty()) {
                 // OffsetDateTime.parse é ideal para strings de data/hora com timezone (ISO 8601)
                 entity.setOccurrenceAt(OffsetDateTime.parse(dto.getOccurrenceAt()));
             }
-        } catch (Exception e) {
-            System.err.println("Erro ao converter data para a ocorrência ID: " + dto.getId() + " - " + e.getMessage());
+        } catch (final Exception e) {
+            logger.error("❌ Erro ao converter data para ocorrência ID {}: occurrenceAt='{}' - {}", 
+                dto.getId(), dto.getOccurrenceAt(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 4. Empacotamento de todos os metadados
         try {
             // Serializa o DTO original completo para a coluna de metadados
-            String metadata = objectMapper.writeValueAsString(dto);
+            final String metadata = objectMapper.writeValueAsString(dto);
             entity.setMetadata(metadata);
-        } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+        } catch (final JsonProcessingException e) {
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para ocorrência ID {}: {}", 
+                dto.getId(), e.getMessage(), e);
+            // Tenta serializar versão simplificada como fallback
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));
         }
 
         return entity;

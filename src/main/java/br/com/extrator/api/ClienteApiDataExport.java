@@ -1,11 +1,15 @@
 package br.com.extrator.api;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -422,6 +426,221 @@ public class ClienteApiDataExport {
             
         } catch (JsonProcessingException e) {
             logger.error("Erro ao construir corpo da requisição: {}", e.getMessage(), e);
+            return "{}";
+        }
+    }
+
+    /**
+     * Obtém a contagem total de manifestos para uma data de referência específica
+     * Baixa o CSV e conta as linhas de forma eficiente usando NIO
+     * 
+     * @param dataReferencia Data de referência para filtrar os manifestos
+     * @return Número total de manifestos encontrados
+     * @throws RuntimeException se houver erro no download ou processamento do CSV
+     */
+    public int obterContagemManifestos(final LocalDate dataReferencia) {
+        return obterContagemGenericaCsv(
+            templateIdManifestos, 
+            TABELA_MANIFESTOS, 
+            CAMPO_MANIFESTOS, 
+            dataReferencia, 
+            "manifestos"
+        );
+    }
+
+    /**
+     * Obtém a contagem total de cotações para uma data de referência específica
+     * Baixa o CSV e conta as linhas de forma eficiente usando NIO
+     * 
+     * @param dataReferencia Data de referência para filtrar as cotações
+     * @return Número total de cotações encontradas
+     * @throws RuntimeException se houver erro no download ou processamento do CSV
+     */
+    public int obterContagemCotacoes(final LocalDate dataReferencia) {
+        return obterContagemGenericaCsv(
+            templateIdCotacoes, 
+            TABELA_COTACOES, 
+            CAMPO_COTACOES, 
+            dataReferencia, 
+            "cotações"
+        );
+    }
+
+    /**
+     * Obtém a contagem total de localizações de carga para uma data de referência específica
+     * Baixa o CSV e conta as linhas de forma eficiente usando NIO
+     * 
+     * @param dataReferencia Data de referência para filtrar as localizações
+     * @return Número total de localizações de carga encontradas
+     * @throws RuntimeException se houver erro no download ou processamento do CSV
+     */
+    public int obterContagemLocalizacoesCarga(final LocalDate dataReferencia) {
+        return obterContagemGenericaCsv(
+            templateIdLocalizacaoCarga, 
+            TABELA_LOCALIZACAO_CARGA, 
+            CAMPO_LOCALIZACAO_CARGA, 
+            dataReferencia, 
+            "localizações de carga"
+        );
+    }
+
+    /**
+     * Método genérico para obter contagem de registros via download e contagem de CSV
+     * Implementa a estratégia recomendada na documentação: baixar CSV e contar linhas
+     * 
+     * @param templateId ID do template para a requisição
+     * @param nomeTabela Nome da tabela para filtros
+     * @param campoData Campo de data para filtros
+     * @param dataReferencia Data de referência para filtros
+     * @param tipoAmigavel Nome amigável do tipo de dados para logs
+     * @return Número total de registros encontrados
+     * @throws RuntimeException se houver erro no download ou processamento
+     */
+    private int obterContagemGenericaCsv(int templateId, String nomeTabela, String campoData, 
+            LocalDate dataReferencia, String tipoAmigavel) {
+        
+        String chaveTemplate = "Template-" + templateId;
+        
+        // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
+        if (templatesComCircuitAberto.contains(chaveTemplate)) {
+            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado para contagem", 
+                    templateId, tipoAmigavel);
+            return 0;
+        }
+
+        logger.info("🔢 Obtendo contagem de {} via CSV - Template: {}, Data: {}", 
+                tipoAmigavel, templateId, dataReferencia);
+
+        Path arquivoTemporario = null;
+        try {
+            // Converter LocalDate para Instant (início e fim do dia)
+            Instant dataInicio = dataReferencia.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+            Instant dataFim = dataReferencia.plusDays(1).atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+
+            // URL para download do CSV
+            String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+
+            // Construir corpo da requisição com per=1 para otimização (apenas primeira página)
+            String corpoJson = construirCorpoRequisicaoCsv(nomeTabela, campoData, dataInicio, dataFim);
+
+            logger.debug("Baixando CSV para contagem via URL: {} com corpo: {}", url, corpoJson);
+
+            HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "text/csv") // Solicitar formato CSV
+                    .timeout(this.timeoutRequisicao)
+                    .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson))
+                    .build();
+
+            final long inicioMs = System.currentTimeMillis();
+            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.httpClient, requisicao, "contagem-csv-" + tipoAmigavel.replace(" ", "-"));
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao baixar CSV para contagem de {}", tipoAmigavel);
+                throw new RuntimeException("Falha na requisição CSV: resposta é null");
+            }
+
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao baixar CSV para contagem de %s. Status: %d", 
+                    tipoAmigavel, resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                throw new RuntimeException(mensagemErro);
+            }
+
+            // Criar arquivo temporário no diretório temporário do sistema
+            arquivoTemporario = Files.createTempFile("contagem-" + tipoAmigavel.replace(" ", "-"), ".csv");
+            
+            // Escrever conteúdo CSV no arquivo temporário
+            Files.write(arquivoTemporario, resposta.body().getBytes());
+
+            // Contar linhas usando NIO de forma eficiente (sem carregar tudo na memória)
+            long totalLinhas;
+            try (var linhas = Files.lines(arquivoTemporario)) {
+                totalLinhas = linhas.count();
+            }
+
+            // Subtrair 1 para desconsiderar o cabeçalho
+            final int contagem = Math.max(0, (int) (totalLinhas - 1));
+
+            // Reset do contador de falhas em caso de sucesso
+            contadorFalhasConsecutivas.put(chaveTemplate, 0);
+
+            logger.info("✅ Contagem de {} obtida com sucesso via CSV: {} registros ({} ms)", 
+                    tipoAmigavel, contagem, duracaoMs);
+
+            return contagem;
+
+        } catch (final IOException e) {
+            logger.error("Erro de I/O ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
+            incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+            throw new RuntimeException("Erro de I/O ao processar contagem de " + tipoAmigavel + " via CSV", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro de runtime ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
+            incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+            throw e; // Re-lançar RuntimeException sem encapsular
+        } catch (final Exception e) {
+            logger.error("Erro inesperado ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
+            incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+            throw new RuntimeException("Erro inesperado ao processar contagem de " + tipoAmigavel + " via CSV", e);
+        } finally {
+            // Garantir que o arquivo temporário seja deletado
+            if (arquivoTemporario != null) {
+                try {
+                    Files.deleteIfExists(arquivoTemporario);
+                    logger.debug("Arquivo temporário deletado: {}", arquivoTemporario);
+                } catch (final IOException e) {
+                    logger.warn("Não foi possível deletar arquivo temporário {}: {}", 
+                            arquivoTemporario, e.getMessage());
+                } catch (final SecurityException e) {
+                    logger.warn("Sem permissão para deletar arquivo temporário {}: {}", 
+                            arquivoTemporario, e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Constrói o corpo da requisição JSON para contagem via CSV
+     * Similar ao método original, mas otimizado para contagem
+     * 
+     * @param nomeTabela Nome da tabela para filtros
+     * @param campoData Campo de data para filtros
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return String JSON do corpo da requisição
+     */
+    private String construirCorpoRequisicaoCsv(String nomeTabela, String campoData, 
+            Instant dataInicio, Instant dataFim) {
+        try {
+            ObjectNode corpo = objectMapper.createObjectNode();
+            ObjectNode search = objectMapper.createObjectNode();
+            ObjectNode table = objectMapper.createObjectNode();
+
+            // Formatar as datas no formato yyyy-MM-dd - yyyy-MM-dd
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            String range = dataInicioStr + " - " + dataFimStr;
+
+            // Construir a estrutura JSON
+            table.put(campoData, range);
+            search.set(nomeTabela, table);
+
+            corpo.set("search", search);
+            corpo.put("page", "1"); // Apenas primeira página para contagem
+            corpo.put("per", "10000"); // Máximo possível para obter todos os registros
+
+            String corpoJson = objectMapper.writeValueAsString(corpo);
+            logger.debug("Corpo JSON para contagem CSV construído: {}", corpoJson);
+            return corpoJson;
+            
+        } catch (JsonProcessingException e) {
+            logger.error("Erro ao construir corpo da requisição para contagem CSV: {}", e.getMessage(), e);
             return "{}";
         }
     }

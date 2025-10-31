@@ -159,6 +159,196 @@ public class ClienteApiGraphQL {
     }
 
     /**
+     * Obtém a contagem total de fretes para uma data de referência específica
+     * Usa uma query GraphQL otimizada que solicita apenas o totalCount
+     * 
+     * @param dataReferencia Data de referência para filtrar os fretes
+     * @return Número total de fretes encontrados
+     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     */
+    public int obterContagemFretes(final LocalDate dataReferencia) {
+        // Query GraphQL otimizada que solicita apenas totalCount
+        String query = """
+                query ContagemFretes($params: FreightInput!) {
+                    freight(params: $params) {
+                        totalCount
+                    }
+                }""";
+
+        try {
+            // Calcular o intervalo de 24 horas (mesmo padrão do buscarFretes)
+            LocalDate dataInicio = dataReferencia.minusDays(1);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
+
+            // Construir variáveis usando o intervalo de datas
+            Map<String, Object> variaveis = Map.of(
+                "params", Map.of("serviceAt", intervaloServiceAt)
+            );
+
+            logger.info("Obtendo contagem de fretes via GraphQL para período: {}", intervaloServiceAt);
+
+            // Construir o corpo da requisição GraphQL
+            ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            corpoJson.put("query", query);
+            corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
+            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
+
+            // Construir a requisição HTTP
+            HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(urlBase + endpointGraphQL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
+                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
+                    .timeout(this.timeoutRequisicao)
+                    .build();
+
+            // Executar a requisição
+            final long inicioMs = System.currentTimeMillis();
+            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "contagem-fretes-graphql");
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+
+            // Verificar se a resposta é válida
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao obter contagem de fretes via GraphQL");
+                throw new RuntimeException("Falha na requisição GraphQL: resposta é null");
+            }
+
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao obter contagem de fretes via GraphQL. Status: %d", 
+                    resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                throw new RuntimeException(mensagemErro);
+            }
+
+            // Parsear a resposta JSON
+            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+
+            // Verificar se há erros na resposta GraphQL
+            if (respostaJson.has("errors")) {
+                JsonNode erros = respostaJson.get("errors");
+                logger.error("Erros na query GraphQL de contagem de fretes: {}", erros.toString());
+                throw new RuntimeException("Erro na query GraphQL: " + erros.toString());
+            }
+
+            // Extrair totalCount da resposta
+            if (!respostaJson.has("data") || !respostaJson.get("data").has("freight") || 
+                !respostaJson.get("data").get("freight").has("totalCount")) {
+                logger.error("Estrutura JSON inválida: campo 'data.freight.totalCount' não encontrado na resposta GraphQL");
+                throw new RuntimeException("Resposta GraphQL não contém campo 'data.freight.totalCount'");
+            }
+
+            final int totalCount = respostaJson.get("data").get("freight").get("totalCount").asInt();
+            logger.info("Contagem de fretes obtida com sucesso via GraphQL: {} registros ({} ms)", totalCount, duracaoMs);
+
+            return totalCount;
+
+        } catch (final JsonProcessingException e) {
+            logger.error("Erro de processamento JSON ao obter contagem de fretes via GraphQL", e);
+            incrementarContadorFalhas("contagem-fretes-graphql", "contagem-fretes");
+            throw new RuntimeException("Erro ao processar JSON na contagem de fretes via GraphQL", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro ao obter contagem de fretes via GraphQL: {}", e.getMessage());
+            incrementarContadorFalhas("contagem-fretes-graphql", "contagem-fretes");
+            throw e;
+        }
+    }
+
+    /**
+     * Obtém a contagem total de coletas para uma data de referência específica
+     * Usa uma query GraphQL otimizada que solicita apenas o totalCount
+     * 
+     * @param dataReferencia Data de referência para filtrar as coletas
+     * @return Número total de coletas encontradas
+     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     */
+    public int obterContagemColetas(final LocalDate dataReferencia) {
+        // Query GraphQL otimizada que solicita apenas totalCount
+        String query = """
+                query ContagemColetas($params: PickInput!) {
+                    pick(params: $params) {
+                        totalCount
+                    }
+                }""";
+
+        try {
+            // Construir variáveis usando exclusivamente requestDate (mesmo padrão do buscarColetas)
+            String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
+            Map<String, Object> variaveis = Map.of(
+                "params", Map.of("requestDate", dataFormatada)
+            );
+
+            logger.info("Obtendo contagem de coletas via GraphQL para data: {}", dataFormatada);
+
+            // Construir o corpo da requisição GraphQL
+            ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            corpoJson.put("query", query);
+            corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
+            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
+
+            // Construir a requisição HTTP
+            HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(urlBase + endpointGraphQL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
+                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
+                    .timeout(this.timeoutRequisicao)
+                    .build();
+
+            // Executar a requisição
+            final long inicioMs = System.currentTimeMillis();
+            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "contagem-coletas-graphql");
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+
+            // Verificar se a resposta é válida
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao obter contagem de coletas via GraphQL");
+                throw new RuntimeException("Falha na requisição GraphQL: resposta é null");
+            }
+
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao obter contagem de coletas via GraphQL. Status: %d", 
+                    resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                throw new RuntimeException(mensagemErro);
+            }
+
+            // Parsear a resposta JSON
+            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+
+            // Verificar se há erros na resposta GraphQL
+            if (respostaJson.has("errors")) {
+                JsonNode erros = respostaJson.get("errors");
+                logger.error("Erros na query GraphQL de contagem de coletas: {}", erros.toString());
+                throw new RuntimeException("Erro na query GraphQL: " + erros.toString());
+            }
+
+            // Extrair totalCount da resposta
+            if (!respostaJson.has("data") || !respostaJson.get("data").has("pick") || 
+                !respostaJson.get("data").get("pick").has("totalCount")) {
+                logger.error("Estrutura JSON inválida: campo 'data.pick.totalCount' não encontrado na resposta GraphQL");
+                throw new RuntimeException("Resposta GraphQL não contém campo 'data.pick.totalCount'");
+            }
+
+            final int totalCount = respostaJson.get("data").get("pick").get("totalCount").asInt();
+            logger.info("Contagem de coletas obtida com sucesso via GraphQL: {} registros ({} ms)", totalCount, duracaoMs);
+
+            return totalCount;
+
+        } catch (final JsonProcessingException e) {
+            logger.error("Erro de processamento JSON ao obter contagem de coletas via GraphQL", e);
+            incrementarContadorFalhas("contagem-coletas-graphql", "contagem-coletas");
+            throw new RuntimeException("Erro ao processar JSON na contagem de coletas via GraphQL", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro ao obter contagem de coletas via GraphQL: {}", e.getMessage());
+            incrementarContadorFalhas("contagem-coletas-graphql", "contagem-coletas");
+            throw e;
+        }
+    }
+
+    /**
      * Construtor da classe ClienteApiGraphQL
      * Inicializa as configurações necessárias para comunicação com a API GraphQL
      */

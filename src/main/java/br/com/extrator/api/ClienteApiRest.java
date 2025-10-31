@@ -524,4 +524,216 @@ public class ClienteApiRest {
         }
     }
 
+    /**
+     * Obtém a contagem total de ocorrências para uma data de referência específica
+     * 
+     * @param dataReferencia Data de referência para filtrar as ocorrências
+     * @return Número total de ocorrências encontradas
+     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     */
+    public int obterContagemOcorrencias(final LocalDate dataReferencia) {
+        final String dataInicio = formatarDataParaApiRest(dataReferencia);
+        final String endpoint = "occurrences";
+        
+        try {
+            // Constrói a URL com filtros de data e per_page=1 para otimização
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
+                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+            
+            logger.info("Obtendo contagem de ocorrências para data: {} (URL: {})", dataReferencia, url);
+            
+            // Cria a requisição HTTP
+            final HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .timeout(timeoutRequisicao)
+                    .GET()
+                    .build();
+            
+            // Executa a requisição
+            final long inicioMs = System.currentTimeMillis();
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "contagem-ocorrencias");
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+            
+            // Verifica se a resposta é válida
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao obter contagem de ocorrências");
+                throw new RuntimeException("Falha na requisição: resposta é null");
+            }
+            
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao obter contagem de ocorrências. Status: %d", 
+                    resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                throw new RuntimeException(mensagemErro);
+            }
+            
+            // Processa a resposta JSON para extrair meta.total_count
+            final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
+            final JsonNode metaJson = raizJson.get("meta");
+            
+            if (metaJson == null || !metaJson.has("total_count")) {
+                logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
+                throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
+            }
+            
+            final int totalCount = metaJson.get("total_count").asInt();
+            logger.info("Contagem de ocorrências obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
+            
+            return totalCount;
+            
+        } catch (final IOException e) {
+            logger.error("Erro de I/O ao obter contagem de ocorrências", e);
+            incrementarFalhasConsecutivas("contagem-ocorrencias");
+            throw new RuntimeException("Erro ao comunicar com a API para contagem de ocorrências", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro ao obter contagem de ocorrências: {}", e.getMessage());
+            incrementarFalhasConsecutivas("contagem-ocorrencias");
+            throw e;
+        }
+    }
+
+    /**
+     * Obtém a contagem total de faturas a receber para uma data de referência específica
+     * 
+     * @param dataReferencia Data de referência para filtrar as faturas
+     * @return Número total de faturas a receber encontradas
+     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     */
+    public int obterContagemFaturasAReceber(final LocalDate dataReferencia) {
+        final String dataInicio = formatarDataParaApiRest(dataReferencia);
+        final String endpoint = "receivable_invoices";
+        
+        try {
+            // Constrói a URL com filtros de data e per_page=1 para otimização
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
+                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+            
+            logger.info("Obtendo contagem de faturas a receber para data: {} (URL: {})", dataReferencia, url);
+            
+            // Cria a requisição HTTP
+            final HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .timeout(timeoutRequisicao)
+                    .GET()
+                    .build();
+            
+            // Executa a requisição
+            final long inicioMs = System.currentTimeMillis();
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "contagem-faturas-receber");
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+            
+            // Verifica se a resposta é válida
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao obter contagem de faturas a receber");
+                throw new RuntimeException("Falha na requisição: resposta é null");
+            }
+            
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao obter contagem de faturas a receber. Status: %d", 
+                    resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                throw new RuntimeException(mensagemErro);
+            }
+            
+            // Processa a resposta JSON para extrair meta.total_count
+            final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
+            final JsonNode metaJson = raizJson.get("meta");
+            
+            if (metaJson == null || !metaJson.has("total_count")) {
+                logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
+                throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
+            }
+            
+            final int totalCount = metaJson.get("total_count").asInt();
+            logger.info("Contagem de faturas a receber obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
+            
+            return totalCount;
+            
+        } catch (final IOException e) {
+            logger.error("Erro de I/O ao obter contagem de faturas a receber", e);
+            incrementarFalhasConsecutivas("contagem-faturas-receber");
+            throw new RuntimeException("Erro ao comunicar com a API para contagem de faturas a receber", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro ao obter contagem de faturas a receber: {}", e.getMessage());
+            incrementarFalhasConsecutivas("contagem-faturas-receber");
+            throw e;
+        }
+    }
+
+    /**
+     * Obtém a contagem total de faturas a pagar para uma data de referência específica
+     * 
+     * @param dataReferencia Data de referência para filtrar as faturas
+     * @return Número total de faturas a pagar encontradas
+     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     */
+    public int obterContagemFaturasAPagar(final LocalDate dataReferencia) {
+        final String dataInicio = formatarDataParaApiRest(dataReferencia);
+        final String endpoint = "payable_invoices";
+        
+        try {
+            // Constrói a URL com filtros de data e per_page=1 para otimização
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
+                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+            
+            logger.info("Obtendo contagem de faturas a pagar para data: {} (URL: {})", dataReferencia, url);
+            
+            // Cria a requisição HTTP
+            final HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Authorization", "Bearer " + token)
+                    .header("Accept", "application/json")
+                    .timeout(timeoutRequisicao)
+                    .GET()
+                    .build();
+            
+            // Executa a requisição
+            final long inicioMs = System.currentTimeMillis();
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                    this.clienteHttp, requisicao, "contagem-faturas-pagar");
+            final long duracaoMs = System.currentTimeMillis() - inicioMs;
+            
+            // Verifica se a resposta é válida
+            if (resposta == null) {
+                logger.error("Erro: resposta nula ao obter contagem de faturas a pagar");
+                throw new RuntimeException("Falha na requisição: resposta é null");
+            }
+            
+            if (resposta.statusCode() != 200) {
+                final String mensagemErro = String.format("Erro ao obter contagem de faturas a pagar. Status: %d", 
+                    resposta.statusCode());
+                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
+                throw new RuntimeException(mensagemErro);
+            }
+            
+            // Processa a resposta JSON para extrair meta.total_count
+            final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
+            final JsonNode metaJson = raizJson.get("meta");
+            
+            if (metaJson == null || !metaJson.has("total_count")) {
+                logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
+                throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
+            }
+            
+            final int totalCount = metaJson.get("total_count").asInt();
+            logger.info("Contagem de faturas a pagar obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
+            
+            return totalCount;
+            
+        } catch (final IOException e) {
+            logger.error("Erro de I/O ao obter contagem de faturas a pagar", e);
+            incrementarFalhasConsecutivas("contagem-faturas-pagar");
+            throw new RuntimeException("Erro ao comunicar com a API para contagem de faturas a pagar", e);
+        } catch (final RuntimeException e) {
+            logger.error("Erro ao obter contagem de faturas a pagar: {}", e.getMessage());
+            incrementarFalhasConsecutivas("contagem-faturas-pagar");
+            throw e;
+        }
+    }
 }

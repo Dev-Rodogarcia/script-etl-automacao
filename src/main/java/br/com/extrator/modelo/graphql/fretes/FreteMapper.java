@@ -4,6 +4,8 @@ import br.com.extrator.db.entity.FreteEntity;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -15,6 +17,8 @@ import java.time.format.DateTimeParseException;
  * na coluna de metadados.
  */
 public class FreteMapper {
+
+    private static final Logger logger = LoggerFactory.getLogger(FreteMapper.class);
 
     private final ObjectMapper objectMapper;
 
@@ -48,17 +52,19 @@ public class FreteMapper {
 
         // 2. Conversão segura de tipos de data e hora
         try {
-            if (dto.getServiceAt() != null) {
+            if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
                 entity.setServicoEm(OffsetDateTime.parse(dto.getServiceAt()));
             }
-            if (dto.getCreatedAt() != null) {
+            if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
                 entity.setCriadoEm(OffsetDateTime.parse(dto.getCreatedAt()));
             }
-            if (dto.getDeliveryPredictionDate() != null) {
+            if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
                 entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));
             }
         } catch (DateTimeParseException e) {
-            System.err.println("Erro ao converter data para o frete ID: " + dto.getId() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter data para frete ID {}: serviceAt='{}', createdAt='{}', deliveryPredictionDate='{}' - {}", 
+                dto.getId(), dto.getServiceAt(), dto.getCreatedAt(), dto.getDeliveryPredictionDate(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -66,7 +72,9 @@ public class FreteMapper {
             String metadata = objectMapper.writeValueAsString(dto);
             entity.setMetadata(metadata);
         } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para frete ID {}: {}", 
+                dto.getId(), e.getMessage(), e);
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));
         }
 
         return entity;

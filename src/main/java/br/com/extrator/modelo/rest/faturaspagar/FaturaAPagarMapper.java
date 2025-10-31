@@ -3,6 +3,9 @@ package br.com.extrator.modelo.rest.faturaspagar;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -16,6 +19,7 @@ import br.com.extrator.db.entity.FaturaAPagarEntity;
  */
 public class FaturaAPagarMapper {
 
+    private static final Logger logger = LoggerFactory.getLogger(FaturaAPagarMapper.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -43,18 +47,20 @@ public class FaturaAPagarMapper {
 
         // 2. Conversão segura de tipos (String para tipos do banco)
         try {
-            if (dto.getIssueDate() != null) {
+            if (dto.getIssueDate() != null && !dto.getIssueDate().trim().isEmpty()) {
                 entity.setIssueDate(LocalDate.parse(dto.getIssueDate()));
             }
-            if (dto.getDueDate() != null) {
+            if (dto.getDueDate() != null && !dto.getDueDate().trim().isEmpty()) {
                 entity.setDueDate(LocalDate.parse(dto.getDueDate()));
             }
-            if (dto.getValue() != null) {
+            if (dto.getValue() != null && !dto.getValue().trim().isEmpty()) {
                 entity.setTotalValue(new BigDecimal(dto.getValue()));
             }
         } catch (final Exception e) {
-            // Aqui você pode logar um erro de parsing, se necessário
-            System.err.println("Erro ao converter dados para a fatura ID: " + dto.getId() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter dados para fatura a pagar ID {}: issueDate='{}', dueDate='{}', value='{}' - {}", 
+                dto.getId(), dto.getIssueDate(), dto.getDueDate(), dto.getValue(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
+            // Mantém NULL mas REGISTRA o problema
         }
 
         // 3. Empacotamento dos metadados
@@ -63,11 +69,18 @@ public class FaturaAPagarMapper {
             final String headerMetadata = objectMapper.writeValueAsString(dto);
             entity.setHeaderMetadata(headerMetadata);
         } catch (final JsonProcessingException e) {
-            entity.setHeaderMetadata("{\"error\":\"Falha ao serializar metadados do cabeçalho\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar header metadata para fatura a pagar ID {}: {}", 
+                dto.getId(), e.getMessage(), e);
+            entity.setHeaderMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));
         }
 
-        // Armazena o JSON bruto dos títulos/parcelas diretamente
-        entity.setInstallmentsMetadata(installmentsJson);
+        // Armazena o JSON bruto dos títulos/parcelas diretamente (com validação)
+        if (installmentsJson != null && !installmentsJson.trim().isEmpty()) {
+            entity.setInstallmentsMetadata(installmentsJson);
+        } else {
+            logger.warn("⚠️ installmentsJson está nulo ou vazio para fatura a pagar ID {}", dto.getId());
+            entity.setInstallmentsMetadata("[]"); // Array vazio como fallback
+        }
 
         return entity;
     }

@@ -1,5 +1,6 @@
 package br.com.extrator.modelo.rest.ocorrencias;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.HashMap;
@@ -39,6 +40,11 @@ public class OcorrenciaDTO {
     @JsonAnySetter
     public void add(String key, Object value) {
         this.otherProperties.put(key, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getOtherProperties() {
+        return otherProperties;
     }
 
     // --- Getters e Setters ---
@@ -91,7 +97,6 @@ public class OcorrenciaDTO {
         this.occurrenceDetails = occurrenceDetails;
     }
 
-    public Map<String, Object> getOtherProperties() {
-        return otherProperties;
-    }
+    // Método getOtherProperties() já foi movido para cima com @JsonAnyGetter
 }
+

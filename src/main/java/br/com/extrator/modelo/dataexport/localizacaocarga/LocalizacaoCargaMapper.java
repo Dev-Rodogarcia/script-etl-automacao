@@ -8,14 +8,18 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
- * Mapper (Tradutor) que transforma o LocalizacaoCargaDTO (dados brutos do Data Export)
+ * Mapper (Tradutor) que transforma o LocalizacaoCargaDTO (dados brutos da API Data Export)
  * em uma LocalizacaoCargaEntity (pronta para o banco de dados).
- * É responsável pela conversão de tipos (String para BigDecimal/OffsetDateTime)
- * e pela serialização de todos os dados na coluna de metadados.
+ *
+ * @author Lucas
  */
 public class LocalizacaoCargaMapper {
 
+    private static final Logger logger = LoggerFactory.getLogger(LocalizacaoCargaMapper.class);
     private final ObjectMapper objectMapper;
 
     public LocalizacaoCargaMapper() {
@@ -43,17 +47,19 @@ public class LocalizacaoCargaMapper {
 
         // 2. Conversão segura de tipos de dados
         try {
-            if (dto.getServiceAt() != null) {
+            if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
                 entity.setServiceAt(OffsetDateTime.parse(dto.getServiceAt()));
             }
-            if (dto.getPredictedDeliveryAt() != null) {
+            if (dto.getPredictedDeliveryAt() != null && !dto.getPredictedDeliveryAt().trim().isEmpty()) {
                 entity.setPredictedDeliveryAt(OffsetDateTime.parse(dto.getPredictedDeliveryAt()));
             }
-            if (dto.getTotalValue() != null) {
+            if (dto.getTotalValue() != null && !dto.getTotalValue().trim().isEmpty()) {
                 entity.setTotalValue(new BigDecimal(dto.getTotalValue()));
             }
         } catch (DateTimeParseException | NumberFormatException e) {
-            System.err.println("Erro ao converter dados para o registro: " + dto.getSequenceNumber() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter dados para localização carga {}: serviceAt='{}', predictedDeliveryAt='{}', totalValue='{}' - {}", 
+                dto.getSequenceNumber(), dto.getServiceAt(), dto.getPredictedDeliveryAt(), dto.getTotalValue(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -61,7 +67,9 @@ public class LocalizacaoCargaMapper {
             String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
             entity.setMetadata(metadata);
         } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para localização carga {}: {}", 
+                dto.getSequenceNumber(), e.getMessage(), e);
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_number\":%d}", dto.getSequenceNumber()));
         }
 
         return entity;

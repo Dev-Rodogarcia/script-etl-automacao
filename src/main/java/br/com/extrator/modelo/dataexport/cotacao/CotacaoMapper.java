@@ -8,14 +8,20 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Mapper (Tradutor) que transforma o CotacaoDTO (dados brutos da API Data Export)
  * em uma CotacaoEntity (pronta para o banco de dados).
  * É responsável pela conversão de tipos (String para BigDecimal/OffsetDateTime)
  * e pela serialização de todos os dados na coluna de metadados.
+ *
+ * @author Lucas
  */
 public class CotacaoMapper {
 
+    private static final Logger logger = LoggerFactory.getLogger(CotacaoMapper.class);
     private final ObjectMapper objectMapper;
 
     public CotacaoMapper() {
@@ -45,20 +51,22 @@ public class CotacaoMapper {
 
         // 2. Conversão segura de tipos de dados (String para tipos específicos)
         try {
-            if (dto.getRequestedAt() != null) {
+            if (dto.getRequestedAt() != null && !dto.getRequestedAt().trim().isEmpty()) {
                 entity.setRequestedAt(OffsetDateTime.parse(dto.getRequestedAt()));
             }
-            if (dto.getTotalValue() != null) {
+            if (dto.getTotalValue() != null && !dto.getTotalValue().trim().isEmpty()) {
                 entity.setTotalValue(new BigDecimal(dto.getTotalValue()));
             }
-            if (dto.getTaxedWeight() != null) {
+            if (dto.getTaxedWeight() != null && !dto.getTaxedWeight().trim().isEmpty()) {
                 entity.setTaxedWeight(new BigDecimal(dto.getTaxedWeight()));
             }
-            if (dto.getInvoicesValue() != null) {
+            if (dto.getInvoicesValue() != null && !dto.getInvoicesValue().trim().isEmpty()) {
                 entity.setInvoicesValue(new BigDecimal(dto.getInvoicesValue()));
             }
         } catch (DateTimeParseException | NumberFormatException e) {
-            System.err.println("Erro ao converter dados para a cotação: " + dto.getSequenceCode() + " - " + e.getMessage());
+            logger.error("❌ Erro ao converter dados para cotação {}: requestedAt='{}', totalValue='{}', taxedWeight='{}', invoicesValue='{}' - {}", 
+                dto.getSequenceCode(), dto.getRequestedAt(), dto.getTotalValue(), dto.getTaxedWeight(), dto.getInvoicesValue(), e.getMessage());
+            logger.debug("Stack trace completo:", e);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -67,7 +75,9 @@ public class CotacaoMapper {
             String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
             entity.setMetadata(metadata);
         } catch (JsonProcessingException e) {
-            entity.setMetadata("{\"error\":\"Falha ao serializar metadados\"}");
+            logger.error("❌ CRÍTICO: Falha ao serializar metadados para cotação {}: {}", 
+                dto.getSequenceCode(), e.getMessage(), e);
+            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
         }
 
         return entity;

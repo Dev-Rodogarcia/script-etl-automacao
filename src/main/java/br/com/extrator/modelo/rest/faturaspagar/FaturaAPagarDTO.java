@@ -1,5 +1,6 @@
 package br.com.extrator.modelo.rest.faturaspagar;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.HashMap;
@@ -101,6 +102,7 @@ public class FaturaAPagarDTO {
         this.receiver = receiver;
     }
 
+    @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {
         return otherProperties;
     }

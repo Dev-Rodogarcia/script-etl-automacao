@@ -1,5 +1,6 @@
 package br.com.extrator.modelo.rest.faturasreceber;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.HashMap;
@@ -39,7 +40,7 @@ public class FaturaAReceberDTO {
     // --- Contêiner Dinâmico ("Resto") ---
     // Este mapa capturará todos os campos não declarados explicitamente,
     // como 'installments', 'comments', etc.
-    private Map<String, Object> otherProperties = new HashMap<>();
+    private final Map<String, Object> otherProperties = new HashMap<>();
 
     @JsonAnySetter
     public void add(String key, Object value) {
@@ -104,6 +105,7 @@ public class FaturaAReceberDTO {
         this.customer = customer;
     }
 
+    @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {
         return otherProperties;
     }
