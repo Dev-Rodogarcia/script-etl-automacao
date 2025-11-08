@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -32,24 +33,22 @@ import br.com.extrator.modelo.rest.ocorrencias.OcorrenciaDTO;
 import br.com.extrator.util.CarregadorConfig;
 import br.com.extrator.util.GerenciadorRequisicaoHttp;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-
 /**
  * Classe responsável pela comunicação com a API REST do ESL Cloud
  * Especializada em buscar Faturas e Ocorrências via endpoints REST
  */
 public class ClienteApiRest {
     private static final Logger logger = LoggerFactory.getLogger(ClienteApiRest.class);
-    
+
     // Limites configuráveis para paginação
     private final int maxPaginasPorExecucao;
     private final int intervaloPaginasLog;
-    
+
     // Circuit Breaker - Controle de falhas consecutivas
     private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
     private final Set<String> entidadesComCircuitAberto = new HashSet<>();
     private static final int MAX_FALHAS_CONSECUTIVAS = 5;
-    
+
     private final String urlBase;
     private final String token;
     private final HttpClient clienteHttp;
@@ -77,117 +76,165 @@ public class ClienteApiRest {
 
     /**
      * Busca faturas a RECEBER da API REST.
-     * Endpoint sugerido baseado na documentação do projeto.
+     * Utiliza janela móvel de 24 horas para capturar todos os dados
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @param dataReferencia Data de referência para busca (não utilizada - mantida
+     *                       para compatibilidade)
      * @return Lista de DTOs de faturas a receber
      */
     public ResultadoExtracao<FaturaAReceberDTO> buscarFaturasAReceber(final LocalDate dataReferencia) {
-        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesComResultado("/api/accounting/credit/billings", dataInicioFormatada, "faturas_a_receber", FaturaAReceberDTO.class);
+        // CORREÇÃO: Usa janela móvel de 24h em vez de meia-noite para capturar 100% dos
+        // dados
+        final ZonedDateTime agora = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
+        final ZonedDateTime dataInicio = agora.minusHours(24);
+        final String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+
+        logger.info("Buscando faturas a receber com janela móvel de 24h: {} até {}",
+                dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                agora.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+
+        return buscarEntidadesComResultado("/api/accounting/credit/billings", dataInicioFormatada, "faturas_a_receber",
+                FaturaAReceberDTO.class);
     }
 
     /**
      * Busca faturas a PAGAR da API REST.
-     * Endpoint sugerido baseado na documentação do projeto.
+     * Utiliza janela móvel de 24 horas para capturar todos os dados
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @param dataReferencia Data de referência para busca (não utilizada - mantida
+     *                       para compatibilidade)
      * @return Lista de DTOs de faturas a pagar
      */
     public ResultadoExtracao<FaturaAPagarDTO> buscarFaturasAPagar(final LocalDate dataReferencia) {
-        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesComResultado("/api/accounting/debit/billings", dataInicioFormatada, "faturas_a_pagar", FaturaAPagarDTO.class);
+        // CORREÇÃO: Usa janela móvel de 24h em vez de meia-noite para capturar 100% dos
+        // dados
+        final ZonedDateTime agora = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
+        final ZonedDateTime dataInicio = agora.minusHours(24);
+        final String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+
+        logger.info("Buscando faturas a pagar com janela móvel de 24h: {} até {}",
+                dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                agora.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+
+        return buscarEntidadesComResultado("/api/accounting/debit/billings", dataInicioFormatada, "faturas_a_pagar",
+                FaturaAPagarDTO.class);
     }
 
     /**
      * Busca ocorrências da API REST ESL Cloud com paginação
+     * Utiliza janela móvel de 24 horas para capturar todos os dados
      * 
-     * @param dataReferencia Data de referência para busca (dia de hoje)
+     * @param dataReferencia Data de referência para busca (não utilizada - mantida
+     *                       para compatibilidade)
      * @return Lista de DTOs de ocorrências
      */
     public ResultadoExtracao<OcorrenciaDTO> buscarOcorrencias(final LocalDate dataReferencia) {
-        String dataInicioFormatada = formatarDataParaApiRest(dataReferencia);
-        return buscarEntidadesComResultado("/api/invoice_occurrences", dataInicioFormatada, "ocorrencias", OcorrenciaDTO.class);
+        // CORREÇÃO: Usa janela móvel de 24h em vez de meia-noite para capturar 100% dos
+        // dados
+        final ZonedDateTime agora = ZonedDateTime.now(ZoneId.of("America/Sao_Paulo"));
+        final ZonedDateTime dataInicio = agora.minusHours(24);
+        final String dataInicioFormatada = dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+
+        logger.info("Buscando ocorrências com janela móvel de 24h: {} até {}",
+                dataInicio.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                agora.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+
+        return buscarEntidadesComResultado("/api/invoice_occurrences", dataInicioFormatada, "ocorrencias",
+                OcorrenciaDTO.class);
     }
 
     /**
-     * Busca itens/parcelas de uma fatura a pagar específica.
+     * Busca itens/parcelas de uma fatura a pagar.
+     * Inclui delay intencional de 2.2s para respeitar rate limit da API.
      * 
      * @param idFatura ID da fatura para buscar os itens
      * @return JSON bruto dos itens da fatura
      */
-    public String buscarItensFaturaAPagar(Long idFatura) {
+    public String buscarItensFaturaAPagar(final Long idFatura) {
         logger.info("Buscando itens da fatura a pagar ID: {}", idFatura);
-        
+
         try {
-            String endpoint = String.format("/api/accounting/debit/billings/%d/installments", idFatura);
-            String urlCompleta = urlBase + endpoint;
-            
-            HttpRequest requisicao = HttpRequest.newBuilder()
+            // Delay CRÍTICO: respeita rate limit de 2s da API + margem de segurança
+            aplicarDelayRateLimit("fatura-" + idFatura);
+
+            final String endpoint = String.format("/api/accounting/debit/billings/%d/installments", idFatura);
+            final String urlCompleta = urlBase + endpoint;
+
+            final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(urlCompleta))
                     .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
                     .timeout(this.timeoutRequisicao)
                     .GET()
                     .build();
-            
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
                     this.clienteHttp, requisicao, "ItensFaturaAPagar-" + idFatura);
-            
+
             if (resposta.statusCode() == 200) {
                 logger.debug("Itens da fatura {} obtidos com sucesso", idFatura);
                 return resposta.body();
             } else {
-                logger.error("Erro ao buscar itens da fatura {}: HTTP {} - {}", 
-                    idFatura, resposta.statusCode(), resposta.body());
+                logger.error("Erro ao buscar itens da fatura {}: HTTP {} - {}",
+                        idFatura, resposta.statusCode(), resposta.body());
                 return "{}";
             }
-            
-        } catch (Exception e) {
-            logger.error("Erro ao buscar itens da fatura {}: {}", idFatura, e.getMessage(), e);
-            return "{}";
+
+        } catch (final Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("HTTP 404")) {
+                logger.debug("Fatura {} não possui itens (HTTP 404 - esperado)", idFatura);
+                return "{}";
+            } else {
+                logger.error("Erro ao buscar itens da fatura {}: {}", idFatura, e.getMessage(), e);
+                return "{}";
+            }
         }
     }
 
     /**
      * Formata um LocalDate para o formato esperado pela API REST.
-     * Converte para início do dia no fuso horário do Brasil (America/Sao_Paulo) 
+     * Converte para início do dia no fuso horário do Brasil (America/Sao_Paulo)
      * e formata como ISO 8601 completo com offset de timezone.
      * 
      * @param dataReferencia Data de referência
      * @return String formatada para API REST (ex: 2025-10-27T00:00:00-03:00)
      */
-    private String formatarDataParaApiRest(LocalDate dataReferencia) {
-        ZonedDateTime inicioDodia = dataReferencia.atStartOfDay(ZoneId.of("America/Sao_Paulo"));
+    private String formatarDataParaApiRest(final LocalDate dataReferencia) {
+        final ZonedDateTime inicioDodia = dataReferencia.atStartOfDay(ZoneId.of("America/Sao_Paulo"));
         return inicioDodia.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
     /**
-     * Busca entidades tipadas com resultado detalhado incluindo informações de paginação
+     * Busca entidades tipadas com resultado detalhado incluindo informações de
+     * paginação
      * 
-     * @param <T> Tipo da entidade
-     * @param endpoint Endpoint da API
-     * @param dataInicio Data de início formatada
-     * @param tipoEntidade Nome do tipo de entidade para logs
+     * @param <T>            Tipo da entidade
+     * @param endpoint       Endpoint da API
+     * @param dataInicio     Data de início formatada
+     * @param tipoEntidade   Nome do tipo de entidade para logs
      * @param classeEntidade Classe da entidade
      * @return ResultadoExtracao com dados e informações de paginação
      */
     public <T> ResultadoExtracao<T> buscarEntidadesComResultado(final String endpoint, final String dataInicio,
             final String tipoEntidade, final Class<T> classeEntidade) {
         logger.info("Iniciando busca de {} a partir de: {}", endpoint, dataInicio);
-        
+
         // Circuit Breaker - Verifica se o circuit está aberto para esta entidade
         if (entidadesComCircuitAberto.contains(tipoEntidade)) {
             logger.warn("Circuit Breaker ABERTO para {}. Retornando resultado vazio.", tipoEntidade);
             return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
         }
-        
+
         final List<T> entidades = new ArrayList<>();
 
         String proximoId = null;
         boolean primeiraPagina = true;
         int paginasProcessadas = 0;
         boolean interrompidoPorLimite = false;
+
+        // Proteção inteligente contra loops infinitos
+        int paginasVaziasConsecutivas = 0;
+        final int MAX_PAGINAS_VAZIAS_CONSECUTIVAS = 10;
 
         // Validação básica de configuração
         if (urlBase == null || urlBase.isBlank() || token == null || token.isBlank()) {
@@ -197,10 +244,13 @@ public class ClienteApiRest {
 
         try {
             do {
+                // Delay CRÍTICO: respeita rate limit de 2s da API + margem de segurança
+                aplicarDelayRateLimit(tipoEntidade);
+
                 // Verifica limite de páginas
                 if (paginasProcessadas >= maxPaginasPorExecucao) {
-                    logger.warn("Limite de páginas atingido para {}: {} páginas processadas. Interrompendo extração.", 
-                               tipoEntidade, paginasProcessadas);
+                    logger.warn("Limite de páginas atingido para {}: {} páginas processadas. Interrompendo extração.",
+                            tipoEntidade, paginasProcessadas);
                     interrompidoPorLimite = true;
                     break;
                 }
@@ -209,16 +259,16 @@ public class ClienteApiRest {
                 String url;
                 if (primeiraPagina) {
                     // Usa diretamente o timestamp formatado com fuso horário
-                    String timestampFormatado = dataInicio;
-                    
+                    final String timestampFormatado = dataInicio;
+
                     // Log detalhado para diagnóstico
                     logger.info("DIAGNÓSTICO API REST - Timestamp formatado: {}", timestampFormatado);
-                    
+
                     // Codifica o timestamp para URL para evitar problemas com caracteres especiais
-                    String timestampCodificado = URLEncoder.encode(timestampFormatado, StandardCharsets.UTF_8);
-                    
+                    final String timestampCodificado = URLEncoder.encode(timestampFormatado, StandardCharsets.UTF_8);
+
                     logger.debug("Endpoint: {}, Timestamp codificado para URL: {}", endpoint, timestampCodificado);
-                    
+
                     url = urlBase + endpoint + "?since=" + timestampCodificado;
 
                     // OTIMIZAÇÃO: Aumenta o tamanho da página para reduzir chamadas de rede
@@ -275,8 +325,9 @@ public class ClienteApiRest {
 
                 // Extrai o próximo ID para paginação
                 proximoId = paginacaoJson != null && paginacaoJson.has("next_id")
-                        ? paginacaoJson.get("next_id").asText()
-                        : null;
+                        && !paginacaoJson.get("next_id").isNull()
+                                ? paginacaoJson.get("next_id").asText()
+                                : null;
 
                 // Converte os dados JSON em objetos tipados
                 int entidadesNestaPagina = 0; // Nova variável para contar
@@ -294,49 +345,70 @@ public class ClienteApiRest {
                 }
 
                 paginasProcessadas++;
-                
+
                 // Log de progresso a cada intervalo configurado
                 if (paginasProcessadas % intervaloPaginasLog == 0) {
-                    logger.info("Progresso {}: {} páginas processadas, {} entidades coletadas", 
-                               tipoEntidade, paginasProcessadas, entidades.size());
+                    logger.info("Progresso {}: {} páginas processadas, {} entidades coletadas",
+                            tipoEntidade, paginasProcessadas, entidades.size());
                 }
 
                 logger.info("Processadas {} entidades nesta página ({} ms)", entidadesNestaPagina, duracaoMs);
 
-                // CONDIÇÃO DE PARAGEM MELHORADA
+                // PROTEÇÃO INTELIGENTE: Respeita next_id=null, mas tolera gaps
                 if (entidadesNestaPagina == 0) {
-                    proximoId = null; // Força a paragem do loop se não vierem mais dados
+                    // CRÍTICO: Se API retornou next_id=null, NÃO HÁ MAIS PÁGINAS!
+                    if (proximoId == null) {
+                        logger.info("✅ Fim natural da paginação - API retornou next_id=null em página vazia");
+                        break; // Sai do loop imediatamente
+                    }
+
+                    // Se next_id EXISTE mas página vazia, pode ser gap - continua com proteção
+                    paginasVaziasConsecutivas++;
+                    logger.warn(
+                            "⚠️ Página {} vazia ({}/{} consecutivas) mas next_id existe: {}. Continuando (possível gap de IDs)...",
+                            paginasProcessadas, paginasVaziasConsecutivas,
+                            MAX_PAGINAS_VAZIAS_CONSECUTIVAS, proximoId);
+
+                    if (paginasVaziasConsecutivas >= MAX_PAGINAS_VAZIAS_CONSECUTIVAS) {
+                        logger.error(
+                                "🚨 PROTEÇÃO: {} páginas vazias consecutivas com next_id. Possível loop infinito - Parando.",
+                                MAX_PAGINAS_VAZIAS_CONSECUTIVAS);
+                        break;
+                    }
+                } else {
+                    // Reset contador quando encontra dados
+                    paginasVaziasConsecutivas = 0;
                 }
 
             } while (proximoId != null);
 
         } catch (final IOException e) {
             logger.error("Erro de I/O ou JSON durante a comunicação com a API", e);
-            
+
             // Circuit Breaker - Incrementa contador de falhas
             incrementarFalhasConsecutivas(tipoEntidade);
-            
+
             throw new RuntimeException("Erro ao comunicar com a API ESL Cloud", e);
         } catch (final RuntimeException e) {
             logger.error("Erro durante a busca de {}: {}", tipoEntidade, e.getMessage());
-            
+
             // Circuit Breaker - Incrementa contador de falhas
             incrementarFalhasConsecutivas(tipoEntidade);
-            
+
             throw e;
         }
 
         // Circuit Breaker - Reset contador de falhas em caso de sucesso
         resetarFalhasConsecutivas(tipoEntidade);
 
-        logger.info("Busca de {} concluída. Páginas processadas: {}, Total de entidades encontradas: {}", 
-                   endpoint, paginasProcessadas, entidades.size());
-        
+        logger.info("Busca de {} concluída. Páginas processadas: {}, Total de entidades encontradas: {}",
+                endpoint, paginasProcessadas, entidades.size());
+
         // Retorna resultado apropriado baseado se foi interrompido ou não
         if (interrompidoPorLimite) {
-            return ResultadoExtracao.incompleto(entidades, 
-                ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
-                paginasProcessadas, entidades.size());
+            return ResultadoExtracao.incompleto(entidades,
+                    ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS,
+                    paginasProcessadas, entidades.size());
         } else {
             return ResultadoExtracao.completo(entidades, paginasProcessadas, entidades.size());
         }
@@ -495,18 +567,18 @@ public class ClienteApiRest {
      * 
      * @param tipoEntidade Tipo da entidade
      */
-    private void incrementarFalhasConsecutivas(String tipoEntidade) {
+    private void incrementarFalhasConsecutivas(final String tipoEntidade) {
         int falhasAtuais = contadorFalhasConsecutivas.getOrDefault(tipoEntidade, 0);
         falhasAtuais++;
         contadorFalhasConsecutivas.put(tipoEntidade, falhasAtuais);
-        
-        logger.warn("Falha #{} para entidade '{}' (limite: {})", 
-                   falhasAtuais, tipoEntidade, MAX_FALHAS_CONSECUTIVAS);
-        
+
+        logger.warn("Falha #{} para entidade '{}' (limite: {})",
+                falhasAtuais, tipoEntidade, MAX_FALHAS_CONSECUTIVAS);
+
         if (falhasAtuais >= MAX_FALHAS_CONSECUTIVAS) {
             entidadesComCircuitAberto.add(tipoEntidade);
-            logger.error("Circuit Breaker ABERTO para '{}' após {} falhas consecutivas", 
-                        tipoEntidade, falhasAtuais);
+            logger.error("Circuit Breaker ABERTO para '{}' após {} falhas consecutivas",
+                    tipoEntidade, falhasAtuais);
         }
     }
 
@@ -516,7 +588,7 @@ public class ClienteApiRest {
      * 
      * @param tipoEntidade Tipo da entidade
      */
-    private void resetarFalhasConsecutivas(String tipoEntidade) {
+    private void resetarFalhasConsecutivas(final String tipoEntidade) {
         if (contadorFalhasConsecutivas.containsKey(tipoEntidade)) {
             contadorFalhasConsecutivas.remove(tipoEntidade);
             entidadesComCircuitAberto.remove(tipoEntidade);
@@ -534,14 +606,14 @@ public class ClienteApiRest {
     public int obterContagemOcorrencias(final LocalDate dataReferencia) {
         final String dataInicio = formatarDataParaApiRest(dataReferencia);
         final String endpoint = "occurrences";
-        
+
         try {
             // Constrói a URL com filtros de data e per_page=1 para otimização
-            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
-                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
-            
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1",
+                    urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+
             logger.info("Obtendo contagem de ocorrências para data: {} (URL: {})", dataReferencia, url);
-            
+
             // Cria a requisição HTTP
             final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -550,40 +622,40 @@ public class ClienteApiRest {
                     .timeout(timeoutRequisicao)
                     .GET()
                     .build();
-            
+
             // Executa a requisição
             final long inicioMs = System.currentTimeMillis();
             final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
                     this.clienteHttp, requisicao, "contagem-ocorrencias");
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
-            
+
             // Verifica se a resposta é válida
             if (resposta == null) {
                 logger.error("Erro: resposta nula ao obter contagem de ocorrências");
                 throw new RuntimeException("Falha na requisição: resposta é null");
             }
-            
+
             if (resposta.statusCode() != 200) {
-                final String mensagemErro = String.format("Erro ao obter contagem de ocorrências. Status: %d", 
-                    resposta.statusCode());
+                final String mensagemErro = String.format("Erro ao obter contagem de ocorrências. Status: %d",
+                        resposta.statusCode());
                 logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
                 throw new RuntimeException(mensagemErro);
             }
-            
+
             // Processa a resposta JSON para extrair meta.total_count
             final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
             final JsonNode metaJson = raizJson.get("meta");
-            
+
             if (metaJson == null || !metaJson.has("total_count")) {
                 logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
                 throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
             }
-            
+
             final int totalCount = metaJson.get("total_count").asInt();
             logger.info("Contagem de ocorrências obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
-            
+
             return totalCount;
-            
+
         } catch (final IOException e) {
             logger.error("Erro de I/O ao obter contagem de ocorrências", e);
             incrementarFalhasConsecutivas("contagem-ocorrencias");
@@ -596,7 +668,8 @@ public class ClienteApiRest {
     }
 
     /**
-     * Obtém a contagem total de faturas a receber para uma data de referência específica
+     * Obtém a contagem total de faturas a receber para uma data de referência
+     * específica
      * 
      * @param dataReferencia Data de referência para filtrar as faturas
      * @return Número total de faturas a receber encontradas
@@ -605,14 +678,14 @@ public class ClienteApiRest {
     public int obterContagemFaturasAReceber(final LocalDate dataReferencia) {
         final String dataInicio = formatarDataParaApiRest(dataReferencia);
         final String endpoint = "receivable_invoices";
-        
+
         try {
             // Constrói a URL com filtros de data e per_page=1 para otimização
-            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
-                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
-            
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1",
+                    urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+
             logger.info("Obtendo contagem de faturas a receber para data: {} (URL: {})", dataReferencia, url);
-            
+
             // Cria a requisição HTTP
             final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -621,40 +694,41 @@ public class ClienteApiRest {
                     .timeout(timeoutRequisicao)
                     .GET()
                     .build();
-            
+
             // Executa a requisição
             final long inicioMs = System.currentTimeMillis();
             final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
                     this.clienteHttp, requisicao, "contagem-faturas-receber");
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
-            
+
             // Verifica se a resposta é válida
             if (resposta == null) {
                 logger.error("Erro: resposta nula ao obter contagem de faturas a receber");
                 throw new RuntimeException("Falha na requisição: resposta é null");
             }
-            
+
             if (resposta.statusCode() != 200) {
-                final String mensagemErro = String.format("Erro ao obter contagem de faturas a receber. Status: %d", 
-                    resposta.statusCode());
+                final String mensagemErro = String.format("Erro ao obter contagem de faturas a receber. Status: %d",
+                        resposta.statusCode());
                 logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
                 throw new RuntimeException(mensagemErro);
             }
-            
+
             // Processa a resposta JSON para extrair meta.total_count
             final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
             final JsonNode metaJson = raizJson.get("meta");
-            
+
             if (metaJson == null || !metaJson.has("total_count")) {
                 logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
                 throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
             }
-            
+
             final int totalCount = metaJson.get("total_count").asInt();
-            logger.info("Contagem de faturas a receber obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
-            
+            logger.info("Contagem de faturas a receber obtida com sucesso: {} registros ({} ms)", totalCount,
+                    duracaoMs);
+
             return totalCount;
-            
+
         } catch (final IOException e) {
             logger.error("Erro de I/O ao obter contagem de faturas a receber", e);
             incrementarFalhasConsecutivas("contagem-faturas-receber");
@@ -667,7 +741,8 @@ public class ClienteApiRest {
     }
 
     /**
-     * Obtém a contagem total de faturas a pagar para uma data de referência específica
+     * Obtém a contagem total de faturas a pagar para uma data de referência
+     * específica
      * 
      * @param dataReferencia Data de referência para filtrar as faturas
      * @return Número total de faturas a pagar encontradas
@@ -676,14 +751,14 @@ public class ClienteApiRest {
     public int obterContagemFaturasAPagar(final LocalDate dataReferencia) {
         final String dataInicio = formatarDataParaApiRest(dataReferencia);
         final String endpoint = "payable_invoices";
-        
+
         try {
             // Constrói a URL com filtros de data e per_page=1 para otimização
-            final String url = String.format("%s/%s?created_at_start=%s&per_page=1", 
-                urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
-            
+            final String url = String.format("%s/%s?created_at_start=%s&per_page=1",
+                    urlBase, endpoint, URLEncoder.encode(dataInicio, StandardCharsets.UTF_8));
+
             logger.info("Obtendo contagem de faturas a pagar para data: {} (URL: {})", dataReferencia, url);
-            
+
             // Cria a requisição HTTP
             final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -692,40 +767,40 @@ public class ClienteApiRest {
                     .timeout(timeoutRequisicao)
                     .GET()
                     .build();
-            
+
             // Executa a requisição
             final long inicioMs = System.currentTimeMillis();
             final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
                     this.clienteHttp, requisicao, "contagem-faturas-pagar");
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
-            
+
             // Verifica se a resposta é válida
             if (resposta == null) {
                 logger.error("Erro: resposta nula ao obter contagem de faturas a pagar");
                 throw new RuntimeException("Falha na requisição: resposta é null");
             }
-            
+
             if (resposta.statusCode() != 200) {
-                final String mensagemErro = String.format("Erro ao obter contagem de faturas a pagar. Status: %d", 
-                    resposta.statusCode());
+                final String mensagemErro = String.format("Erro ao obter contagem de faturas a pagar. Status: %d",
+                        resposta.statusCode());
                 logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
                 throw new RuntimeException(mensagemErro);
             }
-            
+
             // Processa a resposta JSON para extrair meta.total_count
             final JsonNode raizJson = mapeadorJson.readTree(resposta.body());
             final JsonNode metaJson = raizJson.get("meta");
-            
+
             if (metaJson == null || !metaJson.has("total_count")) {
                 logger.error("Estrutura JSON inválida: campo 'meta.total_count' não encontrado na resposta");
                 throw new RuntimeException("Resposta da API não contém campo 'meta.total_count'");
             }
-            
+
             final int totalCount = metaJson.get("total_count").asInt();
             logger.info("Contagem de faturas a pagar obtida com sucesso: {} registros ({} ms)", totalCount, duracaoMs);
-            
+
             return totalCount;
-            
+
         } catch (final IOException e) {
             logger.error("Erro de I/O ao obter contagem de faturas a pagar", e);
             incrementarFalhasConsecutivas("contagem-faturas-pagar");
@@ -734,6 +809,25 @@ public class ClienteApiRest {
             logger.error("Erro ao obter contagem de faturas a pagar: {}", e.getMessage());
             incrementarFalhasConsecutivas("contagem-faturas-pagar");
             throw e;
+        }
+    }
+
+    /**
+     * Aplica delay crítico para respeitar rate limit da API.
+     * Este método encapsula o Thread.sleep para suprimir warnings específicos do
+     * IDE.
+     * 
+     * @param tipoEntidade tipo da entidade sendo processada (para logs)
+     */
+    @SuppressWarnings({ "java:S2925", "squid:S2142", "ThreadSleep", "SleepWhileHoldingLock",
+            "CallToNativeMethodWhileLocked" })
+    private void aplicarDelayRateLimit(final String tipoEntidade) {
+        try {
+            Thread.sleep(2200); // 2.2s = rate limit 2s + margem de segurança
+            logger.debug("Delay de 2.2s aplicado antes de buscar {}", tipoEntidade);
+        } catch (final InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            logger.warn("Thread interrompida durante delay para {}", tipoEntidade);
         }
     }
 }

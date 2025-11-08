@@ -108,6 +108,23 @@ public class ColetaNodeDTO {
     @JsonProperty("vehicleTypeId")
     private Long vehicleTypeId;
 
+    @JsonProperty("manifestItemPickId")
+    private Long manifestItemPickId;
+
+    // --- Campos Expandidos (Objetos Aninhados) ---
+    @JsonProperty("customer")
+    private CustomerDTO customer;
+
+    @JsonProperty("pickAddress")
+    private PickAddressDTO pickAddress;
+
+    @JsonProperty("user")
+    private UserDTO user;
+
+    // --- Campos Adicionais do CSV (22 campos mapeados) ---
+    @JsonProperty("finishDate")
+    private String finishDate; // Recebido como String YYYY-MM-DD
+
     // --- Contêiner Dinâmico ("Resto") ---
     private final Map<String, Object> otherProperties = new HashMap<>();
 
@@ -356,6 +373,50 @@ public class ColetaNodeDTO {
 
     public void setVehicleTypeId(final Long vehicleTypeId) {
         this.vehicleTypeId = vehicleTypeId;
+    }
+
+    public Long getManifestItemPickId() {
+        return manifestItemPickId;
+    }
+
+    public void setManifestItemPickId(Long manifestItemPickId) {
+        this.manifestItemPickId = manifestItemPickId;
+    }
+
+    // --- Getters e Setters para Campos Expandidos ---
+
+    public CustomerDTO getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(CustomerDTO customer) {
+        this.customer = customer;
+    }
+
+    public PickAddressDTO getPickAddress() {
+        return pickAddress;
+    }
+
+    public void setPickAddress(PickAddressDTO pickAddress) {
+        this.pickAddress = pickAddress;
+    }
+
+    public UserDTO getUser() {
+        return user;
+    }
+
+    public void setUser(UserDTO user) {
+        this.user = user;
+    }
+
+    // --- Getters e Setters para Campos Adicionais do CSV ---
+
+    public String getFinishDate() {
+        return finishDate;
+    }
+
+    public void setFinishDate(String finishDate) {
+        this.finishDate = finishDate;
     }
 
     @JsonAnyGetter

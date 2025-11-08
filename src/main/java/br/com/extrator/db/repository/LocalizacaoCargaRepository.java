@@ -3,7 +3,6 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 
@@ -42,13 +41,23 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     -- Coluna de Chave Primária (Chave de Negócio)
                     sequence_number BIGINT PRIMARY KEY,
 
-                    -- Colunas Essenciais para Indexação e Relatórios
+                    -- Colunas Essenciais para Indexação e Relatórios conforme docs/descobertas-endpoints/localizacaocarga.md
+                    type NVARCHAR(100),
                     service_at DATETIMEOFFSET,
-                    status NVARCHAR(50),
+                    invoices_volumes INT,
+                    taxed_weight NVARCHAR(50),
+                    invoices_value NVARCHAR(50),
                     total_value DECIMAL(18, 2),
+                    service_type NVARCHAR(50),
+                    branch_nickname NVARCHAR(255),
                     predicted_delivery_at DATETIMEOFFSET,
-                    origin_location_name NVARCHAR(255),
                     destination_location_name NVARCHAR(255),
+                    destination_branch_nickname NVARCHAR(255),
+                    classification NVARCHAR(255),
+                    status NVARCHAR(50),
+                    status_branch_nickname NVARCHAR(255),
+                    origin_location_name NVARCHAR(255),
+                    origin_branch_nickname NVARCHAR(255),
 
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
@@ -76,36 +85,70 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, metadata, data_extracao)
             ON target.sequence_number = source.sequence_number
             WHEN MATCHED THEN
                 UPDATE SET
+                    type = source.type,
                     service_at = source.service_at,
-                    status = source.status,
+                    invoices_volumes = source.invoices_volumes,
+                    taxed_weight = source.taxed_weight,
+                    invoices_value = source.invoices_value,
                     total_value = source.total_value,
+                    service_type = source.service_type,
+                    branch_nickname = source.branch_nickname,
                     predicted_delivery_at = source.predicted_delivery_at,
-                    origin_location_name = source.origin_location_name,
                     destination_location_name = source.destination_location_name,
+                    destination_branch_nickname = source.destination_branch_nickname,
+                    classification = source.classification,
+                    status = source.status,
+                    status_branch_nickname = source.status_branch_nickname,
+                    origin_location_name = source.origin_location_name,
+                    origin_branch_nickname = source.origin_branch_nickname,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_number, service_at, status, total_value, predicted_delivery_at, origin_location_name, destination_location_name, metadata, data_extracao)
-                VALUES (source.sequence_number, source.service_at, source.status, source.total_value, source.predicted_delivery_at, source.origin_location_name, source.destination_location_name, source.metadata, source.data_extracao);
+                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, metadata, data_extracao)
+                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            // Define os parâmetros de forma segura e na ordem correta.
+            // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
             int paramIndex = 1;
             statement.setObject(paramIndex++, carga.getSequenceNumber(), Types.BIGINT);
-            statement.setObject(paramIndex++, carga.getServiceAt(), Types.TIMESTAMP_WITH_TIMEZONE);
-            statement.setString(paramIndex++, carga.getStatus());
-            statement.setBigDecimal(paramIndex++, carga.getTotalValue());
-            statement.setObject(paramIndex++, carga.getPredictedDeliveryAt(), Types.TIMESTAMP_WITH_TIMEZONE);
-            statement.setString(paramIndex++, carga.getOriginLocationName());
+            statement.setString(paramIndex++, carga.getType());
+            // Usar helper methods para tipos especiais
+            if (carga.getServiceAt() != null) {
+                statement.setObject(paramIndex++, carga.getServiceAt(), Types.TIMESTAMP_WITH_TIMEZONE);
+            } else {
+                statement.setNull(paramIndex++, Types.TIMESTAMP_WITH_TIMEZONE);
+            }
+            statement.setObject(paramIndex++, carga.getInvoicesVolumes(), Types.INTEGER);
+            statement.setString(paramIndex++, carga.getTaxedWeight());
+            statement.setString(paramIndex++, carga.getInvoicesValue());
+            setBigDecimalParameter(statement, paramIndex++, carga.getTotalValue());
+            statement.setString(paramIndex++, carga.getServiceType());
+            statement.setString(paramIndex++, carga.getBranchNickname());
+            if (carga.getPredictedDeliveryAt() != null) {
+                statement.setObject(paramIndex++, carga.getPredictedDeliveryAt(), Types.TIMESTAMP_WITH_TIMEZONE);
+            } else {
+                statement.setNull(paramIndex++, Types.TIMESTAMP_WITH_TIMEZONE);
+            }
             statement.setString(paramIndex++, carga.getDestinationLocationName());
+            statement.setString(paramIndex++, carga.getDestinationBranchNickname());
+            statement.setString(paramIndex++, carga.getClassification());
+            statement.setString(paramIndex++, carga.getStatus());
+            statement.setString(paramIndex++, carga.getStatusBranchNickname());
+            statement.setString(paramIndex++, carga.getOriginLocationName());
+            statement.setString(paramIndex++, carga.getOriginBranchNickname());
             statement.setString(paramIndex++, carga.getMetadata());
-            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
+            setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
+            
+            // Verificar se todos os parâmetros foram definidos (19 parâmetros = paramIndex final = 20)
+            if (paramIndex != 20) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 19, definido %d", paramIndex - 1));
+            }
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Localização de Carga sequence_number {}: {} linha(s) afetada(s)", carga.getSequenceNumber(), rowsAffected);

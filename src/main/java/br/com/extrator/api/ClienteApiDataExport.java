@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -196,21 +195,29 @@ public class ClienteApiDataExport {
             return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
         }
         
-        logger.info("🔍 Executando busca genérica - Template: {} ({}), Período: {} a {}", 
-                templateId, tipoAmigavel, 
+        // Obter valor de 'per' e timeout adequado
+        String valorPer = obterValorPerPorTemplate(templateId);
+        Duration timeout = obterTimeoutPorTemplate(templateId);
+        
+        logger.info("═══════════════════════════════════════════════════════");
+        logger.info("INICIANDO EXTRAÇÃO: Template {} - {}", templateId, tipoAmigavel);
+        logger.info("Período: {} até {}", 
                 dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate(), 
                 dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate());
+        logger.info("Valor 'per': {}", valorPer);
+        logger.info("Timeout: {} segundos", timeout.getSeconds());
+        logger.info("═══════════════════════════════════════════════════════");
 
         List<T> resultadosFinais = new ArrayList<>();
         int paginaAtual = 1;
-        boolean haMaisPaginas;
+        int totalPaginas = 0;
         int totalRegistrosProcessados = 0;
-        boolean interrompido = false; // Rastrear se a extração foi interrompida
+        boolean interrompido = false;
+        int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
 
-        do {
-            try {
+        try {
+            while (true) {
                 // PROTEÇÃO 1: Limite máximo de páginas
-                int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
                 if (paginaAtual > limitePaginas) {
                     logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
                             templateId, tipoAmigavel, limitePaginas);
@@ -226,95 +233,122 @@ public class ClienteApiDataExport {
                     break;
                 }
 
-                // Log de progresso a cada intervalo definido
-                if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
-                    logger.info("📊 Progresso Template {} ({}): Página {}, {} registros processados", 
-                            templateId, tipoAmigavel, paginaAtual, totalRegistrosProcessados);
-                }
+                // Log início da página
+                logger.info("→ Requisitando página {}...", paginaAtual);
 
                 // URL base limpa sem parâmetros de query (filtros e paginação vão no corpo JSON)
                 String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
 
                 // Constrói o corpo JSON com search, page, per conforme formato do Postman
-                String corpoJson = construirCorpoRequisicao(nomeTabela, campoData, dataInicio, dataFim, paginaAtual);
+                String corpoJson = construirCorpoRequisicao(templateId, nomeTabela, campoData, dataInicio, dataFim, paginaAtual, valorPer);
 
-                logger.debug("Enviando requisição para URL: {} com corpo: {}", url, corpoJson);
+                logger.debug("URL: {} | Corpo: {}", url, corpoJson);
 
                 HttpRequest requisicao = HttpRequest.newBuilder()
                         .uri(URI.create(url))
                         .header("Authorization", "Bearer " + token)
                         .header("Content-Type", "application/json")
-                        .timeout(this.timeoutRequisicao)
-                        .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson)) // GET com corpo JSON
+                        .timeout(timeout) // Timeout específico por template
+                        .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson))
                         .build();
 
+                // Executar requisição com medição de tempo
+                long tempoInicio = System.currentTimeMillis();
                 HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, 
                         "DataExport-Template-" + templateId + "-Page-" + paginaAtual);
+                long duracaoMs = System.currentTimeMillis() - tempoInicio;
 
-                List<T> resultadosDaPagina = Collections.emptyList();
-                if (resposta.statusCode() == 200) {
+                // Verificar resposta
+                if (resposta == null) {
+                    logger.error("❌ Erro: resposta nula na página {}", paginaAtual);
+                    incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                    throw new RuntimeException("Resposta nula na paginação - página " + paginaAtual);
+                }
+
+                logger.info("← Resposta recebida: Status {}, Tempo: {}ms", resposta.statusCode(), duracaoMs);
+
+                if (resposta.statusCode() != 200) {
+                    logger.error("❌ Erro HTTP {} na página {}: {}", 
+                            resposta.statusCode(), paginaAtual, resposta.body());
+                    incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                    throw new RuntimeException("Erro HTTP " + resposta.statusCode() + " na página " + paginaAtual);
+                }
+
+                // Parse da resposta
+                List<T> registrosPagina;
+                try {
                     JsonNode raizJson = objectMapper.readTree(resposta.body());
                     JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
 
-                    if (dadosNode != null && dadosNode.isArray() && dadosNode.size() > 0) {
-                        resultadosDaPagina = objectMapper.convertValue(dadosNode, typeReference);
-                        resultadosFinais.addAll(resultadosDaPagina);
-                        totalRegistrosProcessados += resultadosDaPagina.size();
-                        
-                        // Reset do contador de falhas em caso de sucesso
-                        contadorFalhasConsecutivas.put(chaveTemplate, 0);
-                        
-                        logger.debug("✅ Página {} processada: {} registros (Total: {})", 
-                                paginaAtual, resultadosDaPagina.size(), totalRegistrosProcessados);
+                    if (dadosNode != null && dadosNode.isArray()) {
+                        if (dadosNode.size() == 0) {
+                            // Array vazio - fim da paginação
+                            logger.info("■ Fim da paginação (página vazia)");
+                            totalPaginas = paginaAtual - 1;
+                            break;
+                        }
+                        registrosPagina = objectMapper.convertValue(dadosNode, typeReference);
                     } else {
-                        logger.info("📄 Página {}: sem dados, fim da paginação", paginaAtual);
+                        // Resposta não é um array - tratar como vazio
+                        logger.warn("⚠️ Resposta não é um array válido na página {}. Tratando como vazio.", paginaAtual);
+                        totalPaginas = paginaAtual - 1;
+                        break;
                     }
-                } else {
-                    logger.error("❌ A requisição para a página {} do template {} falhou com status {}. Body: {}", 
-                            paginaAtual, templateId, resposta.statusCode(), resposta.body());
-                    
-                    // Incrementar contador de falhas
+                } catch (JsonProcessingException e) {
+                    logger.error("❌ Erro ao parsear JSON da página {}: {}", paginaAtual, e.getMessage());
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+                    throw new RuntimeException("Erro ao parsear página " + paginaAtual, e);
+                }
+
+                logger.info("✓ Página {}: {} registros parseados", paginaAtual, registrosPagina.size());
+
+                // CONDIÇÃO DE PARADA: array vazio (já tratado acima, mas garantindo)
+                if (registrosPagina == null || registrosPagina.isEmpty()) {
+                    logger.info("■ Fim da paginação (array vazio)");
+                    totalPaginas = paginaAtual - 1;
                     break;
                 }
 
-                haMaisPaginas = !resultadosDaPagina.isEmpty();
+                // Adicionar registros
+                resultadosFinais.addAll(registrosPagina);
+                totalRegistrosProcessados += registrosPagina.size();
+                
+                // Reset do contador de falhas em caso de sucesso
+                contadorFalhasConsecutivas.put(chaveTemplate, 0);
+                
+                logger.info("↑ Total acumulado: {} registros", totalRegistrosProcessados);
+
+                // Log de progresso a cada intervalo definido
+                if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
+                    logger.info("⏳ Progresso: {} páginas processadas, {} registros", 
+                            paginaAtual, totalRegistrosProcessados);
+                }
+
+                // Próxima página
                 paginaAtual++;
-
-            } catch (java.io.IOException e) {
-                logger.error("💥 Erro de I/O ou processamento JSON ao buscar dados do template {} página {}: {}", 
-                        templateId, paginaAtual, e.getMessage(), e);
-                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                break;
-            } catch (IllegalArgumentException e) {
-                logger.error("💥 Argumento inválido ao buscar dados do template {} página {}: {}", 
-                        templateId, paginaAtual, e.getMessage(), e);
-                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                break;
-            } catch (RuntimeException e) {
-                logger.error("💥 Erro de execução ao buscar dados do template {} página {}: {}", 
-                        templateId, paginaAtual, e.getMessage(), e);
-                incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                break;
             }
-        } while (haMaisPaginas);
 
-        // Log final com resultado claro e diferenciado
-        if (resultadosFinais.isEmpty()) {
-            logger.info("❌ Busca concluída - Template {}: Nenhum {} encontrado no período especificado", 
-                    templateId, tipoAmigavel.toLowerCase());
-        } else {
-            String statusExtracao = interrompido ? "INCOMPLETA" : "COMPLETA";
-            logger.info("✅ Busca {} - Template {}: {} {} extraídos em {} páginas (Proteções: ✓ Ativas)", 
-                    statusExtracao, templateId, totalRegistrosProcessados, tipoAmigavel.toLowerCase(), paginaAtual - 1);
-        }
-        
-        // Retornar ResultadoExtracao baseado no status da interrupção
-        if (interrompido) {
-            return ResultadoExtracao.incompleto(resultadosFinais, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
-                    paginaAtual - 1, totalRegistrosProcessados);
-        } else {
-            return ResultadoExtracao.completo(resultadosFinais, paginaAtual - 1, totalRegistrosProcessados);
+            // Reset circuit breaker em caso de sucesso
+            contadorFalhasConsecutivas.put(chaveTemplate, 0);
+
+            logger.info("═══════════════════════════════════════════════════════");
+            logger.info("✅ EXTRAÇÃO CONCLUÍDA: {} registros em {} páginas", 
+                    totalRegistrosProcessados, totalPaginas > 0 ? totalPaginas : (paginaAtual - 1));
+            logger.info("═══════════════════════════════════════════════════════");
+
+            // Retornar ResultadoExtracao
+            if (interrompido) {
+                return ResultadoExtracao.incompleto(resultadosFinais, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
+                        totalPaginas > 0 ? totalPaginas : (paginaAtual - 1), totalRegistrosProcessados);
+            } else {
+                return ResultadoExtracao.completo(resultadosFinais, 
+                        totalPaginas > 0 ? totalPaginas : (paginaAtual - 1), totalRegistrosProcessados);
+            }
+
+        } catch (Exception e) {
+            logger.error("❌ ERRO CRÍTICO na extração de {}: {}", tipoAmigavel, e.getMessage(), e);
+            incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
+            throw new RuntimeException("Falha na extração de " + tipoAmigavel, e);
         }
     }
 
@@ -390,17 +424,19 @@ public class ClienteApiDataExport {
 
     /**
      * Constrói o corpo JSON da requisição conforme formato esperado pela API DataExport.
-     * Formato: {"search": {"nomeTabela": {"campoData": "yyyy-MM-dd - yyyy-MM-dd"}}, "page": "1", "per": "100"}
+     * Formato: {"search": {"nomeTabela": {"campoData": "yyyy-MM-dd - yyyy-MM-dd"}}, "page": "1", "per": "1000|10000"}
      * 
+     * @param templateId ID do template para determinar o valor de 'per'
      * @param nomeTabela Nome da tabela para o campo search
      * @param campoData Nome do campo de data específico do template
      * @param dataInicio Data de início do filtro
      * @param dataFim Data de fim do filtro
      * @param pagina Número da página atual
+     * @param valorPer Valor de 'per' (registros por página)
      * @return String JSON formatada para o corpo da requisição
      */
-    private String construirCorpoRequisicao(String nomeTabela, String campoData, 
-            Instant dataInicio, Instant dataFim, int pagina) {
+    private String construirCorpoRequisicao(int templateId, String nomeTabela, String campoData, 
+            Instant dataInicio, Instant dataFim, int pagina, String valorPer) {
         try {
             ObjectNode corpo = objectMapper.createObjectNode();
             ObjectNode search = objectMapper.createObjectNode();
@@ -418,7 +454,7 @@ public class ClienteApiDataExport {
 
             corpo.set("search", search);
             corpo.put("page", String.valueOf(pagina));
-            corpo.put("per", "100");
+            corpo.put("per", valorPer);
 
             String corpoJson = objectMapper.writeValueAsString(corpo);
             logger.debug("Corpo JSON construído: {}", corpoJson);
@@ -602,6 +638,45 @@ public class ClienteApiDataExport {
                 }
             }
         }
+    }
+
+    /**
+     * Obtém o valor de 'per' (registros por página) baseado no template ID.
+     * Conforme documentação em docs/descobertas-endpoints/:
+     * - Template 6906 (Cotações): per: "1000"
+     * - Template 6399 (Manifestos): per: "10000"
+     * - Template 8656 (Localização de Carga): per: "10000"
+     * 
+     * @param templateId ID do template
+     * @return String com o valor de 'per' apropriado
+     */
+    private String obterValorPerPorTemplate(int templateId) {
+        return switch (templateId) {
+            case 6906 -> "1000";   // Cotações
+            case 6399 -> "10000";  // Manifestos
+            case 8656 -> "10000";  // Localização de Carga
+            default -> "100";      // Valor padrão para templates desconhecidos
+        };
+    }
+
+    /**
+     * Obtém o timeout adequado baseado no template ID.
+     * Manifestos podem retornar páginas grandes, então precisam de timeout maior.
+     * 
+     * @param templateId ID do template
+     * @return Duration com o timeout apropriado
+     */
+    private Duration obterTimeoutPorTemplate(int templateId) {
+        // Timeout padrão da configuração
+        Duration timeoutPadrao = this.timeoutRequisicao;
+        
+        // Timeout aumentado para manifestos (podem ter páginas muito grandes)
+        return switch (templateId) {
+            case 6399 -> Duration.ofSeconds(120);  // Manifestos: 120 segundos
+            case 8656 -> Duration.ofSeconds(90);   // Localização: 90 segundos
+            case 6906 -> Duration.ofSeconds(60);   // Cotações: 60 segundos
+            default -> timeoutPadrao;              // Usar timeout padrão
+        };
     }
 
     /**

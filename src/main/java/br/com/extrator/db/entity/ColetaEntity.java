@@ -23,6 +23,25 @@ public class ColetaEntity {
     private BigDecimal totalWeight;
     private Integer totalVolumes;
 
+    // --- Campos Expandidos (22 campos do CSV) ---
+    private Long clienteId;
+    private String clienteNome;
+    private String localColeta;
+    private String cidadeColeta;
+    private String ufColeta;
+    private Long usuarioId;
+    private String usuarioNome;
+    private String requestHour;
+    private String serviceStartHour;
+    private LocalDate finishDate;
+    private String serviceEndHour;
+    private String requester;
+    private BigDecimal taxedWeight;
+    private String comments;
+    private Long agentId;
+    private Long manifestItemPickId;
+    private Long vehicleTypeId;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -92,6 +111,144 @@ public class ColetaEntity {
 
     public void setTotalVolumes(final Integer totalVolumes) {
         this.totalVolumes = totalVolumes;
+    }
+
+    // --- Getters e Setters para Campos Expandidos ---
+
+    public Long getClienteId() {
+        return clienteId;
+    }
+
+    public void setClienteId(Long clienteId) {
+        this.clienteId = clienteId;
+    }
+
+    public String getClienteNome() {
+        return clienteNome;
+    }
+
+    public void setClienteNome(String clienteNome) {
+        this.clienteNome = clienteNome;
+    }
+
+    public String getLocalColeta() {
+        return localColeta;
+    }
+
+    public void setLocalColeta(String localColeta) {
+        this.localColeta = localColeta;
+    }
+
+    public String getCidadeColeta() {
+        return cidadeColeta;
+    }
+
+    public void setCidadeColeta(String cidadeColeta) {
+        this.cidadeColeta = cidadeColeta;
+    }
+
+    public String getUfColeta() {
+        return ufColeta;
+    }
+
+    public void setUfColeta(String ufColeta) {
+        this.ufColeta = ufColeta;
+    }
+
+    public Long getUsuarioId() {
+        return usuarioId;
+    }
+
+    public void setUsuarioId(Long usuarioId) {
+        this.usuarioId = usuarioId;
+    }
+
+    public String getUsuarioNome() {
+        return usuarioNome;
+    }
+
+    public void setUsuarioNome(String usuarioNome) {
+        this.usuarioNome = usuarioNome;
+    }
+
+    public String getRequestHour() {
+        return requestHour;
+    }
+
+    public void setRequestHour(String requestHour) {
+        this.requestHour = requestHour;
+    }
+
+    public String getServiceStartHour() {
+        return serviceStartHour;
+    }
+
+    public void setServiceStartHour(String serviceStartHour) {
+        this.serviceStartHour = serviceStartHour;
+    }
+
+    public LocalDate getFinishDate() {
+        return finishDate;
+    }
+
+    public void setFinishDate(LocalDate finishDate) {
+        this.finishDate = finishDate;
+    }
+
+    public String getServiceEndHour() {
+        return serviceEndHour;
+    }
+
+    public void setServiceEndHour(String serviceEndHour) {
+        this.serviceEndHour = serviceEndHour;
+    }
+
+    public String getRequester() {
+        return requester;
+    }
+
+    public void setRequester(String requester) {
+        this.requester = requester;
+    }
+
+    public BigDecimal getTaxedWeight() {
+        return taxedWeight;
+    }
+
+    public void setTaxedWeight(BigDecimal taxedWeight) {
+        this.taxedWeight = taxedWeight;
+    }
+
+    public String getComments() {
+        return comments;
+    }
+
+    public void setComments(String comments) {
+        this.comments = comments;
+    }
+
+    public Long getAgentId() {
+        return agentId;
+    }
+
+    public void setAgentId(Long agentId) {
+        this.agentId = agentId;
+    }
+
+    public Long getManifestItemPickId() {
+        return manifestItemPickId;
+    }
+
+    public void setManifestItemPickId(Long manifestItemPickId) {
+        this.manifestItemPickId = manifestItemPickId;
+    }
+
+    public Long getVehicleTypeId() {
+        return vehicleTypeId;
+    }
+
+    public void setVehicleTypeId(Long vehicleTypeId) {
+        this.vehicleTypeId = vehicleTypeId;
     }
 
     public String getMetadata() {

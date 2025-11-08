@@ -78,11 +78,13 @@ public class ClienteApiGraphQL {
         int paginaAtual = 1;
         int totalRegistrosProcessados = 0;
         boolean interrompido = false; // NOVO: Rastrear se foi interrompido
+        
+        // ✅ LER A CONFIGURAÇÃO UMA VEZ ANTES DO LOOP
+        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiGraphQL();
 
         while (hasNextPage) {
             try {
-                // PROTEÇÃO 1: Limite máximo de páginas
-                int limitePaginas = CarregadorConfig.obterLimitePaginasApiGraphQL();
+                // PROTEÇÃO 1: Limite máximo de páginas (agora usa a variável já lida)
                 if (paginaAtual > limitePaginas) {
                     logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
                             nomeEntidade, limitePaginas);
@@ -159,194 +161,28 @@ public class ClienteApiGraphQL {
     }
 
     /**
-     * Obtém a contagem total de fretes para uma data de referência específica
-     * Usa uma query GraphQL otimizada que solicita apenas o totalCount
+     * ⚠️ MÉTODO REMOVIDO: obterContagemFretes()
      * 
-     * @param dataReferencia Data de referência para filtrar os fretes
-     * @return Número total de fretes encontrados
-     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     * Motivo: O campo 'totalCount' não existe na API GraphQL conforme descoberto
+     * em docs/descobertas-endpoints/fretes.md linha 29.
+     * 
+     * Erro retornado pela API: "Field 'totalCount' doesn't exist on type 'PageInfo'"
+     * 
+     * Solução: A contagem deve ser feita via paginação completa ou removida
+     * se não for essencial para o funcionamento do sistema.
      */
-    public int obterContagemFretes(final LocalDate dataReferencia) {
-        // Query GraphQL otimizada que solicita apenas totalCount
-        String query = """
-                query ContagemFretes($params: FreightInput!) {
-                    freight(params: $params) {
-                        totalCount
-                    }
-                }""";
-
-        try {
-            // Calcular o intervalo de 24 horas (mesmo padrão do buscarFretes)
-            LocalDate dataInicio = dataReferencia.minusDays(1);
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
-
-            // Construir variáveis usando o intervalo de datas
-            Map<String, Object> variaveis = Map.of(
-                "params", Map.of("serviceAt", intervaloServiceAt)
-            );
-
-            logger.info("Obtendo contagem de fretes via GraphQL para período: {}", intervaloServiceAt);
-
-            // Construir o corpo da requisição GraphQL
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
-            corpoJson.put("query", query);
-            corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
-            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
-
-            // Construir a requisição HTTP
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlBase + endpointGraphQL))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
-                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
-                    .timeout(this.timeoutRequisicao)
-                    .build();
-
-            // Executar a requisição
-            final long inicioMs = System.currentTimeMillis();
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
-                    this.clienteHttp, requisicao, "contagem-fretes-graphql");
-            final long duracaoMs = System.currentTimeMillis() - inicioMs;
-
-            // Verificar se a resposta é válida
-            if (resposta == null) {
-                logger.error("Erro: resposta nula ao obter contagem de fretes via GraphQL");
-                throw new RuntimeException("Falha na requisição GraphQL: resposta é null");
-            }
-
-            if (resposta.statusCode() != 200) {
-                final String mensagemErro = String.format("Erro ao obter contagem de fretes via GraphQL. Status: %d", 
-                    resposta.statusCode());
-                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
-                throw new RuntimeException(mensagemErro);
-            }
-
-            // Parsear a resposta JSON
-            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
-
-            // Verificar se há erros na resposta GraphQL
-            if (respostaJson.has("errors")) {
-                JsonNode erros = respostaJson.get("errors");
-                logger.error("Erros na query GraphQL de contagem de fretes: {}", erros.toString());
-                throw new RuntimeException("Erro na query GraphQL: " + erros.toString());
-            }
-
-            // Extrair totalCount da resposta
-            if (!respostaJson.has("data") || !respostaJson.get("data").has("freight") || 
-                !respostaJson.get("data").get("freight").has("totalCount")) {
-                logger.error("Estrutura JSON inválida: campo 'data.freight.totalCount' não encontrado na resposta GraphQL");
-                throw new RuntimeException("Resposta GraphQL não contém campo 'data.freight.totalCount'");
-            }
-
-            final int totalCount = respostaJson.get("data").get("freight").get("totalCount").asInt();
-            logger.info("Contagem de fretes obtida com sucesso via GraphQL: {} registros ({} ms)", totalCount, duracaoMs);
-
-            return totalCount;
-
-        } catch (final JsonProcessingException e) {
-            logger.error("Erro de processamento JSON ao obter contagem de fretes via GraphQL", e);
-            incrementarContadorFalhas("contagem-fretes-graphql", "contagem-fretes");
-            throw new RuntimeException("Erro ao processar JSON na contagem de fretes via GraphQL", e);
-        } catch (final RuntimeException e) {
-            logger.error("Erro ao obter contagem de fretes via GraphQL: {}", e.getMessage());
-            incrementarContadorFalhas("contagem-fretes-graphql", "contagem-fretes");
-            throw e;
-        }
-    }
 
     /**
-     * Obtém a contagem total de coletas para uma data de referência específica
-     * Usa uma query GraphQL otimizada que solicita apenas o totalCount
+     * ⚠️ MÉTODO REMOVIDO: obterContagemColetas()
      * 
-     * @param dataReferencia Data de referência para filtrar as coletas
-     * @return Número total de coletas encontradas
-     * @throws RuntimeException se houver erro na requisição ou resposta inválida
+     * Motivo: O campo 'totalCount' não existe na API GraphQL conforme descoberto
+     * em docs/descobertas-endpoints/coletas.md linha 40-41.
+     * 
+     * Erro retornado pela API: "Field 'totalCount' doesn't exist on type 'PickConnection'"
+     * 
+     * Solução: A contagem deve ser feita via paginação completa ou removida
+     * se não for essencial para o funcionamento do sistema.
      */
-    public int obterContagemColetas(final LocalDate dataReferencia) {
-        // Query GraphQL otimizada que solicita apenas totalCount
-        String query = """
-                query ContagemColetas($params: PickInput!) {
-                    pick(params: $params) {
-                        totalCount
-                    }
-                }""";
-
-        try {
-            // Construir variáveis usando exclusivamente requestDate (mesmo padrão do buscarColetas)
-            String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
-            Map<String, Object> variaveis = Map.of(
-                "params", Map.of("requestDate", dataFormatada)
-            );
-
-            logger.info("Obtendo contagem de coletas via GraphQL para data: {}", dataFormatada);
-
-            // Construir o corpo da requisição GraphQL
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
-            corpoJson.put("query", query);
-            corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
-            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
-
-            // Construir a requisição HTTP
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlBase + endpointGraphQL))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
-                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
-                    .timeout(this.timeoutRequisicao)
-                    .build();
-
-            // Executar a requisição
-            final long inicioMs = System.currentTimeMillis();
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
-                    this.clienteHttp, requisicao, "contagem-coletas-graphql");
-            final long duracaoMs = System.currentTimeMillis() - inicioMs;
-
-            // Verificar se a resposta é válida
-            if (resposta == null) {
-                logger.error("Erro: resposta nula ao obter contagem de coletas via GraphQL");
-                throw new RuntimeException("Falha na requisição GraphQL: resposta é null");
-            }
-
-            if (resposta.statusCode() != 200) {
-                final String mensagemErro = String.format("Erro ao obter contagem de coletas via GraphQL. Status: %d", 
-                    resposta.statusCode());
-                logger.error("{} ({} ms) Body: {}", mensagemErro, duracaoMs, resposta.body());
-                throw new RuntimeException(mensagemErro);
-            }
-
-            // Parsear a resposta JSON
-            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
-
-            // Verificar se há erros na resposta GraphQL
-            if (respostaJson.has("errors")) {
-                JsonNode erros = respostaJson.get("errors");
-                logger.error("Erros na query GraphQL de contagem de coletas: {}", erros.toString());
-                throw new RuntimeException("Erro na query GraphQL: " + erros.toString());
-            }
-
-            // Extrair totalCount da resposta
-            if (!respostaJson.has("data") || !respostaJson.get("data").has("pick") || 
-                !respostaJson.get("data").get("pick").has("totalCount")) {
-                logger.error("Estrutura JSON inválida: campo 'data.pick.totalCount' não encontrado na resposta GraphQL");
-                throw new RuntimeException("Resposta GraphQL não contém campo 'data.pick.totalCount'");
-            }
-
-            final int totalCount = respostaJson.get("data").get("pick").get("totalCount").asInt();
-            logger.info("Contagem de coletas obtida com sucesso via GraphQL: {} registros ({} ms)", totalCount, duracaoMs);
-
-            return totalCount;
-
-        } catch (final JsonProcessingException e) {
-            logger.error("Erro de processamento JSON ao obter contagem de coletas via GraphQL", e);
-            incrementarContadorFalhas("contagem-coletas-graphql", "contagem-coletas");
-            throw new RuntimeException("Erro ao processar JSON na contagem de coletas via GraphQL", e);
-        } catch (final RuntimeException e) {
-            logger.error("Erro ao obter contagem de coletas via GraphQL: {}", e.getMessage());
-            incrementarContadorFalhas("contagem-coletas-graphql", "contagem-coletas");
-            throw e;
-        }
-    }
 
     /**
      * Construtor da classe ClienteApiGraphQL
@@ -365,48 +201,71 @@ public class ClienteApiGraphQL {
     }
 
     /**
-     * Busca coletas via GraphQL para uma data específica
+     * Busca coletas via GraphQL para as últimas 24h (ontem + hoje)
+     * API GraphQL de coletas (PickInput) SÓ aceita 1 data específica em requestDate, não aceita intervalo.
+     * Para obter coletas das últimas 24h, precisa buscar 2 dias separadamente.
      * 
      * @param dataReferencia Data de referência para buscar as coletas (LocalDate)
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
+        // Query GraphQL expandida conforme documentação em docs/descobertas-endpoints/coletas.md
+        // Query: BuscarColetasExpandidaV2, Tipo: Pick
         String query = """
-                query BuscarColetas($params: PickInput!, $after: String) {
+                query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
                     pick(params: $params, after: $after, first: 100) {
                         edges {
                             cursor
                             node {
                                 id
+                                sequenceCode
+                                requestDate
+                                requestHour
+                                serviceDate
+                                serviceStartHour
+                                finishDate
+                                serviceEndHour
+                                status
+                                requester
+                                invoicesVolumes
+                                invoicesWeight
+                                taxedWeight
+                                invoicesValue
+                                comments
                                 agentId
+                                manifestItemPickId
+                                vehicleTypeId
+                                customer {
+                                    id
+                                    name
+                                }
+                                pickAddress {
+                                    line1
+                                    city {
+                                        name
+                                        state {
+                                            code
+                                        }
+                                    }
+                                }
+                                user {
+                                    id
+                                    name
+                                }
+                                invoicesCubedWeight
                                 cancellationReason
                                 cancellationUserId
                                 cargoClassificationId
-                                comments
                                 costCenterId
                                 destroyReason
                                 destroyUserId
-                                invoicesCubedWeight
-                                invoicesValue
-                                invoicesVolumes
-                                invoicesWeight
                                 lunchBreakEndHour
                                 lunchBreakStartHour
                                 notificationEmail
                                 notificationPhone
                                 pickTypeId
                                 pickupLocationId
-                                requestDate
-                                requestHour
-                                requester
-                                sequenceCode
-                                serviceDate
-                                serviceEndHour
-                                serviceStartHour
-                                status
                                 statusUpdatedAt
-                                taxedWeight
-                                vehicleTypeId
                             }
                         }
                         pageInfo {
@@ -416,15 +275,61 @@ public class ClienteApiGraphQL {
                     }
                 }""";
 
-        // Construir variáveis usando exclusivamente requestDate
-        String dataFormatada = formatarDataParaApiGraphQL(dataReferencia);
-        Map<String, Object> variaveis = Map.of(
-            "params", Map.of("requestDate", dataFormatada)
+        // Calcular dia anterior (ontem)
+        LocalDate diaAnterior = dataReferencia.minusDays(1);
+        
+        // Lista consolidada para armazenar todas as coletas
+        List<ColetaNodeDTO> todasColetas = new ArrayList<>();
+        int totalPaginas = 0;
+        boolean ambasCompletas = true;
+
+        // 1. Buscar coletas do dia anterior (ontem)
+        logger.info("🔍 Coletas - Dia 1/2: {}", diaAnterior);
+        String dataAnteriorFormatada = formatarDataParaApiGraphQL(diaAnterior);
+        Map<String, Object> variaveisDiaAnterior = Map.of(
+            "params", Map.of("requestDate", dataAnteriorFormatada)
         );
+        
+        ResultadoExtracao<ColetaNodeDTO> resultadoDiaAnterior = executarQueryPaginada(query, "pick", variaveisDiaAnterior, ColetaNodeDTO.class);
+        todasColetas.addAll(resultadoDiaAnterior.getDados());
+        totalPaginas += resultadoDiaAnterior.getPaginasProcessadas();
+        
+        if (resultadoDiaAnterior.isCompleto()) {
+            logger.info("✅ Dia 1/2: {} coletas", resultadoDiaAnterior.getDados().size());
+        } else {
+            logger.warn("⚠️ Dia 1/2: {} coletas (INCOMPLETO)", resultadoDiaAnterior.getDados().size());
+            ambasCompletas = false;
+        }
 
-        logger.info("Buscando coletas via GraphQL - Data: {}", dataFormatada);
+        // 2. Buscar coletas do dia atual (hoje)
+        logger.info("🔍 Coletas - Dia 2/2: {}", dataReferencia);
+        String dataAtualFormatada = formatarDataParaApiGraphQL(dataReferencia);
+        Map<String, Object> variaveisDataAtual = Map.of(
+            "params", Map.of("requestDate", dataAtualFormatada)
+        );
+        
+        ResultadoExtracao<ColetaNodeDTO> resultadoDataAtual = executarQueryPaginada(query, "pick", variaveisDataAtual, ColetaNodeDTO.class);
+        todasColetas.addAll(resultadoDataAtual.getDados());
+        totalPaginas += resultadoDataAtual.getPaginasProcessadas();
+        
+        if (resultadoDataAtual.isCompleto()) {
+            logger.info("✅ Dia 2/2: {} coletas", resultadoDataAtual.getDados().size());
+        } else {
+            logger.warn("⚠️ Dia 2/2: {} coletas (INCOMPLETO)", resultadoDataAtual.getDados().size());
+            ambasCompletas = false;
+        }
 
-        return executarQueryPaginada(query, "pick", variaveis, ColetaNodeDTO.class);
+        // 3. Consolidar resultados
+        logger.info("✅ Total: {} coletas", todasColetas.size());
+
+        // 4. Retornar resultado consolidado
+        if (ambasCompletas) {
+            return ResultadoExtracao.completo(todasColetas, totalPaginas, todasColetas.size());
+        } else {
+            // Se qualquer uma das buscas foi incompleta, marcar o resultado como incompleto
+            ResultadoExtracao.MotivoInterrupcao motivo = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
+            return ResultadoExtracao.incompleto(todasColetas, motivo, totalPaginas, todasColetas.size());
+        }
     }
 
 
@@ -438,14 +343,63 @@ public class ClienteApiGraphQL {
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
-        // A query GraphQL permanece a mesma, pois já está correta.
+        // Query GraphQL expandida conforme documentação em docs/descobertas-endpoints/fretes.md
+        // Query: BuscarFretesExpandidaV3, Tipo: FreightBase
         String query = """
-                query BuscarFretes($params: FreightInput!, $after: String) {
+                query BuscarFretesExpandidaV3($params: FreightInput!, $after: String) {
                     freight(params: $params, after: $after, first: 100) {
                         edges {
-                            cursor
                             node {
                                 id
+                                referenceNumber
+                                serviceAt
+                                total
+                                subtotal
+                                invoicesValue
+                                invoicesTotalVolumes
+                                taxedWeight
+                                realWeight
+                                totalCubicVolume
+                                payer {
+                                    id
+                                    name
+                                }
+                                sender {
+                                    id
+                                    name
+                                    mainAddress {
+                                        city {
+                                            name
+                                            state {
+                                                code
+                                            }
+                                        }
+                                    }
+                                }
+                                receiver {
+                                    id
+                                    name
+                                    mainAddress {
+                                        city {
+                                            name
+                                            state {
+                                                code
+                                            }
+                                        }
+                                    }
+                                }
+                                corporation {
+                                    name
+                                }
+                                customerPriceTable {
+                                    name
+                                }
+                                freightClassification {
+                                    name
+                                }
+                                costCenter {
+                                    name
+                                }
                                 accountingCreditId
                                 accountingCreditInstallmentId
                                 adValoremSubtotal
@@ -481,8 +435,6 @@ public class ClienteApiGraphQL {
                                 insuranceEnabled
                                 insuranceId
                                 insuredValue
-                                invoicesTotalVolumes
-                                invoicesValue
                                 invoicesWeight
                                 itrSubtotal
                                 km
@@ -496,21 +448,14 @@ public class ClienteApiGraphQL {
                                 previousDocumentType
                                 priceTableAccountableType
                                 productsValue
-                                realWeight
                                 redispatchSubtotal
-                                referenceNumber
                                 secCatSubtotal
-                                serviceAt
                                 serviceDate
                                 serviceType
                                 status
-                                subtotal
                                 suframaSubtotal
-                                taxedWeight
                                 tdeSubtotal
                                 tollSubtotal
-                                total
-                                totalCubicVolume
                                 trtSubtotal
                                 type
                             }

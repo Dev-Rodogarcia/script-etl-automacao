@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +34,8 @@ public class CompletudeValidator {
     
     // Clientes de API para buscar contagens do ESL Cloud
     private final ClienteApiRest clienteApiRest;
-    private final ClienteApiGraphQL clienteApiGraphQL;
+    @SuppressWarnings("unused") // Mantido para compatibilidade futura e testes
+    private final ClienteApiGraphQL clienteApiGraphQL; // ⚠️ Não usado atualmente (métodos obterContagemFretes/Coletas removidos)
     private final ClienteApiDataExport clienteApiDataExport;
     
     // Mapeamento de entidades para nomes de tabelas no banco
@@ -67,9 +69,9 @@ public class CompletudeValidator {
      * @param clienteApiGraphQL Cliente da API GraphQL
      * @param clienteApiDataExport Cliente da API DataExport
      */
-    public CompletudeValidator(ClienteApiRest clienteApiRest, 
-                              ClienteApiGraphQL clienteApiGraphQL,
-                              ClienteApiDataExport clienteApiDataExport) {
+    public CompletudeValidator(final ClienteApiRest clienteApiRest, 
+                              final ClienteApiGraphQL clienteApiGraphQL,
+                              final ClienteApiDataExport clienteApiDataExport) {
         this.clienteApiRest = clienteApiRest;
         this.clienteApiGraphQL = clienteApiGraphQL;
         this.clienteApiDataExport = clienteApiDataExport;
@@ -86,74 +88,77 @@ public class CompletudeValidator {
      * - ClienteApiDataExport: manifestos, cotações, localizações de carga
      * 
      * @param dataReferencia Data de referência para buscar as contagens
-     * @return Map com chave=nome_entidade e valor=contagem_esl_cloud
+     * @return Optional com Map contendo chave=nome_entidade e valor=contagem_esl_cloud, ou Optional.empty() se falhar
      */
-    public Map<String, Integer> buscarTotaisEslCloud(LocalDate dataReferencia) {
+    public Optional<Map<String, Integer>> buscarTotaisEslCloud(final LocalDate dataReferencia) {
         logger.info("🔍 Iniciando busca de totais do ESL Cloud para data: {}", dataReferencia);
         
-        Map<String, Integer> totaisEslCloud = new HashMap<>();
+        final Map<String, Integer> totaisEslCloud = new HashMap<>();
         
         try {
             // === API REST - Ocorrências e Faturas ===
             logger.info("📡 Buscando contagens via API REST...");
             
             // Ocorrências
-            int contagemOcorrencias = clienteApiRest.obterContagemOcorrencias(dataReferencia);
+            final int contagemOcorrencias = clienteApiRest.obterContagemOcorrencias(dataReferencia);
             totaisEslCloud.put("ocorrencias", contagemOcorrencias);
             logger.info("✅ Ocorrências: {} registros", contagemOcorrencias);
             
             // Faturas a Receber
-            int contagemFaturasReceber = clienteApiRest.obterContagemFaturasAReceber(dataReferencia);
+            final int contagemFaturasReceber = clienteApiRest.obterContagemFaturasAReceber(dataReferencia);
             totaisEslCloud.put("faturas_a_receber", contagemFaturasReceber);
             logger.info("✅ Faturas a Receber: {} registros", contagemFaturasReceber);
             
             // Faturas a Pagar
-            int contagemFaturasPagar = clienteApiRest.obterContagemFaturasAPagar(dataReferencia);
+            final int contagemFaturasPagar = clienteApiRest.obterContagemFaturasAPagar(dataReferencia);
             totaisEslCloud.put("faturas_a_pagar", contagemFaturasPagar);
             logger.info("✅ Faturas a Pagar: {} registros", contagemFaturasPagar);
             
             // === API GraphQL - Fretes e Coletas ===
-            logger.info("🔗 Buscando contagens via API GraphQL...");
+            // ⚠️ MÉTODOS REMOVIDOS: obterContagemFretes() e obterContagemColetas()
+            // Motivo: O campo 'totalCount' não existe na API GraphQL conforme descoberto
+            // em docs/descobertas-endpoints/fretes.md linha 29 e coletas.md linha 40-41.
+            // A contagem deve ser feita via paginação completa ou removida se não for essencial.
+            logger.warn("⚠️ Contagem de Fretes e Coletas via GraphQL não disponível (totalCount não existe na API)");
             
-            // Fretes
-            int contagemFretes = clienteApiGraphQL.obterContagemFretes(dataReferencia);
-            totaisEslCloud.put("fretes", contagemFretes);
-            logger.info("✅ Fretes: {} registros", contagemFretes);
+            // Fretes - Contagem não disponível via API GraphQL
+            totaisEslCloud.put("fretes", -1); // -1 indica contagem não disponível
+            logger.info("⚠️ Fretes: Contagem não disponível (totalCount não existe na API GraphQL)");
             
-            // Coletas
-            int contagemColetas = clienteApiGraphQL.obterContagemColetas(dataReferencia);
-            totaisEslCloud.put("coletas", contagemColetas);
-            logger.info("✅ Coletas: {} registros", contagemColetas);
+            // Coletas - Contagem não disponível via API GraphQL
+            totaisEslCloud.put("coletas", -1); // -1 indica contagem não disponível
+            logger.info("⚠️ Coletas: Contagem não disponível (totalCount não existe na API GraphQL)");
             
             // === API DataExport - Manifestos, Cotações e Localizações ===
             logger.info("📊 Buscando contagens via API DataExport...");
             
             // Manifestos
-            int contagemManifestos = clienteApiDataExport.obterContagemManifestos(dataReferencia);
+            final int contagemManifestos = clienteApiDataExport.obterContagemManifestos(dataReferencia);
             totaisEslCloud.put("manifestos", contagemManifestos);
             logger.info("✅ Manifestos: {} registros", contagemManifestos);
             
             // Cotações
-            int contagemCotacoes = clienteApiDataExport.obterContagemCotacoes(dataReferencia);
+            final int contagemCotacoes = clienteApiDataExport.obterContagemCotacoes(dataReferencia);
             totaisEslCloud.put("cotacoes", contagemCotacoes);
             logger.info("✅ Cotações: {} registros", contagemCotacoes);
             
             // Localizações de Carga
-            int contagemLocalizacoes = clienteApiDataExport.obterContagemLocalizacoesCarga(dataReferencia);
+            final int contagemLocalizacoes = clienteApiDataExport.obterContagemLocalizacoesCarga(dataReferencia);
             totaisEslCloud.put("localizacao_cargas", contagemLocalizacoes);
             logger.info("✅ Localizações de Carga: {} registros", contagemLocalizacoes);
             
             // Log do resumo final
-            int totalGeralRegistros = totaisEslCloud.values().stream().mapToInt(Integer::intValue).sum();
+            final int totalGeralRegistros = totaisEslCloud.values().stream().mapToInt(Integer::intValue).sum();
             logger.info("🎯 Busca de totais ESL Cloud concluída: {} entidades, {} registros totais", 
                     totaisEslCloud.size(), totalGeralRegistros);
             
-        } catch (Exception e) {
-            logger.error("❌ Erro ao buscar totais do ESL Cloud: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha na busca de totais do ESL Cloud", e);
+        } catch (final Exception e) {
+            logger.warn("❌ Todas as 3 tentativas falharam ao buscar totais da API");
+            logger.debug("Última exceção capturada:", e);
+            return Optional.empty();
         }
         
-        return totaisEslCloud;
+        return Optional.of(totaisEslCloud);
     }
     
     /**
@@ -171,21 +176,21 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para filtrar consultas no banco
      * @return Map com resultado da validação por entidade
      */
-    public Map<String, StatusValidacao> validarCompletude(Map<String, Integer> totaisEslCloud, 
-                                                         LocalDate dataReferencia) {
+    public Map<String, StatusValidacao> validarCompletude(final Map<String, Integer> totaisEslCloud, 
+                                                         final LocalDate dataReferencia) {
         logger.info("🔍 Iniciando validação de completude para {} entidades na data: {}", 
                 totaisEslCloud.size(), dataReferencia);
         
-        Map<String, StatusValidacao> resultadosValidacao = new HashMap<>();
+        final Map<String, StatusValidacao> resultadosValidacao = new HashMap<>();
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             
-            for (Map.Entry<String, Integer> entrada : totaisEslCloud.entrySet()) {
-                String nomeEntidade = entrada.getKey();
-                int contagemEslCloud = entrada.getValue();
+            for (final Map.Entry<String, Integer> entrada : totaisEslCloud.entrySet()) {
+                final String nomeEntidade = entrada.getKey();
+                final int contagemEslCloud = entrada.getValue();
                 
                 // Obter nome da tabela correspondente
-                String nomeTabela = MAPEAMENTO_ENTIDADES_TABELAS.get(nomeEntidade);
+                final String nomeTabela = MAPEAMENTO_ENTIDADES_TABELAS.get(nomeEntidade);
                 if (nomeTabela == null) {
                     logger.warn("⚠️ Entidade '{}' não possui mapeamento para tabela. Pulando validação.", nomeEntidade);
                     resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
@@ -195,7 +200,7 @@ public class CompletudeValidator {
                 try {
                     // Query SQL eficiente para contar registros na data específica
                     // String.format é seguro aqui pois nomeTabela vem de fonte controlada
-                    String sql = String.format(
+                    final String sql = String.format(
                         "SELECT COUNT(*) FROM %s WHERE DATE(data_extracao) = ?", 
                         nomeTabela
                     );
@@ -211,34 +216,34 @@ public class CompletudeValidator {
                     }
                     
                     // Determinar status baseado na comparação
-                    StatusValidacao status = determinarStatusValidacao(contagemEslCloud, contagemBanco);
+                    final StatusValidacao status = determinarStatusValidacao(contagemEslCloud, contagemBanco);
                     resultadosValidacao.put(nomeEntidade, status);
                     
                     // Log com status visual claro
-                    String iconeStatus = obterIconeStatus(status);
+                    final String iconeStatus = obterIconeStatus(status);
                     logger.info("{} {}: ESL Cloud={}, Banco={}", 
                             iconeStatus, nomeEntidade, contagemEslCloud, contagemBanco);
                     
-                } catch (SQLException e) {
+                } catch (final SQLException e) {
                     logger.error("❌ Erro SQL ao validar entidade '{}': {}", nomeEntidade, e.getMessage(), e);
                     resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
                 }
             }
             
             // Log do resumo final
-            long totalOk = resultadosValidacao.values().stream()
+            final long totalOk = resultadosValidacao.values().stream()
                     .filter(status -> status == StatusValidacao.OK).count();
-            long totalIncompleto = resultadosValidacao.values().stream()
+            final long totalIncompleto = resultadosValidacao.values().stream()
                     .filter(status -> status == StatusValidacao.INCOMPLETO).count();
-            long totalDuplicados = resultadosValidacao.values().stream()
+            final long totalDuplicados = resultadosValidacao.values().stream()
                     .filter(status -> status == StatusValidacao.DUPLICADOS).count();
-            long totalErros = resultadosValidacao.values().stream()
+            final long totalErros = resultadosValidacao.values().stream()
                     .filter(status -> status == StatusValidacao.ERRO).count();
             
             logger.info("📊 Validação de completude concluída: ✅ {} OK, ❌ {} INCOMPLETO, ⚠️ {} DUPLICADOS, 💥 {} ERROS", 
                     totalOk, totalIncompleto, totalDuplicados, totalErros);
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("❌ Erro ao conectar com banco de dados para validação: {}", e.getMessage(), e);
             throw new RuntimeException("Falha na conexão com banco de dados", e);
         }
@@ -253,7 +258,7 @@ public class CompletudeValidator {
      * @param contagemBanco Contagem obtida do banco local
      * @return Status da validação
      */
-    private StatusValidacao determinarStatusValidacao(int contagemEslCloud, int contagemBanco) {
+    private StatusValidacao determinarStatusValidacao(final int contagemEslCloud, final int contagemBanco) {
         if (contagemEslCloud == contagemBanco) {
             return StatusValidacao.OK;
         } else if (contagemBanco < contagemEslCloud) {
@@ -269,7 +274,7 @@ public class CompletudeValidator {
      * @param status Status da validação
      * @return String com ícone visual
      */
-    private String obterIconeStatus(StatusValidacao status) {
+    private String obterIconeStatus(final StatusValidacao status) {
         return switch (status) {
             case OK -> "✅ OK";
             case INCOMPLETO -> "❌ INCOMPLETO";
@@ -287,7 +292,7 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para análise
      * @return StatusValidacao indicando se há gaps nos IDs
      */
-    public StatusValidacao validarGapsOcorrencias(LocalDate dataReferencia) {
+    public StatusValidacao validarGapsOcorrencias(final LocalDate dataReferencia) {
         logger.info("🔍 Iniciando validação de gaps para ocorrências...");
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
@@ -300,7 +305,7 @@ public class CompletudeValidator {
             // Se são sequenciais, verificar gaps
             return detectarGapsSequenciais(conexao, "ocorrencias", dataReferencia);
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("❌ Erro ao validar gaps nas ocorrências: {}", e.getMessage(), e);
             return StatusValidacao.ERRO;
         }
@@ -313,8 +318,8 @@ public class CompletudeValidator {
      * @param nomeTabela Nome da tabela a verificar
      * @return true se os IDs são sequenciais, false caso contrário
      */
-    private boolean verificarIdsSequenciais(Connection conexao, String nomeTabela) throws SQLException {
-        String sql = """
+    private boolean verificarIdsSequenciais(final Connection conexao, final String nomeTabela) throws SQLException {
+        final String sql = """
             WITH ids_ordenados AS (
                 SELECT id, ROW_NUMBER() OVER (ORDER BY id) as posicao
                 FROM %s
@@ -333,7 +338,7 @@ public class CompletudeValidator {
              ResultSet rs = stmt.executeQuery()) {
             
             if (rs.next()) {
-                boolean sequencial = rs.getInt("ids_sequenciais") == 1;
+                final boolean sequencial = rs.getInt("ids_sequenciais") == 1;
                 logger.info("📊 Análise de sequencialidade para {}: {}", nomeTabela, 
                     sequencial ? "IDs são sequenciais" : "IDs têm gaps/pulos");
                 return sequencial;
@@ -350,8 +355,8 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para análise
      * @return StatusValidacao indicando se há gaps
      */
-    private StatusValidacao detectarGapsSequenciais(Connection conexao, String nomeTabela, LocalDate dataReferencia) throws SQLException {
-        String sql = """
+    private StatusValidacao detectarGapsSequenciais(final Connection conexao, final String nomeTabela, final LocalDate dataReferencia) throws SQLException {
+        final String sql = """
             WITH ids_esperados AS (
                 SELECT MIN(id) + n.number as id_esperado
                 FROM %s,
@@ -371,14 +376,14 @@ public class CompletudeValidator {
             """.formatted(nomeTabela, nomeTabela, nomeTabela);
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            java.sql.Date sqlDate = java.sql.Date.valueOf(dataReferencia);
+            final java.sql.Date sqlDate = java.sql.Date.valueOf(dataReferencia);
             stmt.setDate(1, sqlDate);
             stmt.setDate(2, sqlDate);
             stmt.setDate(3, sqlDate);
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    int totalGaps = rs.getInt("total_gaps");
+                    final int totalGaps = rs.getInt("total_gaps");
                     
                     if (totalGaps == 0) {
                         logger.info("✅ Nenhum gap detectado nos IDs de {}", nomeTabela);
@@ -402,18 +407,18 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para análise
      * @return Map com status de validação por entidade
      */
-    public Map<String, StatusValidacao> validarJanelaTemporal(LocalDate dataReferencia) {
+    public Map<String, StatusValidacao> validarJanelaTemporal(final LocalDate dataReferencia) {
         logger.info("🕐 Iniciando validação de janela temporal para data: {}", dataReferencia);
         
-        Map<String, StatusValidacao> resultados = new HashMap<>();
+        final Map<String, StatusValidacao> resultados = new HashMap<>();
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             // Buscar timestamps de extração do log
-            Map<String, TimestampsExtracao> timestampsExtracao = buscarTimestampsExtracao(conexao, dataReferencia);
+            final Map<String, TimestampsExtracao> timestampsExtracao = buscarTimestampsExtracao(conexao, dataReferencia);
             
             // Validar cada entidade
-            for (String entidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
-                TimestampsExtracao timestamps = timestampsExtracao.get(entidade);
+            for (final String entidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
+                final TimestampsExtracao timestamps = timestampsExtracao.get(entidade);
                 
                 if (timestamps == null) {
                     logger.warn("⚠️ Nenhum log de extração encontrado para {} na data {}", entidade, dataReferencia);
@@ -421,14 +426,14 @@ public class CompletudeValidator {
                     continue;
                 }
                 
-                StatusValidacao status = validarJanelaTemporalEntidade(entidade, timestamps, dataReferencia);
+                final StatusValidacao status = validarJanelaTemporalEntidade(entidade, timestamps, dataReferencia);
                 resultados.put(entidade, status);
             }
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("❌ Erro ao validar janela temporal: {}", e.getMessage(), e);
             // Marcar todas as entidades como erro
-            for (String entidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
+            for (final String entidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
                 resultados.put(entidade, StatusValidacao.ERRO);
             }
         }
@@ -443,8 +448,8 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência
      * @return Map com timestamps por entidade
      */
-    private Map<String, TimestampsExtracao> buscarTimestampsExtracao(Connection conexao, LocalDate dataReferencia) throws SQLException {
-        String sql = """
+    private Map<String, TimestampsExtracao> buscarTimestampsExtracao(final Connection conexao, final LocalDate dataReferencia) throws SQLException {
+        final String sql = """
             SELECT entidade, timestamp_inicio, timestamp_fim
             FROM log_extracoes
             WHERE CAST(timestamp_inicio AS DATE) = ?
@@ -452,16 +457,16 @@ public class CompletudeValidator {
             ORDER BY timestamp_inicio DESC
             """;
         
-        Map<String, TimestampsExtracao> timestamps = new HashMap<>();
+        final Map<String, TimestampsExtracao> timestamps = new HashMap<>();
         
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setDate(1, java.sql.Date.valueOf(dataReferencia));
             
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    String entidade = rs.getString("entidade");
-                    java.sql.Timestamp inicio = rs.getTimestamp("timestamp_inicio");
-                    java.sql.Timestamp fim = rs.getTimestamp("timestamp_fim");
+                    final String entidade = rs.getString("entidade");
+                    final java.sql.Timestamp inicio = rs.getTimestamp("timestamp_inicio");
+                    final java.sql.Timestamp fim = rs.getTimestamp("timestamp_fim");
                     
                     timestamps.put(entidade, new TimestampsExtracao(inicio, fim));
                 }
@@ -480,10 +485,10 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência
      * @return StatusValidacao da janela temporal
      */
-    private StatusValidacao validarJanelaTemporalEntidade(String entidade, TimestampsExtracao timestamps, LocalDate dataReferencia) {
+    private StatusValidacao validarJanelaTemporalEntidade(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         try {
             // Fazer chamada à API para contar registros criados durante a janela de extração
-            int registrosDuranteExtracao = contarRegistrosDuranteJanela(entidade, timestamps, dataReferencia);
+            final int registrosDuranteExtracao = contarRegistrosDuranteJanela(entidade, timestamps, dataReferencia);
             
             if (registrosDuranteExtracao == 0) {
                 logger.info("✅ Nenhum registro criado durante extração de {} - janela temporal OK", entidade);
@@ -494,7 +499,7 @@ public class CompletudeValidator {
                 return StatusValidacao.INCOMPLETO;
             }
             
-        } catch (Exception e) {
+        } catch (final Exception e) {
             logger.error("❌ Erro ao validar janela temporal para {}: {}", entidade, e.getMessage(), e);
             return StatusValidacao.ERRO;
         }
@@ -508,7 +513,7 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência
      * @return Número de registros criados durante a extração
      */
-    private int contarRegistrosDuranteJanela(String entidade, TimestampsExtracao timestamps, LocalDate dataReferencia) {
+    private int contarRegistrosDuranteJanela(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         // Implementar chamadas específicas para cada tipo de API
         return switch (entidade) {
             case "ocorrencias", "faturas_a_receber", "faturas_a_pagar" ->
@@ -535,7 +540,7 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
      * @return Número de registros encontrados na janela temporal
      */
-    private int contarRegistrosApiRest(String entidade, TimestampsExtracao timestamps, LocalDate dataReferencia) {
+    private int contarRegistrosApiRest(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         // Implementação específica para API REST
         // Por enquanto, retorna 0 (implementação futura)
         logger.debug("🔄 Contagem temporal via API REST para {} ainda não implementada (janela: {} - {}, data: {})", 
@@ -551,7 +556,7 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
      * @return Número de registros encontrados na janela temporal
      */
-    private int contarRegistrosApiGraphQL(String entidade, TimestampsExtracao timestamps, LocalDate dataReferencia) {
+    private int contarRegistrosApiGraphQL(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         // Implementação específica para API GraphQL
         // Por enquanto, retorna 0 (implementação futura)
         logger.debug("🔄 Contagem temporal via API GraphQL para {} ainda não implementada (janela: {} - {}, data: {})", 
@@ -567,7 +572,7 @@ public class CompletudeValidator {
      * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
      * @return Número de registros encontrados na janela temporal
      */
-    private int contarRegistrosApiDataExport(String entidade, TimestampsExtracao timestamps, LocalDate dataReferencia) {
+    private int contarRegistrosApiDataExport(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         // Implementação específica para API Data Export
         // Por enquanto, retorna 0 (implementação futura)
         logger.debug("🔄 Contagem temporal via API Data Export para {} ainda não implementada (janela: {} - {}, data: {})", 
@@ -582,7 +587,7 @@ public class CompletudeValidator {
         private final java.sql.Timestamp inicio;
         private final java.sql.Timestamp fim;
         
-        public TimestampsExtracao(java.sql.Timestamp inicio, java.sql.Timestamp fim) {
+        public TimestampsExtracao(final java.sql.Timestamp inicio, final java.sql.Timestamp fim) {
             this.inicio = inicio;
             this.fim = fim;
         }

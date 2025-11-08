@@ -128,13 +128,23 @@ public class GerenciadorRequisicaoHttp {
                 
                 // PROBLEMA 5 CORRIGIDO: Verifica se deve retentar baseado no código de status
                 if (!deveRetentar(statusCode)) {
-                    String mensagemErro = String.format(
-                        "✗ Erro definitivo na requisição para %s - HTTP %d (não será retentado). Resposta: %s",
-                        tipoEntidade != null ? tipoEntidade : "API",
-                        statusCode,
-                        resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body()
-                    );
-                    logger.error(mensagemErro);
+                    // HTTP 404 é esperado para faturas sem itens - usa DEBUG
+                    if (statusCode == 404) {
+                        logger.debug("ℹ️ HTTP 404 para {} (esperado - recurso não encontrado). Resposta: {}",
+                            tipoEntidade != null ? tipoEntidade : "API",
+                            resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body()
+                        );
+                    }
+                    // Outros erros definitivos (401, 403) usam ERROR
+                    else {
+                        String mensagemErro = String.format(
+                            "✗ Erro definitivo na requisição para %s - HTTP %d (não será retentado). Resposta: %s",
+                            tipoEntidade != null ? tipoEntidade : "API",
+                            statusCode,
+                            resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body()
+                        );
+                        logger.error(mensagemErro);
+                    }
                     return resposta; // Retorna a resposta com erro ao invés de lançar exceção
                 }
                 

@@ -32,11 +32,11 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
      * para armazenar os dados JSON completos, garantindo resiliência.
      */
     @Override
-    protected void criarTabelaSeNaoExistir(Connection conexao) throws SQLException {
+    protected void criarTabelaSeNaoExistir(final Connection conexao) throws SQLException {
         if (!verificarTabelaExiste(conexao, NOME_TABELA)) {
             logger.info("Criando tabela {} com arquitetura híbrida...", NOME_TABELA);
 
-            String sql = """
+            final String sql = """
                 CREATE TABLE faturas_a_pagar (
                     -- Colunas de Chave
                     id BIGINT PRIMARY KEY,
@@ -49,6 +49,26 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
                     receiver_cnpj NVARCHAR(14),
                     receiver_name NVARCHAR(255),
                     invoice_type NVARCHAR(100),
+
+                    -- NOVOS CAMPOS DISPONÍVEIS (14/24)
+                    cnpj_filial NVARCHAR(14),
+                    filial NVARCHAR(255),
+                    observacoes NVARCHAR(MAX),
+                    conta_contabil NVARCHAR(255),
+                    centro_custo NVARCHAR(500),
+                    status NVARCHAR(50),
+                    forma_pagamento NVARCHAR(100),
+
+                    -- CAMPOS FUTUROS (10/24) - Preparados para integração futura
+                    sequencia NVARCHAR(50),
+                    cheque NVARCHAR(50),
+                    vencimento_original DATE,
+                    competencia NVARCHAR(7),
+                    data_baixa DATE,
+                    data_liquidacao DATE,
+                    banco_pagamento NVARCHAR(255),
+                    conta_pagamento NVARCHAR(100),
+                    descricao_despesa NVARCHAR(MAX),
 
                     -- Colunas de Metadados para Resiliência e Completude
                     header_metadata NVARCHAR(MAX),
@@ -72,7 +92,7 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
      * A lógica é segura e baseada na nova arquitetura de Entidade.
      */
     @Override
-    protected int executarMerge(Connection conexao, FaturaAPagarEntity fatura) throws SQLException {
+    protected int executarMerge(final Connection conexao, final FaturaAPagarEntity fatura) throws SQLException {
         // Define a cláusula de junção (ON) do MERGE, priorizando o ID primário
         // e usando a chave de negócio (document_number) como alternativa.
         String onClause;
@@ -85,10 +105,13 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
             throw new SQLException("Não é possível executar o MERGE para Fatura a Pagar sem um ID ou Número de Documento.");
         }
 
-        String sql = String.format("""
+        final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type,
+                          cnpj_filial, filial, observacoes, conta_contabil, centro_custo, status, forma_pagamento,
+                          header_metadata, installments_metadata, data_extracao,
+                          sequencia, cheque, vencimento_original, competencia, data_baixa)
             %s
             WHEN MATCHED THEN
                 UPDATE SET
@@ -98,12 +121,31 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
                     receiver_cnpj = source.receiver_cnpj,
                     receiver_name = source.receiver_name,
                     invoice_type = source.invoice_type,
+                    cnpj_filial = source.cnpj_filial,
+                    filial = source.filial,
+                    observacoes = source.observacoes,
+                    conta_contabil = source.conta_contabil,
+                    centro_custo = source.centro_custo,
+                    status = source.status,
+                    forma_pagamento = source.forma_pagamento,
                     header_metadata = source.header_metadata,
                     installments_metadata = source.installments_metadata,
-                    data_extracao = source.data_extracao
+                    data_extracao = source.data_extracao,
+                    sequencia = source.sequencia,
+                    cheque = source.cheque,
+                    vencimento_original = source.vencimento_original,
+                    competencia = source.competencia,
+                    data_baixa = source.data_baixa
             WHEN NOT MATCHED THEN
-                INSERT (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type, header_metadata, installments_metadata, data_extracao)
-                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value, source.receiver_cnpj, source.receiver_name, source.invoice_type, source.header_metadata, source.installments_metadata, source.data_extracao);
+                INSERT (id, document_number, issue_date, due_date, total_value, receiver_cnpj, receiver_name, invoice_type,
+                       cnpj_filial, filial, observacoes, conta_contabil, centro_custo, status, forma_pagamento,
+                       header_metadata, installments_metadata, data_extracao,
+                       sequencia, cheque, vencimento_original, competencia, data_baixa)
+                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value, 
+                       source.receiver_cnpj, source.receiver_name, source.invoice_type,
+                       source.cnpj_filial, source.filial, source.observacoes, source.conta_contabil, source.centro_custo, source.status, source.forma_pagamento,
+                       source.header_metadata, source.installments_metadata, source.data_extracao,
+                       source.sequencia, source.cheque, source.vencimento_original, source.competencia, source.data_baixa);
             """, NOME_TABELA, onClause);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -117,11 +159,29 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
             statement.setString(paramIndex++, fatura.getReceiverCnpj());
             statement.setString(paramIndex++, fatura.getReceiverName());
             statement.setString(paramIndex++, fatura.getInvoiceType());
+            
+            // Novos campos disponíveis
+            statement.setString(paramIndex++, fatura.getCnpjFilial());
+            statement.setString(paramIndex++, fatura.getFilial());
+            statement.setString(paramIndex++, fatura.getObservacoes());
+            statement.setString(paramIndex++, fatura.getContaContabil());
+            statement.setString(paramIndex++, fatura.getCentroCusto());
+            statement.setString(paramIndex++, fatura.getStatus());
+            statement.setString(paramIndex++, fatura.getFormaPagamento());
+            
+            // Metadados
             statement.setString(paramIndex++, fatura.getHeaderMetadata());
             statement.setString(paramIndex++, fatura.getInstallmentsMetadata());
             statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
+            
+            // Campos futuros (apenas alguns para o MERGE)
+            statement.setString(paramIndex++, fatura.getSequencia());
+            statement.setString(paramIndex++, fatura.getCheque());
+            statement.setObject(paramIndex++, fatura.getVencimentoOriginal(), Types.DATE);
+            statement.setString(paramIndex++, fatura.getCompetencia());
+            statement.setObject(paramIndex++, fatura.getDataBaixa(), Types.DATE);
 
-            int rowsAffected = statement.executeUpdate();
+            final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Fatura a Pagar ID {}: {} linha(s) afetada(s)", fatura.getId(), rowsAffected);
             return rowsAffected;
         }

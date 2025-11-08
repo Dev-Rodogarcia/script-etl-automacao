@@ -3,7 +3,6 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 
@@ -42,16 +41,27 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     -- Coluna de Chave Primária (Chave de Negócio)
                     sequence_code BIGINT PRIMARY KEY,
 
-                    -- Colunas Essenciais para Indexação e Relatórios
+                    -- Colunas Essenciais para Indexação e Relatórios conforme docs/descobertas-endpoints/cotacoes.md
                     requested_at DATETIMEOFFSET,
-                    total_value DECIMAL(18, 2),
-                    taxed_weight DECIMAL(18, 3),
-                    invoices_value DECIMAL(18, 2),
+                    operation_type NVARCHAR(100),
+                    customer_doc NVARCHAR(14),
+                    customer_name NVARCHAR(255),
                     origin_city NVARCHAR(100),
                     origin_state NVARCHAR(2),
                     destination_city NVARCHAR(100),
                     destination_state NVARCHAR(2),
-                    customer_doc NVARCHAR(14),
+                    price_table NVARCHAR(255),
+                    volumes INT,
+                    taxed_weight DECIMAL(18, 3),
+                    invoices_value DECIMAL(18, 2),
+                    total_value DECIMAL(18, 2),
+                    user_name NVARCHAR(255),
+                    branch_nickname NVARCHAR(255),
+                    company_name NVARCHAR(255),
+                    requester_name NVARCHAR(255),
+                    real_weight NVARCHAR(50),
+                    origin_postal_code NVARCHAR(10),
+                    destination_postal_code NVARCHAR(10),
 
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
@@ -79,42 +89,74 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_code, requested_at, operation_type, customer_doc, customer_name, origin_city, origin_state, destination_city, destination_state, price_table, volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname, company_name, requester_name, real_weight, origin_postal_code, destination_postal_code, metadata, data_extracao)
             ON target.sequence_code = source.sequence_code
             WHEN MATCHED THEN
                 UPDATE SET
                     requested_at = source.requested_at,
-                    total_value = source.total_value,
-                    taxed_weight = source.taxed_weight,
-                    invoices_value = source.invoices_value,
+                    operation_type = source.operation_type,
+                    customer_doc = source.customer_doc,
+                    customer_name = source.customer_name,
                     origin_city = source.origin_city,
                     origin_state = source.origin_state,
                     destination_city = source.destination_city,
                     destination_state = source.destination_state,
-                    customer_doc = source.customer_doc,
+                    price_table = source.price_table,
+                    volumes = source.volumes,
+                    taxed_weight = source.taxed_weight,
+                    invoices_value = source.invoices_value,
+                    total_value = source.total_value,
+                    user_name = source.user_name,
+                    branch_nickname = source.branch_nickname,
+                    company_name = source.company_name,
+                    requester_name = source.requester_name,
+                    real_weight = source.real_weight,
+                    origin_postal_code = source.origin_postal_code,
+                    destination_postal_code = source.destination_postal_code,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_code, requested_at, total_value, taxed_weight, invoices_value, origin_city, origin_state, destination_city, destination_state, customer_doc, metadata, data_extracao)
-                VALUES (source.sequence_code, source.requested_at, source.total_value, source.taxed_weight, source.invoices_value, source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.customer_doc, source.metadata, source.data_extracao);
+                INSERT (sequence_code, requested_at, operation_type, customer_doc, customer_name, origin_city, origin_state, destination_city, destination_state, price_table, volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname, company_name, requester_name, real_weight, origin_postal_code, destination_postal_code, metadata, data_extracao)
+                VALUES (source.sequence_code, source.requested_at, source.operation_type, source.customer_doc, source.customer_name, source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.price_table, source.volumes, source.taxed_weight, source.invoices_value, source.total_value, source.user_name, source.branch_nickname, source.company_name, source.requester_name, source.real_weight, source.origin_postal_code, source.destination_postal_code, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            // Define os parâmetros de forma segura e na ordem correta.
+            // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
             int paramIndex = 1;
             statement.setObject(paramIndex++, cotacao.getSequenceCode(), Types.BIGINT);
-            statement.setObject(paramIndex++, cotacao.getRequestedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
-            statement.setBigDecimal(paramIndex++, cotacao.getTotalValue());
-            statement.setBigDecimal(paramIndex++, cotacao.getTaxedWeight());
-            statement.setBigDecimal(paramIndex++, cotacao.getInvoicesValue());
+            // Usar helper methods para tipos especiais
+            if (cotacao.getRequestedAt() != null) {
+                statement.setObject(paramIndex++, cotacao.getRequestedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
+            } else {
+                statement.setNull(paramIndex++, Types.TIMESTAMP_WITH_TIMEZONE);
+            }
+            statement.setString(paramIndex++, cotacao.getOperationType());
+            statement.setString(paramIndex++, cotacao.getCustomerDoc());
+            statement.setString(paramIndex++, cotacao.getCustomerName());
             statement.setString(paramIndex++, cotacao.getOriginCity());
             statement.setString(paramIndex++, cotacao.getOriginState());
             statement.setString(paramIndex++, cotacao.getDestinationCity());
             statement.setString(paramIndex++, cotacao.getDestinationState());
-            statement.setString(paramIndex++, cotacao.getCustomerDoc());
+            statement.setString(paramIndex++, cotacao.getPriceTable());
+            statement.setObject(paramIndex++, cotacao.getVolumes(), Types.INTEGER);
+            setBigDecimalParameter(statement, paramIndex++, cotacao.getTaxedWeight());
+            setBigDecimalParameter(statement, paramIndex++, cotacao.getInvoicesValue());
+            setBigDecimalParameter(statement, paramIndex++, cotacao.getTotalValue());
+            statement.setString(paramIndex++, cotacao.getUserName());
+            statement.setString(paramIndex++, cotacao.getBranchNickname());
+            statement.setString(paramIndex++, cotacao.getCompanyName());
+            statement.setString(paramIndex++, cotacao.getRequesterName());
+            statement.setString(paramIndex++, cotacao.getRealWeight());
+            statement.setString(paramIndex++, cotacao.getOriginPostalCode());
+            statement.setString(paramIndex++, cotacao.getDestinationPostalCode());
             statement.setString(paramIndex++, cotacao.getMetadata());
-            statement.setTimestamp(paramIndex++, Timestamp.from(Instant.now())); // UTC timestamp
+            setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
+            
+            // Verificar se todos os parâmetros foram definidos (23 parâmetros = paramIndex final = 24)
+            if (paramIndex != 24) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 23, definido %d", paramIndex - 1));
+            }
 
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Cotação sequence_code {}: {} linha(s) afetada(s)", cotacao.getSequenceCode(), rowsAffected);

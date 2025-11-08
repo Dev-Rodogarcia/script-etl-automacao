@@ -39,14 +39,39 @@ public class ManifestoMapper {
 
         ManifestoEntity entity = new ManifestoEntity();
 
-        // 1. Mapeamento dos campos essenciais
+        // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/manifestos.md
         entity.setSequenceCode(dto.getSequenceCode());
         entity.setStatus(dto.getStatus());
-        entity.setTraveledKm(dto.getTraveledKm());
-        entity.setVehiclePlate(dto.getVehiclePlate());
-        entity.setDriverName(dto.getDriverName());
-        entity.setOriginBranch(dto.getOriginBranch());
+        entity.setBranchNickname(dto.getBranchNickname());
+        entity.setMdfeNumber(dto.getMdfeNumber());
+        entity.setMdfeKey(dto.getMdfeKey());
         entity.setMdfeStatus(dto.getMdfeStatus());
+        entity.setDistributionPole(dto.getDistributionPole());
+        entity.setClassification(dto.getClassification());
+        entity.setVehiclePlate(dto.getVehiclePlate());
+        entity.setVehicleType(dto.getVehicleType());
+        entity.setVehicleOwner(dto.getVehicleOwner());
+        entity.setDriverName(dto.getDriverName());
+        entity.setVehicleDepartureKm(dto.getVehicleDepartureKm());
+        entity.setClosingKm(dto.getClosingKm());
+        entity.setTraveledKm(dto.getTraveledKm());
+        entity.setInvoicesCount(dto.getInvoicesCount());
+        entity.setInvoicesVolumes(dto.getInvoicesVolumes());
+        entity.setInvoicesWeight(dto.getInvoicesWeight());
+        entity.setTotalTaxedWeight(dto.getTotalTaxedWeight());
+        entity.setTotalCubicVolume(dto.getTotalCubicVolume());
+        entity.setInvoicesValue(dto.getInvoicesValue());
+        entity.setManifestFreightsTotal(dto.getManifestFreightsTotal());
+        entity.setPickSequenceCode(dto.getPickSequenceCode());
+        entity.setContractNumber(dto.getContractNumber());
+        entity.setDailySubtotal(dto.getDailySubtotal());
+        entity.setOperationalExpensesTotal(dto.getOperationalExpensesTotal());
+        entity.setInssValue(dto.getInssValue());
+        entity.setSestSenatValue(dto.getSestSenatValue());
+        entity.setIrValue(dto.getIrValue());
+        entity.setPayingTotal(dto.getPayingTotal());
+        entity.setCreationUserName(dto.getCreationUserName());
+        entity.setAdjustmentUserName(dto.getAdjustmentUserName());
 
         // 2. Conversão segura de tipos de dados
         try {
@@ -56,6 +81,9 @@ public class ManifestoMapper {
             if (dto.getDeparturedAt() != null && !dto.getDeparturedAt().trim().isEmpty()) {
                 entity.setDeparturedAt(OffsetDateTime.parse(dto.getDeparturedAt()));
             }
+            if (dto.getClosedAt() != null && !dto.getClosedAt().trim().isEmpty()) {
+                entity.setClosedAt(OffsetDateTime.parse(dto.getClosedAt()));
+            }
             if (dto.getFinishedAt() != null && !dto.getFinishedAt().trim().isEmpty()) {
                 entity.setFinishedAt(OffsetDateTime.parse(dto.getFinishedAt()));
             }
@@ -63,8 +91,8 @@ public class ManifestoMapper {
                 entity.setTotalCost(new BigDecimal(dto.getTotalCost()));
             }
         } catch (DateTimeParseException | NumberFormatException e) {
-            logger.error("❌ Erro ao converter dados para manifesto {}: createdAt='{}', departuredAt='{}', finishedAt='{}', totalCost='{}' - {}", 
-                dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getFinishedAt(), dto.getTotalCost(), e.getMessage());
+            logger.error("❌ Erro ao converter dados para manifesto {}: createdAt='{}', departuredAt='{}', closedAt='{}', finishedAt='{}', totalCost='{}' - {}", 
+                dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getClosedAt(), dto.getFinishedAt(), dto.getTotalCost(), e.getMessage());
             logger.debug("Stack trace completo:", e);
         }
 

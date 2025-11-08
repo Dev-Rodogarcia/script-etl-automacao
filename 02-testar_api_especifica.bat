@@ -1,53 +1,78 @@
 @echo off
-title Testar API Especifica (rest | graphql | dataexport)
-@REM ================================================================
-@REM Script: 02-testar_api_especifica.bat
-@REM Finalidade:
-@REM   Executa testes da API especifica informada como parametro.
-@REM   Valores aceitos: 'rest', 'graphql' ou 'dataexport'.
-@REM
-@REM Uso:
-@REM   02-testar_api_especifica.bat <api>
-@REM
-@REM Parametros:
-@REM   <api>  Nome da API a testar: rest | graphql | dataexport
-@REM
-@REM Exemplos:
-@REM   02-testar_api_especifica.bat rest
-@REM   02-testar_api_especifica.bat graphql
-@REM   02-testar_api_especifica.bat dataexport
-@REM ================================================================
 setlocal
-cd /d "%~dp0"
 
-@REM Valida se o parametro foi fornecido
-if "%~1"=="" goto :USAGE
+REM ================================================================
+REM Script: 02-testar_api_especifica.bat
+REM Finalidade:
+REM   Executa testes da API especifica informada como parametro.
+REM   Valores aceitos: 'rest', 'graphql' ou 'dataexport'.
+REM
+REM Uso:
+REM   02-testar_api_especifica.bat <api>
+REM
+REM Parametros:
+REM   %%1  Nome da API a testar: rest | graphql | dataexport
+REM
+REM Exemplos:
+REM   02-testar_api_especifica.bat rest
+REM   02-testar_api_especifica.bat graphql
+REM   02-testar_api_especifica.bat dataexport
+REM ================================================================
 
-set API=%~1
+if "%~1"=="" (
+    echo ERRO: Parametro obrigatorio nao informado!
+    echo.
+    echo Uso: %~nx0 ^<api^>
+    echo   api: rest ^| graphql ^| dataexport
+    echo.
+    echo Exemplos:
+    echo   %~nx0 rest
+    echo   %~nx0 graphql
+    echo   %~nx0 dataexport
+    echo.
+    pause
+    exit /b 1
+)
 
-@REM Valida se o parametro e um dos valores aceitos
-if /I "%API%"=="rest" goto :RUN
-if /I "%API%"=="graphql" goto :RUN
-if /I "%API%"=="dataexport" goto :RUN
+set "API=%~1"
 
-echo [ERRO] Parametro invalido: "%API%".
-goto :USAGE
+if /i not "%API%"=="rest" if /i not "%API%"=="graphql" if /i not "%API%"=="dataexport" (
+    echo ERRO: API '%API%' nao reconhecida!
+    echo.
+    echo APIs suportadas: rest, graphql, dataexport
+    echo.
+    pause
+    exit /b 1
+)
 
-:RUN
-@REM Executa o comando Java com o parametro da API
-java -jar "target\extrator.jar" --testar-api "%API%"
-goto :END
+echo ================================================================
+echo TESTANDO API: %API%
+echo ================================================================
 
-:USAGE
-@REM Bloco de ajuda
+if not exist "target\extrator.jar" (
+    echo ERRO: Arquivo target\extrator.jar nao encontrado!
+    echo Execute primeiro: mvn clean package -DskipTests
+    echo.
+    pause
+    exit /b 1
+)
+
+echo Executando: java -jar "target\extrator.jar" --testar-api %API%
 echo.
-echo [USO] 02-testar_api_especifica.bat ^<api^>
-echo       Onde ^<api^> pode ser: rest ^| graphql ^| dataexport
-echo.
-echo [EXEMPLOS]
-echo   02-testar_api_especifica.bat rest
-echo   02-testar_api_especifica.bat graphql
-echo   02-testar_api_especifica.bat dataexport
 
-:END
+java -jar "target\extrator.jar" --testar-api %API%
+
+if %ERRORLEVEL% equ 0 (
+    echo.
+    echo ================================================================
+    echo TESTE CONCLUIDO COM SUCESSO!
+    echo ================================================================
+) else (
+    echo.
+    echo ================================================================
+    echo TESTE FALHOU ^(Exit Code: %ERRORLEVEL%^)
+    echo ================================================================
+)
+
+echo.
 pause

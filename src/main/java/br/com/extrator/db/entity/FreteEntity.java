@@ -28,6 +28,30 @@ public class FreteEntity {
     private Long idCidadeDestino;
     private LocalDate dataPrevisaoEntrega;
 
+    // --- Campos Expandidos (22 campos do CSV) ---
+    private Long pagadorId;
+    private String pagadorNome;
+    private Long remetenteId;
+    private String remetenteNome;
+    private String origemCidade;
+    private String origemUf;
+    private Long destinatarioId;
+    private String destinatarioNome;
+    private String destinoCidade;
+    private String destinoUf;
+    private String filialNome;
+    private String numeroNotaFiscal;
+    private String tabelaPrecoNome;
+    private String classificacaoNome;
+    private String centroCustoNome;
+    private String usuarioNome;
+    private String referenceNumber;
+    private Integer invoicesTotalVolumes;
+    private BigDecimal taxedWeight;
+    private BigDecimal realWeight;
+    private BigDecimal totalCubicVolume;
+    private BigDecimal subtotal;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -127,6 +151,184 @@ public class FreteEntity {
 
     public void setDataPrevisaoEntrega(final LocalDate dataPrevisaoEntrega) {
         this.dataPrevisaoEntrega = dataPrevisaoEntrega;
+    }
+
+    // --- Getters e Setters para Campos Expandidos ---
+
+    public Long getPagadorId() {
+        return pagadorId;
+    }
+
+    public void setPagadorId(Long pagadorId) {
+        this.pagadorId = pagadorId;
+    }
+
+    public String getPagadorNome() {
+        return pagadorNome;
+    }
+
+    public void setPagadorNome(String pagadorNome) {
+        this.pagadorNome = pagadorNome;
+    }
+
+    public Long getRemetenteId() {
+        return remetenteId;
+    }
+
+    public void setRemetenteId(Long remetenteId) {
+        this.remetenteId = remetenteId;
+    }
+
+    public String getRemetenteNome() {
+        return remetenteNome;
+    }
+
+    public void setRemetenteNome(String remetenteNome) {
+        this.remetenteNome = remetenteNome;
+    }
+
+    public String getOrigemCidade() {
+        return origemCidade;
+    }
+
+    public void setOrigemCidade(String origemCidade) {
+        this.origemCidade = origemCidade;
+    }
+
+    public String getOrigemUf() {
+        return origemUf;
+    }
+
+    public void setOrigemUf(String origemUf) {
+        this.origemUf = origemUf;
+    }
+
+    public Long getDestinatarioId() {
+        return destinatarioId;
+    }
+
+    public void setDestinatarioId(Long destinatarioId) {
+        this.destinatarioId = destinatarioId;
+    }
+
+    public String getDestinatarioNome() {
+        return destinatarioNome;
+    }
+
+    public void setDestinatarioNome(String destinatarioNome) {
+        this.destinatarioNome = destinatarioNome;
+    }
+
+    public String getDestinoCidade() {
+        return destinoCidade;
+    }
+
+    public void setDestinoCidade(String destinoCidade) {
+        this.destinoCidade = destinoCidade;
+    }
+
+    public String getDestinoUf() {
+        return destinoUf;
+    }
+
+    public void setDestinoUf(String destinoUf) {
+        this.destinoUf = destinoUf;
+    }
+
+    public String getFilialNome() {
+        return filialNome;
+    }
+
+    public void setFilialNome(String filialNome) {
+        this.filialNome = filialNome;
+    }
+
+    public String getNumeroNotaFiscal() {
+        return numeroNotaFiscal;
+    }
+
+    public void setNumeroNotaFiscal(String numeroNotaFiscal) {
+        this.numeroNotaFiscal = numeroNotaFiscal;
+    }
+
+    public String getTabelaPrecoNome() {
+        return tabelaPrecoNome;
+    }
+
+    public void setTabelaPrecoNome(String tabelaPrecoNome) {
+        this.tabelaPrecoNome = tabelaPrecoNome;
+    }
+
+    public String getClassificacaoNome() {
+        return classificacaoNome;
+    }
+
+    public void setClassificacaoNome(String classificacaoNome) {
+        this.classificacaoNome = classificacaoNome;
+    }
+
+    public String getCentroCustoNome() {
+        return centroCustoNome;
+    }
+
+    public void setCentroCustoNome(String centroCustoNome) {
+        this.centroCustoNome = centroCustoNome;
+    }
+
+    public String getUsuarioNome() {
+        return usuarioNome;
+    }
+
+    public void setUsuarioNome(String usuarioNome) {
+        this.usuarioNome = usuarioNome;
+    }
+
+    public String getReferenceNumber() {
+        return referenceNumber;
+    }
+
+    public void setReferenceNumber(String referenceNumber) {
+        this.referenceNumber = referenceNumber;
+    }
+
+    public Integer getInvoicesTotalVolumes() {
+        return invoicesTotalVolumes;
+    }
+
+    public void setInvoicesTotalVolumes(Integer invoicesTotalVolumes) {
+        this.invoicesTotalVolumes = invoicesTotalVolumes;
+    }
+
+    public BigDecimal getTaxedWeight() {
+        return taxedWeight;
+    }
+
+    public void setTaxedWeight(BigDecimal taxedWeight) {
+        this.taxedWeight = taxedWeight;
+    }
+
+    public BigDecimal getRealWeight() {
+        return realWeight;
+    }
+
+    public void setRealWeight(BigDecimal realWeight) {
+        this.realWeight = realWeight;
+    }
+
+    public BigDecimal getTotalCubicVolume() {
+        return totalCubicVolume;
+    }
+
+    public void setTotalCubicVolume(BigDecimal totalCubicVolume) {
+        this.totalCubicVolume = totalCubicVolume;
+    }
+
+    public BigDecimal getSubtotal() {
+        return subtotal;
+    }
+
+    public void setSubtotal(BigDecimal subtotal) {
+        this.subtotal = subtotal;
     }
 
     public String getMetadata() {

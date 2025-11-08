@@ -39,11 +39,21 @@ public class LocalizacaoCargaMapper {
 
         LocalizacaoCargaEntity entity = new LocalizacaoCargaEntity();
 
-        // 1. Mapeamento dos campos essenciais
+        // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/localizacaocarga.md
         entity.setSequenceNumber(dto.getSequenceNumber());
-        entity.setStatus(dto.getStatus());
-        entity.setOriginLocationName(dto.getOriginLocationName());
+        entity.setType(dto.getType());
+        entity.setInvoicesVolumes(dto.getInvoicesVolumes());
+        entity.setTaxedWeight(dto.getTaxedWeight());
+        entity.setInvoicesValue(dto.getInvoicesValue());
+        entity.setServiceType(dto.getServiceType());
+        entity.setBranchNickname(dto.getBranchNickname());
         entity.setDestinationLocationName(dto.getDestinationLocationName());
+        entity.setDestinationBranchNickname(dto.getDestinationBranchNickname());
+        entity.setClassification(dto.getClassification());
+        entity.setStatus(dto.getStatus());
+        entity.setStatusBranchNickname(dto.getStatusBranchNickname());
+        entity.setOriginLocationName(dto.getOriginLocationName());
+        entity.setOriginBranchNickname(dto.getOriginBranchNickname());
 
         // 2. Conversão segura de tipos de dados
         try {

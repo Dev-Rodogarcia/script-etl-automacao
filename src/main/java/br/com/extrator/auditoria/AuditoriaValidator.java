@@ -135,7 +135,10 @@ public class AuditoriaValidator {
          }
         
         try {
-            // Verificar se a tabela existe
+            // ✅ CORREÇÃO: Criar tabela se não existir antes de validar
+            criarTabelaSeNaoExistir(conexao, nomeEntidade);
+            
+            // Verificar se a tabela existe (após tentar criar)
             if (!verificarExistenciaTabela(conexao, nomeEntidade)) {
                 final String erro = "Tabela não encontrada: " + nomeEntidade;
                 logger.error("❌ {}", erro);
@@ -238,6 +241,84 @@ public class AuditoriaValidator {
         } catch (final SQLException e) {
             logger.error("Erro ao verificar existência de dados recentes: {}", e.getMessage(), e);
             return false;
+        }
+    }
+    
+    /**
+     * Cria todas as tabelas necessárias se elas não existirem.
+     * Este método é chamado antes da auditoria para garantir que todas as tabelas existam.
+     * 
+     * @param conexao Conexão com o banco de dados
+     */
+    public void criarTodasTabelasSeNaoExistirem(final Connection conexao) {
+        final List<String> entidades = List.of(
+            "cotacoes", "coletas", "faturas_a_pagar", "faturas_a_receber",
+            "fretes", "manifestos", "ocorrencias", "localizacao_cargas"
+        );
+        
+        logger.info("🔧 Criando tabelas se não existirem...");
+        for (final String entidade : entidades) {
+            criarTabelaSeNaoExistir(conexao, entidade);
+        }
+        logger.info("✅ Verificação de tabelas concluída");
+    }
+    
+    /**
+     * Cria a tabela correspondente a uma entidade se ela não existir.
+     * Este método instancia o repository apropriado e chama criarTabelaSeNaoExistir().
+     * 
+     * @param conexao Conexão com o banco de dados
+     * @param nomeEntidade Nome da entidade (ex: "cotacoes", "fretes", etc.)
+     */
+    public void criarTabelaSeNaoExistir(final Connection conexao, final String nomeEntidade) {
+        try {
+            // Mapear nome da entidade para o repository correspondente
+            switch (nomeEntidade) {
+                case "cotacoes" -> {
+                    final br.com.extrator.db.repository.CotacaoRepository repo = new br.com.extrator.db.repository.CotacaoRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela cotacoes criada/verificada");
+                }
+                case "coletas" -> {
+                    final br.com.extrator.db.repository.ColetaRepository repo = new br.com.extrator.db.repository.ColetaRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela coletas criada/verificada");
+                }
+                case "fretes" -> {
+                    final br.com.extrator.db.repository.FreteRepository repo = new br.com.extrator.db.repository.FreteRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela fretes criada/verificada");
+                }
+                case "manifestos" -> {
+                    final br.com.extrator.db.repository.ManifestoRepository repo = new br.com.extrator.db.repository.ManifestoRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela manifestos criada/verificada");
+                }
+                case "localizacao_cargas" -> {
+                    final br.com.extrator.db.repository.LocalizacaoCargaRepository repo = new br.com.extrator.db.repository.LocalizacaoCargaRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela localizacao_cargas criada/verificada");
+                }
+                case "faturas_a_pagar" -> {
+                    final br.com.extrator.db.repository.FaturaAPagarRepository repo = new br.com.extrator.db.repository.FaturaAPagarRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela faturas_a_pagar criada/verificada");
+                }
+                case "faturas_a_receber" -> {
+                    final br.com.extrator.db.repository.FaturaAReceberRepository repo = new br.com.extrator.db.repository.FaturaAReceberRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela faturas_a_receber criada/verificada");
+                }
+                case "ocorrencias" -> {
+                    final br.com.extrator.db.repository.OcorrenciaRepository repo = new br.com.extrator.db.repository.OcorrenciaRepository();
+                    repo.criarTabelaSeNaoExistirPublico(conexao);
+                    logger.debug("✅ Tabela ocorrencias criada/verificada");
+                }
+                default -> logger.warn("⚠️ Entidade desconhecida para criação de tabela: {}", nomeEntidade);
+            }
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar tabela para entidade {}: {}", nomeEntidade, e.getMessage(), e);
+            // Não lançar exceção - deixar a validação continuar e reportar o erro
         }
     }
     

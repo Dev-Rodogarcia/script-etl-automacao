@@ -57,6 +57,7 @@ public final class DataExportRunner {
                               (resultadoManifestos.isCompleto() ? "" : " (INCOMPLETO: " + resultadoManifestos.getMotivoInterrupcao() + ")"));
             
             int registrosSalvos = 0;
+            final int registrosExtraidos = resultadoManifestos.getRegistrosExtraidos();
             if (!manifestosDTO.isEmpty()) {
                 final List<ManifestoEntity> manifestosEntities = manifestosDTO.stream()
                     .map(manifestoMapper::toEntity)
@@ -65,18 +66,20 @@ public final class DataExportRunner {
                 System.out.println("✓ Salvos: " + registrosSalvos + "/" + manifestosDTO.size() + " manifestos");
             }
 
-            // Registrar no log
-            String status = resultadoManifestos.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-            String mensagem = resultadoManifestos.isCompleto() ? 
-                "Extração completa" : 
-                "Extração incompleta: " + resultadoManifestos.getMotivoInterrupcao();
-            
+            // Registrar no log (status enum + quantidade extraída)
+            final LogExtracaoEntity.StatusExtracao statusFinal = 
+                resultadoManifestos.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+            final String mensagem = resultadoManifestos.isCompleto() ?
+                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
+                ("Extração incompleta (" + resultadoManifestos.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
+
             LogExtracaoEntity logManifestos = new LogExtracaoEntity(
                 "manifestos",
                 inicioManifestos,
                 LocalDateTime.now(),
-                status,
-                registrosSalvos,
+                statusFinal,
+                registrosExtraidos,
                 resultadoManifestos.getPaginasProcessadas(),
                 mensagem
             );
@@ -109,6 +112,7 @@ public final class DataExportRunner {
                               (resultadoCotacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoCotacoes.getMotivoInterrupcao() + ")"));
             
             int registrosSalvos = 0;
+            final int registrosExtraidos = resultadoCotacoes.getRegistrosExtraidos();
             if (!cotacoesDTO.isEmpty()) {
                 final List<CotacaoEntity> cotacoesEntities = cotacoesDTO.stream()
                     .map(cotacaoMapper::toEntity)
@@ -117,18 +121,20 @@ public final class DataExportRunner {
                 System.out.println("✓ Salvas: " + registrosSalvos + "/" + cotacoesDTO.size() + " cotações");
             }
 
-            // Registrar no log
-            String status = resultadoCotacoes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-            String mensagem = resultadoCotacoes.isCompleto() ? 
-                "Extração completa" : 
-                "Extração incompleta: " + resultadoCotacoes.getMotivoInterrupcao();
-            
+            // Registrar no log (status enum + quantidade extraída)
+            final LogExtracaoEntity.StatusExtracao statusFinal = 
+                resultadoCotacoes.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+            final String mensagem = resultadoCotacoes.isCompleto() ?
+                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
+                ("Extração incompleta (" + resultadoCotacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
+
             LogExtracaoEntity logCotacoes = new LogExtracaoEntity(
                 "cotacoes",
                 inicioCotacoes,
                 LocalDateTime.now(),
-                status,
-                registrosSalvos,
+                statusFinal,
+                registrosExtraidos,
                 resultadoCotacoes.getPaginasProcessadas(),
                 mensagem
             );
@@ -161,6 +167,7 @@ public final class DataExportRunner {
                               (resultadoLocalizacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoLocalizacoes.getMotivoInterrupcao() + ")"));
             
             int registrosSalvos = 0;
+            final int registrosExtraidos = resultadoLocalizacoes.getRegistrosExtraidos();
             if (!localizacoesDTO.isEmpty()) {
                 final List<LocalizacaoCargaEntity> localizacoesEntities = localizacoesDTO.stream()
                     .map(localizacaoMapper::toEntity)
@@ -169,18 +176,20 @@ public final class DataExportRunner {
                 System.out.println("✓ Salvas: " + registrosSalvos + "/" + localizacoesDTO.size() + " localizações");
             }
 
-            // Registrar no log
-            String status = resultadoLocalizacoes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-            String mensagem = resultadoLocalizacoes.isCompleto() ? 
-                "Extração completa" : 
-                "Extração incompleta: " + resultadoLocalizacoes.getMotivoInterrupcao();
-            
+            // Registrar no log (status enum + quantidade extraída)
+            final LogExtracaoEntity.StatusExtracao statusFinal = 
+                resultadoLocalizacoes.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+            final String mensagem = resultadoLocalizacoes.isCompleto() ?
+                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
+                ("Extração incompleta (" + resultadoLocalizacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
+
             LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
                 "localizacao_cargas",
                 inicioLocalizacoes,
                 LocalDateTime.now(),
-                status,
-                registrosSalvos,
+                statusFinal,
+                registrosExtraidos,
                 resultadoLocalizacoes.getPaginasProcessadas(),
                 mensagem
             );

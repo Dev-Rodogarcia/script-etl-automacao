@@ -50,6 +50,70 @@ public class FreteMapper {
         entity.setIdCorporacao(dto.getCorporationId());
         entity.setIdCidadeDestino(dto.getDestinationCityId());
 
+        // 1.1. Mapeamento dos campos expandidos (22 campos do CSV)
+        if (dto.getPayer() != null) {
+            entity.setPagadorId(dto.getPayer().getId());
+            entity.setPagadorNome(dto.getPayer().getName());
+        }
+
+        if (dto.getSender() != null) {
+            entity.setRemetenteId(dto.getSender().getId());
+            entity.setRemetenteNome(dto.getSender().getName());
+            if (dto.getSender().getMainAddress() != null && 
+                dto.getSender().getMainAddress().getCity() != null) {
+                entity.setOrigemCidade(dto.getSender().getMainAddress().getCity().getName());
+                if (dto.getSender().getMainAddress().getCity().getState() != null) {
+                    entity.setOrigemUf(dto.getSender().getMainAddress().getCity().getState().getCode());
+                }
+            }
+        }
+
+        if (dto.getReceiver() != null) {
+            entity.setDestinatarioId(dto.getReceiver().getId());
+            entity.setDestinatarioNome(dto.getReceiver().getName());
+            if (dto.getReceiver().getMainAddress() != null && 
+                dto.getReceiver().getMainAddress().getCity() != null) {
+                entity.setDestinoCidade(dto.getReceiver().getMainAddress().getCity().getName());
+                if (dto.getReceiver().getMainAddress().getCity().getState() != null) {
+                    entity.setDestinoUf(dto.getReceiver().getMainAddress().getCity().getState().getCode());
+                }
+            }
+        }
+
+        // Mapear campos expandidos adicionais
+        if (dto.getCorporation() != null) {
+            entity.setFilialNome(dto.getCorporation().getName());
+        }
+
+        if (dto.getFreightInvoices() != null && !dto.getFreightInvoices().isEmpty()) {
+            // Pegar primeira NF (ou concatenar todas)
+            entity.setNumeroNotaFiscal(dto.getFreightInvoices().get(0).getNumber());
+        }
+
+        if (dto.getCustomerPriceTable() != null) {
+            entity.setTabelaPrecoNome(dto.getCustomerPriceTable().getName());
+        }
+
+        if (dto.getFreightClassification() != null) {
+            entity.setClassificacaoNome(dto.getFreightClassification().getName());
+        }
+
+        if (dto.getCostCenter() != null) {
+            entity.setCentroCustoNome(dto.getCostCenter().getName());
+        }
+
+        if (dto.getUser() != null) {
+            entity.setUsuarioNome(dto.getUser().getName());
+        }
+
+        // Mapear campos simples adicionais (22 campos do CSV)
+        entity.setReferenceNumber(dto.getReferenceNumber());
+        entity.setInvoicesTotalVolumes(dto.getInvoicesTotalVolumes());
+        entity.setTaxedWeight(dto.getTaxedWeight());
+        entity.setRealWeight(dto.getRealWeight());
+        entity.setTotalCubicVolume(dto.getTotalCubicVolume());
+        entity.setSubtotal(dto.getSubtotal());
+
         // 2. Conversão segura de tipos de data e hora
         try {
             if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {

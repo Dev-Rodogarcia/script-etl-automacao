@@ -41,13 +41,24 @@ public class CotacaoMapper {
 
         CotacaoEntity entity = new CotacaoEntity();
 
-        // 1. Mapeamento dos campos essenciais
+        // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/cotacoes.md
         entity.setSequenceCode(dto.getSequenceCode());
+        entity.setOperationType(dto.getOperationType());
+        entity.setCustomerDoc(dto.getCustomerDocument());
+        entity.setCustomerName(dto.getCustomerName());
         entity.setOriginCity(dto.getOriginCity());
         entity.setOriginState(dto.getOriginState());
         entity.setDestinationCity(dto.getDestinationCity());
         entity.setDestinationState(dto.getDestinationState());
-        entity.setCustomerDoc(dto.getCustomerDocument());
+        entity.setPriceTable(dto.getPriceTable());
+        entity.setVolumes(dto.getVolumes());
+        entity.setUserName(dto.getUserName());
+        entity.setBranchNickname(dto.getBranchNickname());
+        entity.setCompanyName(dto.getCompanyName());
+        entity.setRequesterName(dto.getRequesterName());
+        entity.setRealWeight(dto.getRealWeight());
+        entity.setOriginPostalCode(dto.getOriginPostalCode());
+        entity.setDestinationPostalCode(dto.getDestinationPostalCode());
 
         // 2. Conversão segura de tipos de dados (String para tipos específicos)
         try {

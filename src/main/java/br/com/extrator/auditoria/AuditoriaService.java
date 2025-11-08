@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,12 +67,17 @@ public class AuditoriaService {
             Map<String, Integer> totaisApi = null;
             try {
                 logger.info("🔍 Buscando API...");
-                totaisApi = completudeValidator.buscarTotaisEslCloud(java.time.LocalDate.now());
+                Optional<Map<String, Integer>> totaisApiOpt = completudeValidator.buscarTotaisEslCloud(java.time.LocalDate.now());
+                totaisApi = totaisApiOpt.orElse(null);
             } catch (final Exception e) {
                 logger.error("❌ API falhou: {} - Continuando local", e.getMessage());
             }
 
-            // ✅ FASE 2: Validar com comparação
+            // ✅ FASE 2: Criar todas as tabelas antes de validar
+            logger.info("🔧 Garantindo que todas as tabelas existem...");
+            validator.criarTodasTabelasSeNaoExistirem(conexao);
+            
+            // ✅ FASE 3: Validar com comparação
             final List<String> ents = List.of("cotacoes", "coletas", "faturas_a_pagar",
                     "faturas_a_receber", "fretes", "manifestos", "ocorrencias", "localizacao_cargas");
 
@@ -127,6 +133,9 @@ public class AuditoriaService {
     // ✅ NOVO MÉTODO
     private long contarRegistrosNoBanco(final Connection c, final String e, final Instant i, final Instant f)
             throws SQLException {
+        // ✅ CORREÇÃO: Garantir que a tabela existe antes de contar
+        validator.criarTabelaSeNaoExistir(c, e);
+        
         final String sql = String.format("SELECT COUNT(*) FROM %s WHERE data_extracao BETWEEN ? AND ?", e);
         try (PreparedStatement s = c.prepareStatement(sql)) {
             s.setTimestamp(1, Timestamp.from(i));

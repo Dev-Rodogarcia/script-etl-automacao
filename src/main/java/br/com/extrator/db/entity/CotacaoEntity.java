@@ -15,15 +15,28 @@ public class CotacaoEntity {
     private Long sequenceCode;
 
     // --- Colunas Essenciais para Indexação e Relatórios ---
+    // Campos principais conforme docs/descobertas-endpoints/cotacoes.md
     private OffsetDateTime requestedAt;
-    private BigDecimal totalValue;
-    private BigDecimal taxedWeight;
-    private BigDecimal invoicesValue;
+    private String operationType; // Tipo de operação
+    private String customerDoc;
+    private String customerName; // Cliente Pagador
     private String originCity;
     private String originState;
     private String destinationCity;
     private String destinationState;
-    private String customerDoc;
+    private String priceTable; // Tabela
+    private Integer volumes;
+    private BigDecimal taxedWeight;
+    private BigDecimal invoicesValue;
+    private BigDecimal totalValue;
+    private String userName; // Usuário
+    private String branchNickname; // Filial
+    private String companyName; // Empresa
+    // Campos adicionais importantes
+    private String requesterName; // Solicitante
+    private String realWeight; // Peso real
+    private String originPostalCode; // CEP Origem
+    private String destinationPostalCode; // CEP Destino
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -108,6 +121,96 @@ public class CotacaoEntity {
 
     public void setCustomerDoc(final String customerDoc) {
         this.customerDoc = customerDoc;
+    }
+
+    // Getters e Setters para campos adicionais
+    
+    public String getOperationType() {
+        return operationType;
+    }
+
+    public void setOperationType(final String operationType) {
+        this.operationType = operationType;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(final String customerName) {
+        this.customerName = customerName;
+    }
+
+    public String getPriceTable() {
+        return priceTable;
+    }
+
+    public void setPriceTable(final String priceTable) {
+        this.priceTable = priceTable;
+    }
+
+    public Integer getVolumes() {
+        return volumes;
+    }
+
+    public void setVolumes(final Integer volumes) {
+        this.volumes = volumes;
+    }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(final String userName) {
+        this.userName = userName;
+    }
+
+    public String getBranchNickname() {
+        return branchNickname;
+    }
+
+    public void setBranchNickname(final String branchNickname) {
+        this.branchNickname = branchNickname;
+    }
+
+    public String getCompanyName() {
+        return companyName;
+    }
+
+    public void setCompanyName(final String companyName) {
+        this.companyName = companyName;
+    }
+
+    public String getRequesterName() {
+        return requesterName;
+    }
+
+    public void setRequesterName(final String requesterName) {
+        this.requesterName = requesterName;
+    }
+
+    public String getRealWeight() {
+        return realWeight;
+    }
+
+    public void setRealWeight(final String realWeight) {
+        this.realWeight = realWeight;
+    }
+
+    public String getOriginPostalCode() {
+        return originPostalCode;
+    }
+
+    public void setOriginPostalCode(final String originPostalCode) {
+        this.originPostalCode = originPostalCode;
+    }
+
+    public String getDestinationPostalCode() {
+        return destinationPostalCode;
+    }
+
+    public void setDestinationPostalCode(final String destinationPostalCode) {
+        this.destinationPostalCode = destinationPostalCode;
     }
 
     public String getMetadata() {

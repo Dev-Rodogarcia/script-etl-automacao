@@ -56,13 +56,13 @@ public class Main {
         // Inicializa o sistema de logging para capturar saída do terminal
         final LoggingService loggingService = new LoggingService();
         loggingService.iniciarCaptura("extracao_dados");
+        // Garante que os logs sejam salvos mesmo em encerramentos abruptos
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> loggingService.pararCaptura()));
         
         // Organiza quaisquer logs .txt gerados na raiz, movendo-os para a pasta logs/
         organizarLogsTxtNaPastaLogs();
         
         try {
-            // Organiza logs .txt na pasta logs
-            organizarLogsTxtNaPastaLogs();
             
             // Determina o comando a ser executado
             final String nomeComando = (args.length == 0) ? "--fluxo-completo" : args[0].toLowerCase();
@@ -80,6 +80,8 @@ public class Main {
         } catch (final Exception e) {
             logger.error("Erro durante execução: {}", e.getMessage(), e);
             System.err.println("❌ Erro durante execução: " + e.getMessage());
+            // Salva os logs antes de encerrar com código de erro
+            loggingService.pararCaptura();
             System.exit(1);
         } finally {
             // Finaliza captura de logs

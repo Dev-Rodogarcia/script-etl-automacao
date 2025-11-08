@@ -1,0 +1,149 @@
+package br.com.extrator.util;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Utilitário para exibir banners estilizados no console
+ */
+public class BannerUtil {
+
+    private static final Logger logger = LoggerFactory.getLogger(BannerUtil.class);
+
+    /**
+     * Exibe o banner de extração completa
+     */
+    public static void exibirBannerExtracaoCompleta() {
+        exibirBanner("banners/banner-extracao-completa.txt");
+    }
+
+    /**
+     * Exibe o banner da API REST
+     */
+    public static void exibirBannerApiRest() {
+        exibirBanner("banners/banner-api-rest.txt");
+    }
+
+    /**
+     * Exibe o banner da API GraphQL
+     */
+    public static void exibirBannerApiGraphQL() {
+        exibirBanner("banners/banner-api-graphql.txt");
+    }
+
+    /**
+     * Exibe o banner da API Data Export
+     */
+    public static void exibirBannerApiDataExport() {
+        exibirBanner("banners/banner-api-dataexport.txt");
+    }
+
+    /**
+     * Exibe o banner de sucesso
+     */
+    public static void exibirBannerSucesso() {
+        exibirBanner("banners/banner-sucesso.txt");
+    }
+
+    /**
+     * Exibe o banner de erro
+     */
+    public static void exibirBannerErro() {
+        exibirBanner("banners/banner-erro.txt");
+    }
+
+    /**
+     * Exibe um banner personalizado
+     * 
+     * @param caminhoArquivo Caminho do arquivo de banner em resources
+     */
+    private static void exibirBanner(final String caminhoArquivo) {
+        try (final InputStream inputStream = BannerUtil.class.getClassLoader()
+                .getResourceAsStream(caminhoArquivo)) {
+
+            if (inputStream == null) {
+                logger.warn("Banner não encontrado: {}", caminhoArquivo);
+                return;
+            }
+
+            try (final BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                
+                final String banner = reader.lines()
+                        .collect(Collectors.joining("\n"));
+
+                System.out.println(banner);
+            }
+
+        } catch (final Exception e) {
+            logger.warn("Erro ao exibir banner: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Exibe estatísticas de extração formatadas
+     * 
+     * @param nomeApi Nome da API
+     * @param registros Número de registros extraídos
+     * @param tempoSegundos Tempo de execução em segundos
+     */
+    public static void exibirEstatisticas(final String nomeApi, final int registros, final long tempoSegundos) {
+        System.out.println();
+        System.out.println("  📊 " + nomeApi);
+        System.out.println("     ├─ Registros: " + registros);
+        System.out.println("     ├─ Tempo: " + tempoSegundos + "s");
+        if (tempoSegundos > 0) {
+            System.out.println("     └─ Taxa: " + (registros / tempoSegundos) + " reg/s");
+        }
+        System.out.println();
+    }
+
+    /**
+     * Exibe uma linha separadora
+     */
+    public static void exibirSeparador() {
+        System.out.println("═══════════════════════════════════════════════════════════════════════════");
+    }
+
+    /**
+     * Exibe uma mensagem de progresso
+     * 
+     * @param mensagem Mensagem a exibir
+     */
+    public static void exibirProgresso(final String mensagem) {
+        System.out.println("  ⏳ " + mensagem + "...");
+    }
+
+    /**
+     * Exibe uma mensagem de sucesso
+     * 
+     * @param mensagem Mensagem a exibir
+     */
+    public static void exibirSucessoMensagem(final String mensagem) {
+        System.out.println("  ✅ " + mensagem);
+    }
+
+    /**
+     * Exibe uma mensagem de erro
+     * 
+     * @param mensagem Mensagem a exibir
+     */
+    public static void exibirErroMensagem(final String mensagem) {
+        System.out.println("  ❌ " + mensagem);
+    }
+
+    /**
+     * Exibe uma mensagem de aviso
+     * 
+     * @param mensagem Mensagem a exibir
+     */
+    public static void exibirAvisoMensagem(final String mensagem) {
+        System.out.println("  ⚠️  " + mensagem);
+    }
+}

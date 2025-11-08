@@ -26,7 +26,7 @@ public class LogExtracaoRepository {
      */
     public void gravarLogExtracao(LogExtracaoEntity logExtracao) {
         String sql = """
-            INSERT INTO log_extracoes
+            INSERT INTO dbo.log_extracoes
             (entidade, timestamp_inicio, timestamp_fim, status_final, registros_extraidos, paginas_processadas, mensagem)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """;
@@ -63,7 +63,7 @@ public class LogExtracaoRepository {
         String sql = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
                    registros_extraidos, paginas_processadas, mensagem
-            FROM log_extracoes
+            FROM dbo.log_extracoes
             WHERE entidade = ?
             ORDER BY timestamp_fim DESC
             """;
@@ -103,7 +103,7 @@ public class LogExtracaoRepository {
         String sql = """
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_NAME = 'log_extracoes'
+            WHERE TABLE_NAME = 'log_extracoes' AND TABLE_SCHEMA = 'dbo'
             """;
         
         try (Connection conn = GerenciadorConexao.obterConexao();
@@ -130,8 +130,8 @@ public class LogExtracaoRepository {
             return;
         }
         
-        String sql = """
-            CREATE TABLE log_extracoes (
+        final String ddlTabela = """
+            CREATE TABLE dbo.log_extracoes (
                 id BIGINT IDENTITY PRIMARY KEY,
                 entidade NVARCHAR(50) NOT NULL,
                 timestamp_inicio DATETIME2 NOT NULL,
@@ -140,20 +140,25 @@ public class LogExtracaoRepository {
                 registros_extraidos INT NOT NULL,
                 paginas_processadas INT NOT NULL,
                 mensagem NVARCHAR(MAX)
-            );
-            
-            CREATE INDEX idx_entidade_timestamp ON log_extracoes (entidade, timestamp_fim DESC);
+            )
             """;
-        
-        try (Connection conn = GerenciadorConexao.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.executeUpdate();
-            logger.info("✅ Tabela log_extracoes criada com sucesso");
-            
+
+        final String ddlIndice = """
+            CREATE INDEX idx_entidade_timestamp ON dbo.log_extracoes (entidade, timestamp_fim DESC)
+            """;
+
+        try (Connection conn = GerenciadorConexao.obterConexao()) {
+            // Executa DDLs separadamente para maior compatibilidade com o driver do SQL Server
+            try (PreparedStatement stmtTabela = conn.prepareStatement(ddlTabela)) {
+                stmtTabela.executeUpdate();
+            }
+            try (PreparedStatement stmtIndice = conn.prepareStatement(ddlIndice)) {
+                stmtIndice.executeUpdate();
+            }
+            logger.info("✅ Tabela dbo.log_extracoes criada com sucesso");
         } catch (SQLException e) {
-            logger.error("❌ Erro ao criar tabela log_extracoes: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha ao criar tabela log_extracoes", e);
+            logger.error("❌ Erro ao criar tabela dbo.log_extracoes: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar tabela dbo.log_extracoes", e);
         }
     }
 }

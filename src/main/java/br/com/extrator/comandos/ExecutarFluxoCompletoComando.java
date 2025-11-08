@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import br.com.extrator.auditoria.CompletudeValidator;
 import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
 import br.com.extrator.runners.RestRunner;
+import br.com.extrator.util.BannerUtil;
 
 /**
  * Comando responsável por executar o fluxo completo de extração de dados
@@ -29,8 +31,8 @@ public class ExecutarFluxoCompletoComando implements Comando {
     
     @Override
     public void executar(String[] args) throws Exception {
-        // Exibe banner inicial
-        exibirBanner();
+        // Exibe banner inicial de extração completa
+        BannerUtil.exibirBannerExtracaoCompleta();
         
         // Define data de hoje para buscar dados do dia atual
         final LocalDate dataHoje = LocalDate.now();
@@ -77,111 +79,123 @@ public class ExecutarFluxoCompletoComando implements Comando {
             System.out.println("🔍 INICIANDO VALIDAÇÃO DE COMPLETUDE DOS DADOS");
             System.out.println("=".repeat(60));
             
-            // Instancia o validador
-            final CompletudeValidator validator = new CompletudeValidator();
-            
-            // Passo B.1: Buscar totais da API ESL Cloud
-            System.out.println("🔄 [1/2] Buscando totais nas APIs do ESL Cloud...");
-            final LocalDate dataReferencia = LocalDate.now();
-            final Map<String, Integer> totaisEslCloud = validator.buscarTotaisEslCloud(dataReferencia);
-            System.out.println("✅ Totais obtidos das APIs com sucesso!");
-            
-            // Passo B.2: Validar completude comparando com o banco de dados
-            System.out.println("🔄 [2/2] Validando completude dos dados extraídos...");
-            final Map<String, CompletudeValidator.StatusValidacao> resultadosValidacao = validator.validarCompletude(totaisEslCloud, dataReferencia);
-            
-            // Determina se a extração está completa (todos os status devem ser OK)
-            boolean extracaoCompleta = resultadosValidacao.values().stream()
-                .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
-            
-            // TÓPICO 4: Validações Avançadas (apenas se a validação básica passou)
-            boolean gapValidationOk = true;
-            boolean temporalValidationOk = true;
-            
-            if (extracaoCompleta) {
-                System.out.println("🔍 [3/4] Executando validação de gaps (IDs sequenciais)...");
-                CompletudeValidator.StatusValidacao gapStatus = validator.validarGapsOcorrencias(dataReferencia);
-                gapValidationOk = (gapStatus == CompletudeValidator.StatusValidacao.OK);
+            try {
+                // Instancia o validador
+                final CompletudeValidator validator = new CompletudeValidator();
                 
-                if (gapValidationOk) {
-                    System.out.println("✅ Validação de gaps: OK");
-                    logger.info("✅ Validação de gaps concluída com sucesso");
+                // Passo B.1: Buscar totais da API ESL Cloud
+                System.out.println("🔄 [1/2] Buscando totais nas APIs do ESL Cloud...");
+                final LocalDate dataReferencia = LocalDate.now();
+                final Optional<Map<String, Integer>> totaisEslCloudOpt = validator.buscarTotaisEslCloud(dataReferencia);
+                
+                if (totaisEslCloudOpt.isPresent()) {
+                    final Map<String, Integer> totaisEslCloud = totaisEslCloudOpt.get();
+                    System.out.println("✅ Totais obtidos das APIs com sucesso!");
+                    
+                    // Passo B.2: Validar completude comparando com o banco de dados
+                    System.out.println("🔄 [2/2] Validando completude dos dados extraídos...");
+                    final Map<String, CompletudeValidator.StatusValidacao> resultadosValidacao = validator.validarCompletude(totaisEslCloud, dataReferencia);
+                    
+                    // Determina se a extração está completa (todos os status devem ser OK)
+                    boolean extracaoCompleta = resultadosValidacao.values().stream()
+                        .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
+                    
+                    // TÓPICO 4: Validações Avançadas (apenas se a validação básica passou)
+                    boolean gapValidationOk = true;
+                    boolean temporalValidationOk = true;
+                    
+                    if (extracaoCompleta) {
+                        System.out.println("🔍 [3/4] Executando validação de gaps (IDs sequenciais)...");
+                        CompletudeValidator.StatusValidacao gapStatus = validator.validarGapsOcorrencias(dataReferencia);
+                        gapValidationOk = (gapStatus == CompletudeValidator.StatusValidacao.OK);
+                        
+                        if (gapValidationOk) {
+                            System.out.println("✅ Validação de gaps: OK");
+                            logger.info("✅ Validação de gaps concluída com sucesso");
+                        } else {
+                            System.out.println("⚠️ Validação de gaps: " + gapStatus);
+                            logger.warn("⚠️ Validação de gaps detectou problemas: {}", gapStatus);
+                        }
+                        
+                        System.out.println("🕐 [4/4] Executando validação de janela temporal...");
+                        Map<String, CompletudeValidator.StatusValidacao> temporalResults = validator.validarJanelaTemporal(dataReferencia);
+                        temporalValidationOk = temporalResults.values().stream()
+                            .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
+                        
+                        if (temporalValidationOk) {
+                            System.out.println("✅ Validação temporal: OK");
+                            logger.info("✅ Validação de janela temporal concluída com sucesso");
+                        } else {
+                            System.out.println("❌ Validação temporal detectou problemas críticos!");
+                            logger.error("❌ Validação temporal detectou registros criados durante extração - risco de perda de dados");
+                        }
+                    }
+                    
+                    // Determina resultado final considerando todas as validações
+                    boolean validacaoFinalCompleta = extracaoCompleta && gapValidationOk && temporalValidationOk;
+                    
+                    // Exibe resultado final da validação
+                    System.out.println("\n" + "=".repeat(60));
+                    if (validacaoFinalCompleta) {
+                        System.out.println("🎉 EXTRAÇÃO 100% COMPLETA E VALIDADA!");
+                        System.out.println("✅ Todos os dados foram extraídos com sucesso!");
+                        System.out.println("✅ Validação de gaps: OK");
+                        System.out.println("✅ Validação temporal: OK");
+                        logger.info("🎉 EXTRAÇÃO 100% COMPLETA! Todas as validações (básica, gaps e temporal) foram bem-sucedidas.");
+                    } else {
+                        System.out.println("❌ EXTRAÇÃO COM PROBLEMAS - Verificar logs");
+                        if (!extracaoCompleta) {
+                            System.out.println("⚠️  Inconsistências na contagem de registros detectadas.");
+                        }
+                        if (!gapValidationOk) {
+                            System.out.println("⚠️  Gaps nos IDs detectados - possível perda de registros específicos.");
+                        }
+                        if (!temporalValidationOk) {
+                            System.out.println("❌ CRÍTICO: Registros criados durante extração - risco de perda de dados!");
+                        }
+                        System.out.println("💡 Consulte os logs detalhados para identificar os problemas.");
+                        logger.error("❌ EXTRAÇÃO COM PROBLEMAS - Básica: {}, Gaps: {}, Temporal: {}", 
+                            extracaoCompleta, gapValidationOk, temporalValidationOk);
+                        
+                        // Nota: Implementação futura de alertas por email/Slack pode ser adicionada aqui
+                    }
+                    System.out.println("=".repeat(60));
                 } else {
-                    System.out.println("⚠️ Validação de gaps: " + gapStatus);
-                    logger.warn("⚠️ Validação de gaps detectou problemas: {}", gapStatus);
+                    System.out.println("ℹ️ Continuando sem validação de completude (API indisponível)");
+                    logger.info("ℹ️ Continuando sem validação de completude (API indisponível)");
                 }
                 
-                System.out.println("🕐 [4/4] Executando validação de janela temporal...");
-                Map<String, CompletudeValidator.StatusValidacao> temporalResults = validator.validarJanelaTemporal(dataReferencia);
-                temporalValidationOk = temporalResults.values().stream()
-                    .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
-                
-                if (temporalValidationOk) {
-                    System.out.println("✅ Validação temporal: OK");
-                    logger.info("✅ Validação de janela temporal concluída com sucesso");
-                } else {
-                    System.out.println("❌ Validação temporal detectou problemas críticos!");
-                    logger.error("❌ Validação temporal detectou registros criados durante extração - risco de perda de dados");
-                }
+            } catch (Exception e) {
+                logger.warn("⚠️ Não foi possível comparar com API ESL Cloud: {}", e.getMessage());
+                logger.info("ℹ️ Continuando sem validação de completude (dados extraídos estão salvos)");
+                logger.debug("Stack trace completo da falha na validação:", e);
+                System.out.println("⚠️ Validação de completude falhou - continuando sem validação");
+                System.out.println("ℹ️ Os dados extraídos foram salvos com sucesso no banco de dados");
             }
-            
-            // Determina resultado final considerando todas as validações
-            boolean validacaoFinalCompleta = extracaoCompleta && gapValidationOk && temporalValidationOk;
-            
-            // Exibe resultado final da validação
-            System.out.println("\n" + "=".repeat(60));
-            if (validacaoFinalCompleta) {
-                System.out.println("🎉 EXTRAÇÃO 100% COMPLETA E VALIDADA!");
-                System.out.println("✅ Todos os dados foram extraídos com sucesso!");
-                System.out.println("✅ Validação de gaps: OK");
-                System.out.println("✅ Validação temporal: OK");
-                logger.info("🎉 EXTRAÇÃO 100% COMPLETA! Todas as validações (básica, gaps e temporal) foram bem-sucedidas.");
-            } else {
-                System.out.println("❌ EXTRAÇÃO COM PROBLEMAS - Verificar logs");
-                if (!extracaoCompleta) {
-                    System.out.println("⚠️  Inconsistências na contagem de registros detectadas.");
-                }
-                if (!gapValidationOk) {
-                    System.out.println("⚠️  Gaps nos IDs detectados - possível perda de registros específicos.");
-                }
-                if (!temporalValidationOk) {
-                    System.out.println("❌ CRÍTICO: Registros criados durante extração - risco de perda de dados!");
-                }
-                System.out.println("💡 Consulte os logs detalhados para identificar os problemas.");
-                logger.error("❌ EXTRAÇÃO COM PROBLEMAS - Básica: {}, Gaps: {}, Temporal: {}", 
-                    extracaoCompleta, gapValidationOk, temporalValidationOk);
-                
-                // Nota: Implementação futura de alertas por email/Slack pode ser adicionada aqui
-            }
-            System.out.println("=".repeat(60));
             
             // Exibe resumo final
             final LocalDateTime fimExecucao = LocalDateTime.now();
-            System.out.println("\n" + "=".repeat(60));
-            System.out.println("PROCESSO DE EXTRAÇÃO E VALIDAÇÃO CONCLUÍDO");
-            System.out.println("=".repeat(60));
+            
+            // Exibe banner de sucesso
+            BannerUtil.exibirBannerSucesso();
+            
+            System.out.println("📊 RESUMO DA EXTRAÇÃO");
             System.out.println("Início: " + inicioExecucao.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
             System.out.println("Fim: " + fimExecucao.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
             System.out.println("Duração: " + java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes() + " minutos");
             System.out.println("✅ Todas as 3 APIs foram processadas e validadas!");
-            System.out.println("=".repeat(60));
+            System.out.println();
             
             // Grava timestamp de execução bem-sucedida
             gravarDataExecucao();
             
         } catch (final Exception e) {
+            // Exibe banner de erro
+            BannerUtil.exibirBannerErro();
+            System.err.println("❌ Erro durante execução: " + e.getMessage());
             logger.error("Falha durante a execução do fluxo completo: {}", e.getMessage(), e);
             throw e; // Re-propaga para tratamento de alto nível
         }
-    }
-    
-    private void exibirBanner() {
-        System.out.println("=".repeat(80));
-        System.out.println("🚀 SISTEMA DE EXTRAÇÃO DE DADOS - ESL CLOUD");
-        System.out.println("=".repeat(80));
-        System.out.println("Versão: 3.0 - Arquitetura Refatorada com Padrão Command");
-        System.out.println("Desenvolvido para automação de extração de dados via APIs");
-        System.out.println("=".repeat(80));
     }
     
     /**

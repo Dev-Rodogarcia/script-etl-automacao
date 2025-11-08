@@ -277,6 +277,17 @@ public abstract class AbstractRepository<T> {
      * @throws SQLException Se ocorrer um erro durante a criação da tabela
      */
     protected abstract void criarTabelaSeNaoExistir(Connection conexao) throws SQLException;
+    
+    /**
+     * Método público para criar a tabela se não existir.
+     * Permite que classes externas (como AuditoriaValidator) criem tabelas sem precisar salvar dados.
+     * 
+     * @param conexao Conexão com o banco de dados
+     * @throws SQLException Se ocorrer um erro durante a criação da tabela
+     */
+    public void criarTabelaSeNaoExistirPublico(Connection conexao) throws SQLException {
+        criarTabelaSeNaoExistir(conexao);
+    }
 
     /**
      * Método abstrato que deve ser implementado por cada repositório específico
