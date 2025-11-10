@@ -1,6 +1,9 @@
 package br.com.extrator.db.entity;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 
 /**
@@ -55,6 +58,9 @@ public class ManifestoEntity {
 
     // --- Coluna de Metadados ---
     private String metadata;
+
+    // --- Coluna de Identificador Único (para chave composta) ---
+    private String identificadorUnico;
 
     // --- Getters e Setters ---
 
@@ -362,5 +368,70 @@ public class ManifestoEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public String getIdentificadorUnico() {
+        return identificadorUnico;
+    }
+
+    public void setIdentificadorUnico(final String identificadorUnico) {
+        this.identificadorUnico = identificadorUnico;
+    }
+
+    /**
+     * Calcula o identificador único para este manifesto.
+     * Este método deve ser chamado DEPOIS que o metadata for definido.
+     * 
+     * Prioridade 1: pick_sequence_code (quando disponível e não NULL)
+     * Prioridade 2: hash SHA-256 do metadata completo (quando pick_sequence_code é NULL)
+     * 
+     * O hash do metadata garante que manifestos com mesmo sequence_code mas
+     * metadata diferentes (duplicados naturais) sejam tratados como registros distintos.
+     */
+    public void calcularIdentificadorUnico() {
+        if (this.pickSequenceCode != null) {
+            // Prioridade 1: Usar pick_sequence_code quando disponível
+            this.identificadorUnico = String.valueOf(this.pickSequenceCode);
+        } else {
+            // Prioridade 2: Calcular hash do metadata quando pick_sequence_code é NULL
+            this.identificadorUnico = calcularHashMetadata(this.metadata);
+        }
+    }
+
+    /**
+     * Calcula hash SHA-256 do metadata JSON.
+     * Usado quando pick_sequence_code não está disponível para diferenciar
+     * duplicados naturais que têm mesmo sequence_code mas metadata diferentes.
+     * 
+     * @param metadata String JSON do metadata
+     * @return String hexadecimal do hash SHA-256 (64 caracteres) ou fallback se metadata estiver vazio
+     */
+    private String calcularHashMetadata(final String metadata) {
+        if (metadata == null || metadata.trim().isEmpty()) {
+            // Fallback: usar hash do sequence_code se metadata estiver vazio
+            return "NULL_METADATA_" + (this.sequenceCode != null ? this.sequenceCode : "UNKNOWN");
+        }
+        try {
+            final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            final byte[] hash = digest.digest(metadata.getBytes(StandardCharsets.UTF_8));
+            return bytesToHex(hash);
+        } catch (final NoSuchAlgorithmException e) {
+            // Fallback: usar hash simples se SHA-256 não disponível (não deve acontecer)
+            throw new RuntimeException("Erro ao calcular hash SHA-256 do metadata", e);
+        }
+    }
+
+    /**
+     * Converte array de bytes para string hexadecimal.
+     * 
+     * @param bytes Array de bytes a ser convertido
+     * @return String hexadecimal (2 caracteres por byte)
+     */
+    private String bytesToHex(final byte[] bytes) {
+        final StringBuilder result = new StringBuilder();
+        for (final byte b : bytes) {
+            result.append(String.format("%02x", b));
+        }
+        return result.toString();
     }
 }

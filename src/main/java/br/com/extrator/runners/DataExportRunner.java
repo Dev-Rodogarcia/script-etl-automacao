@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.db.entity.CotacaoEntity;
@@ -26,6 +29,7 @@ import br.com.extrator.modelo.dataexport.manifestos.ManifestoMapper;
  * Runner independente para a API Data Export (Manifestos, Cotações e Localização de Carga).
  */
 public final class DataExportRunner {
+    private static final Logger logger = LoggerFactory.getLogger(DataExportRunner.class);
 
     private DataExportRunner() {}
 
@@ -57,29 +61,48 @@ public final class DataExportRunner {
                               (resultadoManifestos.isCompleto() ? "" : " (INCOMPLETO: " + resultadoManifestos.getMotivoInterrupcao() + ")"));
             
             int registrosSalvos = 0;
+            int totalUnicos = 0;
             final int registrosExtraidos = resultadoManifestos.getRegistrosExtraidos();
             if (!manifestosDTO.isEmpty()) {
                 final List<ManifestoEntity> manifestosEntities = manifestosDTO.stream()
                     .map(manifestoMapper::toEntity)
                     .collect(Collectors.toList());
-                registrosSalvos = manifestoRepository.salvar(manifestosEntities);
-                System.out.println("✓ Salvos: " + registrosSalvos + "/" + manifestosDTO.size() + " manifestos");
+                
+                // Deduplicar registros (proteção contra duplicados da API)
+                final List<ManifestoEntity> manifestosUnicos = deduplicarManifestos(manifestosEntities);
+                totalUnicos = manifestosUnicos.size();
+                
+                // Log se houver duplicados removidos
+                if (manifestosEntities.size() != manifestosUnicos.size()) {
+                    final int duplicadosRemovidos = manifestosEntities.size() - manifestosUnicos.size();
+                    System.out.println("⚠️ Removidos " + duplicadosRemovidos + " duplicados da resposta da API antes de salvar");
+                    logger.warn("🔄 API retornou {} duplicados para manifestos. Removidos antes de salvar. Total único: {}", 
+                        duplicadosRemovidos, manifestosUnicos.size());
+                }
+                
+                registrosSalvos = manifestoRepository.salvar(manifestosUnicos);
+                System.out.println("✓ Processados: " + registrosSalvos + "/" + totalUnicos + " manifestos (INSERTs + UPDATEs)");
             }
-
+            
             // Registrar no log (status enum + quantidade extraída)
+            // NOTA: "salvos" = operações bem-sucedidas (INSERTs + UPDATEs)
+            // UPDATEs não adicionam novas linhas, apenas atualizam existentes
+            // registrosExtraidos = quantidade retornada pela API (pode incluir duplicados)
+            // totalUnicos = quantidade após deduplicação (registros únicos)
+            // registrosSalvos = quantidade processada com sucesso (INSERTs + UPDATEs)
             final LogExtracaoEntity.StatusExtracao statusFinal = 
                 resultadoManifestos.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
 
             final String mensagem = resultadoManifestos.isCompleto() ?
-                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
-                ("Extração incompleta (" + resultadoManifestos.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
+                ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                ("Extração incompleta (" + resultadoManifestos.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
 
-            LogExtracaoEntity logManifestos = new LogExtracaoEntity(
+            final LogExtracaoEntity logManifestos = new LogExtracaoEntity(
                 "manifestos",
                 inicioManifestos,
                 LocalDateTime.now(),
                 statusFinal,
-                registrosExtraidos,
+                totalUnicos, // ← CORRIGIDO: usar totalUnicos (após deduplicação) em vez de registrosExtraidos (bruto da API)
                 resultadoManifestos.getPaginasProcessadas(),
                 mensagem
             );
@@ -112,29 +135,48 @@ public final class DataExportRunner {
                               (resultadoCotacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoCotacoes.getMotivoInterrupcao() + ")"));
             
             int registrosSalvos = 0;
+            int totalUnicos = 0;
             final int registrosExtraidos = resultadoCotacoes.getRegistrosExtraidos();
             if (!cotacoesDTO.isEmpty()) {
                 final List<CotacaoEntity> cotacoesEntities = cotacoesDTO.stream()
                     .map(cotacaoMapper::toEntity)
                     .collect(Collectors.toList());
-                registrosSalvos = cotacaoRepository.salvar(cotacoesEntities);
-                System.out.println("✓ Salvas: " + registrosSalvos + "/" + cotacoesDTO.size() + " cotações");
+                
+                // Deduplicar registros (proteção contra duplicados da API)
+                final List<CotacaoEntity> cotacoesUnicas = deduplicarCotacoes(cotacoesEntities);
+                totalUnicos = cotacoesUnicas.size();
+                
+                // Log se houver duplicados removidos
+                if (cotacoesEntities.size() != cotacoesUnicas.size()) {
+                    final int duplicadosRemovidos = cotacoesEntities.size() - cotacoesUnicas.size();
+                    System.out.println("⚠️ Removidos " + duplicadosRemovidos + " duplicados da resposta da API antes de salvar");
+                    logger.warn("🔄 API retornou {} duplicados para cotações. Removidos antes de salvar. Total único: {}", 
+                        duplicadosRemovidos, cotacoesUnicas.size());
+                }
+                
+                registrosSalvos = cotacaoRepository.salvar(cotacoesUnicas);
+                System.out.println("✓ Processadas: " + registrosSalvos + "/" + totalUnicos + " cotações (INSERTs + UPDATEs)");
             }
-
+            
             // Registrar no log (status enum + quantidade extraída)
+            // NOTA: "salvos" = operações bem-sucedidas (INSERTs + UPDATEs)
+            // UPDATEs não adicionam novas linhas, apenas atualizam existentes
+            // registrosExtraidos = quantidade retornada pela API (pode incluir duplicados)
+            // totalUnicos = quantidade após deduplicação (registros únicos)
+            // registrosSalvos = quantidade processada com sucesso (INSERTs + UPDATEs)
             final LogExtracaoEntity.StatusExtracao statusFinal = 
                 resultadoCotacoes.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
 
             final String mensagem = resultadoCotacoes.isCompleto() ?
-                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
-                ("Extração incompleta (" + resultadoCotacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
+                ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                ("Extração incompleta (" + resultadoCotacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
 
-            LogExtracaoEntity logCotacoes = new LogExtracaoEntity(
+            final LogExtracaoEntity logCotacoes = new LogExtracaoEntity(
                 "cotacoes",
                 inicioCotacoes,
                 LocalDateTime.now(),
                 statusFinal,
-                registrosExtraidos,
+                totalUnicos, // ← CORRIGIDO: usar totalUnicos (após deduplicação) em vez de registrosExtraidos (bruto da API)
                 resultadoCotacoes.getPaginasProcessadas(),
                 mensagem
             );
@@ -172,28 +214,46 @@ public final class DataExportRunner {
                 final List<LocalizacaoCargaEntity> localizacoesEntities = localizacoesDTO.stream()
                     .map(localizacaoMapper::toEntity)
                     .collect(Collectors.toList());
-                registrosSalvos = localizacaoRepository.salvar(localizacoesEntities);
-                System.out.println("✓ Salvas: " + registrosSalvos + "/" + localizacoesDTO.size() + " localizações");
+                
+                // Deduplicar registros (proteção contra duplicados da API)
+                final List<LocalizacaoCargaEntity> localizacoesUnicas = deduplicarLocalizacoes(localizacoesEntities);
+                
+                // Log se houver duplicados removidos
+                if (localizacoesEntities.size() != localizacoesUnicas.size()) {
+                    final int duplicadosRemovidos = localizacoesEntities.size() - localizacoesUnicas.size();
+                    System.out.println("⚠️ Removidos " + duplicadosRemovidos + " duplicados da resposta da API antes de salvar");
+                    logger.warn("🔄 API retornou {} duplicados para localizações. Removidos antes de salvar. Total único: {}", 
+                        duplicadosRemovidos, localizacoesUnicas.size());
+                }
+                
+                registrosSalvos = localizacaoRepository.salvar(localizacoesUnicas);
+                final int totalUnicos = localizacoesUnicas.size();
+                System.out.println("✓ Processadas: " + registrosSalvos + "/" + totalUnicos + " localizações (INSERTs + UPDATEs)");
+                
+                // Registrar no log (status enum + quantidade extraída)
+                // NOTA: "salvos" = operações bem-sucedidas (INSERTs + UPDATEs)
+                // UPDATEs não adicionam novas linhas, apenas atualizam existentes
+                // registrosExtraidos = quantidade retornada pela API (pode incluir duplicados)
+                // totalUnicos = quantidade após deduplicação (registros únicos)
+                // registrosSalvos = quantidade processada com sucesso (INSERTs + UPDATEs)
+                final LogExtracaoEntity.StatusExtracao statusFinal = 
+                    resultadoLocalizacoes.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+                final String mensagem = resultadoLocalizacoes.isCompleto() ?
+                    ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                    ("Extração incompleta (" + resultadoLocalizacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
+
+                LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
+                    "localizacao_cargas",
+                    inicioLocalizacoes,
+                    LocalDateTime.now(),
+                    statusFinal,
+                    totalUnicos, // ← CORRIGIDO: usar totalUnicos (após deduplicação) em vez de registrosExtraidos (bruto da API)
+                    resultadoLocalizacoes.getPaginasProcessadas(),
+                    mensagem
+                );
+                logExtracaoRepository.gravarLogExtracao(logLocalizacoes);
             }
-
-            // Registrar no log (status enum + quantidade extraída)
-            final LogExtracaoEntity.StatusExtracao statusFinal = 
-                resultadoLocalizacoes.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
-
-            final String mensagem = resultadoLocalizacoes.isCompleto() ?
-                ("Extração completa – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos) :
-                ("Extração incompleta (" + resultadoLocalizacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + ", salvos " + registrosSalvos);
-
-            LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
-                "localizacao_cargas",
-                inicioLocalizacoes,
-                LocalDateTime.now(),
-                statusFinal,
-                registrosExtraidos,
-                resultadoLocalizacoes.getPaginasProcessadas(),
-                mensagem
-            );
-            logExtracaoRepository.gravarLogExtracao(logLocalizacoes);
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
@@ -209,5 +269,113 @@ public final class DataExportRunner {
             logExtracaoRepository.gravarLogExtracao(logErro);
             throw new RuntimeException("Falha na extração de localização de cargas", e);
         }
+    }
+    
+    /**
+     * Deduplica lista de manifestos removendo registros duplicados da API.
+     * Usa chave composta (sequence_code + identificador_unico) para identificar duplicados.
+     * Mantém o primeiro registro encontrado e descarta duplicados subsequentes.
+     * 
+     * @param manifestos Lista de manifestos a deduplicar
+     * @return Lista deduplicada de manifestos
+     */
+    private static List<ManifestoEntity> deduplicarManifestos(final List<ManifestoEntity> manifestos) {
+        if (manifestos == null || manifestos.isEmpty()) {
+            return manifestos;
+        }
+        
+        return manifestos.stream()
+            .collect(Collectors.toMap(
+                m -> {
+                    // Chave única: sequence_code + "_" + identificador_unico
+                    if (m.getSequenceCode() == null) {
+                        throw new IllegalStateException("Manifesto com sequence_code NULL não pode ser deduplicado");
+                    }
+                    if (m.getIdentificadorUnico() == null || m.getIdentificadorUnico().trim().isEmpty()) {
+                        throw new IllegalStateException("Manifesto com identificador_unico NULL/vazio não pode ser deduplicado");
+                    }
+                    return m.getSequenceCode() + "_" + m.getIdentificadorUnico();
+                },
+                m -> m,
+                (primeiro, segundo) -> {
+                    // Se houver duplicado, manter o primeiro e logar o segundo
+                    logger.warn("⚠️ Duplicado detectado na resposta da API: sequence_code={}, identificador_unico={}", 
+                        segundo.getSequenceCode(), segundo.getIdentificadorUnico());
+                    return primeiro; // Mantém o primeiro
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Deduplica lista de cotações removendo registros duplicados da API.
+     * Usa sequence_code como chave única (PRIMARY KEY da tabela).
+     * Mantém o primeiro registro encontrado e descarta duplicados subsequentes.
+     * 
+     * @param cotacoes Lista de cotações a deduplicar
+     * @return Lista deduplicada de cotações
+     */
+    private static List<CotacaoEntity> deduplicarCotacoes(final List<CotacaoEntity> cotacoes) {
+        if (cotacoes == null || cotacoes.isEmpty()) {
+            return cotacoes;
+        }
+        
+        return cotacoes.stream()
+            .collect(Collectors.toMap(
+                c -> {
+                    // Chave única: sequence_code
+                    if (c.getSequenceCode() == null) {
+                        throw new IllegalStateException("Cotação com sequence_code NULL não pode ser deduplicada");
+                    }
+                    return c.getSequenceCode();
+                },
+                c -> c,
+                (primeiro, segundo) -> {
+                    // Se houver duplicado, manter o primeiro e logar o segundo
+                    logger.warn("⚠️ Duplicado detectado na resposta da API: sequence_code={}", 
+                        segundo.getSequenceCode());
+                    return primeiro; // Mantém o primeiro
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * Deduplica lista de localizações removendo registros duplicados da API.
+     * Usa sequence_number como chave única (PRIMARY KEY da tabela).
+     * Mantém o primeiro registro encontrado e descarta duplicados subsequentes.
+     * 
+     * @param localizacoes Lista de localizações a deduplicar
+     * @return Lista deduplicada de localizações
+     */
+    private static List<LocalizacaoCargaEntity> deduplicarLocalizacoes(final List<LocalizacaoCargaEntity> localizacoes) {
+        if (localizacoes == null || localizacoes.isEmpty()) {
+            return localizacoes;
+        }
+        
+        return localizacoes.stream()
+            .collect(Collectors.toMap(
+                l -> {
+                    // Chave única: sequence_number
+                    if (l.getSequenceNumber() == null) {
+                        throw new IllegalStateException("Localização com sequence_number NULL não pode ser deduplicada");
+                    }
+                    return l.getSequenceNumber();
+                },
+                l -> l,
+                (primeiro, segundo) -> {
+                    // Se houver duplicado, manter o primeiro e logar o segundo
+                    logger.warn("⚠️ Duplicado detectado na resposta da API: sequence_number={}", 
+                        segundo.getSequenceNumber());
+                    return primeiro; // Mantém o primeiro
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
     }
 }

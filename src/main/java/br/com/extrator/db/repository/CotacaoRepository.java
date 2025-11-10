@@ -159,8 +159,26 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             }
 
             final int rowsAffected = statement.executeUpdate();
-            logger.debug("MERGE executado para Cotação sequence_code {}: {} linha(s) afetada(s)", cotacao.getSequenceCode(), rowsAffected);
+            
+            // ✅ VERIFICAR rows affected
+            if (rowsAffected == 0) {
+                logger.error("❌ MERGE retornou 0 linhas para cotação sequence_code={}. " +
+                           "Possível violação de constraint ou dados inválidos.", 
+                           cotacao.getSequenceCode());
+                // Não lançar exceção aqui - deixar o AbstractRepository tratar
+                return 0;
+            }
+            
+            if (rowsAffected > 0) {
+                logger.debug("✅ Cotação sequence_code={} salva com sucesso: {} linha(s) afetada(s)", 
+                            cotacao.getSequenceCode(), rowsAffected);
+            }
+            
             return rowsAffected;
+        } catch (SQLException e) {
+            logger.error("❌ SQLException ao salvar cotação sequence_code={}: {} - SQLState: {} - ErrorCode: {}", 
+                        cotacao.getSequenceCode(), e.getMessage(), e.getSQLState(), e.getErrorCode(), e);
+            throw e;
         }
     }
 }

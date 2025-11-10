@@ -40,7 +40,15 @@ SELECT
     COUNT(DISTINCT CAST(created_at AS DATE)) as dias_distintos,
     MIN(CAST(created_at AS DATE)) as data_mais_antiga,
     MAX(CAST(created_at AS DATE)) as data_mais_recente
-FROM ocorrencias;
+FROM ocorrencias
+UNION ALL
+SELECT 
+    'manifestos' as tabela,
+    COUNT(*) as total_registros,
+    COUNT(DISTINCT CAST(data_extracao AS DATE)) as dias_distintos,
+    MIN(CAST(data_extracao AS DATE)) as data_mais_antiga,
+    MAX(CAST(data_extracao AS DATE)) as data_mais_recente
+FROM manifestos;
 
 PRINT '';
 
@@ -68,6 +76,8 @@ contagens_banco AS (
     SELECT 'coletas' as tipo, COUNT(*) as total FROM coletas  
     UNION ALL
     SELECT 'ocorrencias' as tipo, COUNT(*) as total FROM ocorrencias
+    UNION ALL
+    SELECT 'manifestos' as tipo, COUNT(*) as total FROM manifestos
 )
 SELECT 
     COALESCE(l.tipo_extracao, c.tipo) as tipo_dados,
@@ -122,7 +132,18 @@ FROM (
     FROM ocorrencias
     GROUP BY id_ocorrencia
     HAVING COUNT(*) > 1
-) dup_ocorrencias;
+) dup_ocorrencias
+
+UNION ALL
+
+-- Manifestos duplicados (por sequence_code)
+SELECT 'manifestos' as tabela, COUNT(*) as duplicatas_encontradas
+FROM (
+    SELECT sequence_code, COUNT(*) as qtd
+    FROM manifestos
+    GROUP BY sequence_code
+    HAVING COUNT(*) > 1
+) dup_manifestos;
 
 PRINT '';
 
@@ -179,6 +200,22 @@ FROM ocorrencias
 WHERE created_at >= DATEADD(day, -7, GETDATE())
 GROUP BY CAST(created_at AS DATE)
 
+UNION ALL
+
+-- Manifestos por dia
+SELECT 
+    'manifestos' as tipo,
+    CAST(data_extracao AS DATE) as data_referencia,
+    COUNT(*) as registros,
+    CASE 
+        WHEN COUNT(*) < 50 THEN '⚠️ BAIXO'
+        WHEN COUNT(*) > 500 THEN '⚠️ ALTO'
+        ELSE '✅ NORMAL'
+    END as status_volume
+FROM manifestos
+WHERE data_extracao >= DATEADD(day, -7, GETDATE())
+GROUP BY CAST(data_extracao AS DATE)
+
 ORDER BY tipo, data_referencia DESC;
 
 PRINT '';
@@ -219,7 +256,13 @@ FROM ocorrencias WHERE id_ocorrencia IS NULL
 UNION ALL
 
 SELECT 'ocorrencias_data_futura' as problema, COUNT(*) as quantidade
-FROM ocorrencias WHERE created_at > GETDATE();
+FROM ocorrencias WHERE created_at > GETDATE()
+
+UNION ALL
+
+-- Manifestos com problemas
+SELECT 'manifestos_sem_sequence_code' as problema, COUNT(*) as quantidade
+FROM manifestos WHERE sequence_code IS NULL;
 
 PRINT '';
 
@@ -267,10 +310,14 @@ SELECT @total_problemas = (
     (SELECT COUNT(*) FROM (
         SELECT id_ocorrencia FROM ocorrencias GROUP BY id_ocorrencia HAVING COUNT(*) > 1
     ) dup3) +
+    (SELECT COUNT(*) FROM (
+        SELECT sequence_code FROM manifestos GROUP BY sequence_code HAVING COUNT(*) > 1
+    ) dup4) +
     -- Dados inválidos
     (SELECT COUNT(*) FROM cotacoes WHERE preco <= 0 OR codigo_produto IS NULL OR codigo_produto = '') +
     (SELECT COUNT(*) FROM coletas WHERE quantidade <= 0 OR codigo_produto IS NULL OR codigo_produto = '') +
-    (SELECT COUNT(*) FROM ocorrencias WHERE id_ocorrencia IS NULL OR created_at > GETDATE())
+    (SELECT COUNT(*) FROM ocorrencias WHERE id_ocorrencia IS NULL OR created_at > GETDATE()) +
+    (SELECT COUNT(*) FROM manifestos WHERE sequence_code IS NULL)
 );
 
 IF @total_problemas = 0

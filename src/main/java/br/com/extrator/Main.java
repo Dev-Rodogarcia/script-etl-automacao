@@ -1,5 +1,6 @@
 package br.com.extrator;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import br.com.extrator.comandos.LimparTabelasComando;
 import br.com.extrator.comandos.RealizarIntrospeccaoGraphQLComando;
 import br.com.extrator.comandos.TestarApiComando;
 import br.com.extrator.comandos.ValidarAcessoComando;
+import br.com.extrator.comandos.ValidarManifestosComando;
 import br.com.extrator.comandos.VerificarTimestampsComando;
 import br.com.extrator.comandos.VerificarTimezoneComando;
 import br.com.extrator.servicos.LoggingService;
@@ -39,18 +41,23 @@ public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     // Mapa de comandos disponíveis
-    private static final Map<String, Comando> COMANDOS = Map.of(
-        "--fluxo-completo", new ExecutarFluxoCompletoComando(),
-        "--validar", new ValidarAcessoComando(),
-        "--ajuda", new ExibirAjudaComando(),
-        "--help", new ExibirAjudaComando(),
-        "--introspeccao", new RealizarIntrospeccaoGraphQLComando(),
-        "--auditoria", new ExecutarAuditoriaComando(),
-        "--testar-api", new TestarApiComando(),
-        "--limpar-tabelas", new LimparTabelasComando(),
-        "--verificar-timestamps", new VerificarTimestampsComando(),
-        "--verificar-timezone", new VerificarTimezoneComando()
-    );
+    private static final Map<String, Comando> COMANDOS = criarMapaComandos();
+    
+    private static Map<String, Comando> criarMapaComandos() {
+        Map<String, Comando> comandos = new HashMap<>();
+        comandos.put("--fluxo-completo", new ExecutarFluxoCompletoComando());
+        comandos.put("--validar", new ValidarAcessoComando());
+        comandos.put("--ajuda", new ExibirAjudaComando());
+        comandos.put("--help", new ExibirAjudaComando());
+        comandos.put("--introspeccao", new RealizarIntrospeccaoGraphQLComando());
+        comandos.put("--auditoria", new ExecutarAuditoriaComando());
+        comandos.put("--testar-api", new TestarApiComando());
+        comandos.put("--limpar-tabelas", new LimparTabelasComando());
+        comandos.put("--verificar-timestamps", new VerificarTimestampsComando());
+        comandos.put("--verificar-timezone", new VerificarTimezoneComando());
+        comandos.put("--validar-manifestos", new ValidarManifestosComando());
+        return comandos;
+    }
 
     public static void main(final String[] args) {
         // Inicializa o sistema de logging para capturar saída do terminal

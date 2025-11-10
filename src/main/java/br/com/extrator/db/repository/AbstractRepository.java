@@ -103,12 +103,25 @@ public abstract class AbstractRepository<T> {
                     try {
                         // Tenta executar o MERGE para este registro
                         final int rowsAffected = executarMerge(conexao, entidade);
-                        totalSucesso += rowsAffected;
+                        
+                        // Contar como sucesso apenas se rowsAffected > 0
+                        // MERGE normalmente retorna 1 para INSERT ou UPDATE bem-sucedido
+                        // Se retornar 0, significa que não inseriu nem atualizou (não conta como salvo)
+                        if (rowsAffected > 0) {
+                            // Contar como 1 registro salvo (não somar rowsAffected, que pode ser > 1 em casos raros)
+                            totalSucesso++;
+                        } else {
+                            // Se rowsAffected == 0, não conta como sucesso
+                            // O executarMerge() já deve ter logado o erro
+                            logger.warn("⚠️ MERGE retornou 0 para registro {}/{} de {}: {} (não foi salvo)", 
+                                registroAtual, totalRegistros, getClass().getSimpleName(),
+                                obterIdentificadorEntidade(entidade));
+                        }
                         
                         // Commit em batches para evitar transações muito grandes
                         if (registroAtual % BATCH_SIZE == 0) {
                             conexao.commit();
-                            logger.debug("✅ Batch commit: {}/{} registros salvos", registroAtual, totalRegistros);
+                            logger.debug("✅ Batch commit: {}/{} registros processados", registroAtual, totalRegistros);
                         }
                         
                     } catch (final SQLException e) {
@@ -141,15 +154,26 @@ public abstract class AbstractRepository<T> {
                 conexao.commit();
                 
                 // Log final com estatísticas
-                if (totalFalhas > 0) {
-                    logger.warn("⚠️ Salvamento concluído com {} sucessos e {} falhas de {} total ({}%)", 
+                // IMPORTANTE: "totalSucesso" = operações bem-sucedidas (INSERTs + UPDATEs)
+                // UPDATEs não adicionam novas linhas, apenas atualizam existentes
+                // Por isso, o número de registros no banco pode ser menor que "totalSucesso"
+                // quando há UPDATEs (comportamento esperado em execuções periódicas)
+                if (totalFalhas > 0 || totalSucesso < totalRegistros) {
+                    final int registrosNaoSalvos = totalRegistros - totalSucesso - totalFalhas;
+                    logger.warn("⚠️ Salvamento concluído: {} operações bem-sucedidas (INSERTs + UPDATEs), {} falhas, {} não processados (rowsAffected=0) de {} total ({}%)", 
                         totalSucesso, 
-                        totalFalhas, 
+                        totalFalhas,
+                        registrosNaoSalvos,
                         totalRegistros,
                         String.format("%.1f", (totalSucesso * 100.0 / totalRegistros)));
+                    logger.info("💡 Nota: 'Operações bem-sucedidas' inclui INSERTs (novos registros) e UPDATEs (registros atualizados). " +
+                               "UPDATEs não adicionam novas linhas ao banco, apenas atualizam existentes.");
                 } else {
-                    logger.info("✅ Salvamento 100% concluído: {} registros de {} no banco", 
-                        totalSucesso, getClass().getSimpleName());
+                    logger.info("✅ Salvamento 100% concluído: {} operações bem-sucedidas (INSERTs + UPDATEs) de {} processados", 
+                        totalSucesso, totalRegistros);
+                    logger.info("💡 Nota: 'Operações bem-sucedidas' inclui INSERTs (novos registros) e UPDATEs (registros atualizados). " +
+                               "Se houver UPDATEs, o número de registros no banco pode ser menor que o número de operações. " +
+                               "Isso é esperado quando o script roda periodicamente (execuções a cada 1h buscando últimas 24h).");
                 }
 
             } catch (final SQLException e) {
@@ -161,6 +185,8 @@ public abstract class AbstractRepository<T> {
             }
         }
 
+        // Retornar número de linhas afetadas (rowsAffected) - comportamento original
+        // Isso é consistente com o comportamento anterior onde somava rowsAffected
         return totalSucesso;
     }
 

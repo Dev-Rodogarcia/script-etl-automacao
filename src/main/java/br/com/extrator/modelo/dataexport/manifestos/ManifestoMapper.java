@@ -100,10 +100,17 @@ public class ManifestoMapper {
         try {
             String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
             entity.setMetadata(metadata);
+            
+            // 4. Calcular identificador único APÓS definir metadata
+            // Isso permite usar pick_sequence_code ou hash do metadata
+            entity.calcularIdentificadorUnico();
+            
         } catch (JsonProcessingException e) {
             logger.error("❌ CRÍTICO: Falha ao serializar metadados para manifesto {}: {}", 
                 dto.getSequenceCode(), e.getMessage(), e);
             entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
+            // Tentar calcular identificador mesmo com erro (usará fallback)
+            entity.calcularIdentificadorUnico();
         }
 
         return entity;
