@@ -57,19 +57,23 @@ public class ManifestoMapper {
         entity.setTraveledKm(dto.getTraveledKm());
         entity.setInvoicesCount(dto.getInvoicesCount());
         entity.setInvoicesVolumes(dto.getInvoicesVolumes());
-        entity.setInvoicesWeight(dto.getInvoicesWeight());
-        entity.setTotalTaxedWeight(dto.getTotalTaxedWeight());
-        entity.setTotalCubicVolume(dto.getTotalCubicVolume());
-        entity.setInvoicesValue(dto.getInvoicesValue());
-        entity.setManifestFreightsTotal(dto.getManifestFreightsTotal());
+        
+        // Converter campos numéricos de String para BigDecimal
+        entity.setInvoicesWeight(converterParaBigDecimal(dto.getInvoicesWeight(), "invoices_weight", dto.getSequenceCode()));
+        entity.setTotalTaxedWeight(converterParaBigDecimal(dto.getTotalTaxedWeight(), "total_taxed_weight", dto.getSequenceCode()));
+        entity.setTotalCubicVolume(converterParaBigDecimal(dto.getTotalCubicVolume(), "total_cubic_volume", dto.getSequenceCode()));
+        entity.setInvoicesValue(converterParaBigDecimal(dto.getInvoicesValue(), "invoices_value", dto.getSequenceCode()));
+        entity.setManifestFreightsTotal(converterParaBigDecimal(dto.getManifestFreightsTotal(), "manifest_freights_total", dto.getSequenceCode()));
+        
         entity.setPickSequenceCode(dto.getPickSequenceCode());
         entity.setContractNumber(dto.getContractNumber());
-        entity.setDailySubtotal(dto.getDailySubtotal());
-        entity.setOperationalExpensesTotal(dto.getOperationalExpensesTotal());
-        entity.setInssValue(dto.getInssValue());
-        entity.setSestSenatValue(dto.getSestSenatValue());
-        entity.setIrValue(dto.getIrValue());
-        entity.setPayingTotal(dto.getPayingTotal());
+        
+        entity.setDailySubtotal(converterParaBigDecimal(dto.getDailySubtotal(), "daily_subtotal", dto.getSequenceCode()));
+        entity.setOperationalExpensesTotal(converterParaBigDecimal(dto.getOperationalExpensesTotal(), "operational_expenses_total", dto.getSequenceCode()));
+        entity.setInssValue(converterParaBigDecimal(dto.getInssValue(), "inss_value", dto.getSequenceCode()));
+        entity.setSestSenatValue(converterParaBigDecimal(dto.getSestSenatValue(), "sest_senat_value", dto.getSequenceCode()));
+        entity.setIrValue(converterParaBigDecimal(dto.getIrValue(), "ir_value", dto.getSequenceCode()));
+        entity.setPayingTotal(converterParaBigDecimal(dto.getPayingTotal(), "paying_total", dto.getSequenceCode()));
         entity.setCreationUserName(dto.getCreationUserName());
         entity.setAdjustmentUserName(dto.getAdjustmentUserName());
 
@@ -87,14 +91,14 @@ public class ManifestoMapper {
             if (dto.getFinishedAt() != null && !dto.getFinishedAt().trim().isEmpty()) {
                 entity.setFinishedAt(OffsetDateTime.parse(dto.getFinishedAt()));
             }
-            if (dto.getTotalCost() != null && !dto.getTotalCost().trim().isEmpty()) {
-                entity.setTotalCost(new BigDecimal(dto.getTotalCost()));
-            }
-        } catch (DateTimeParseException | NumberFormatException e) {
-            logger.error("❌ Erro ao converter dados para manifesto {}: createdAt='{}', departuredAt='{}', closedAt='{}', finishedAt='{}', totalCost='{}' - {}", 
-                dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getClosedAt(), dto.getFinishedAt(), dto.getTotalCost(), e.getMessage());
+        } catch (DateTimeParseException e) {
+            logger.error("❌ Erro ao converter datas para manifesto {}: createdAt='{}', departuredAt='{}', closedAt='{}', finishedAt='{}' - {}", 
+                dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getClosedAt(), dto.getFinishedAt(), e.getMessage());
             logger.debug("Stack trace completo:", e);
         }
+        
+        // Converter totalCost usando o método auxiliar
+        entity.setTotalCost(converterParaBigDecimal(dto.getTotalCost(), "total_cost", dto.getSequenceCode()));
 
         // 3. Empacotamento de todos os metadados
         try {
@@ -114,5 +118,28 @@ public class ManifestoMapper {
         }
 
         return entity;
+    }
+    
+    /**
+     * Converte uma String para BigDecimal de forma segura.
+     * Retorna null se a string for null, vazia ou não puder ser convertida.
+     * 
+     * @param valor String a ser convertida
+     * @param nomeCampo Nome do campo (para logs de erro)
+     * @param sequenceCode Código sequencial do manifesto (para logs de erro)
+     * @return BigDecimal ou null se não puder converter
+     */
+    private BigDecimal converterParaBigDecimal(String valor, String nomeCampo, Long sequenceCode) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return null;
+        }
+        
+        try {
+            return new BigDecimal(valor.trim());
+        } catch (NumberFormatException e) {
+            logger.warn("⚠️ Erro ao converter campo '{}' para BigDecimal no manifesto {}: valor='{}'. Definindo como NULL.", 
+                nomeCampo, sequenceCode, valor);
+            return null;
+        }
     }
 }

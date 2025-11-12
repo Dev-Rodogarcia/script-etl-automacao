@@ -26,10 +26,210 @@ public class ValidarManifestosComando implements Comando {
         
         try (Connection conn = GerenciadorConexao.obterConexao()) {
             validarManifestos(conn);
+            
+            // Executar SQLs adicionais de validação
+            System.out.println();
+            System.out.println("===============================================================================");
+            System.out.println("                    EXECUTANDO SQLs DE VALIDAÇÃO");
+            System.out.println("===============================================================================");
+            System.out.println();
+            
+            executarSqlsValidacao(conn);
+            
         } catch (final SQLException e) {
             logger.error("❌ Erro ao validar manifestos: {}", e.getMessage(), e);
             System.err.println("❌ Erro ao conectar ao banco de dados: " + e.getMessage());
             throw e;
+        }
+    }
+    
+    /**
+     * Executa os SQLs de validação equivalentes aos arquivos em resources/sql
+     */
+    private void executarSqlsValidacao(final Connection conn) throws SQLException {
+        // 1. Identificar duplicados falsos
+        System.out.println("📄 IDENTIFICAR DUPLICADOS FALSOS:");
+        System.out.println("(Manifestos com mesmo sequence_code mas identificador_unico diferente)");
+        System.out.println();
+        
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 """
+                    SELECT 
+                      sequence_code,
+                      COUNT(*) as total_registros,
+                      COUNT(DISTINCT identificador_unico) as identificadores_unicos,
+                      MIN(data_extracao) as primeira_extracao,
+                      MAX(data_extracao) as ultima_extracao
+                    FROM manifestos
+                    WHERE pick_sequence_code IS NULL
+                    GROUP BY sequence_code
+                    HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1
+                    ORDER BY COUNT(*) DESC""")) {
+            exibirResultado(rs);
+        }
+        
+        System.out.println();
+        System.out.println("===============================================================================");
+        System.out.println();
+        
+        // 2. Validação da correção do identificador único
+        System.out.println("📄 VALIDAÇÃO DA CORREÇÃO DO IDENTIFICADOR ÚNICO:");
+        System.out.println();
+        
+        // Teste 1: Duplicados falsos
+        System.out.println("TESTE 1: Verificar duplicados falsos");
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 """
+                    SELECT 
+                      sequence_code,
+                      COUNT(*) as total
+                    FROM manifestos
+                    WHERE pick_sequence_code IS NULL
+                    GROUP BY sequence_code
+                    HAVING COUNT(*) > 1""")) {
+            exibirResultado(rs);
+        }
+        System.out.println();
+        
+        // Teste 2: Identificadores NULL
+        System.out.println("TESTE 2: Verificar identificadores NULL");
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 "SELECT COUNT(*) as total_com_identificador_null FROM manifestos WHERE identificador_unico IS NULL")) {
+            exibirResultado(rs);
+        }
+        System.out.println();
+        
+        // Teste 3: Distribuição de pick_sequence_code
+        System.out.println("TESTE 3: Distribuição de pick_sequence_code");
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 """
+                    SELECT 
+                      CASE 
+                        WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
+                        ELSE 'Sem pick_sequence_code (usa hash)'
+                      END as tipo,
+                      COUNT(*) as total,
+                      CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos) AS DECIMAL(5,2)) as percentual
+                    FROM manifestos
+                    GROUP BY 
+                      CASE 
+                        WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
+                        ELSE 'Sem pick_sequence_code (usa hash)'
+                      END""")) {
+            exibirResultado(rs);
+        }
+        System.out.println();
+        
+        // Teste 4: Integridade de chave composta
+        System.out.println("TESTE 4: Integridade de chave composta");
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 """
+                    SELECT 
+                      sequence_code,
+                      identificador_unico,
+                      COUNT(*) as total
+                    FROM manifestos
+                    GROUP BY sequence_code, identificador_unico
+                    HAVING COUNT(*) > 1""")) {
+            exibirResultado(rs);
+        }
+        System.out.println();
+        
+        // Teste 5: Resumo final
+        System.out.println("TESTE 5: Resumo final");
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                 """
+                    SELECT 
+                      'Total de manifestos' as metrica,
+                      COUNT(*) as valor
+                    FROM manifestos
+                    UNION ALL
+                    SELECT 
+                      'Com pick_sequence_code' as metrica,
+                      COUNT(*) as valor
+                    FROM manifestos
+                    WHERE pick_sequence_code IS NOT NULL
+                    UNION ALL
+                    SELECT 
+                      'Sem pick_sequence_code (usa hash)' as metrica,
+                      COUNT(*) as valor
+                    FROM manifestos
+                    WHERE pick_sequence_code IS NULL
+                    UNION ALL
+                    SELECT 
+                      'Com identificador_unico NULL' as metrica,
+                      COUNT(*) as valor
+                    FROM manifestos
+                    WHERE identificador_unico IS NULL
+                    UNION ALL
+                    SELECT 
+                      'Duplicados falsos (mesmo sequence_code, sem pick)' as metrica,
+                      COUNT(*) as valor
+                    FROM (
+                      SELECT sequence_code
+                      FROM manifestos
+                      WHERE pick_sequence_code IS NULL
+                      GROUP BY sequence_code
+                      HAVING COUNT(*) > 1
+                    ) as duplicados""")) {
+            exibirResultado(rs);
+        }
+        System.out.println();
+    }
+    
+    
+    /**
+     * Exibe o resultado de um ResultSet de forma formatada
+     */
+    private void exibirResultado(final ResultSet rs) throws SQLException {
+        final java.sql.ResultSetMetaData metaData = rs.getMetaData();
+        final int columnCount = metaData.getColumnCount();
+        
+        // Exibir cabeçalhos
+        for (int i = 1; i <= columnCount; i++) {
+            if (i > 1) {
+                System.out.print(" | ");
+            }
+            System.out.print(metaData.getColumnName(i));
+        }
+        System.out.println();
+        
+        // Linha separadora
+        for (int i = 1; i <= columnCount; i++) {
+            if (i > 1) {
+                System.out.print("-+-");
+            }
+            for (int j = 0; j < metaData.getColumnName(i).length(); j++) {
+                System.out.print("-");
+            }
+        }
+        System.out.println();
+        
+        // Exibir dados
+        int rowCount = 0;
+        while (rs.next()) {
+            rowCount++;
+            for (int i = 1; i <= columnCount; i++) {
+                if (i > 1) {
+                    System.out.print(" | ");
+                }
+                final Object value = rs.getObject(i);
+                System.out.print(value != null ? value.toString() : "NULL");
+            }
+            System.out.println();
+        }
+        
+        if (rowCount == 0) {
+            System.out.println("(0 linhas)");
+        } else {
+            System.out.println();
+            System.out.println("Total: " + rowCount + " linha(s)");
         }
     }
     
@@ -459,6 +659,158 @@ public class ValidarManifestosComando implements Comando {
             System.out.println("Registros sem identificador_unico: " + registrosSemIdentificador);
         }
         System.out.println("Registros com pick_sequence_code NULL: " + registrosComPickNull);
+        System.out.println();
+        System.out.println("===============================================================================");
+        System.out.println();
+        
+        // 9. Identificar duplicados falsos (mesmo sequence_code, identificador_unico diferente)
+        if (temIdentificadorUnico) {
+            System.out.println("🔍 IDENTIFICAR DUPLICADOS FALSOS:");
+            System.out.println();
+            System.out.println("(Manifestos com mesmo sequence_code mas identificador_unico diferente)");
+            System.out.println("(Isso indica que campos voláteis estavam no hash ANTES da correção)");
+            System.out.println();
+            
+            int duplicadosFalsosCount = 0;
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(
+                     """
+                        SELECT \
+                          sequence_code, \
+                          COUNT(*) as total_registros, \
+                          COUNT(DISTINCT identificador_unico) as identificadores_unicos \
+                        FROM manifestos \
+                        WHERE pick_sequence_code IS NULL \
+                        GROUP BY sequence_code \
+                        HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1 \
+                        ORDER BY COUNT(*) DESC""")) {
+                boolean encontrou = false;
+                while (rs.next()) {
+                    if (!encontrou) {
+                        System.out.println("Duplicados falsos encontrados:");
+                        encontrou = true;
+                    }
+                    final long sequenceCode = rs.getLong("sequence_code");
+                    final int totalRegistros = rs.getInt("total_registros");
+                    final int identificadoresUnicos = rs.getInt("identificadores_unicos");
+                    System.out.println("  sequence_code: " + sequenceCode + 
+                                     " - " + totalRegistros + " registros, " + 
+                                     identificadoresUnicos + " identificadores diferentes");
+                    duplicadosFalsosCount++;
+                }
+                if (!encontrou) {
+                    System.out.println("✅ Nenhum duplicado falso encontrado!");
+                    System.out.println("   Todos os manifestos com mesmo sequence_code têm mesmo identificador_unico.");
+                    System.out.println("   Isso indica que a correção está funcionando corretamente.");
+                } else {
+                    System.out.println();
+                    System.out.println("⚠️ Total de sequence_codes com duplicados falsos: " + duplicadosFalsosCount);
+                    System.out.println();
+                    System.out.println("💡 Interpretação:");
+                    System.out.println("   - Esses são duplicados criados ANTES da correção do identificador único");
+                    System.out.println("   - Eles têm mesmo sequence_code mas identificador_unico diferente");
+                    System.out.println("   - Isso acontecia porque campos voláteis (mobile_read_at, etc.) estavam no hash");
+                    System.out.println("   - Após a correção, novas extrações não criarão mais esses duplicados");
+                    System.out.println();
+                    System.out.println("💡 Solução:");
+                    System.out.println("   - Execute uma nova extração completa");
+                    System.out.println("   - Os duplicados falsos não serão mais criados");
+                    System.out.println("   - Os existentes permanecerão no banco (são registros válidos)");
+                }
+            }
+            System.out.println();
+            System.out.println("===============================================================================");
+            System.out.println();
+            
+            // 10. Validação da correção do identificador único
+            System.out.println("✅ VALIDAÇÃO DA CORREÇÃO DO IDENTIFICADOR ÚNICO:");
+            System.out.println();
+            
+            // Teste 1: Verificar se ainda há duplicados falsos
+            System.out.println("TESTE 1: Verificar duplicados falsos");
+            int duplicadosFalsosAposCorrecao = 0;
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(
+                     """
+                        SELECT sequence_code \
+                        FROM manifestos \
+                        WHERE pick_sequence_code IS NULL \
+                        GROUP BY sequence_code \
+                        HAVING COUNT(*) > 1""")) {
+                while (rs.next()) {
+                    duplicadosFalsosAposCorrecao++;
+                }
+            }
+            if (duplicadosFalsosAposCorrecao == 0) {
+                System.out.println("  ✅ PASSOU: Nenhum duplicado falso (todos têm identificador_unico único)");
+            } else {
+                System.out.println("  ⚠️ ATENÇÃO: " + duplicadosFalsosAposCorrecao + " sequence_codes com múltiplos registros");
+                System.out.println("     (Isso pode ser normal se são duplicados naturais com pick_sequence_code diferentes)");
+            }
+            System.out.println();
+            
+            // Teste 2: Verificar identificadores NULL
+            System.out.println("TESTE 2: Verificar identificadores NULL");
+            if (registrosSemIdentificador == 0) {
+                System.out.println("  ✅ PASSOU: Todos os registros têm identificador_unico");
+            } else {
+                System.out.println("  ❌ FALHOU: " + registrosSemIdentificador + " registros sem identificador_unico");
+            }
+            System.out.println();
+            
+            // Teste 3: Verificar distribuição de pick_sequence_code
+            System.out.println("TESTE 3: Distribuição de pick_sequence_code");
+            System.out.println("  Registros com pick_sequence_code: " + registrosComPickNotNull + 
+                             " (" + String.format("%.2f", (registrosComPickNotNull * 100.0 / totalBanco)) + "%)");
+            System.out.println("  Registros sem pick_sequence_code (usa hash): " + registrosComPickNull + 
+                             " (" + String.format("%.2f", (registrosComPickNull * 100.0 / totalBanco)) + "%)");
+            System.out.println();
+            
+            // Teste 4: Verificar integridade de chave composta
+            System.out.println("TESTE 4: Integridade de chave composta");
+            int duplicadosChaveComposta = 0;
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(
+                     """
+                        SELECT sequence_code, identificador_unico \
+                        FROM manifestos \
+                        GROUP BY sequence_code, identificador_unico \
+                        HAVING COUNT(*) > 1""")) {
+                while (rs.next()) {
+                    duplicadosChaveComposta++;
+                }
+            }
+            if (duplicadosChaveComposta == 0) {
+                System.out.println("  ✅ PASSOU: Chave composta é única (sem duplicados)");
+            } else {
+                System.out.println("  ❌ FALHOU: " + duplicadosChaveComposta + " duplicados na chave composta");
+                System.out.println("     (Isso não deveria acontecer - verifique constraint UNIQUE)");
+            }
+            System.out.println();
+            
+            // Teste 5: Resumo final
+            System.out.println("TESTE 5: Resumo final");
+            System.out.println("  Total de manifestos: " + totalBanco);
+            System.out.println("  Com pick_sequence_code: " + registrosComPickNotNull);
+            System.out.println("  Sem pick_sequence_code (usa hash): " + registrosComPickNull);
+            System.out.println("  Com identificador_unico NULL: " + registrosSemIdentificador);
+            System.out.println("  Duplicados falsos: " + duplicadosFalsosCount);
+            System.out.println();
+            
+            // Conclusão
+            boolean todosTestesPassaram = (registrosSemIdentificador == 0) && (duplicadosChaveComposta == 0);
+            if (todosTestesPassaram) {
+                System.out.println("✅ TODOS OS TESTES PASSARAM!");
+                System.out.println("   A correção do identificador único está funcionando corretamente.");
+            } else {
+                System.out.println("⚠️ ALGUNS TESTES FALHARAM");
+                System.out.println("   Revise os resultados acima para identificar problemas.");
+            }
+        } else {
+            System.out.println("⚠️ VALIDAÇÃO DA CORREÇÃO NÃO PODE SER EXECUTADA");
+            System.out.println("   A tabela não tem a coluna identificador_unico ainda.");
+            System.out.println("   Execute a migração para chave composta primeiro.");
+        }
         System.out.println();
         System.out.println("===============================================================================");
     }

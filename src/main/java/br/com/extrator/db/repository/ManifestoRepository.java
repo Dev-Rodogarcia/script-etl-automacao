@@ -106,20 +106,20 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     traveled_km INT,
                     invoices_count INT,
                     invoices_volumes INT,
-                    invoices_weight NVARCHAR(50),
-                    total_taxed_weight NVARCHAR(50),
-                    total_cubic_volume NVARCHAR(50),
-                    invoices_value NVARCHAR(50),
-                    manifest_freights_total NVARCHAR(50),
+                    invoices_weight DECIMAL(18, 3),
+                    total_taxed_weight DECIMAL(18, 3),
+                    total_cubic_volume DECIMAL(18, 6),
+                    invoices_value DECIMAL(18, 2),
+                    manifest_freights_total DECIMAL(18, 2),
                     pick_sequence_code BIGINT,
                     contract_number NVARCHAR(50),
-                    daily_subtotal NVARCHAR(50),
+                    daily_subtotal DECIMAL(18, 2),
                     total_cost DECIMAL(18, 2),
-                    operational_expenses_total NVARCHAR(50),
-                    inss_value NVARCHAR(50),
-                    sest_senat_value NVARCHAR(50),
-                    ir_value NVARCHAR(50),
-                    paying_total NVARCHAR(50),
+                    operational_expenses_total DECIMAL(18, 2),
+                    inss_value DECIMAL(18, 2),
+                    sest_senat_value DECIMAL(18, 2),
+                    ir_value DECIMAL(18, 2),
+                    paying_total DECIMAL(18, 2),
                     creation_user_name NVARCHAR(255),
                     adjustment_user_name NVARCHAR(255),
 
@@ -130,8 +130,14 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     data_extracao DATETIME2 DEFAULT GETDATE(),
                     
                     -- Constraint UNIQUE para chave composta
-                    -- Permite múltiplos registros com mesmo sequence_code mas identificador_unico diferente
-                    -- Evita duplicação não natural (mesmos dados em execuções periódicas)
+                    -- IMPORTANTE: O MERGE usa (sequence_code, pick_sequence_code, mdfe_number) para matching, mas
+                    -- a constraint é (sequence_code, identificador_unico) para garantir integridade.
+                    -- O identificador_unico é calculado como:
+                    --   - pick_sequence_code (se disponível)
+                    --   - sequence_code + "_MDFE_" + mdfe_number (se não há pick mas há MDF-e)
+                    --   - hash do metadata (se não há pick nem MDF-e)
+                    -- Isso garante que múltiplos MDF-es tenham identificadores diferentes e sejam preservados.
+                    -- O identificador_unico é atualizado no UPDATE quando há match, então não há violação.
                     CONSTRAINT UQ_manifestos_sequence_identificador UNIQUE (sequence_code, identificador_unico)
                 )
                 """;
@@ -180,7 +186,28 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     }
     
     /**
-     * Executa MERGE com estrutura nova (chave composta: sequence_code + identificador_unico).
+     * Executa MERGE com estrutura nova.
+     * 
+     * IMPORTANTE: O MERGE usa (sequence_code, pick_sequence_code, mdfe_number) para matching,
+     * NÃO (sequence_code, identificador_unico).
+     * 
+     * Lógica do MERGE (usando COALESCE para simplificar):
+     * - Compara (sequence_code, pick_sequence_code, mdfe_number):
+     *   - Se ambos têm pick_sequence_code: compara os valores (ex: 71920 = 71920)
+     *   - Se ambos são NULL: ambos viram -1 → match! (mesmo manifesto sem coleta)
+     *   - Se um é NULL e outro não: não match (registros diferentes)
+     *   - Se ambos têm mdfe_number: compara os valores (ex: 1503 = 1503)
+     *   - Se ambos são NULL: ambos viram -1 → match! (mesmo manifesto sem MDF-e)
+     * 
+     * Isso garante que:
+     * - Duplicados naturais (mesmo sequence_code, diferentes pick_sequence_code) são preservados
+     * - Múltiplos MDF-es (mesmo sequence_code, diferentes mdfe_number) são preservados
+     * - Duplicados falsos (mesmo sequence_code, pick NULL, mdfe NULL, hash diferente) são eliminados
+     * - O identificador_unico é atualizado no UPDATE, mas não é usado para matching
+     * 
+     * Com essa correção, futuras extrações não criarão mais duplicados falsos e preservarão
+     * todos os MDF-es legítimos, pois o MERGE sempre encontrará o registro correto baseado
+     * em (sequence_code, pick_sequence_code, mdfe_number).
      */
     private int executarMergeEstruturaNova(final Connection conexao, final ManifestoEntity manifesto) throws SQLException {
         // Validar que identificador_unico foi calculado
@@ -206,8 +233,9 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             MERGE %s AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
                 AS source (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, daily_subtotal, total_cost, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, creation_user_name, adjustment_user_name, metadata, data_extracao)
-            ON target.sequence_code = source.sequence_code 
-               AND target.identificador_unico = source.identificador_unico
+            ON target.sequence_code = source.sequence_code
+               AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1)
+               AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)
             WHEN MATCHED THEN
                 UPDATE SET
                     status = source.status,
@@ -247,6 +275,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     creation_user_name = source.creation_user_name,
                     adjustment_user_name = source.adjustment_user_name,
                     metadata = source.metadata,
+                    identificador_unico = source.identificador_unico,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
                 INSERT (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, daily_subtotal, total_cost, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, creation_user_name, adjustment_user_name, metadata, data_extracao)
@@ -297,20 +326,20 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             statement.setObject(paramIndex++, manifesto.getTraveledKm(), Types.INTEGER);
             statement.setObject(paramIndex++, manifesto.getInvoicesCount(), Types.INTEGER);
             statement.setObject(paramIndex++, manifesto.getInvoicesVolumes(), Types.INTEGER);
-            statement.setString(paramIndex++, manifesto.getInvoicesWeight());
-            statement.setString(paramIndex++, manifesto.getTotalTaxedWeight());
-            statement.setString(paramIndex++, manifesto.getTotalCubicVolume());
-            statement.setString(paramIndex++, manifesto.getInvoicesValue());
-            statement.setString(paramIndex++, manifesto.getManifestFreightsTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInvoicesWeight());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalTaxedWeight());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalCubicVolume());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInvoicesValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getManifestFreightsTotal());
             statement.setObject(paramIndex++, manifesto.getPickSequenceCode(), Types.BIGINT);
             statement.setString(paramIndex++, manifesto.getContractNumber());
-            statement.setString(paramIndex++, manifesto.getDailySubtotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getDailySubtotal());
             setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalCost());
-            statement.setString(paramIndex++, manifesto.getOperationalExpensesTotal());
-            statement.setString(paramIndex++, manifesto.getInssValue());
-            statement.setString(paramIndex++, manifesto.getSestSenatValue());
-            statement.setString(paramIndex++, manifesto.getIrValue());
-            statement.setString(paramIndex++, manifesto.getPayingTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getOperationalExpensesTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInssValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getSestSenatValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getIrValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getPayingTotal());
             statement.setString(paramIndex++, truncate(manifesto.getCreationUserName(), 255, "creation_user_name"));
             statement.setString(paramIndex++, truncate(manifesto.getAdjustmentUserName(), 255, "adjustment_user_name"));
             statement.setString(paramIndex++, manifesto.getMetadata()); // JSON - sem limite, mas pode ser grande
@@ -368,6 +397,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     manifesto.getSequenceCode());
         
         // MERGE usando apenas sequence_code como chave (estrutura antiga)
+        // NOTA: Esta estrutura NÃO preserva duplicados naturais (múltiplos MDF-es ou coletas)
+        // Recomenda-se migrar para estrutura nova com chave composta
         final String sql = String.format("""
             MERGE %s AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
@@ -459,20 +490,20 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             statement.setObject(paramIndex++, manifesto.getTraveledKm(), Types.INTEGER);
             statement.setObject(paramIndex++, manifesto.getInvoicesCount(), Types.INTEGER);
             statement.setObject(paramIndex++, manifesto.getInvoicesVolumes(), Types.INTEGER);
-            statement.setString(paramIndex++, manifesto.getInvoicesWeight());
-            statement.setString(paramIndex++, manifesto.getTotalTaxedWeight());
-            statement.setString(paramIndex++, manifesto.getTotalCubicVolume());
-            statement.setString(paramIndex++, manifesto.getInvoicesValue());
-            statement.setString(paramIndex++, manifesto.getManifestFreightsTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInvoicesWeight());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalTaxedWeight());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalCubicVolume());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInvoicesValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getManifestFreightsTotal());
             statement.setObject(paramIndex++, manifesto.getPickSequenceCode(), Types.BIGINT);
             statement.setString(paramIndex++, manifesto.getContractNumber());
-            statement.setString(paramIndex++, manifesto.getDailySubtotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getDailySubtotal());
             setBigDecimalParameter(statement, paramIndex++, manifesto.getTotalCost());
-            statement.setString(paramIndex++, manifesto.getOperationalExpensesTotal());
-            statement.setString(paramIndex++, manifesto.getInssValue());
-            statement.setString(paramIndex++, manifesto.getSestSenatValue());
-            statement.setString(paramIndex++, manifesto.getIrValue());
-            statement.setString(paramIndex++, manifesto.getPayingTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getOperationalExpensesTotal());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getInssValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getSestSenatValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getIrValue());
+            setBigDecimalParameter(statement, paramIndex++, manifesto.getPayingTotal());
             statement.setString(paramIndex++, truncate(manifesto.getCreationUserName(), 255, "creation_user_name"));
             statement.setString(paramIndex++, truncate(manifesto.getAdjustmentUserName(), 255, "adjustment_user_name"));
             statement.setString(paramIndex++, manifesto.getMetadata());

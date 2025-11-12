@@ -5,6 +5,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Entity (Entidade) que representa uma linha na tabela 'manifestos' do banco de dados.
@@ -13,6 +23,9 @@ import java.time.OffsetDateTime;
  * do objeto original para garantir 100% de completude e resiliência.
  */
 public class ManifestoEntity {
+
+    private static final Logger logger = LoggerFactory.getLogger(ManifestoEntity.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // --- Coluna de Chave Primária ---
     private Long sequenceCode;
@@ -39,20 +52,20 @@ public class ManifestoEntity {
     private Integer traveledKm;
     private Integer invoicesCount; // Total Notas
     private Integer invoicesVolumes; // Total Volumes
-    private String invoicesWeight; // Peso Real
-    private String totalTaxedWeight; // Peso Taxado
-    private String totalCubicVolume; // Cubagem
-    private String invoicesValue; // Valor Notas
-    private String manifestFreightsTotal; // Valor Fretes
+    private BigDecimal invoicesWeight; // Peso Real
+    private BigDecimal totalTaxedWeight; // Peso Taxado
+    private BigDecimal totalCubicVolume; // Cubagem
+    private BigDecimal invoicesValue; // Valor Notas
+    private BigDecimal manifestFreightsTotal; // Valor Fretes
     private Long pickSequenceCode; // Coleta (Item)
     private String contractNumber; // Contrato
-    private String dailySubtotal; // Diárias
+    private BigDecimal dailySubtotal; // Diárias
     private BigDecimal totalCost;
-    private String operationalExpensesTotal; // Desp. Operacionais
-    private String inssValue; // INSS
-    private String sestSenatValue; // SEST/SENAT
-    private String irValue; // IR
-    private String payingTotal; // Valor a Pagar
+    private BigDecimal operationalExpensesTotal; // Desp. Operacionais
+    private BigDecimal inssValue; // INSS
+    private BigDecimal sestSenatValue; // SEST/SENAT
+    private BigDecimal irValue; // IR
+    private BigDecimal payingTotal; // Valor a Pagar
     private String creationUserName; // Usuário (Criação)
     private String adjustmentUserName; // Usuário do Acerto
 
@@ -68,7 +81,7 @@ public class ManifestoEntity {
         return sequenceCode;
     }
 
-    public void setSequenceCode(Long sequenceCode) {
+    public void setSequenceCode(final Long sequenceCode) {
         this.sequenceCode = sequenceCode;
     }
 
@@ -76,7 +89,7 @@ public class ManifestoEntity {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(final String status) {
         this.status = status;
     }
 
@@ -84,7 +97,7 @@ public class ManifestoEntity {
         return createdAt;
     }
 
-    public void setCreatedAt(OffsetDateTime createdAt) {
+    public void setCreatedAt(final OffsetDateTime createdAt) {
         this.createdAt = createdAt;
     }
 
@@ -92,7 +105,7 @@ public class ManifestoEntity {
         return departuredAt;
     }
 
-    public void setDeparturedAt(OffsetDateTime departuredAt) {
+    public void setDeparturedAt(final OffsetDateTime departuredAt) {
         this.departuredAt = departuredAt;
     }
 
@@ -100,7 +113,7 @@ public class ManifestoEntity {
         return finishedAt;
     }
 
-    public void setFinishedAt(OffsetDateTime finishedAt) {
+    public void setFinishedAt(final OffsetDateTime finishedAt) {
         this.finishedAt = finishedAt;
     }
 
@@ -108,7 +121,7 @@ public class ManifestoEntity {
         return totalCost;
     }
 
-    public void setTotalCost(BigDecimal totalCost) {
+    public void setTotalCost(final BigDecimal totalCost) {
         this.totalCost = totalCost;
     }
 
@@ -116,7 +129,7 @@ public class ManifestoEntity {
         return traveledKm;
     }
 
-    public void setTraveledKm(Integer traveledKm) {
+    public void setTraveledKm(final Integer traveledKm) {
         this.traveledKm = traveledKm;
     }
 
@@ -124,7 +137,7 @@ public class ManifestoEntity {
         return vehiclePlate;
     }
 
-    public void setVehiclePlate(String vehiclePlate) {
+    public void setVehiclePlate(final String vehiclePlate) {
         this.vehiclePlate = vehiclePlate;
     }
 
@@ -132,7 +145,7 @@ public class ManifestoEntity {
         return driverName;
     }
 
-    public void setDriverName(String driverName) {
+    public void setDriverName(final String driverName) {
         this.driverName = driverName;
     }
 
@@ -242,43 +255,43 @@ public class ManifestoEntity {
         this.invoicesVolumes = invoicesVolumes;
     }
 
-    public String getInvoicesWeight() {
+    public BigDecimal getInvoicesWeight() {
         return invoicesWeight;
     }
 
-    public void setInvoicesWeight(final String invoicesWeight) {
+    public void setInvoicesWeight(final BigDecimal invoicesWeight) {
         this.invoicesWeight = invoicesWeight;
     }
 
-    public String getTotalTaxedWeight() {
+    public BigDecimal getTotalTaxedWeight() {
         return totalTaxedWeight;
     }
 
-    public void setTotalTaxedWeight(final String totalTaxedWeight) {
+    public void setTotalTaxedWeight(final BigDecimal totalTaxedWeight) {
         this.totalTaxedWeight = totalTaxedWeight;
     }
 
-    public String getTotalCubicVolume() {
+    public BigDecimal getTotalCubicVolume() {
         return totalCubicVolume;
     }
 
-    public void setTotalCubicVolume(final String totalCubicVolume) {
+    public void setTotalCubicVolume(final BigDecimal totalCubicVolume) {
         this.totalCubicVolume = totalCubicVolume;
     }
 
-    public String getInvoicesValue() {
+    public BigDecimal getInvoicesValue() {
         return invoicesValue;
     }
 
-    public void setInvoicesValue(final String invoicesValue) {
+    public void setInvoicesValue(final BigDecimal invoicesValue) {
         this.invoicesValue = invoicesValue;
     }
 
-    public String getManifestFreightsTotal() {
+    public BigDecimal getManifestFreightsTotal() {
         return manifestFreightsTotal;
     }
 
-    public void setManifestFreightsTotal(final String manifestFreightsTotal) {
+    public void setManifestFreightsTotal(final BigDecimal manifestFreightsTotal) {
         this.manifestFreightsTotal = manifestFreightsTotal;
     }
 
@@ -298,51 +311,51 @@ public class ManifestoEntity {
         this.contractNumber = contractNumber;
     }
 
-    public String getDailySubtotal() {
+    public BigDecimal getDailySubtotal() {
         return dailySubtotal;
     }
 
-    public void setDailySubtotal(final String dailySubtotal) {
+    public void setDailySubtotal(final BigDecimal dailySubtotal) {
         this.dailySubtotal = dailySubtotal;
     }
 
-    public String getOperationalExpensesTotal() {
+    public BigDecimal getOperationalExpensesTotal() {
         return operationalExpensesTotal;
     }
 
-    public void setOperationalExpensesTotal(final String operationalExpensesTotal) {
+    public void setOperationalExpensesTotal(final BigDecimal operationalExpensesTotal) {
         this.operationalExpensesTotal = operationalExpensesTotal;
     }
 
-    public String getInssValue() {
+    public BigDecimal getInssValue() {
         return inssValue;
     }
 
-    public void setInssValue(final String inssValue) {
+    public void setInssValue(final BigDecimal inssValue) {
         this.inssValue = inssValue;
     }
 
-    public String getSestSenatValue() {
+    public BigDecimal getSestSenatValue() {
         return sestSenatValue;
     }
 
-    public void setSestSenatValue(final String sestSenatValue) {
+    public void setSestSenatValue(final BigDecimal sestSenatValue) {
         this.sestSenatValue = sestSenatValue;
     }
 
-    public String getIrValue() {
+    public BigDecimal getIrValue() {
         return irValue;
     }
 
-    public void setIrValue(final String irValue) {
+    public void setIrValue(final BigDecimal irValue) {
         this.irValue = irValue;
     }
 
-    public String getPayingTotal() {
+    public BigDecimal getPayingTotal() {
         return payingTotal;
     }
 
-    public void setPayingTotal(final String payingTotal) {
+    public void setPayingTotal(final BigDecimal payingTotal) {
         this.payingTotal = payingTotal;
     }
 
@@ -380,26 +393,46 @@ public class ManifestoEntity {
 
     /**
      * Calcula o identificador único para este manifesto.
-     * Este método deve ser chamado DEPOIS que o metadata for definido.
+     * Este método deve ser chamado DEPOIS que o metadata e mdfe_number forem definidos.
      * 
-     * Prioridade 1: pick_sequence_code (quando disponível e não NULL)
-     * Prioridade 2: hash SHA-256 do metadata completo (quando pick_sequence_code é NULL)
+     * Prioridade 1: pick_sequence_code + mdfe_number (quando AMBOS estão disponíveis)
+     *   - CRÍTICO: Incluir mdfe_number para diferenciar múltiplos MDF-es com mesmo pick
+     * Prioridade 2: pick_sequence_code (quando apenas pick está disponível)
+     * Prioridade 3: sequence_code + mdfe_number (quando apenas mdfe_number está disponível)
+     * Prioridade 4: hash SHA-256 do metadata completo (quando ambos são NULL)
      * 
-     * O hash do metadata garante que manifestos com mesmo sequence_code mas
-     * metadata diferentes (duplicados naturais) sejam tratados como registros distintos.
+     * IMPORTANTE: Múltiplos MDF-es do mesmo manifesto devem ser preservados como registros distintos.
+     * Por isso, mdfe_number é SEMPRE incluído no identificador quando disponível, mesmo se pick_sequence_code também estiver.
      */
     public void calcularIdentificadorUnico() {
-        if (this.pickSequenceCode != null) {
-            // Prioridade 1: Usar pick_sequence_code quando disponível
+        // CASO 1: AMBOS pick_sequence_code E mdfe_number preenchidos
+        // CRÍTICO: Incluir mdfe_number para diferenciar múltiplos MDF-es com mesmo pick
+        if (this.pickSequenceCode != null && this.mdfeNumber != null) {
+            this.identificadorUnico = this.pickSequenceCode + "_MDFE_" + this.mdfeNumber;
+        }
+        // CASO 2: Apenas pick_sequence_code preenchido (mdfe_number é NULL)
+        else if (this.pickSequenceCode != null) {
             this.identificadorUnico = String.valueOf(this.pickSequenceCode);
-        } else {
-            // Prioridade 2: Calcular hash do metadata quando pick_sequence_code é NULL
+        }
+        // CASO 3: Apenas mdfe_number preenchido (pick_sequence_code é NULL)
+        else if (this.mdfeNumber != null) {
+            // Usar sequence_code + mdfe_number quando não há pick mas há MDF-e
+            // Isso garante que múltiplos MDF-es do mesmo manifesto sejam preservados
+            this.identificadorUnico = this.sequenceCode + "_MDFE_" + this.mdfeNumber;
+        }
+        // CASO 4: Ambos NULL - usar hash do metadata
+        else {
+            // Calcular hash do metadata quando não há pick nem MDF-e
             this.identificadorUnico = calcularHashMetadata(this.metadata);
         }
     }
 
     /**
      * Calcula hash SHA-256 do metadata JSON.
+     * IMPORTANTE: Exclui campos voláteis que podem mudar durante a extração
+     * para garantir que o mesmo manifesto tenha o mesmo identificador único
+     * mesmo que alguns campos sejam atualizados durante a operação.
+     * 
      * Usado quando pick_sequence_code não está disponível para diferenciar
      * duplicados naturais que têm mesmo sequence_code mas metadata diferentes.
      * 
@@ -412,9 +445,66 @@ public class ManifestoEntity {
             return "NULL_METADATA_" + (this.sequenceCode != null ? this.sequenceCode : "UNKNOWN");
         }
         try {
+            // Parse do JSON para Map
+            @SuppressWarnings("unchecked")
+            final
+            Map<String, Object> metadataMap = (Map<String, Object>) objectMapper.readValue(metadata, Map.class);
+            
+            // Criar cópia do metadata para não modificar o original
+            final Map<String, Object> metadataParaHash = new LinkedHashMap<>(metadataMap);
+            
+            // Lista COMPLETA de campos voláteis que DEVEM ser excluídos do hash
+            // IMPORTANTE: Campos que podem mudar DURANTE a extração não devem fazer parte do hash
+            final List<String> camposVolateis = Arrays.asList(
+                // Campos de timestamp que mudam durante operação
+                "mobile_read_at",
+                "departured_at", 
+                "closed_at",
+                "finished_at",
+                
+                // Campos de quilometragem que mudam durante viagem
+                "vehicle_departure_km",
+                "closing_km",
+                "traveled_km",
+                
+                // Contadores que mudam durante operação
+                "finalized_manifest_items_count",
+                
+                // Campos do MDF-e (Manifesto Eletrônico) que podem mudar durante extração
+                // Novo MDF-e pode ser emitido/cancelado/corrigido enquanto extração ocorre
+                "mft_mfs_number",      // Número do MDF-e
+                "mft_mfs_key",         // Chave do MDF-e (44 dígitos)
+                "mdfe_status",         // Status do MDF-e
+                
+                // Campos de ajustes posteriores que podem ser preenchidos depois
+                "mft_aoe_comments",    // Comentários de ajuste
+                "mft_aoe_rer_name"     // Nome do ajustador
+            );
+            
+            // Remover campos voláteis
+            camposVolateis.forEach(metadataParaHash::remove);
+            
+            // Gerar hash apenas dos campos estáveis
+            final String metadataJson = objectMapper.writeValueAsString(metadataParaHash);
             final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            final byte[] hash = digest.digest(metadata.getBytes(StandardCharsets.UTF_8));
-            return bytesToHex(hash);
+            final byte[] hash = digest.digest(metadataJson.getBytes(StandardCharsets.UTF_8));
+            final String hashHex = bytesToHex(hash);
+            
+            logger.debug("Identificador único gerado: {} (após remover {} campos voláteis)", 
+                         hashHex.substring(0, 8), camposVolateis.size());
+            
+            return hashHex;
+            
+        } catch (final JsonProcessingException e) {
+            logger.error("Erro ao processar metadata para hash: {}", e.getMessage(), e);
+            // Fallback: calcular hash do metadata original (sem remover campos voláteis)
+            try {
+                final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                final byte[] hash = digest.digest(metadata.getBytes(StandardCharsets.UTF_8));
+                return bytesToHex(hash);
+            } catch (final NoSuchAlgorithmException ex) {
+                throw new RuntimeException("Erro ao calcular hash SHA-256 do metadata", ex);
+            }
         } catch (final NoSuchAlgorithmException e) {
             // Fallback: usar hash simples se SHA-256 não disponível (não deve acontecer)
             throw new RuntimeException("Erro ao calcular hash SHA-256 do metadata", e);

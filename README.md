@@ -1,54 +1,1242 @@
+<!-- PORTFOLIO-FEATURED
+title: Extrator de Dados ESL Cloud (ETL)
+description: Sistema de automação ETL (Java) para extrair dados de 3 APIs (REST, GraphQL, Data Export) do ESL Cloud e carregar em SQL Server, com sistema robusto de deduplicação e execução paralela resiliente.
+technologies: Java 17, Maven, SQL Server (mssql-jdbc), Jackson, SLF4J
+demo: N/A (Backend CLI Tool)
+highlight: true
+image: public/foto.png
+-->
+
+<p align="center"> 
+  <img src="public/foto.png" alt="Capa do projeto" width="1200"> 
+</p>
+
 # Extrator de Dados ESL Cloud
 
-Script de automação em Java que extrai dados de múltiplas APIs do ESL Cloud e carrega em SQL Server, com coleta automática de métricas de execução.
+**Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados de múltiplas APIs do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução e sistema robusto de deduplicação.
 
-**Versão:** 2.1.0 | **Última Atualização:** 07/11/2025
+**Versão:** 2.1.0 | **Última Atualização:** 11/11/2025 | **Status:** ✅ Estável
 
-## 🚀 Início Rápido
+---
 
-### 1. Compilar
+## 📋 Índice
+
+1. [Visão Geral](#visão-geral)
+2. [Arquitetura do Sistema](#arquitetura-do-sistema)
+3. [APIs e Entidades Completas](#apis-e-entidades-completas)
+4. [Processo de Extração (ETL)](#processo-de-extração-etl)
+5. [Sistema de Deduplicação e MERGE](#sistema-de-deduplicação-e-merge)
+6. [Estrutura de Dados por Entidade](#estrutura-de-dados-por-entidade)
+7. [Classes e Componentes](#classes-e-componentes)
+8. [Como Usar](#como-usar)
+9. [Tecnologias Utilizadas](#tecnologias-utilizadas)
+10. [Estrutura de Arquivos](#estrutura-de-arquivos)
+11. [Problemas Resolvidos](#problemas-resolvidos)
+
+---
+
+## 🎯 Visão Geral
+
+### O Que Este Projeto Faz?
+
+Este projeto é um **sistema de automação ETL** que:
+
+1. **Extrai dados** de 3 APIs diferentes do ESL Cloud (REST, GraphQL, Data Export)
+2. **Transforma** os dados JSON em entidades estruturadas
+3. **Carrega** os dados em um banco SQL Server usando operações MERGE (UPSERT)
+4. **Garante integridade** através de sistema robusto de deduplicação
+5. **Registra métricas** de execução e gera logs detalhados
+6. **Exporta dados** para CSV para análise externa
+
+### Objetivo Principal
+
+Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão de transportes) para um banco de dados SQL Server, permitindo:
+- Análise de dados históricos
+- Relatórios customizados
+- Integração com outros sistemas
+- Auditoria e rastreabilidade
+
+### Características Principais
+
+- ✅ **3 APIs Integradas**: REST, GraphQL e Data Export
+- ✅ **8 Entidades Extraídas**: Faturas a Pagar, Faturas a Receber, Ocorrências, Coletas, Fretes, Manifestos, Cotações, Localização de Carga
+- ✅ **Sistema MERGE Robusto**: Previne duplicados falsos e preserva duplicados naturais
+- ✅ **Deduplicação Inteligente**: Remove duplicados da API antes de salvar
+- ✅ **Paginação Completa**: Garante 100% de cobertura dos dados
+- ✅ **Logs Estruturados**: Rastreamento completo de todas as operações
+- ✅ **Métricas Automáticas**: Coleta de performance e estatísticas
+- ✅ **Exportação CSV**: Exportação completa de todos os dados
+- ✅ **Validação Automática**: Comandos para validar integridade dos dados
+
+---
+
+## 🏗️ Arquitetura do Sistema
+
+### Padrão Arquitetural
+
+O sistema segue um **padrão de orquestração** com runners especializados:
+
+```
+Main.java (Orquestrador)
+    ├── RestRunner.java (API REST)
+    │   ├── Faturas a Pagar
+    │   ├── Faturas a Receber
+    │   └── Ocorrências
+    ├── GraphQLRunner.java (API GraphQL)
+    │   ├── Coletas
+    │   └── Fretes
+    └── DataExportRunner.java (API Data Export)
+        ├── Manifestos
+        ├── Cotações
+        └── Localização de Carga
+```
+
+### Componentes Principais
+
+#### 1. **Orquestrador (`Main.java`)**
+- Ponto de entrada do sistema
+- Interpreta argumentos da linha de comando
+- Delega execução para runners especializados
+- Gerencia logging e tratamento de erros
+
+#### 2. **Runners (`runners/*.java`)**
+- **RestRunner**: Executa extração de dados via API REST
+- **GraphQLRunner**: Executa extração de dados via API GraphQL
+- **DataExportRunner**: Executa extração de dados via API Data Export
+
+#### 3. **Clientes de API (`api/*.java`)**
+- **ClienteApiRest**: Cliente HTTP para API REST
+- **ClienteApiGraphQL**: Cliente HTTP para API GraphQL
+- **ClienteApiDataExport**: Cliente HTTP para API Data Export
+- Implementam paginação, retry, timeout e tratamento de erros
+
+#### 4. **DTOs e Mappers (`modelo/*.java`)**
+- **DTOs (Data Transfer Objects)**: Representam dados da API
+- **Mappers**: Convertem DTOs em Entities
+- Capturam campos explícitos + metadata JSON completo
+
+#### 5. **Entities (`db/entity/*.java`)**
+- Representam linhas nas tabelas do banco
+- Contêm campos essenciais para indexação
+- Incluem coluna `metadata` (JSON completo) para resiliência
+
+#### 6. **Repositories (`db/repository/*.java`)**
+- Implementam persistência no banco
+- Executam operações MERGE (UPSERT)
+- Validam dados antes de salvar
+- Tratam erros e registram logs
+
+#### 7. **Utilitários (`util/*.java`)**
+- **ExportadorCSV**: Exporta dados para CSV
+- **GerenciadorConexao**: Gerencia conexões com banco
+- **CarregadorConfig**: Carrega configurações
+- **LoggingService**: Sistema de logging estruturado
+
+#### 8. **Comandos (`comandos/*.java`)**
+- **ExecutarFluxoCompletoComando**: Executa extração completa
+- **ValidarManifestosComando**: Valida integridade de manifestos
+- **ExecutarAuditoriaComando**: Executa auditoria de dados
+- **TestarApiComando**: Testa conectividade com APIs
+
+---
+
+## 🔌 APIs e Entidades Completas
+
+### API REST
+
+**Autenticação:** `Authorization: Bearer {{token_rest}}`
+
+**Base URL:** `{{base_url}}/api/v1`
+
+**Cliente:** `ClienteApiRest.java`
+
+#### 1. Faturas a Pagar (`FaturaAPagarEntity`)
+
+**Endpoint:** `GET /payables`
+
+**Classes Relacionadas:**
+- **DTO**: `FaturaAPagarDTO.java` (modelo/rest/faturaspagar/)
+- **Mapper**: `FaturaAPagarMapper.java` (modelo/rest/faturaspagar/)
+- **Entity**: `FaturaAPagarEntity.java` (db/entity/)
+- **Repository**: `FaturaAPagarRepository.java` (db/repository/)
+- **DTO Auxiliar**: `ReceiverDTO.java` (modelo/rest/faturaspagar/)
+
+**Características:**
+- **Chave Primária**: `id` (BIGINT)
+- **Chave de Negócio**: `document_number` (VARCHAR)
+- **Campos Principais**: 14 campos mapeados
+- **Campos Futuros**: 10 campos preparados (placeholders)
+- **Metadata**: `header_metadata` + `installments_metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+
+**Campos Mapeados (14):**
+1. `id` - Chave primária
+2. `document_number` - Número do documento
+3. `issue_date` - Data de emissão
+4. `due_date` - Data de vencimento
+5. `total_value` - Valor total
+6. `receiver_cnpj` - CNPJ do fornecedor
+7. `receiver_name` - Nome do fornecedor
+8. `invoice_type` - Tipo de fatura
+9. `cnpj_filial` - CNPJ da filial
+10. `filial` - Nome da filial
+11. `observacoes` - Observações
+12. `conta_contabil` - Conta contábil
+13. `centro_custo` - Centro de custo
+14. `status` - Status calculado (Pendente/Vencido)
+15. `forma_pagamento` - Forma de pagamento
+
+**Campos Futuros (10 placeholders):**
+- `sequencia`, `cheque`, `vencimento_original`, `competencia`, `data_baixa`, `data_liquidacao`, `banco_pagamento`, `conta_pagamento`, `descricao_despesa`
+
+**Repository:**
+- **MERGE**: Usa `id` como chave de matching
+- **Tabela**: `faturas_a_pagar`
+- **Criação Automática**: Sim
+
+#### 2. Faturas a Receber (`FaturaAReceberEntity`)
+
+**Endpoint:** `GET /receivables`
+
+**Classes Relacionadas:**
+- **DTO**: `FaturaAReceberDTO.java` (modelo/rest/faturasreceber/)
+- **Mapper**: `FaturaAReceberMapper.java` (modelo/rest/faturasreceber/)
+- **Entity**: `FaturaAReceberEntity.java` (db/entity/)
+- **Repository**: `FaturaAReceberRepository.java` (db/repository/)
+- **DTO Auxiliar**: `CustomerDTO.java` (modelo/rest/faturasreceber/)
+
+**Características:**
+- **Chave Primária**: `id` (BIGINT)
+- **Chave de Negócio**: `document_number` (VARCHAR)
+- **Campos Principais**: 11 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+
+**Campos Mapeados (11):**
+1. `id` - Chave primária
+2. `document_number` - Número do documento
+3. `issue_date` - Data de emissão
+4. `due_date` - Data de vencimento
+5. `total_value` - Valor total
+6. `customer_cnpj` - CNPJ do cliente
+7. `customer_name` - Nome do cliente
+8. `invoice_type` - Tipo de fatura
+9. `metadata` - JSON completo
+
+**Repository:**
+- **MERGE**: Usa `id` como chave de matching
+- **Tabela**: `faturas_a_receber`
+- **Criação Automática**: Sim
+
+#### 3. Ocorrências (`OcorrenciaEntity`)
+
+**Endpoint:** `GET /occurrences`
+
+**Classes Relacionadas:**
+- **DTO**: `OcorrenciaDTO.java` (modelo/rest/ocorrencias/)
+- **Mapper**: `OcorrenciaMapper.java` (modelo/rest/ocorrencias/)
+- **Entity**: `OcorrenciaEntity.java` (db/entity/)
+- **Repository**: `OcorrenciaRepository.java` (db/repository/)
+- **DTOs Auxiliares**: 
+  - `FreightDTO.java` (modelo/rest/ocorrencias/)
+  - `InvoiceDTO.java` (modelo/rest/ocorrencias/)
+  - `OccurrenceDetailsDTO.java` (modelo/rest/ocorrencias/)
+
+**Características:**
+- **Chave Primária**: `id` (BIGINT)
+- **Campos Principais**: 8 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+
+**Campos Mapeados (8):**
+1. `id` - Chave primária
+2. `occurrence_at` - Data/hora da ocorrência
+3. `occurrence_code` - Código da ocorrência
+4. `occurrence_description` - Descrição da ocorrência
+5. `freight_id` - ID do frete
+6. `cte_key` - Chave do CT-e
+7. `invoice_id` - ID da nota fiscal
+8. `invoice_key` - Chave da nota fiscal
+
+**Repository:**
+- **MERGE**: Usa `id` como chave de matching
+- **Tabela**: `ocorrencias`
+- **Criação Automática**: Sim
+
+---
+
+### API GraphQL
+
+**Autenticação:** `Authorization: Bearer {{token_graphql}}`
+
+**Endpoint:** `POST {{base_url}}/graphql`
+
+**Cliente:** `ClienteApiGraphQL.java`
+
+#### 4. Coletas (`ColetaEntity`)
+
+**Query:** `BuscarColetasExpandidaV2`
+
+**Tipo GraphQL:** `Pick`
+
+**Classes Relacionadas:**
+- **DTO**: `ColetaNodeDTO.java` (modelo/graphql/coletas/)
+- **Mapper**: `ColetaMapper.java` (modelo/graphql/coletas/)
+- **Entity**: `ColetaEntity.java` (db/entity/)
+- **Repository**: `ColetaRepository.java` (db/repository/)
+- **DTOs Auxiliares**: 
+  - `CityDTO.java` (modelo/graphql/coletas/)
+  - `CustomerDTO.java` (modelo/graphql/coletas/)
+  - `PickAddressDTO.java` (modelo/graphql/coletas/)
+  - `StateDTO.java` (modelo/graphql/coletas/)
+  - `UserDTO.java` (modelo/graphql/coletas/)
+
+**Características:**
+- **Chave Primária**: `id` (VARCHAR)
+- **Chave de Negócio**: `sequence_code` (BIGINT)
+- **Campos Principais**: 22 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: 2 dias (dia anterior + dia atual)
+- **Paginação**: Cursor-based (`first` e `after`)
+
+**Campos Mapeados (22):**
+1. `id` - Chave primária
+2. `sequence_code` - Código sequencial
+3. `request_date` - Data da solicitação
+4. `service_date` - Data do serviço
+5. `status` - Status da coleta
+6. `total_value` - Valor total
+7. `total_weight` - Peso total
+8. `total_volumes` - Total de volumes
+9. `cliente_id` - ID do cliente
+10. `cliente_nome` - Nome do cliente
+11. `local_coleta` - Local de coleta
+12. `cidade_coleta` - Cidade de coleta
+13. `uf_coleta` - UF de coleta
+14. `usuario_id` - ID do usuário
+15. `usuario_nome` - Nome do usuário
+16. `request_hour` - Hora da solicitação
+17. `service_start_hour` - Hora de início do serviço
+18. `finish_date` - Data de finalização
+19. `service_end_hour` - Hora de término do serviço
+20. `requester` - Solicitante
+21. `taxed_weight` - Peso taxado
+22. `comments` - Comentários
+
+**Repository:**
+- **MERGE**: Usa `id` como chave de matching
+- **Tabela**: `coletas`
+- **Criação Automática**: Sim
+
+#### 5. Fretes (`FreteEntity`)
+
+**Query:** `BuscarFretesExpandidaV3`
+
+**Tipo GraphQL:** `FreightBase`
+
+**Classes Relacionadas:**
+- **DTO**: `FreteNodeDTO.java` (modelo/graphql/fretes/)
+- **Mapper**: `FreteMapper.java` (modelo/graphql/fretes/)
+- **Entity**: `FreteEntity.java` (db/entity/)
+- **Repository**: `FreteRepository.java` (db/repository/)
+- **DTOs Auxiliares**: 
+  - `CityDTO.java` (modelo/graphql/fretes/)
+  - `CorporationDTO.java` (modelo/graphql/fretes/)
+  - `CostCenterDTO.java` (modelo/graphql/fretes/)
+  - `CustomerPriceTableDTO.java` (modelo/graphql/fretes/)
+  - `FreightClassificationDTO.java` (modelo/graphql/fretes/)
+  - `FreightInvoiceDTO.java` (modelo/graphql/fretes/)
+  - `MainAddressDTO.java` (modelo/graphql/fretes/)
+  - `PayerDTO.java` (modelo/graphql/fretes/)
+  - `ReceiverDTO.java` (modelo/graphql/fretes/)
+  - `SenderDTO.java` (modelo/graphql/fretes/)
+  - `StateDTO.java` (modelo/graphql/fretes/)
+  - `UserDTO.java` (modelo/graphql/fretes/)
+
+**Características:**
+- **Chave Primária**: `id` (BIGINT)
+- **Campos Principais**: 22 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+- **Paginação**: Cursor-based (`first` e `after`)
+
+**Campos Mapeados (22):**
+1. `id` - Chave primária
+2. `servico_em` - Data/hora do serviço
+3. `criado_em` - Data/hora de criação
+4. `status` - Status do frete
+5. `modal` - Modalidade
+6. `tipo_frete` - Tipo de frete
+7. `valor_total` - Valor total
+8. `valor_notas` - Valor das notas
+9. `peso_notas` - Peso das notas
+10. `id_corporacao` - ID da corporação
+11. `id_cidade_destino` - ID da cidade de destino
+12. `data_previsao_entrega` - Data de previsão de entrega
+13. `pagador_id` - ID do pagador
+14. `pagador_nome` - Nome do pagador
+15. `remetente_id` - ID do remetente
+16. `remetente_nome` - Nome do remetente
+17. `origem_cidade` - Cidade de origem
+18. `origem_uf` - UF de origem
+19. `destinatario_id` - ID do destinatário
+20. `destinatario_nome` - Nome do destinatário
+21. `destino_cidade` - Cidade de destino
+22. `destino_uf` - UF de destino
+
+**Repository:**
+- **MERGE**: Usa `id` como chave de matching
+- **Tabela**: `fretes`
+- **Criação Automática**: Sim
+
+---
+
+### API Data Export
+
+**Autenticação:** `Authorization: Bearer {{token_dataexport}}`
+
+**Endpoint Base:** `GET {{base_url}}/api/analytics/reports/{templateId}/data`
+
+**Cliente:** `ClienteApiDataExport.java`
+
+#### 6. Manifestos (`ManifestoEntity`)
+
+**Template ID:** `6399`
+
+**Classes Relacionadas:**
+- **DTO**: `ManifestoDTO.java` (modelo/dataexport/manifestos/)
+- **Mapper**: `ManifestoMapper.java` (modelo/dataexport/manifestos/)
+- **Entity**: `ManifestoEntity.java` (db/entity/)
+- **Repository**: `ManifestoRepository.java` (db/repository/)
+
+**Características:**
+- **Chave Primária**: `id` (BIGINT, auto-incrementado)
+- **Chave de Negócio**: `(sequence_code, pick_sequence_code, mdfe_number)` (chave composta)
+- **Chave Única**: `(sequence_code, identificador_unico)` (constraint UNIQUE)
+- **Campos Principais**: 40 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+- **Paginação**: `page` e `per` (até 10000 registros por página)
+- **Timeout**: 120 segundos por página
+- **Especial**: Suporta múltiplos MDF-es e duplicados naturais
+
+**Campos Mapeados (40):**
+1. `sequence_code` - Código sequencial do manifesto (BIGINT)
+2. `identificador_unico` - Identificador único calculado (NVARCHAR)
+3. `status` - Status do manifesto (NVARCHAR)
+4. `created_at` - Data de criação (DATETIMEOFFSET)
+5. `departured_at` - Data de saída (DATETIMEOFFSET)
+6. `closed_at` - Data de fechamento (DATETIMEOFFSET)
+7. `finished_at` - Data de finalização (DATETIMEOFFSET)
+8. `mdfe_number` - Número do MDF-e (INT)
+9. `mdfe_key` - Chave do MDF-e (NVARCHAR)
+10. `mdfe_status` - Status do MDF-e (NVARCHAR)
+11. `distribution_pole` - Polo de distribuição (NVARCHAR)
+12. `classification` - Classificação (NVARCHAR)
+13. `vehicle_plate` - Placa do veículo (NVARCHAR)
+14. `vehicle_type` - Tipo de veículo (NVARCHAR)
+15. `vehicle_owner` - Proprietário do veículo (NVARCHAR)
+16. `driver_name` - Nome do motorista (NVARCHAR)
+17. `branch_nickname` - Apelido da filial (NVARCHAR)
+18. `vehicle_departure_km` - KM de saída (INT)
+19. `closing_km` - KM de fechamento (INT)
+20. `traveled_km` - KM rodado (INT)
+21. `invoices_count` - Total de notas (INT)
+22. `invoices_volumes` - Total de volumes (INT)
+23. `invoices_weight` - Peso real (DECIMAL(18,3)) ✅
+24. `total_taxed_weight` - Peso taxado (DECIMAL(18,3)) ✅
+25. `total_cubic_volume` - Cubagem (DECIMAL(18,6)) ✅
+26. `invoices_value` - Valor das notas (DECIMAL(18,2)) ✅
+27. `manifest_freights_total` - Valor dos fretes (DECIMAL(18,2)) ✅
+28. `pick_sequence_code` - Código sequencial da coleta (BIGINT)
+29. `contract_number` - Número do contrato (NVARCHAR)
+30. `daily_subtotal` - Subtotal de diárias (DECIMAL(18,2)) ✅
+31. `total_cost` - Custo total (DECIMAL(18,2)) ✅
+32. `operational_expenses_total` - Despesas operacionais (DECIMAL(18,2)) ✅
+33. `inss_value` - Valor do INSS (DECIMAL(18,2)) ✅
+34. `sest_senat_value` - Valor do SEST/SENAT (DECIMAL(18,2)) ✅
+35. `ir_value` - Valor do IR (DECIMAL(18,2)) ✅
+36. `paying_total` - Valor a pagar (DECIMAL(18,2)) ✅
+37. `creation_user_name` - Nome do usuário de criação (NVARCHAR)
+38. `adjustment_user_name` - Nome do usuário de ajuste (NVARCHAR)
+39. `metadata` - JSON completo (NVARCHAR(MAX))
+40. `data_extracao` - Data de extração (DATETIME2)
+
+**✅ Campos Numéricos:** 11 campos numéricos usam `DECIMAL` para permitir análises (SUM, AVG, comparações)
+
+**Identificador Único:**
+- **Prioridade 1**: Se `pick_sequence_code` está preenchido → usa `pick_sequence_code`
+- **Prioridade 2**: Se `pick_sequence_code` é NULL mas `mdfe_number` está preenchido → usa `sequence_code + "_MDFE_" + mdfe_number`
+- **Prioridade 3**: Se ambos são NULL → calcula hash SHA-256 do metadata (excluindo campos voláteis)
+
+**Campos Voláteis Excluídos do Hash:**
+- Timestamps: `mobile_read_at`, `departured_at`, `closed_at`, `finished_at`
+- Quilometragens: `vehicle_departure_km`, `closing_km`, `traveled_km`
+- Contadores: `finalized_manifest_items_count`
+- MDF-e: `mft_mfs_number`, `mft_mfs_key`, `mdfe_status`
+- Ajustes: `mft_aoe_comments`, `mft_aoe_rer_name`
+
+**Repository:**
+- **MERGE**: Usa `(sequence_code, pick_sequence_code, mdfe_number)` como chave de matching
+- **Tabela**: `manifestos`
+- **Constraint UNIQUE**: `(sequence_code, identificador_unico)`
+- **Criação Automática**: Sim
+- **Deduplicação**: Sim (antes de salvar)
+
+#### 7. Cotações (`CotacaoEntity`)
+
+**Template ID:** `6906`
+
+**Classes Relacionadas:**
+- **DTO**: `CotacaoDTO.java` (modelo/dataexport/cotacao/)
+- **Mapper**: `CotacaoMapper.java` (modelo/dataexport/cotacao/)
+- **Entity**: `CotacaoEntity.java` (db/entity/)
+- **Repository**: `CotacaoRepository.java` (db/repository/)
+
+**Características:**
+- **Chave Primária**: `sequence_code` (BIGINT)
+- **Campos Principais**: 19 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+- **Paginação**: `page` e `per` (até 1000 registros por página)
+
+**Campos Mapeados (19):**
+1. `sequence_code` - Código sequencial
+2. `requested_at` - Data/hora da solicitação
+3. `operation_type` - Tipo de operação
+4. `customer_doc` - Documento do cliente
+5. `customer_name` - Nome do cliente
+6. `origin_city` - Cidade de origem
+7. `origin_state` - Estado de origem
+8. `destination_city` - Cidade de destino
+9. `destination_state` - Estado de destino
+10. `price_table` - Tabela de preços
+11. `volumes` - Volumes
+12. `taxed_weight` - Peso taxado
+13. `invoices_value` - Valor das notas
+14. `total_value` - Valor total
+15. `user_name` - Nome do usuário
+16. `branch_nickname` - Apelido da filial
+17. `company_name` - Nome da empresa
+18. `requester_name` - Nome do solicitante
+19. `real_weight` - Peso real
+
+**Repository:**
+- **MERGE**: Usa `sequence_code` como chave de matching
+- **Tabela**: `cotacoes`
+- **Criação Automática**: Sim
+- **Deduplicação**: Sim (antes de salvar)
+
+#### 8. Localização de Carga (`LocalizacaoCargaEntity`)
+
+**Template ID:** `8656`
+
+**Classes Relacionadas:**
+- **DTO**: `LocalizacaoCargaDTO.java` (modelo/dataexport/localizacaocarga/)
+- **Mapper**: `LocalizacaoCargaMapper.java` (modelo/dataexport/localizacaocarga/)
+- **Entity**: `LocalizacaoCargaEntity.java` (db/entity/)
+- **Repository**: `LocalizacaoCargaRepository.java` (db/repository/)
+
+**Características:**
+- **Chave Primária**: `sequence_number` (BIGINT)
+- **Campos Principais**: 17 campos mapeados
+- **Metadata**: `metadata` (JSON completo)
+- **Filtro**: Últimas 24 horas
+- **Paginação**: `page` e `per` (até 10000 registros por página)
+
+**Campos Mapeados (17):**
+1. `sequence_number` - Número sequencial
+2. `service_at` - Data/hora do serviço
+3. `freight_id` - ID do frete
+4. `latitude` - Latitude
+5. `longitude` - Longitude
+6. `address` - Endereço
+7. `city` - Cidade
+8. `state` - Estado
+9. `postal_code` - CEP
+10. `country` - País
+11. `accuracy` - Precisão
+12. `speed` - Velocidade
+13. `heading` - Direção
+14. `altitude` - Altitude
+15. `device_id` - ID do dispositivo
+16. `device_type` - Tipo de dispositivo
+17. `metadata` - JSON completo
+
+**Repository:**
+- **MERGE**: Usa `sequence_number` como chave de matching
+- **Tabela**: `localizacao_cargas`
+- **Criação Automática**: Sim
+- **Deduplicação**: Sim (antes de salvar)
+
+---
+
+## 🔄 Processo de Extração (ETL)
+
+### Fluxo Completo
+
+```
+1. INICIALIZAÇÃO
+   ├── Carregar configurações (tokens, URLs, credenciais DB)
+   ├── Validar conexão com banco de dados
+   └── Inicializar sistema de logging
+
+2. EXTRAÇÃO (Extract)
+   ├── Para cada API:
+   │   ├── Construir requisição HTTP
+   │   ├── Adicionar autenticação (Bearer token)
+   │   ├── Aplicar filtros de data (últimas 24h)
+   │   ├── Executar requisição
+   │   ├── Processar paginação (se necessário)
+   │   └── Retornar lista de DTOs
+   │
+   └── Resultado: Lista de DTOs (JSON deserializado)
+
+3. TRANSFORMAÇÃO (Transform)
+   ├── Para cada DTO:
+   │   ├── Mapper converte DTO → Entity
+   │   ├── Calcular campos derivados
+   │   ├── Validar dados obrigatórios
+   │   ├── Truncar strings longas (se necessário)
+   │   └── Calcular identificador único (apenas para manifestos)
+   │
+   └── Resultado: Lista de Entities (prontas para salvar)
+
+4. DEDUPLICAÇÃO (Opcional - para algumas entidades)
+   ├── Manifestos: Usa (sequence_code + identificador_unico)
+   ├── Cotações: Usa sequence_code
+   ├── Localização de Carga: Usa sequence_number
+   ├── Outras entidades: Não aplica deduplicação (MERGE já previne duplicados)
+   └── Resultado: Lista de Entities únicas
+
+5. CARREGAMENTO (Load)
+   ├── Para cada Entity:
+   │   ├── Verificar se tabela existe (criar se não existir)
+   │   ├── Executar MERGE (UPSERT)
+   │   │   ├── Se registro existe → UPDATE
+   │   │   └── Se registro não existe → INSERT
+   │   ├── Validar rowsAffected > 0
+   │   └── Registrar sucesso/falha
+   │
+   └── Resultado: Contagem de registros processados
+
+6. REGISTRO DE LOG
+   ├── Criar LogExtracaoEntity
+   ├── Registrar: entidade, timestamps, status, contagens
+   └── Salvar no banco (tabela log_extracoes)
+
+7. EXPORTAÇÃO CSV (Opcional)
+   ├── Para cada entidade:
+   │   ├── Executar SELECT * FROM tabela
+   │   ├── Escrever cabeçalho CSV
+   │   ├── Escrever dados CSV
+   │   └── Validar integridade
+   │
+   └── Resultado: Arquivos CSV em pasta exports/
+```
+
+### Paginação
+
+O sistema implementa paginação robusta para garantir 100% de cobertura:
+
+- **API REST**: Usa parâmetros `page` e `per_page`
+- **API GraphQL**: Usa `first` e `after` (cursor-based)
+- **API Data Export**: Usa `page` e `per` no corpo JSON
+
+**Características:**
+- Timeout dinâmico por template (120s para Manifestos)
+- Retry automático em caso de falha
+- Logs detalhados de cada página processada
+- Detecção de fim de paginação
+
+---
+
+## 🔐 Sistema de Deduplicação e MERGE
+
+### Visão Geral
+
+O sistema implementa **duas camadas de proteção** contra duplicados:
+
+1. **Deduplicação Antes de Salvar**: Remove duplicados da resposta da API
+2. **MERGE (UPSERT)**: Atualiza registros existentes ou insere novos
+
+### Deduplicação por Entidade
+
+#### Entidades com Deduplicação
+
+**Manifestos** (`DataExportRunner.deduplicarManifestos()`):
+- **Chave**: `sequence_code + "_" + identificador_unico`
+- **Método**: `Collectors.toMap` com merge function
+- **Resultado**: Mantém o primeiro registro encontrado
+
+**Cotações** (`DataExportRunner.deduplicarCotacoes()`):
+- **Chave**: `sequence_code`
+- **Método**: `Collectors.toMap` com merge function
+- **Resultado**: Mantém o primeiro registro encontrado
+
+**Localização de Carga** (`DataExportRunner.deduplicarLocalizacoes()`):
+- **Chave**: `sequence_number`
+- **Método**: `Collectors.toMap` com merge function
+- **Resultado**: Mantém o primeiro registro encontrado
+
+#### Entidades sem Deduplicação
+
+**Faturas a Pagar, Faturas a Receber, Ocorrências, Coletas, Fretes**:
+- Não aplicam deduplicação antes de salvar
+- O MERGE já previne duplicados usando a chave primária
+
+### MERGE (UPSERT) por Entidade
+
+#### Entidades com MERGE Simples (Chave Primária)
+
+**Faturas a Pagar** (`FaturaAPagarRepository`):
+- **Chave de Matching**: `id`
+- **Tabela**: `faturas_a_pagar`
+- **Operação**: `MERGE ... ON target.id = source.id`
+
+**Faturas a Receber** (`FaturaAReceberRepository`):
+- **Chave de Matching**: `id`
+- **Tabela**: `faturas_a_receber`
+- **Operação**: `MERGE ... ON target.id = source.id`
+
+**Ocorrências** (`OcorrenciaRepository`):
+- **Chave de Matching**: `id`
+- **Tabela**: `ocorrencias`
+- **Operação**: `MERGE ... ON target.id = source.id`
+
+**Coletas** (`ColetaRepository`):
+- **Chave de Matching**: `id`
+- **Tabela**: `coletas`
+- **Operação**: `MERGE ... ON target.id = source.id`
+
+**Fretes** (`FreteRepository`):
+- **Chave de Matching**: `id`
+- **Tabela**: `fretes`
+- **Operação**: `MERGE ... ON target.id = source.id`
+
+**Cotações** (`CotacaoRepository`):
+- **Chave de Matching**: `sequence_code`
+- **Tabela**: `cotacoes`
+- **Operação**: `MERGE ... ON target.sequence_code = source.sequence_code`
+
+**Localização de Carga** (`LocalizacaoCargaRepository`):
+- **Chave de Matching**: `sequence_number`
+- **Tabela**: `localizacao_cargas`
+- **Operação**: `MERGE ... ON target.sequence_number = source.sequence_number`
+
+#### Entidade com MERGE Complexo (Chave Composta)
+
+**Manifestos** (`ManifestoRepository`):
+- **Chave de Matching**: `(sequence_code, pick_sequence_code, mdfe_number)`
+- **Tabela**: `manifestos`
+- **Operação**: `MERGE ... ON target.sequence_code = source.sequence_code AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1) AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)`
+- **Constraint UNIQUE**: `(sequence_code, identificador_unico)`
+- **Especial**: Preserva múltiplos MDF-es e duplicados naturais
+
+### Por Que Manifestos Usam Chave Composta?
+
+**Problema Original:**
+- Manifestos podem ter múltiplos MDF-es (mesmo `sequence_code`, diferentes `mdfe_number`)
+- Manifestos podem ter múltiplas coletas (mesmo `sequence_code`, diferentes `pick_sequence_code`)
+- Usar apenas `sequence_code` como chave causaria perda de dados (sobrescreveria registros)
+
+**Solução:**
+- Usar `(sequence_code, pick_sequence_code, mdfe_number)` como chave de matching no MERGE
+- Isso garante que múltiplos MDF-es e coletas sejam preservados
+- O `identificador_unico` é usado apenas na constraint UNIQUE, não no MERGE
+
+### Identificador Único de Manifestos
+
+**Cálculo** (`ManifestoEntity.calcularIdentificadorUnico()`):
+
+1. **Prioridade 1**: Se `pick_sequence_code` E `mdfe_number` estão preenchidos
+   - Usar `pick_sequence_code + "_MDFE_" + mdfe_number`
+   - **CRÍTICO**: Incluir mdfe_number para diferenciar múltiplos MDF-es com mesmo pick
+   - Exemplo: `identificador_unico = "72433_MDFE_3545"`
+
+2. **Prioridade 2**: Se apenas `pick_sequence_code` está preenchido (mdfe_number é NULL)
+   - Usar `pick_sequence_code` como identificador
+   - Exemplo: `identificador_unico = "72288"`
+
+3. **Prioridade 3**: Se apenas `mdfe_number` está preenchido (pick_sequence_code é NULL)
+   - Usar `sequence_code + "_MDFE_" + mdfe_number`
+   - Exemplo: `identificador_unico = "48990_MDFE_1503"`
+
+4. **Prioridade 4**: Se ambos são NULL
+   - Calcular hash SHA-256 do metadata **excluindo campos voláteis**
+   - Exemplo: `identificador_unico = "a1b2c3d4e5f6..."`
+
+**Campos Voláteis Excluídos do Hash:**
+- Timestamps: `mobile_read_at`, `departured_at`, `closed_at`, `finished_at`
+- Quilometragens: `vehicle_departure_km`, `closing_km`, `traveled_km`
+- Contadores: `finalized_manifest_items_count`
+- MDF-e: `mft_mfs_number`, `mft_mfs_key`, `mdfe_status`
+- Ajustes: `mft_aoe_comments`, `mft_aoe_rer_name`
+
+**Por que excluir campos voláteis?**
+- Esses campos podem mudar **durante** a extração
+- Se incluídos no hash, causariam diferentes hashes para o mesmo manifesto
+- Resultado: Duplicados falsos no banco
+
+---
+
+## 📊 Estrutura de Dados por Entidade
+
+### Arquitetura Híbrida
+
+O sistema usa uma **arquitetura híbrida** para cada entidade:
+
+1. **Campos Essenciais**: Colunas dedicadas para campos mais usados em relatórios
+2. **Coluna Metadata**: JSON completo do objeto original (garante 100% de completude)
+
+### Tabelas do Banco de Dados
+
+#### 1. `faturas_a_pagar`
+
+**Chave Primária**: `id` (BIGINT)
+
+**Campos Principais**: 14 campos + 10 placeholders + 2 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE faturas_a_pagar (
+    id BIGINT PRIMARY KEY,
+    document_number VARCHAR(100),
+    issue_date DATE,
+    due_date DATE,
+    total_value DECIMAL(18,2),
+    receiver_cnpj VARCHAR(20),
+    receiver_name NVARCHAR(200),
+    invoice_type VARCHAR(50),
+    cnpj_filial VARCHAR(20),
+    filial NVARCHAR(200),
+    observacoes NVARCHAR(MAX),
+    conta_contabil NVARCHAR(100),
+    centro_custo NVARCHAR(200),
+    status NVARCHAR(50),
+    forma_pagamento NVARCHAR(50),
+    header_metadata NVARCHAR(MAX),
+    installments_metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 2. `faturas_a_receber`
+
+**Chave Primária**: `id` (BIGINT)
+
+**Campos Principais**: 11 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE faturas_a_receber (
+    id BIGINT PRIMARY KEY,
+    document_number VARCHAR(100),
+    issue_date DATE,
+    due_date DATE,
+    total_value DECIMAL(18,2),
+    customer_cnpj VARCHAR(20),
+    customer_name NVARCHAR(200),
+    invoice_type VARCHAR(50),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 3. `ocorrencias`
+
+**Chave Primária**: `id` (BIGINT)
+
+**Campos Principais**: 8 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE ocorrencias (
+    id BIGINT PRIMARY KEY,
+    occurrence_at DATETIME2,
+    occurrence_code INT,
+    occurrence_description NVARCHAR(500),
+    freight_id BIGINT,
+    cte_key VARCHAR(50),
+    invoice_id BIGINT,
+    invoice_key VARCHAR(50),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 4. `coletas`
+
+**Chave Primária**: `id` (VARCHAR)
+
+**Campos Principais**: 22 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE coletas (
+    id VARCHAR(50) PRIMARY KEY,
+    sequence_code BIGINT,
+    request_date DATE,
+    service_date DATE,
+    status NVARCHAR(50),
+    total_value DECIMAL(18,2),
+    total_weight DECIMAL(18,2),
+    total_volumes INT,
+    cliente_id BIGINT,
+    cliente_nome NVARCHAR(200),
+    local_coleta NVARCHAR(500),
+    cidade_coleta NVARCHAR(100),
+    uf_coleta VARCHAR(2),
+    usuario_id BIGINT,
+    usuario_nome NVARCHAR(200),
+    request_hour VARCHAR(10),
+    service_start_hour VARCHAR(10),
+    finish_date DATE,
+    service_end_hour VARCHAR(10),
+    requester NVARCHAR(200),
+    taxed_weight DECIMAL(18,2),
+    comments NVARCHAR(MAX),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 5. `fretes`
+
+**Chave Primária**: `id` (BIGINT)
+
+**Campos Principais**: 22 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE fretes (
+    id BIGINT PRIMARY KEY,
+    servico_em DATETIME2,
+    criado_em DATETIME2,
+    status NVARCHAR(50),
+    modal NVARCHAR(50),
+    tipo_frete NVARCHAR(50),
+    valor_total DECIMAL(18,2),
+    valor_notas DECIMAL(18,2),
+    peso_notas DECIMAL(18,2),
+    id_corporacao BIGINT,
+    id_cidade_destino BIGINT,
+    data_previsao_entrega DATE,
+    pagador_id BIGINT,
+    pagador_nome NVARCHAR(200),
+    remetente_id BIGINT,
+    remetente_nome NVARCHAR(200),
+    origem_cidade NVARCHAR(100),
+    origem_uf VARCHAR(2),
+    destinatario_id BIGINT,
+    destinatario_nome NVARCHAR(200),
+    destino_cidade NVARCHAR(100),
+    destino_uf VARCHAR(2),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 6. `manifestos`
+
+**Chave Primária**: `id` (BIGINT, auto-incrementado)
+
+**Chave de Negócio**: `(sequence_code, pick_sequence_code, mdfe_number)`
+
+**Constraint UNIQUE**: `(sequence_code, identificador_unico)`
+
+**Campos Principais**: 40 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE manifestos (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    sequence_code BIGINT NOT NULL,
+    identificador_unico NVARCHAR(100) NOT NULL,
+    status NVARCHAR(50),
+    created_at DATETIMEOFFSET,
+    departured_at DATETIMEOFFSET,
+    closed_at DATETIMEOFFSET,
+    finished_at DATETIMEOFFSET,
+    mdfe_number INT,
+    mdfe_key NVARCHAR(100),
+    mdfe_status NVARCHAR(50),
+    distribution_pole NVARCHAR(255),
+    classification NVARCHAR(255),
+    vehicle_plate NVARCHAR(10),
+    vehicle_type NVARCHAR(255),
+    vehicle_owner NVARCHAR(255),
+    driver_name NVARCHAR(255),
+    branch_nickname NVARCHAR(255),
+    vehicle_departure_km INT,
+    closing_km INT,
+    traveled_km INT,
+    invoices_count INT,
+    invoices_volumes INT,
+    invoices_weight DECIMAL(18, 3),              -- ✅ DECIMAL (antes: NVARCHAR)
+    total_taxed_weight DECIMAL(18, 3),           -- ✅ DECIMAL (antes: NVARCHAR)
+    total_cubic_volume DECIMAL(18, 6),           -- ✅ DECIMAL (antes: NVARCHAR)
+    invoices_value DECIMAL(18, 2),               -- ✅ DECIMAL (antes: NVARCHAR)
+    manifest_freights_total DECIMAL(18, 2),      -- ✅ DECIMAL (antes: NVARCHAR)
+    pick_sequence_code BIGINT,
+    contract_number NVARCHAR(50),
+    daily_subtotal DECIMAL(18, 2),               -- ✅ DECIMAL (antes: NVARCHAR)
+    total_cost DECIMAL(18, 2),
+    operational_expenses_total DECIMAL(18, 2),   -- ✅ DECIMAL (antes: NVARCHAR)
+    inss_value DECIMAL(18, 2),                   -- ✅ DECIMAL (antes: NVARCHAR)
+    sest_senat_value DECIMAL(18, 2),             -- ✅ DECIMAL (antes: NVARCHAR)
+    ir_value DECIMAL(18, 2),                     -- ✅ DECIMAL (antes: NVARCHAR)
+    paying_total DECIMAL(18, 2),                 -- ✅ DECIMAL (antes: NVARCHAR)
+    creation_user_name NVARCHAR(255),
+    adjustment_user_name NVARCHAR(255),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE(),
+    CONSTRAINT UQ_manifestos_sequence_identificador UNIQUE (sequence_code, identificador_unico)
+);
+
+CREATE INDEX IX_manifestos_sequence_code ON manifestos(sequence_code);
+```
+
+**✅ Tipos Numéricos:** Todos os campos numéricos (valores monetários, pesos, volumes) usam `DECIMAL` para permitir análises numéricas no banco de dados.
+
+#### 7. `cotacoes`
+
+**Chave Primária**: `sequence_code` (BIGINT)
+
+**Campos Principais**: 19 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE cotacoes (
+    sequence_code BIGINT PRIMARY KEY,
+    requested_at DATETIME2,
+    operation_type NVARCHAR(50),
+    customer_doc VARCHAR(20),
+    customer_name NVARCHAR(200),
+    origin_city NVARCHAR(100),
+    origin_state VARCHAR(2),
+    destination_city NVARCHAR(100),
+    destination_state VARCHAR(2),
+    price_table NVARCHAR(100),
+    volumes INT,
+    taxed_weight DECIMAL(18,2),
+    invoices_value DECIMAL(18,2),
+    total_value DECIMAL(18,2),
+    user_name NVARCHAR(200),
+    branch_nickname NVARCHAR(200),
+    company_name NVARCHAR(200),
+    requester_name NVARCHAR(200),
+    real_weight DECIMAL(18,2),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 8. `localizacao_cargas`
+
+**Chave Primária**: `sequence_number` (BIGINT)
+
+**Campos Principais**: 17 campos + 1 metadata
+
+**Estrutura:**
+```sql
+CREATE TABLE localizacao_cargas (
+    sequence_number BIGINT PRIMARY KEY,
+    service_at DATETIME2,
+    freight_id BIGINT,
+    latitude DECIMAL(10,8),
+    longitude DECIMAL(11,8),
+    address NVARCHAR(500),
+    city NVARCHAR(100),
+    state VARCHAR(2),
+    postal_code VARCHAR(10),
+    country VARCHAR(50),
+    accuracy DECIMAL(10,2),
+    speed DECIMAL(10,2),
+    heading DECIMAL(10,2),
+    altitude DECIMAL(10,2),
+    device_id VARCHAR(50),
+    device_type NVARCHAR(50),
+    metadata NVARCHAR(MAX),
+    data_extracao DATETIME2 DEFAULT GETDATE()
+);
+```
+
+#### 9. `log_extracoes`
+
+**Chave Primária**: `id` (BIGINT, auto-incrementado)
+
+**Estrutura:**
+```sql
+CREATE TABLE log_extracoes (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    entidade NVARCHAR(50) NOT NULL,
+    timestamp_inicio DATETIME2 NOT NULL,
+    timestamp_fim DATETIME2 NOT NULL,
+    status NVARCHAR(20) NOT NULL, -- COMPLETO, INCOMPLETO, ERRO_API
+    registros_extraidos INT NOT NULL,
+    paginas_processadas INT,
+    mensagem NVARCHAR(MAX)
+);
+```
+
+---
+
+## 🔧 Classes e Componentes
+
+### Estrutura de Classes por Entidade
+
+#### API REST
+
+**Faturas a Pagar:**
+- `FaturaAPagarDTO.java` - DTO da API
+- `FaturaAPagarMapper.java` - Mapper DTO → Entity
+- `FaturaAPagarEntity.java` - Entity do banco
+- `FaturaAPagarRepository.java` - Repository (persistência)
+- `ReceiverDTO.java` - DTO auxiliar (fornecedor)
+
+**Faturas a Receber:**
+- `FaturaAReceberDTO.java` - DTO da API
+- `FaturaAReceberMapper.java` - Mapper DTO → Entity
+- `FaturaAReceberEntity.java` - Entity do banco
+- `FaturaAReceberRepository.java` - Repository (persistência)
+- `CustomerDTO.java` - DTO auxiliar (cliente)
+
+**Ocorrências:**
+- `OcorrenciaDTO.java` - DTO da API
+- `OcorrenciaMapper.java` - Mapper DTO → Entity
+- `OcorrenciaEntity.java` - Entity do banco
+- `OcorrenciaRepository.java` - Repository (persistência)
+- `FreightDTO.java` - DTO auxiliar (frete)
+- `InvoiceDTO.java` - DTO auxiliar (nota fiscal)
+- `OccurrenceDetailsDTO.java` - DTO auxiliar (detalhes)
+
+#### API GraphQL
+
+**Coletas:**
+- `ColetaNodeDTO.java` - DTO da API GraphQL
+- `ColetaMapper.java` - Mapper DTO → Entity
+- `ColetaEntity.java` - Entity do banco
+- `ColetaRepository.java` - Repository (persistência)
+- `CityDTO.java` - DTO auxiliar (cidade)
+- `CustomerDTO.java` - DTO auxiliar (cliente)
+- `PickAddressDTO.java` - DTO auxiliar (endereço)
+- `StateDTO.java` - DTO auxiliar (estado)
+- `UserDTO.java` - DTO auxiliar (usuário)
+
+**Fretes:**
+- `FreteNodeDTO.java` - DTO da API GraphQL
+- `FreteMapper.java` - Mapper DTO → Entity
+- `FreteEntity.java` - Entity do banco
+- `FreteRepository.java` - Repository (persistência)
+- `CityDTO.java` - DTO auxiliar (cidade)
+- `CorporationDTO.java` - DTO auxiliar (corporação)
+- `CostCenterDTO.java` - DTO auxiliar (centro de custo)
+- `CustomerPriceTableDTO.java` - DTO auxiliar (tabela de preços)
+- `FreightClassificationDTO.java` - DTO auxiliar (classificação)
+- `FreightInvoiceDTO.java` - DTO auxiliar (nota fiscal)
+- `MainAddressDTO.java` - DTO auxiliar (endereço principal)
+- `PayerDTO.java` - DTO auxiliar (pagador)
+- `ReceiverDTO.java` - DTO auxiliar (destinatário)
+- `SenderDTO.java` - DTO auxiliar (remetente)
+- `StateDTO.java` - DTO auxiliar (estado)
+- `UserDTO.java` - DTO auxiliar (usuário)
+
+#### API Data Export
+
+**Manifestos:**
+- `ManifestoDTO.java` - DTO da API
+- `ManifestoMapper.java` - Mapper DTO → Entity
+- `ManifestoEntity.java` - Entity do banco
+- `ManifestoRepository.java` - Repository (persistência)
+
+**Cotações:**
+- `CotacaoDTO.java` - DTO da API
+- `CotacaoMapper.java` - Mapper DTO → Entity
+- `CotacaoEntity.java` - Entity do banco
+- `CotacaoRepository.java` - Repository (persistência)
+
+**Localização de Carga:**
+- `LocalizacaoCargaDTO.java` - DTO da API
+- `LocalizacaoCargaMapper.java` - Mapper DTO → Entity
+- `LocalizacaoCargaEntity.java` - Entity do banco
+- `LocalizacaoCargaRepository.java` - Repository (persistência)
+
+### Classes Comuns
+
+**Cliente de APIs:**
+- `ClienteApiRest.java` - Cliente HTTP para API REST
+- `ClienteApiGraphQL.java` - Cliente HTTP para API GraphQL
+- `ClienteApiDataExport.java` - Cliente HTTP para API Data Export
+
+**Runners:**
+- `RestRunner.java` - Runner para API REST
+- `GraphQLRunner.java` - Runner para API GraphQL
+- `DataExportRunner.java` - Runner para API Data Export
+
+**Repositories Base:**
+- `AbstractRepository.java` - Classe base abstrata para todos os repositories
+- `LogExtracaoRepository.java` - Repository para logs de extração
+
+**Entities Comuns:**
+- `LogExtracaoEntity.java` - Entity para logs de extração
+
+**Utilitários:**
+- `ExportadorCSV.java` - Exporta dados para CSV
+- `GerenciadorConexao.java` - Gerencia conexões com banco
+- `CarregadorConfig.java` - Carrega configurações
+- `LoggingService.java` - Sistema de logging estruturado
+- `BannerUtil.java` - Utilitário para banners
+- `DiagnosticoBanco.java` - Diagnóstico do banco
+- `LimpadorTabelas.java` - Limpa tabelas
+- `GerenciadorRequisicaoHttp.java` - Gerencia requisições HTTP
+
+**Comandos:**
+- `ExecutarFluxoCompletoComando.java` - Executa extração completa
+- `ValidarManifestosComando.java` - Valida integridade de manifestos
+- `ExecutarAuditoriaComando.java` - Executa auditoria de dados
+- `TestarApiComando.java` - Testa conectividade com APIs
+- `ValidarAcessoComando.java` - Valida acesso às APIs
+- `ExibirAjudaComando.java` - Exibe ajuda
+- `LimparTabelasComando.java` - Limpa tabelas
+- `RealizarIntrospeccaoGraphQLComando.java` - Introspecção GraphQL
+- `VerificarTimestampsComando.java` - Verifica timestamps
+- `VerificarTimezoneComando.java` - Verifica timezone
+
+**Serviços:**
+- `ExtracaoServico.java` - Serviço de extração
+- `LoggingService.java` - Serviço de logging
+
+**Auditoria:**
+- `AuditoriaService.java` - Serviço de auditoria
+- `AuditoriaValidator.java` - Validador de auditoria
+- `AuditoriaRelatorio.java` - Relatório de auditoria
+- `CompletudeValidator.java` - Validador de completude
+- `ResultadoAuditoria.java` - Resultado de auditoria
+- `ResultadoValidacaoEntidade.java` - Resultado de validação
+- `StatusAuditoria.java` - Status de auditoria
+- `StatusValidacao.java` - Status de validação
+
+**API:**
+- `PaginatedGraphQLResponse.java` - Resposta paginada GraphQL
+- `ResultadoExtracao.java` - Resultado de extração
+
+---
+
+## 🚀 Como Usar
+
+### 1. Compilar o Projeto
+
 ```bash
 mvn clean package
 ```
 
-### 2. Executar Extração
-```bash
-# Extração completa (todas as APIs)
-01-executar_extracao_completa.bat
+**Resultado:** JAR gerado em `target/extrator.jar`
 
-# Ou executar APIs específicas
-02-testar_api_especifica.bat
-```
-
-### 3. Validar Dados
-```sql
--- Verificar faturas a pagar (com novos campos v2.0)
-SELECT TOP 10 
-    id, document_number, filial, cnpj_filial,
-    conta_contabil, centro_custo, status, total_value
-FROM faturas_a_pagar
-ORDER BY data_extracao DESC;
-```
-
-## 📋 Funcionalidades
-
-- **3 APIs Integradas**: REST, GraphQL e Data Export
-- **Script de Linha de Comando**: Execução única para extração de dados
-- **Scripts de Automação**: 4 scripts .bat para facilitar operações
-- **Prevenção de Duplicatas**: Sistema MERGE para evitar dados duplicados
-- **Logs Detalhados**: Acompanhamento completo das operações
-- **Métricas Automáticas**: Coleta de performance e estatísticas salvas em JSON
-- **Validação de APIs**: Teste de conectividade sem executar extração
-- **Introspecção GraphQL**: Descoberta de tipos e campos disponíveis
-- **Paginação Completa**: Sistema robusto de paginação que garante 100% de cobertura
-- **Exportação CSV**: Exportação completa de todos os dados extraídos
-
-## ⚙️ Configuração
-
-Configure as variáveis de ambiente ou edite `src/main/resources/config.properties`:
+### 2. Configurar Variáveis de Ambiente
 
 ```bash
-# Variáveis de Ambiente (Recomendado)
+# PowerShell
 $env:API_BASEURL="https://sua-empresa.eslcloud.com.br"
 $env:API_REST_TOKEN="seu_token_rest"
 $env:API_GRAPHQL_TOKEN="seu_token_graphql"
@@ -58,196 +1246,503 @@ $env:DB_USER="sa"
 $env:DB_PASSWORD="sua_senha"
 ```
 
-**⚠️ Segurança:** Tokens e credenciais nunca devem ser commitados no Git. Use variáveis de ambiente ou arquivos `.env` (adicionados ao `.gitignore`).
+**OU** editar `src/main/resources/config.properties`
 
-## 🏗️ Arquitetura
+### 3. Executar Extração
 
-### APIs Suportadas
-- **API REST**: Faturas e Ocorrências
-- **API GraphQL**: Coletas e Fretes  
-- **API Data Export**: Manifestos, Cotações e Localização da Carga
+#### Opção 1: Script Batch (Recomendado)
 
-### Componentes
-- **Runners Independentes** (`runners/*.java`): Execução desacoplada por API
-- **Script de Entrada** (`Main.java`): Apenas despacha por `--testar-api`
-- **Serviços de Logging** (`LoggingService.java`): Sistema de logs estruturados
-- **Clientes de API**: Integração com REST, GraphQL e Data Export
-- **Repositories**: Persistência robusta com validação e tratamento de erros
-- **Exportador CSV**: Exportação completa de dados para análise
+```bash
+# Extração completa (todas as APIs)
+01-executar_extracao_completa.bat
 
-## 📚 Documentação
+# Testar API específica
+02-testar_api_especifica.bat
 
-### 📖 Documentação Principal
+# Validar manifestos
+07-validar-manifestos.bat
 
-A documentação foi **reorganizada** (07/11/2025) para melhor navegação. Consulte:
-
-- **[📚 Documentação Completa](docs/README.md)** - Índice principal da documentação
-- **[🚀 Início Rápido](docs/01-inicio-rapido/)** - Guias de início rápido
-- **[🔌 APIs](docs/02-apis/)** - Documentação completa das APIs
-- **[⚙️ Configuração](docs/03-configuracao/)** - Guias de configuração e troubleshooting
-- **[📋 Especificações Técnicas](docs/04-especificacoes-tecnicas/)** - Detalhes técnicos de implementação
-
-### 📁 Estrutura da Documentação
-
-```
-docs/
-├── 00-documentos-gerais/           # Documentos gerais do projeto
-├── 01-inicio-rapido/              # Guias de início rápido
-├── 02-apis/                       # Documentação de APIs (REST, GraphQL, DataExport)
-├── 03-configuracao/               # Configuração e troubleshooting
-├── 04-especificacoes-tecnicas/    # Especificações técnicas
-├── 05-versoes/                    # Documentação de versões
-├── 06-referencias/                # Referências e templates
-├── 07-ideias-futuras/             # Ideias e melhorias futuras
-├── 08-arquivos-secretos/          # Arquivos sensíveis (NÃO versionados no Git)
-└── relatorios-diarios/            # Relatórios diários de desenvolvimento
+# Exportar CSV
+06-exportar_csv.bat
 ```
 
-### 🔒 Segurança
+#### Opção 2: Linha de Comando
 
-**Verificação de Segurança Realizada (07/11/2025):**
-- ✅ Todos os tokens de API foram censurados na documentação
-- ✅ Credenciais AWS foram censuradas
-- ✅ Senhas foram censuradas
-- ✅ Arquivos sensíveis movidos para `docs/08-arquivos-secretos/` (no `.gitignore`)
+```bash
+# Extração completa
+java -jar target/extrator.jar --fluxo-completo
 
-**Importante:** A pasta `docs/08-arquivos-secretos/` contém informações sensíveis e **não é versionada no GitHub**. Sempre verifique credenciais antes de compartilhar documentação.
+# Validar acesso
+java -jar target/extrator.jar --validar
 
-### 📊 Documentação por Versão
+# Validar manifestos
+java -jar target/extrator.jar --validar-manifestos
 
-- **[Versão 2.1](docs/05-versoes/v2.1/)** - Melhorias de paginação e exportação CSV
-- **[Versão 2.0](docs/05-versoes/v2.0/)** - Expansão de campos REST
+# Executar auditoria
+java -jar target/extrator.jar --auditoria
 
-## 📊 Monitoramento e Logs
+# Ver ajuda
+java -jar target/extrator.jar --ajuda
+```
 
-- **Sistema de Auditoria**: Validação automática de integridade de dados
-- **Logs Estruturados**: Rastreamento detalhado de execuções
-- **Relatórios**: Geração automática de relatórios de execução
-- **Exportação CSV**: Exportação completa de dados para análise externa
+### 4. Validar Dados
 
-### Logs Disponíveis
+```sql
+-- Verificar faturas a pagar
+SELECT TOP 10 
+    id, 
+    document_number, 
+    filial, 
+    cnpj_filial,
+    status, 
+    total_value
+FROM faturas_a_pagar
+ORDER BY data_extracao DESC;
 
-- **Logs de Extração**: `logs/extracao_dados_YYYY-MM-DD_HH-MM-SS.log`
-- **Logs de Exportação**: `logs/exportacao_csv_YYYY-MM-DD_HH-MM-SS.log`
-- **Métricas**: `metricas/metricas-YYYY-MM-DD.json`
+-- Verificar faturas a receber
+SELECT TOP 10 
+    id, 
+    document_number, 
+    customer_name, 
+    total_value
+FROM faturas_a_receber
+ORDER BY data_extracao DESC;
 
-## 🔧 Requisitos Técnicos
+-- Verificar ocorrências
+SELECT TOP 10 
+    id, 
+    occurrence_at, 
+    occurrence_code, 
+    occurrence_description
+FROM ocorrencias
+ORDER BY data_extracao DESC;
+
+-- Verificar coletas
+SELECT TOP 10 
+    id, 
+    sequence_code, 
+    status, 
+    total_value
+FROM coletas
+ORDER BY data_extracao DESC;
+
+-- Verificar fretes
+SELECT TOP 10 
+    id, 
+    servico_em, 
+    status, 
+    valor_total
+FROM fretes
+ORDER BY data_extracao DESC;
+
+-- Verificar manifestos
+SELECT TOP 10 
+    sequence_code, 
+    status, 
+    created_at, 
+    mdfe_number,
+    invoices_value,        -- ✅ Agora é DECIMAL (permite SUM, AVG)
+    total_cost,            -- ✅ Agora é DECIMAL (permite SUM, AVG)
+    paying_total,          -- ✅ Agora é DECIMAL (permite SUM, AVG)
+    data_extracao
+FROM manifestos
+ORDER BY data_extracao DESC;
+
+-- Análises numéricas (agora possível com tipos DECIMAL)
+SELECT 
+    branch_nickname,
+    COUNT(*) as total_manifestos,
+    SUM(invoices_value) as soma_valor_notas,
+    AVG(invoices_value) as media_valor_notas,
+    SUM(total_cost) as soma_custo_total,
+    SUM(paying_total) as soma_valor_pagar
+FROM manifestos
+WHERE invoices_value IS NOT NULL
+GROUP BY branch_nickname
+ORDER BY soma_valor_notas DESC;
+
+-- Verificar cotações
+SELECT TOP 10 
+    sequence_code, 
+    customer_name, 
+    total_value
+FROM cotacoes
+ORDER BY data_extracao DESC;
+
+-- Verificar localização de carga
+SELECT TOP 10 
+    sequence_number, 
+    service_at, 
+    latitude, 
+    longitude
+FROM localizacao_cargas
+ORDER BY data_extracao DESC;
+
+-- Verificar logs de extração
+SELECT TOP 10 
+    entidade,
+    timestamp_inicio,
+    timestamp_fim,
+    status,
+    registros_extraidos
+FROM log_extracoes
+ORDER BY timestamp_fim DESC;
+
+-- Verificar duplicados naturais (manifestos com múltiplos MDF-es)
+SELECT 
+    sequence_code,
+    COUNT(*) as total_mdfes,
+    STRING_AGG(CAST(mdfe_number AS VARCHAR), ', ') as mdfe_numbers
+FROM manifestos
+WHERE mdfe_number IS NOT NULL
+GROUP BY sequence_code
+HAVING COUNT(*) > 1
+ORDER BY total_mdfes DESC;
+```
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+### Linguagem e Framework
 
 - **Java 17** (LTS)
-- **Maven 3.6+**
-- **SQL Server** com JDBC Driver 13.2.0.jre11
-- **Acesso às APIs ESL Cloud**
+- **Maven 3.6+** (Gerenciamento de dependências)
+- **Spring Boot 3.5.6** (Parent POM, mas sem dependências web)
 
-### Dependências Principais
-- Jackson (processamento JSON)
-- SQL Server JDBC Driver 13.2.0.jre11
-- SLF4J (logging)
+### Bibliotecas Principais
+
+- **Jackson** (`jackson-databind`, `jackson-datatype-jsr310`)
+  - Serialização/deserialização JSON
+  - Suporte a tipos de data/hora
+
+- **SQL Server JDBC Driver** (`mssql-jdbc`)
+  - Conexão com banco de dados
+  - Execução de queries SQL
+
+- **SLF4J + Logback** (`slf4j-api`, `logback-classic`)
+  - Sistema de logging estruturado
+
+- **Apache POI** (`poi`, `poi-ooxml`)
+  - Processamento de arquivos Excel (para validação)
+
+- **JUnit 5** (`junit-jupiter`)
+  - Testes unitários
+
+### Ferramentas de Build
+
+- **Maven Assembly Plugin**: Gerar JAR com dependências
+- **Maven Compiler Plugin**: Compilação Java 17
+
+---
+
+## 📁 Estrutura de Arquivos
+
+```
+script-automacao/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── br/com/extrator/
+│   │   │       ├── Main.java                    # Orquestrador principal
+│   │   │       ├── api/                         # Clientes de API
+│   │   │       │   ├── ClienteApiRest.java
+│   │   │       │   ├── ClienteApiGraphQL.java
+│   │   │       │   ├── ClienteApiDataExport.java
+│   │   │       │   ├── PaginatedGraphQLResponse.java
+│   │   │       │   └── ResultadoExtracao.java
+│   │   │       ├── runners/                     # Runners especializados
+│   │   │       │   ├── RestRunner.java
+│   │   │       │   ├── GraphQLRunner.java
+│   │   │       │   └── DataExportRunner.java
+│   │   │       ├── modelo/                      # DTOs e Mappers
+│   │   │       │   ├── rest/
+│   │   │       │   │   ├── faturaspagar/
+│   │   │       │   │   │   ├── FaturaAPagarDTO.java
+│   │   │       │   │   │   ├── FaturaAPagarMapper.java
+│   │   │       │   │   │   └── ReceiverDTO.java
+│   │   │       │   │   ├── faturasreceber/
+│   │   │       │   │   │   ├── FaturaAReceberDTO.java
+│   │   │       │   │   │   ├── FaturaAReceberMapper.java
+│   │   │       │   │   │   └── CustomerDTO.java
+│   │   │       │   │   └── ocorrencias/
+│   │   │       │   │       ├── OcorrenciaDTO.java
+│   │   │       │   │       ├── OcorrenciaMapper.java
+│   │   │       │   │       ├── FreightDTO.java
+│   │   │       │   │       ├── InvoiceDTO.java
+│   │   │       │   │       └── OccurrenceDetailsDTO.java
+│   │   │       │   ├── graphql/
+│   │   │       │   │   ├── coletas/
+│   │   │       │   │   │   ├── ColetaNodeDTO.java
+│   │   │       │   │   │   ├── ColetaMapper.java
+│   │   │       │   │   │   ├── CityDTO.java
+│   │   │       │   │   │   ├── CustomerDTO.java
+│   │   │       │   │   │   ├── PickAddressDTO.java
+│   │   │       │   │   │   ├── StateDTO.java
+│   │   │       │   │   │   └── UserDTO.java
+│   │   │       │   │   └── fretes/
+│   │   │       │   │       ├── FreteNodeDTO.java
+│   │   │       │   │       ├── FreteMapper.java
+│   │   │       │   │       ├── CityDTO.java
+│   │   │       │   │       ├── CorporationDTO.java
+│   │   │       │   │       ├── CostCenterDTO.java
+│   │   │       │   │       ├── CustomerPriceTableDTO.java
+│   │   │       │   │       ├── FreightClassificationDTO.java
+│   │   │       │   │       ├── FreightInvoiceDTO.java
+│   │   │       │   │       ├── MainAddressDTO.java
+│   │   │       │   │       ├── PayerDTO.java
+│   │   │       │   │       ├── ReceiverDTO.java
+│   │   │       │   │       ├── SenderDTO.java
+│   │   │       │   │       ├── StateDTO.java
+│   │   │       │   │       └── UserDTO.java
+│   │   │       │   └── dataexport/
+│   │   │       │       ├── manifestos/
+│   │   │       │       │   ├── ManifestoDTO.java
+│   │   │       │       │   └── ManifestoMapper.java
+│   │   │       │       ├── cotacao/
+│   │   │       │       │   ├── CotacaoDTO.java
+│   │   │       │       │   └── CotacaoMapper.java
+│   │   │       │       └── localizacaocarga/
+│   │   │       │           ├── LocalizacaoCargaDTO.java
+│   │   │       │           └── LocalizacaoCargaMapper.java
+│   │   │       ├── db/
+│   │   │       │   ├── entity/                  # Entities (tabelas)
+│   │   │       │   │   ├── FaturaAPagarEntity.java
+│   │   │       │   │   ├── FaturaAReceberEntity.java
+│   │   │       │   │   ├── OcorrenciaEntity.java
+│   │   │       │   │   ├── ColetaEntity.java
+│   │   │       │   │   ├── FreteEntity.java
+│   │   │       │   │   ├── ManifestoEntity.java
+│   │   │       │   │   ├── CotacaoEntity.java
+│   │   │       │   │   ├── LocalizacaoCargaEntity.java
+│   │   │       │   │   └── LogExtracaoEntity.java
+│   │   │       │   └── repository/              # Repositories (persistência)
+│   │   │       │       ├── AbstractRepository.java
+│   │   │       │       ├── FaturaAPagarRepository.java
+│   │   │       │       ├── FaturaAReceberRepository.java
+│   │   │       │       ├── OcorrenciaRepository.java
+│   │   │       │       ├── ColetaRepository.java
+│   │   │       │       ├── FreteRepository.java
+│   │   │       │       ├── ManifestoRepository.java
+│   │   │       │       ├── CotacaoRepository.java
+│   │   │       │       ├── LocalizacaoCargaRepository.java
+│   │   │       │       └── LogExtracaoRepository.java
+│   │   │       ├── comandos/                    # Comandos CLI
+│   │   │       │   ├── ExecutarFluxoCompletoComando.java
+│   │   │       │   ├── ValidarManifestosComando.java
+│   │   │       │   ├── ExecutarAuditoriaComando.java
+│   │   │       │   ├── TestarApiComando.java
+│   │   │       │   ├── ValidarAcessoComando.java
+│   │   │       │   ├── ExibirAjudaComando.java
+│   │   │       │   ├── LimparTabelasComando.java
+│   │   │       │   ├── RealizarIntrospeccaoGraphQLComando.java
+│   │   │       │   ├── VerificarTimestampsComando.java
+│   │   │       │   └── VerificarTimezoneComando.java
+│   │   │       ├── servicos/                    # Serviços auxiliares
+│   │   │       │   ├── ExtracaoServico.java
+│   │   │       │   └── LoggingService.java
+│   │   │       ├── auditoria/                   # Auditoria
+│   │   │       │   ├── AuditoriaService.java
+│   │   │       │   ├── AuditoriaValidator.java
+│   │   │       │   ├── AuditoriaRelatorio.java
+│   │   │       │   ├── CompletudeValidator.java
+│   │   │       │   ├── ResultadoAuditoria.java
+│   │   │       │   ├── ResultadoValidacaoEntidade.java
+│   │   │       │   ├── StatusAuditoria.java
+│   │   │       │   └── StatusValidacao.java
+│   │   │       └── util/                        # Utilitários
+│   │   │           ├── ExportadorCSV.java
+│   │   │           ├── GerenciadorConexao.java
+│   │   │           ├── CarregadorConfig.java
+│   │   │           ├── LoggingService.java
+│   │   │           ├── BannerUtil.java
+│   │   │           ├── DiagnosticoBanco.java
+│   │   │           ├── LimpadorTabelas.java
+│   │   │           └── GerenciadorRequisicaoHttp.java
+│   │   └── resources/
+│   │       ├── config.properties                # Configurações
+│   │       ├── logback.xml                      # Configuração de logging
+│   │       └── sql/                             # Scripts SQL
+│   └── test/
+│       └── java/                                # Testes unitários
+├── docs/                                        # Documentação completa
+├── logs/                                        # Logs de execução
+├── exports/                                     # CSVs exportados
+├── metricas/                                    # Métricas JSON
+├── scripts/                                      # Scripts auxiliares
+├── pom.xml                                      # Configuração Maven
+└── README.md                                    # Este arquivo
+```
+
+---
+
+## 🔧 Problemas Resolvidos
+
+### 1. Duplicados Falsos em Manifestos
+
+**Problema:**
+- Mesmo manifesto sendo salvo múltiplas vezes
+- Causa: Campos voláteis mudando durante extração
+- Impacto: Dados duplicados no banco
+
+**Solução:**
+- Exclusão de campos voláteis do hash do `identificador_unico`
+- MERGE usando chave de negócio `(sequence_code, pick_sequence_code, mdfe_number)`
+- Deduplicação antes de salvar
+
+**Status:** ✅ Resolvido
+
+### 2. Perda de Múltiplos MDF-es
+
+**Problema:**
+- Manifestos com múltiplos MDF-es perdendo registros
+- Causa: MERGE usando apenas `sequence_code`
+- Impacto: Dados incompletos
+
+**Solução:**
+- MERGE usando `(sequence_code, pick_sequence_code, mdfe_number)`
+- Preservação de duplicados naturais (múltiplos MDF-es)
+
+**Status:** ✅ Resolvido
+
+### 3. Discrepância de Contagem (INSERT vs UPDATE)
+
+**Problema:**
+- Log mostra "processados: 277" mas banco tem 276 registros
+- Causa: UPDATEs não adicionam novas linhas
+- Impacto: Confusão nos logs
+
+**Solução:**
+- Logs melhorados explicando que "processados" = INSERTs + UPDATEs
+- Notas explicativas sobre comportamento esperado
+
+**Status:** ✅ Resolvido
+
+### 4. Campos Voláteis no Hash
+
+**Problema:**
+- Campos como `mobile_read_at`, `mft_mfs_number` mudando durante extração
+- Causa: Hash diferente para mesmo manifesto
+- Impacto: Duplicados falsos
+
+**Solução:**
+- Lista completa de 13 campos voláteis excluídos do hash
+- Hash baseado apenas em campos estáveis
+
+**Status:** ✅ Resolvido
+
+### 5. Tipos de Dados Numéricos (String → BigDecimal)
+
+**Problema:**
+- Campos numéricos (`invoices_value`, `total_cost`, `paying_total`, etc.) salvos como `NVARCHAR(50)`
+- Causa: Impossibilidade de realizar análises numéricas (SUM, AVG, comparações)
+- Impacto: Dados não podem ser usados para relatórios e análises financeiras
+
+**Solução:**
+- Alteração de 11 campos numéricos de `String` para `BigDecimal` em `ManifestoEntity.java`
+- Conversão automática de strings para `BigDecimal` em `ManifestoMapper.java`
+- Criação de tabela com tipos `DECIMAL(18,2)` ou `DECIMAL(18,3)` em `ManifestoRepository.java`
+- Uso de `setBigDecimalParameter()` no MERGE para garantir tipos corretos
+
+**Campos Corrigidos:**
+- `invoices_weight`: DECIMAL(18, 3)
+- `total_taxed_weight`: DECIMAL(18, 3)
+- `total_cubic_volume`: DECIMAL(18, 6)
+- `invoices_value`: DECIMAL(18, 2)
+- `manifest_freights_total`: DECIMAL(18, 2)
+- `daily_subtotal`: DECIMAL(18, 2)
+- `operational_expenses_total`: DECIMAL(18, 2)
+- `inss_value`: DECIMAL(18, 2)
+- `sest_senat_value`: DECIMAL(18, 2)
+- `ir_value`: DECIMAL(18, 2)
+- `paying_total`: DECIMAL(18, 2)
+
+**Status:** ✅ Resolvido
+
+### 6. Expansão de Campos REST
+
+**Problema:**
+- Faturas a Pagar com apenas 11 campos mapeados
+- Causa: Campos adicionais não estavam sendo capturados
+- Impacto: Dados incompletos
+
+**Solução:**
+- Expansão para 14 campos mapeados
+- Adição de 10 campos futuros (placeholders)
+- Captura de dados contábeis e de filial
+
+**Status:** ✅ Resolvido
+
+---
+
+## 📚 Documentação Adicional
+
+A documentação completa está em `docs/`:
+
+- **[📚 Documentação Completa](docs/README.md)** - Índice principal
+- **[🚀 Início Rápido](docs/01-inicio-rapido/)** - Guias de início rápido
+- **[🔌 APIs](docs/02-apis/)** - Documentação completa das APIs
+- **[⚙️ Configuração](docs/03-configuracao/)** - Guias de configuração
+- **[📋 Especificações Técnicas](docs/04-especificacoes-tecnicas/)** - Detalhes técnicos
+
+---
+
+## 🔒 Segurança
+
+**⚠️ IMPORTANTE:**
+
+- Tokens e credenciais **NUNCA** devem ser commitados no Git
+- Use variáveis de ambiente ou arquivos `.env` (adicionados ao `.gitignore`)
+- Arquivos sensíveis estão em `docs/08-arquivos-secretos/` (não versionados)
+
+---
 
 ## 📊 Métricas e Monitoramento
 
-O sistema gera métricas automáticas em `metricas/metricas-YYYY-MM-DD.json` com:
+O sistema gera métricas automáticas em `metricas/metricas-YYYY-MM-DD.json`:
+
 - Tempos de execução por API
 - Quantidade de registros processados
-- Taxa de sucesso/falha (objetivo: 100%)
-- Performance geral (registros/segundo)
+- Taxa de sucesso/falha
+- Performance (registros/segundo)
 - Histórico de execuções
-- Cobertura de dados (porcentagem de registros extraídos)
+
+---
 
 ## 🆘 Suporte e Troubleshooting
 
 Para problemas ou dúvidas:
+
 1. **Verifique os logs** em `logs/`
 2. **Consulte a documentação** em `docs/`
-3. **Execute o teste de validação**: `java -jar target/extrator-script.jar --validar`
+3. **Execute validação**: `07-validar-manifestos.bat`
 4. **Use os scripts .bat** para operações padronizadas
-5. **Monitore as métricas** para identificar problemas de performance
-6. **Consulte a seção de Troubleshooting**: `docs/03-configuracao/troubleshooting/`
+5. **Monitore as métricas** para identificar problemas
 
-## ✨ Novidades v2.1 - Melhorias de Extração e Exportação
+---
 
-### Melhorias de Paginação
-- ✅ **Paginação Completa**: Sistema robusto que garante 100% de cobertura
-- ✅ **Timeout Dinâmico**: Timeouts específicos por template (120s para Manifestos)
-- ✅ **Logs Detalhados**: Rastreamento completo de cada página processada
-- ✅ **Tratamento de Erros**: Recuperação automática de falhas intermediárias
+## 📝 Changelog
 
-### Melhorias de Exportação CSV
-- ✅ **Exportação Completa**: Garante que todos os registros do banco sejam exportados
-- ✅ **Ordenação Consistente**: Ordenação por chave primária para consistência
-- ✅ **Validação de Integridade**: Verificação automática de discrepâncias
-- ✅ **Logs de Progresso**: Acompanhamento detalhado da exportação
-
-### Melhorias de Persistência
-- ✅ **Validação Robusta**: Validação completa de dados antes de salvar
-- ✅ **Truncamento Inteligente**: Truncamento automático de strings longas
-- ✅ **Logs Detalhados**: Rastreamento completo de operações de salvamento
-- ✅ **Tratamento de Erros**: Recuperação automática de falhas individuais
-
-## ✨ Novidades v2.0 - Expansão de Campos REST
-
-### Faturas a Pagar - Novos Campos (14/24)
-- ✅ **+27% mais dados** extraídos (14 vs 11 campos)
-- ✅ **Status automático** calculado (Pendente/Vencido/Indefinido)
-- ✅ **Análise por filial** (CNPJ + nome da filial)
-- ✅ **Dados contábeis** (conta contábil + centros de custo)
-- ✅ **Observações** (comentários das faturas)
-- ✅ **Preparado para o futuro** (10 campos placeholder)
-
-### Novos Campos Disponíveis
-1. `corporation.cnpj` → cnpjFilial
-2. `corporation.nickname` → filial
-3. `receiver.cnpjCpf` → cnpjFornecedor
-4. `comments` → observacoes
-5. `accounting_planning_management.name` → contaContabil
-6. `cost_centers[].name` → centroCusto (concatenado)
-7. `[CALCULADO]` → status (Pendente/Vencido)
-
-**Documentação completa:** `docs/05-versoes/v2.0/`
-
-## 🔄 Changelog
-
-### v2.1.0 (07/11/2025)
-- ✅ **Reorganização da Documentação**: Nova estrutura hierárquica mais clara
-- ✅ **Verificação de Segurança**: Censura de todos os tokens e credenciais
-- ✅ **Melhorias de Paginação**: Sistema robusto que garante 100% de cobertura
-- ✅ **Melhorias de Exportação CSV**: Exportação completa e validada
-- ✅ **Melhorias de Persistência**: Validação robusta e tratamento de erros
+### v2.1.0 (11/11/2025)
+- ✅ Sistema de deduplicação robusto para manifestos, cotações e localização de carga
+- ✅ Correção de duplicados falsos (campos voláteis)
+- ✅ Preservação de múltiplos MDF-es
+- ✅ MERGE usando chave de negócio
+- ✅ Logs melhorados explicando INSERTs vs UPDATEs
+- ✅ Validação automática de manifestos
+- ✅ Correção de tipos de dados numéricos (String → BigDecimal/DECIMAL)
+  - 11 campos numéricos agora usam DECIMAL para permitir análises (SUM, AVG, comparações)
+  - Conversão automática de strings para BigDecimal no Mapper
+  - Tabela criada com tipos DECIMAL corretos
 
 ### v2.0.0 (04/11/2025)
-- ✅ **Expansão de Campos REST**: +27% mais dados extraídos
-- ✅ **Refatoração para Script de Linha de Comando** (remoção do dashboard web)
-- ✅ **Remoção de dependências web** (Spring Boot Web, Actuator)
-- ✅ **Otimização do JAR final** (redução significativa do tamanho)
-- ✅ **Métricas aprimoradas** com salvamento automático em JSON
-- ✅ **Scripts de automação** (.bat) para facilitar operações
-- ✅ **Validação e introspecção** de APIs integradas
+- ✅ Expansão de campos REST (+27% mais dados)
+- ✅ Refatoração para script de linha de comando
+- ✅ Remoção de dependências web
+- ✅ Métricas aprimoradas com salvamento automático
+- ✅ Scripts de automação (.bat)
 
-## 📝 Notas Importantes
-
-### Segurança
-- ⚠️ **NUNCA** commite tokens ou credenciais no Git
-- ⚠️ **SEMPRE** use variáveis de ambiente ou arquivos `.env`
-- ⚠️ **VERIFIQUE** a documentação antes de compartilhar publicamente
-- ✅ Arquivos sensíveis estão em `docs/08-arquivos-secretos/` (no `.gitignore`)
-
-### Performance
-- 📊 **Cobertura Alvo**: 100% dos registros disponíveis
-- 📊 **Performance Alvo**: >1000 registros/segundo
-- 📊 **Taxa de Sucesso Alvo**: 100%
-
-### Manutenção
-- 📚 **Documentação**: Mantida atualizada em `docs/`
-- 🔄 **Versionamento**: Sempre documente mudanças importantes
-- 📝 **Logs**: Sempre verifique os logs para debugging
-
-## 🤝 Contribuindo
-
-Para contribuir com o projeto:
-1. **Leia a documentação** completa em `docs/`
-2. **Siga os padrões** de código estabelecidos
-3. **Teste suas alterações** antes de commitar
-4. **Documente** mudanças importantes
-5. **Verifique segurança** antes de commitar credenciais
+---
 
 ## 📄 Licença
 
@@ -255,6 +1750,6 @@ Este projeto é interno e proprietário. Todos os direitos reservados.
 
 ---
 
-**Última Atualização:** 07/11/2025  
+**Última Atualização:** 11/11/2025  
 **Versão:** 2.1.0  
 **Status:** ✅ Estável
