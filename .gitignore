@@ -255,7 +255,6 @@ yarn-error.log*
 # Build do React
 /dashboard-monitoramento/build/
 /dashboard-monitoramento/dist/
-/public/build/
 
 # Ambiente do React
 .env.local
