@@ -4,11 +4,11 @@ description: Sistema de automação ETL (Java) para extrair dados de 3 APIs (RES
 technologies: Java 17, Maven, SQL Server (mssql-jdbc), Jackson, SLF4J
 demo: N/A (Backend CLI Tool)
 highlight: true
-image: public/foto1.png
+image: public/foto.png
 -->
 
 <p align="center"> 
-  <img src="public/foto1.png" alt="Capa do projeto" width="1200"> 
+  <img src="public/foto.png" alt="Capa do projeto" width="1200"> 
 </p>
 
 # Extrator de Dados ESL Cloud
@@ -1162,6 +1162,22 @@ CREATE TABLE log_extracoes (
 - `LocalizacaoCargaEntity.java` - Entity do banco
 - `LocalizacaoCargaRepository.java` - Repository (persistência)
 
+**Contas a Pagar (Data Export):**
+- `ContasAPagarDTO.java` - DTO da API
+- `ContasAPagarMapper.java` - Mapper DTO → Entity
+- `ContasAPagarDataExportEntity.java` - Entity do banco
+- `ContasAPagarRepository.java` - Repository (persistência)
+
+**Faturas por Cliente (Data Export):**
+- `FaturaPorClienteDTO.java` - DTO da API
+- `FaturaPorClienteMapper.java` - Mapper DTO → Entity
+- `FaturaPorClienteEntity.java` - Entity do banco
+- `FaturaPorClienteRepository.java` - Repository (persistência)
+
+**Tabelas Data Export (adicionais):**
+- `contas_a_pagar` (Data Export)
+- `faturas_por_cliente_data_export` (Data Export)
+
 ### Classes Comuns
 
 **Cliente de APIs:**
@@ -1346,6 +1362,33 @@ SELECT TOP 10
     paying_total,          -- ✅ Agora é DECIMAL (permite SUM, AVG)
     data_extracao
 FROM manifestos
+ORDER BY data_extracao DESC;
+
+-- Verificar contas a pagar (Data Export)
+SELECT TOP 10 
+    sequence_code,
+    document_number,
+    valor_a_pagar,
+    status_pagamento,
+    nome_fornecedor,
+    nome_filial,
+    data_extracao
+FROM contas_a_pagar
+ORDER BY data_extracao DESC;
+
+-- Verificar faturas por cliente (Data Export)
+SELECT TOP 10 
+    unique_id,
+    numero_fatura,
+    valor_fatura,
+    valor_frete,
+    chave_cte,
+    numero_nfse,
+    pagador_nome,
+    filial,
+    data_vencimento_fatura,
+    data_extracao
+FROM faturas_por_cliente_data_export
 ORDER BY data_extracao DESC;
 
 -- Análises numéricas (agora possível com tipos DECIMAL)
@@ -1684,6 +1727,16 @@ A documentação completa está em `docs/`:
 - **[🔌 APIs](docs/02-apis/)** - Documentação completa das APIs
 - **[⚙️ Configuração](docs/03-configuracao/)** - Guias de configuração
 - **[📋 Especificações Técnicas](docs/04-especificacoes-tecnicas/)** - Detalhes técnicos
+
+---
+
+## 🔭 Roadmap
+
+- Data Export: suportar `order_by` nas requisições GET
+- Data Export: tornar `per` configurável por template via `config.properties`
+- Observabilidade: incluir métricas e dashboards para novas tabelas de Data Export
+- Exportação: habilitar CSV para `contas_a_pagar` e `faturas_por_cliente_data_export`
+- CLI: adicionar flags dedicadas para executar apenas relatórios específicos do Data Export
 
 ---
 
