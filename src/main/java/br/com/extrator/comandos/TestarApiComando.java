@@ -7,11 +7,14 @@ import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
 import br.com.extrator.runners.RestRunner;
 import br.com.extrator.util.BannerUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Comando responsável por testar uma API específica do sistema.
  */
 public class TestarApiComando implements Comando {
+    private static final Logger logger = LoggerFactory.getLogger(TestarApiComando.class);
     
     @Override
     public void executar(String[] args) throws Exception {
@@ -60,10 +63,9 @@ public class TestarApiComando implements Comando {
             System.out.println("✅ Teste da API " + tipoApi.toUpperCase() + " concluído com sucesso!");
             
         } catch (Exception e) {
-            // Exibe banner de erro
             BannerUtil.exibirBannerErro();
             System.err.println("❌ Erro durante execução: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Erro durante execução: {}", e.getMessage(), e);
             throw e;
         }
     }

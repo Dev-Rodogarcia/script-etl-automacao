@@ -17,13 +17,15 @@ import java.time.format.DateTimeFormatter;
 public class ExportadorCSV {
     
     private static final String[] ENTIDADES = {
-        "cotacoes", 
-        "coletas", 
-        "faturas_a_pagar", 
-        "faturas_a_receber", 
-        "fretes", 
-        "manifestos", 
-        "ocorrencias", 
+        "cotacoes",
+        "coletas",
+        "faturas_a_pagar",
+        "faturas_a_pagar_data_export",
+        "faturas_por_cliente_data_export",
+        "faturas_a_receber",
+        "fretes",
+        "manifestos",
+        "ocorrencias",
         "localizacao_cargas"
     };
     
@@ -131,20 +133,11 @@ public class ExportadorCSV {
             String query = "SELECT * FROM " + entidade;
             // Adicionar ORDER BY por chave primária para garantir ordem consistente
             switch (entidade) {
-                case "manifestos":
-                case "cotacoes":
-                    query += " ORDER BY sequence_code";
-                    break;
-                case "localizacao_cargas":
-                    query += " ORDER BY sequence_number";
-                    break;
-                case "coletas":
-                    query += " ORDER BY id";
-                    break;
-                case "fretes":
-                    query += " ORDER BY id";
-                    break;
-                // Outras entidades podem não ter ordem definida
+                case "manifestos", "cotacoes", "faturas_a_pagar_data_export" -> query += " ORDER BY sequence_code";
+                case "localizacao_cargas" -> query += " ORDER BY sequence_number";
+                case "coletas", "fretes" -> query += " ORDER BY id";
+                case "faturas_por_cliente_data_export" -> query += " ORDER BY unique_id";
+                default -> {}
             }
             
             try (ResultSet rs = stmt.executeQuery(query)) {

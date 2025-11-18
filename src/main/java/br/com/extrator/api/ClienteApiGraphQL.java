@@ -160,29 +160,7 @@ public class ClienteApiGraphQL {
         }
     }
 
-    /**
-     * ⚠️ MÉTODO REMOVIDO: obterContagemFretes()
-     * 
-     * Motivo: O campo 'totalCount' não existe na API GraphQL conforme descoberto
-     * em docs/descobertas-endpoints/fretes.md linha 29.
-     * 
-     * Erro retornado pela API: "Field 'totalCount' doesn't exist on type 'PageInfo'"
-     * 
-     * Solução: A contagem deve ser feita via paginação completa ou removida
-     * se não for essencial para o funcionamento do sistema.
-     */
-
-    /**
-     * ⚠️ MÉTODO REMOVIDO: obterContagemColetas()
-     * 
-     * Motivo: O campo 'totalCount' não existe na API GraphQL conforme descoberto
-     * em docs/descobertas-endpoints/coletas.md linha 40-41.
-     * 
-     * Erro retornado pela API: "Field 'totalCount' doesn't exist on type 'PickConnection'"
-     * 
-     * Solução: A contagem deve ser feita via paginação completa ou removida
-     * se não for essencial para o funcionamento do sistema.
-     */
+    
 
     /**
      * Construtor da classe ClienteApiGraphQL

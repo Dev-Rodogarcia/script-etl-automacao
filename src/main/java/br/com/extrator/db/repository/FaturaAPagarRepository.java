@@ -141,7 +141,7 @@ public class FaturaAPagarRepository extends AbstractRepository<FaturaAPagarEntit
                        cnpj_filial, filial, observacoes, conta_contabil, centro_custo, status, forma_pagamento,
                        header_metadata, installments_metadata, data_extracao,
                        sequencia, cheque, vencimento_original, competencia, data_baixa)
-                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value, 
+                VALUES (source.id, source.document_number, source.issue_date, source.due_date, source.total_value,
                        source.receiver_cnpj, source.receiver_name, source.invoice_type,
                        source.cnpj_filial, source.filial, source.observacoes, source.conta_contabil, source.centro_custo, source.status, source.forma_pagamento,
                        source.header_metadata, source.installments_metadata, source.data_extracao,

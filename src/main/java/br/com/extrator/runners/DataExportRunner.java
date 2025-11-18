@@ -14,16 +14,24 @@ import br.com.extrator.db.entity.CotacaoEntity;
 import br.com.extrator.db.entity.LocalizacaoCargaEntity;
 import br.com.extrator.db.entity.ManifestoEntity;
 import br.com.extrator.db.entity.LogExtracaoEntity;
+import br.com.extrator.db.entity.ContasAPagarDataExportEntity;
+import br.com.extrator.db.entity.FaturaPorClienteEntity;
 import br.com.extrator.db.repository.CotacaoRepository;
 import br.com.extrator.db.repository.LocalizacaoCargaRepository;
 import br.com.extrator.db.repository.ManifestoRepository;
 import br.com.extrator.db.repository.LogExtracaoRepository;
+import br.com.extrator.db.repository.ContasAPagarRepository;
+import br.com.extrator.db.repository.FaturaPorClienteRepository;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoDTO;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoMapper;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaMapper;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoMapper;
+import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarDTO;
+import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarMapper;
+import br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO;
+import br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteMapper;
 
 /**
  * Runner independente para a API Data Export (Manifestos, Cotações e Localização de Carga).
@@ -43,24 +51,28 @@ public final class DataExportRunner {
         final CotacaoRepository cotacaoRepository = new CotacaoRepository();
         final LocalizacaoCargaRepository localizacaoRepository = new LocalizacaoCargaRepository();
         final LogExtracaoRepository logExtracaoRepository = new LogExtracaoRepository();
+        final ContasAPagarRepository contasAPagarRepository = new ContasAPagarRepository();
+        final FaturaPorClienteRepository faturasPorClienteRepository = new FaturaPorClienteRepository();
 
         final ManifestoMapper manifestoMapper = new ManifestoMapper();
         final CotacaoMapper cotacaoMapper = new CotacaoMapper();
         final LocalizacaoCargaMapper localizacaoMapper = new LocalizacaoCargaMapper();
+        final ContasAPagarMapper contasAPagarMapper = new ContasAPagarMapper();
+        final FaturaPorClienteMapper faturasPorClienteMapper = new FaturaPorClienteMapper();
 
         // Garante que a tabela log_extracoes existe
         logExtracaoRepository.criarTabelaSeNaoExistir();
 
         // Manifestos
         System.out.println("\n🧾 Extraindo Manifestos (últimas 24h)...");
-        LocalDateTime inicioManifestos = LocalDateTime.now();
+        final LocalDateTime inicioManifestos = LocalDateTime.now();
         try {
             final ResultadoExtracao<ManifestoDTO> resultadoManifestos = clienteApiDataExport.buscarManifestos();
             final List<ManifestoDTO> manifestosDTO = resultadoManifestos.getDados();
             System.out.println("✓ Extraídos: " + manifestosDTO.size() + " manifestos" + 
                               (resultadoManifestos.isCompleto() ? "" : " (INCOMPLETO: " + resultadoManifestos.getMotivoInterrupcao() + ")"));
-            
             int registrosSalvos = 0;
+            
             int totalUnicos = 0;
             final int registrosExtraidos = resultadoManifestos.getRegistrosExtraidos();
             if (!manifestosDTO.isEmpty()) {
@@ -110,7 +122,7 @@ public final class DataExportRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
-            LogExtracaoEntity logErro = new LogExtracaoEntity(
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
                 "manifestos",
                 inicioManifestos,
                 LocalDateTime.now(),
@@ -127,15 +139,16 @@ public final class DataExportRunner {
 
         // Cotações
         System.out.println("\n💹 Extraindo Cotações (últimas 24h)...");
-        LocalDateTime inicioCotacoes = LocalDateTime.now();
+        final LocalDateTime inicioCotacoes = LocalDateTime.now();
         try {
             final ResultadoExtracao<CotacaoDTO> resultadoCotacoes = clienteApiDataExport.buscarCotacoes();
             final List<CotacaoDTO> cotacoesDTO = resultadoCotacoes.getDados();
             System.out.println("✓ Extraídas: " + cotacoesDTO.size() + " cotações" + 
                               (resultadoCotacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoCotacoes.getMotivoInterrupcao() + ")"));
             
-            int registrosSalvos = 0;
+            
             int totalUnicos = 0;
+            int registrosSalvos = 0;
             final int registrosExtraidos = resultadoCotacoes.getRegistrosExtraidos();
             if (!cotacoesDTO.isEmpty()) {
                 final List<CotacaoEntity> cotacoesEntities = cotacoesDTO.stream()
@@ -184,7 +197,7 @@ public final class DataExportRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
-            LogExtracaoEntity logErro = new LogExtracaoEntity(
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
                 "cotacoes",
                 inicioCotacoes,
                 LocalDateTime.now(),
@@ -201,14 +214,13 @@ public final class DataExportRunner {
 
         // Localização de Carga
         System.out.println("\n📍 Extraindo Localização de Carga (últimas 24h)...");
-        LocalDateTime inicioLocalizacoes = LocalDateTime.now();
+        final LocalDateTime inicioLocalizacoes = LocalDateTime.now();
         try {
             final ResultadoExtracao<LocalizacaoCargaDTO> resultadoLocalizacoes = clienteApiDataExport.buscarLocalizacaoCarga();
             final List<LocalizacaoCargaDTO> localizacoesDTO = resultadoLocalizacoes.getDados();
             System.out.println("✓ Extraídas: " + localizacoesDTO.size() + " localizações" + 
                               (resultadoLocalizacoes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoLocalizacoes.getMotivoInterrupcao() + ")"));
             
-            int registrosSalvos = 0;
             final int registrosExtraidos = resultadoLocalizacoes.getRegistrosExtraidos();
             if (!localizacoesDTO.isEmpty()) {
                 final List<LocalizacaoCargaEntity> localizacoesEntities = localizacoesDTO.stream()
@@ -226,7 +238,7 @@ public final class DataExportRunner {
                         duplicadosRemovidos, localizacoesUnicas.size());
                 }
                 
-                registrosSalvos = localizacaoRepository.salvar(localizacoesUnicas);
+                final int registrosSalvos = localizacaoRepository.salvar(localizacoesUnicas);
                 final int totalUnicos = localizacoesUnicas.size();
                 System.out.println("✓ Processadas: " + registrosSalvos + "/" + totalUnicos + " localizações (INSERTs + UPDATEs)");
                 
@@ -243,7 +255,7 @@ public final class DataExportRunner {
                     ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
                     ("Extração incompleta (" + resultadoLocalizacoes.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
 
-                LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
+                final LogExtracaoEntity logLocalizacoes = new LogExtracaoEntity(
                     "localizacao_cargas",
                     inicioLocalizacoes,
                     LocalDateTime.now(),
@@ -257,7 +269,7 @@ public final class DataExportRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
-            LogExtracaoEntity logErro = new LogExtracaoEntity(
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
                 "localizacao_cargas",
                 inicioLocalizacoes,
                 LocalDateTime.now(),
@@ -268,6 +280,147 @@ public final class DataExportRunner {
             );
             logExtracaoRepository.gravarLogExtracao(logErro);
             throw new RuntimeException("Falha na extração de localização de cargas", e);
+        }
+
+        Thread.sleep(2000);
+
+        // Faturas a Pagar (Data Export)
+        System.out.println("\n💰 Extraindo Faturas a Pagar - Data Export (últimas 24h)...");
+        final LocalDateTime inicioFaturasAPagar = LocalDateTime.now();
+        try {
+            final ResultadoExtracao<ContasAPagarDTO> resultadoFaturasAPagar = clienteApiDataExport.buscarContasAPagar();
+            final List<ContasAPagarDTO> faturasAPagarDTO = resultadoFaturasAPagar.getDados();
+            System.out.println("✓ Extraídas: " + faturasAPagarDTO.size() + " faturas a pagar" +
+                              (resultadoFaturasAPagar.isCompleto() ? "" : " (INCOMPLETO: " + resultadoFaturasAPagar.getMotivoInterrupcao() + ")"));
+
+            int totalUnicos = 0;
+            int registrosSalvos = 0;
+            final int registrosExtraidos = resultadoFaturasAPagar.getRegistrosExtraidos();
+
+            if (!faturasAPagarDTO.isEmpty()) {
+                final List<ContasAPagarDataExportEntity> faturasAPagarEntities = faturasAPagarDTO.stream()
+                    .map(contasAPagarMapper::toEntity)
+                    .collect(Collectors.toList());
+
+                final List<ContasAPagarDataExportEntity> faturasAPagarUnicas = deduplicarFaturasAPagar(faturasAPagarEntities);
+                totalUnicos = faturasAPagarUnicas.size();
+
+                if (faturasAPagarEntities.size() != faturasAPagarUnicas.size()) {
+                    final int duplicadosRemovidos = faturasAPagarEntities.size() - faturasAPagarUnicas.size();
+                    System.out.println("⚠️ Removidos " + duplicadosRemovidos + " duplicados da resposta da API antes de salvar");
+                    logger.warn("🔄 API retornou {} duplicados para faturas a pagar. Removidos antes de salvar. Total único: {}",
+                        duplicadosRemovidos, faturasAPagarUnicas.size());
+                }
+
+                registrosSalvos = contasAPagarRepository.salvar(faturasAPagarUnicas);
+                System.out.println("✓ Processadas: " + registrosSalvos + "/" + totalUnicos + " faturas a pagar (INSERTs + UPDATEs)");
+            }
+
+            final LogExtracaoEntity.StatusExtracao statusFinal =
+                resultadoFaturasAPagar.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+            final String mensagem = resultadoFaturasAPagar.isCompleto() ?
+                ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                ("Extração incompleta (" + resultadoFaturasAPagar.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
+
+            final LogExtracaoEntity logFaturasAPagar = new LogExtracaoEntity(
+                "faturas_a_pagar_data_export",
+                inicioFaturasAPagar,
+                LocalDateTime.now(),
+                statusFinal,
+                totalUnicos,
+                resultadoFaturasAPagar.getPaginasProcessadas(),
+                mensagem
+            );
+            logExtracaoRepository.gravarLogExtracao(logFaturasAPagar);
+
+        } catch (RuntimeException | java.sql.SQLException e) {
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
+                "faturas_a_pagar_data_export",
+                inicioFaturasAPagar,
+                LocalDateTime.now(),
+                "ERRO_API",
+                0,
+                0,
+                "Erro: " + e.getMessage()
+            );
+            logExtracaoRepository.gravarLogExtracao(logErro);
+            throw new RuntimeException("Falha na extração de faturas a pagar", e);
+        }
+
+        Thread.sleep(2000);
+        System.out.println("\n💰 Extraindo Faturas por Cliente (últimas 24h)...");
+        final LocalDateTime inicioFaturasPorCliente = LocalDateTime.now();
+        try {
+            final ResultadoExtracao<FaturaPorClienteDTO> resultadoFaturasPorCliente = 
+                clienteApiDataExport.buscarFaturasPorCliente();
+            final List<FaturaPorClienteDTO> faturasPorClienteDTO = resultadoFaturasPorCliente.getDados();
+
+            System.out.println("✓ Extraídas: " + faturasPorClienteDTO.size() + " faturas por cliente" +
+                    (resultadoFaturasPorCliente.isCompleto() ? "" : 
+                     " (INCOMPLETO: " + resultadoFaturasPorCliente.getMotivoInterrupcao() + ")"));
+
+            int totalUnicos = 0;
+            int registrosSalvos = 0;
+            final int registrosExtraidos = resultadoFaturasPorCliente.getRegistrosExtraidos();
+
+            if (!faturasPorClienteDTO.isEmpty()) {
+                final List<FaturaPorClienteEntity> faturasPorClienteEntities = faturasPorClienteDTO.stream()
+                    .map(faturasPorClienteMapper::toEntity)
+                    .collect(Collectors.toList());
+
+                final List<FaturaPorClienteEntity> faturasPorClienteUnicas = 
+                    deduplicarFaturasPorCliente(faturasPorClienteEntities);
+                totalUnicos = faturasPorClienteUnicas.size();
+
+                if (faturasPorClienteEntities.size() != faturasPorClienteUnicas.size()) {
+                    final int duplicadosRemovidos = faturasPorClienteEntities.size() - faturasPorClienteUnicas.size();
+                    System.out.println("⚠️ Removidos " + duplicadosRemovidos + 
+                                     " duplicados da resposta da API antes de salvar");
+                    logger.warn("🔄 API retornou {} duplicados para faturas por cliente. Removidos antes de salvar. Total único: {}", 
+                            duplicadosRemovidos, faturasPorClienteUnicas.size());
+                }
+
+                registrosSalvos = faturasPorClienteRepository.salvar(faturasPorClienteUnicas);
+                System.out.println("✓ Processadas: " + registrosSalvos + "/" + totalUnicos + 
+                                 " faturas por cliente (INSERTs + UPDATEs)");
+            }
+
+            final LogExtracaoEntity.StatusExtracao statusFinal =
+                resultadoFaturasPorCliente.isCompleto() ? 
+                LogExtracaoEntity.StatusExtracao.COMPLETO : 
+                LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
+
+            final String mensagem = resultadoFaturasPorCliente.isCompleto() ?
+                ("Extração completa – extraídos " + registrosExtraidos + 
+                 " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                ("Extração incompleta (" + resultadoFaturasPorCliente.getMotivoInterrupcao() + 
+                 ") – extraídos " + registrosExtraidos + 
+                 " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
+
+            final LogExtracaoEntity logFaturasPorCliente = new LogExtracaoEntity(
+                "faturas_por_cliente_data_export",
+                inicioFaturasPorCliente,
+                LocalDateTime.now(),
+                statusFinal,
+                totalUnicos,
+                resultadoFaturasPorCliente.getPaginasProcessadas(),
+                mensagem
+            );
+            logExtracaoRepository.gravarLogExtracao(logFaturasPorCliente);
+
+        } catch (RuntimeException | java.sql.SQLException e) {
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
+                "faturas_por_cliente_data_export",
+                inicioFaturasPorCliente,
+                LocalDateTime.now(),
+                "ERRO_API",
+                0,
+                0,
+                "Erro: " + e.getMessage()
+            );
+            logExtracaoRepository.gravarLogExtracao(logErro);
+            throw new RuntimeException("Falha na extração de faturas por cliente", e);
         }
     }
     
@@ -372,6 +525,58 @@ public final class DataExportRunner {
                     logger.warn("⚠️ Duplicado detectado na resposta da API: sequence_number={}", 
                         segundo.getSequenceNumber());
                     return primeiro; // Mantém o primeiro
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Deduplica Faturas a Pagar por sequence_code (chave primária).
+     */
+    private static List<ContasAPagarDataExportEntity> deduplicarFaturasAPagar(final List<ContasAPagarDataExportEntity> lista) {
+        if (lista == null || lista.isEmpty()) {
+            return lista;
+        }
+
+        return lista.stream()
+            .collect(Collectors.toMap(
+                e -> {
+                    if (e.getSequenceCode() == null) {
+                        throw new IllegalStateException("Fatura a pagar com sequence_code NULL não pode ser deduplicada");
+                    }
+                    return e.getSequenceCode();
+                },
+                e -> e,
+                (primeiro, segundo) -> {
+                    logger.warn("⚠️ Duplicado detectado: sequence_code={}", segundo.getSequenceCode());
+                    return primeiro;
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
+    }
+
+    private static List<FaturaPorClienteEntity> deduplicarFaturasPorCliente(final List<FaturaPorClienteEntity> lista) {
+        if (lista == null || lista.isEmpty()) {
+            return lista;
+        }
+
+        return lista.stream()
+            .collect(Collectors.toMap(
+                e -> {
+                    if (e.getUniqueId() == null || e.getUniqueId().trim().isEmpty()) {
+                        throw new IllegalStateException(
+                            "Fatura por cliente com unique_id NULL não pode ser deduplicada");
+                    }
+                    return e.getUniqueId();
+                },
+                e -> e,
+                (primeiro, segundo) -> {
+                    logger.warn("⚠️ Duplicado detectado: unique_id={}", segundo.getUniqueId());
+                    return primeiro;
                 }
             ))
             .values()

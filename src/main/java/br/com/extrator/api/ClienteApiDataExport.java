@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoDTO;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
+import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.util.CarregadorConfig;
 import br.com.extrator.util.GerenciadorRequisicaoHttp;
@@ -66,16 +67,22 @@ public class ClienteApiDataExport {
     private static final int TEMPLATE_ID_MANIFESTOS = 6399;
     private static final int TEMPLATE_ID_LOCALIZACAO_CARGA = 8656;
     private static final int TEMPLATE_ID_COTACOES = 6906;
+    private static final int TEMPLATE_ID_CONTAS_APAGAR = 8636;
+    private static final int TEMPLATE_ID_FATURAS_POR_CLIENTE = 4924;
 
     // Campos de data corretos para cada template (descobertos via Postman)
     private static final String CAMPO_MANIFESTOS = "service_date";
     private static final String CAMPO_COTACOES = "requested_at";
     private static final String CAMPO_LOCALIZACAO_CARGA = "service_at";
+    private static final String CAMPO_CONTAS_APAGAR = "issue_date";
+    private static final String CAMPO_FATURAS_POR_CLIENTE = "service_at";
     
     // Constantes para nomes de// Nomes das tabelas conforme API DataExport
     private static final String TABELA_MANIFESTOS = "manifests";
     private static final String TABELA_COTACOES = "quotes";
     private static final String TABELA_LOCALIZACAO_CARGA = "freights";
+    private static final String TABELA_CONTAS_APAGAR = "accounting_debits";
+    private static final String TABELA_FATURAS_POR_CLIENTE = "freights";
 
     /**
      * Construtor que inicializa o cliente da API Data Export.
@@ -167,6 +174,40 @@ public class ClienteApiDataExport {
         Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(templateIdLocalizacaoCarga, TABELA_LOCALIZACAO_CARGA, CAMPO_LOCALIZACAO_CARGA,
                 new TypeReference<List<LocalizacaoCargaDTO>>() {}, ontem, agora);
+    }
+
+    /**
+     * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export (últimas 24h).
+     */
+    public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar() {
+        logger.info("Buscando Faturas a Pagar da API DataExport (últimas 24h)");
+        Instant agora = Instant.now();
+        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        return buscarDadosGenericos(
+            TEMPLATE_ID_CONTAS_APAGAR,
+            TABELA_CONTAS_APAGAR,
+            CAMPO_CONTAS_APAGAR,
+            new TypeReference<List<ContasAPagarDTO>>() {},
+            ontem,
+            agora
+        );
+    }
+
+    /**
+     * Busca dados de Faturas por Cliente da API Data Export (últimas 24h).
+     */
+    public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente() {
+        logger.info("Buscando Faturas por Cliente da API DataExport (últimas 24h)");
+        Instant agora = Instant.now();
+        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        return buscarDadosGenericos(
+            TEMPLATE_ID_FATURAS_POR_CLIENTE,
+            TABELA_FATURAS_POR_CLIENTE,
+            CAMPO_FATURAS_POR_CLIENTE,
+            new com.fasterxml.jackson.core.type.TypeReference<java.util.List<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO>>() {},
+            ontem,
+            agora
+        );
     }
 
     /**
@@ -302,12 +343,7 @@ public class ClienteApiDataExport {
 
                 logger.info("✓ Página {}: {} registros parseados", paginaAtual, registrosPagina.size());
 
-                // CONDIÇÃO DE PARADA: array vazio (já tratado acima, mas garantindo)
-                if (registrosPagina == null || registrosPagina.isEmpty()) {
-                    logger.info("■ Fim da paginação (array vazio)");
-                    totalPaginas = paginaAtual - 1;
-                    break;
-                }
+                
 
                 // Adicionar registros
                 resultadosFinais.addAll(registrosPagina);
@@ -345,7 +381,7 @@ public class ClienteApiDataExport {
                         totalPaginas > 0 ? totalPaginas : (paginaAtual - 1), totalRegistrosProcessados);
             }
 
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("❌ ERRO CRÍTICO na extração de {}: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
             throw new RuntimeException("Falha na extração de " + tipoAmigavel, e);
@@ -449,8 +485,15 @@ public class ClienteApiDataExport {
             String range = dataInicioStr + " - " + dataFimStr;
 
             // Constrói a estrutura JSON conforme formato do Postman
-            table.put(campoData, range);
-            search.set(nomeTabela, table);
+            if (templateId == TEMPLATE_ID_CONTAS_APAGAR) {
+                ObjectNode searchNested = objectMapper.createObjectNode();
+                searchNested.put(campoData, range);
+                searchNested.put("created_at", "");
+                search.set(nomeTabela, searchNested);
+            } else {
+                table.put(campoData, range);
+                search.set(nomeTabela, table);
+            }
 
             corpo.set("search", search);
             corpo.put("page", String.valueOf(pagina));
@@ -517,6 +560,19 @@ public class ClienteApiDataExport {
             CAMPO_LOCALIZACAO_CARGA, 
             dataReferencia, 
             "localizações de carga"
+        );
+    }
+
+    /**
+     * Obtém contagem via CSV para Faturas a Pagar.
+     */
+    public int obterContagemContasAPagar(final LocalDate dataReferencia) {
+        return obterContagemGenericaCsv(
+            TEMPLATE_ID_CONTAS_APAGAR,
+            TABELA_CONTAS_APAGAR,
+            CAMPO_CONTAS_APAGAR,
+            dataReferencia,
+            "faturas a pagar"
         );
     }
 
@@ -655,6 +711,7 @@ public class ClienteApiDataExport {
             case 6906 -> "1000";   // Cotações
             case 6399 -> "10000";  // Manifestos
             case 8656 -> "10000";  // Localização de Carga
+            case 8636 -> "100";    // Faturas a Pagar
             default -> "100";      // Valor padrão para templates desconhecidos
         };
     }
@@ -675,6 +732,7 @@ public class ClienteApiDataExport {
             case 6399 -> Duration.ofSeconds(120);  // Manifestos: 120 segundos
             case 8656 -> Duration.ofSeconds(90);   // Localização: 90 segundos
             case 6906 -> Duration.ofSeconds(60);   // Cotações: 60 segundos
+            case 8636 -> Duration.ofSeconds(60);   // Faturas a Pagar: 60 segundos
             default -> timeoutPadrao;              // Usar timeout padrão
         };
     }

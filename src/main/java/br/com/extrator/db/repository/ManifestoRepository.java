@@ -42,8 +42,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     private boolean tabelaTemEstruturaNova(final Connection conexao) throws SQLException {
         try {
             final String sql = """
-                SELECT COUNT(*) as existe 
-                FROM INFORMATION_SCHEMA.COLUMNS 
+                SELECT COUNT(*) as existe
+                FROM INFORMATION_SCHEMA.COLUMNS
                 WHERE TABLE_NAME = ? AND COLUMN_NAME = 'identificador_unico'
                 """;
             try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -80,7 +80,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                 CREATE TABLE manifestos (
                     -- Coluna de Chave Primária (Auto-incrementado)
                     id BIGINT IDENTITY(1,1) PRIMARY KEY,
-                    
+
                     -- Chave Composta (para identificar unicamente)
                     sequence_code BIGINT NOT NULL,
                     identificador_unico NVARCHAR(100) NOT NULL,
@@ -128,7 +128,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
 
                     -- Coluna de Auditoria
                     data_extracao DATETIME2 DEFAULT GETDATE(),
-                    
+
                     -- Constraint UNIQUE para chave composta
                     -- IMPORTANTE: O MERGE usa (sequence_code, pick_sequence_code, mdfe_number) para matching, mas
                     -- a constraint é (sequence_code, identificador_unico) para garantir integridade.

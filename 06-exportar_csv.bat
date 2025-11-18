@@ -81,7 +81,9 @@ echo ================================================================
 echo.
 echo Os seguintes arquivos podem ter sido gerados:
 echo.
-echo   - faturas_a_pagar.csv      (Lancamentos a Pagar)
+echo   - faturas_a_pagar.csv      (Lancamentos a Pagar - REST legado)
+echo   - faturas_a_pagar_data_export.csv (Contas a Pagar - Data Export)
+echo   - faturas_por_cliente_data_export.csv (Faturas por Cliente - Data Export)
 echo   - faturas_a_receber.csv    (Lancamentos a Receber)
 echo   - fretes.csv               (Fretes)
 echo   - coletas.csv              (Coletas)

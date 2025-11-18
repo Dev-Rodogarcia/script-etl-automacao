@@ -53,19 +53,19 @@ public class ValidarManifestosComando implements Comando {
         System.out.println();
         
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 """
-                    SELECT 
-                      sequence_code,
-                      COUNT(*) as total_registros,
-                      COUNT(DISTINCT identificador_unico) as identificadores_unicos,
-                      MIN(data_extracao) as primeira_extracao,
-                      MAX(data_extracao) as ultima_extracao
-                    FROM manifestos
-                    WHERE pick_sequence_code IS NULL
-                    GROUP BY sequence_code
-                    HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1
-                    ORDER BY COUNT(*) DESC""")) {
+            ResultSet rs = stmt.executeQuery(
+                """
+                   SELECT
+                     sequence_code,
+                     COUNT(*) as total_registros,
+                     COUNT(DISTINCT identificador_unico) as identificadores_unicos,
+                     MIN(data_extracao) as primeira_extracao,
+                     MAX(data_extracao) as ultima_extracao
+                   FROM manifestos
+                   WHERE pick_sequence_code IS NULL
+                   GROUP BY sequence_code
+                   HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1
+                   ORDER BY COUNT(*) DESC""")) {
             exibirResultado(rs);
         }
         
@@ -80,15 +80,15 @@ public class ValidarManifestosComando implements Comando {
         // Teste 1: Duplicados falsos
         System.out.println("TESTE 1: Verificar duplicados falsos");
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 """
-                    SELECT 
-                      sequence_code,
-                      COUNT(*) as total
-                    FROM manifestos
-                    WHERE pick_sequence_code IS NULL
-                    GROUP BY sequence_code
-                    HAVING COUNT(*) > 1""")) {
+            ResultSet rs = stmt.executeQuery(
+                """
+                   SELECT
+                     sequence_code,
+                     COUNT(*) as total
+                   FROM manifestos
+                   WHERE pick_sequence_code IS NULL
+                   GROUP BY sequence_code
+                   HAVING COUNT(*) > 1""")) {
             exibirResultado(rs);
         }
         System.out.println();
@@ -105,21 +105,21 @@ public class ValidarManifestosComando implements Comando {
         // Teste 3: Distribuição de pick_sequence_code
         System.out.println("TESTE 3: Distribuição de pick_sequence_code");
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 """
-                    SELECT 
-                      CASE 
-                        WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
-                        ELSE 'Sem pick_sequence_code (usa hash)'
-                      END as tipo,
-                      COUNT(*) as total,
-                      CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos) AS DECIMAL(5,2)) as percentual
-                    FROM manifestos
-                    GROUP BY 
-                      CASE 
-                        WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
-                        ELSE 'Sem pick_sequence_code (usa hash)'
-                      END""")) {
+            ResultSet rs = stmt.executeQuery(
+                """
+                   SELECT
+                     CASE
+                       WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
+                       ELSE 'Sem pick_sequence_code (usa hash)'
+                     END as tipo,
+                     COUNT(*) as total,
+                     CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos) AS DECIMAL(5,2)) as percentual
+                   FROM manifestos
+                   GROUP BY
+                     CASE
+                       WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
+                       ELSE 'Sem pick_sequence_code (usa hash)'
+                     END""")) {
             exibirResultado(rs);
         }
         System.out.println();
@@ -127,15 +127,15 @@ public class ValidarManifestosComando implements Comando {
         // Teste 4: Integridade de chave composta
         System.out.println("TESTE 4: Integridade de chave composta");
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 """
-                    SELECT 
-                      sequence_code,
-                      identificador_unico,
-                      COUNT(*) as total
-                    FROM manifestos
-                    GROUP BY sequence_code, identificador_unico
-                    HAVING COUNT(*) > 1""")) {
+            ResultSet rs = stmt.executeQuery(
+                """
+                   SELECT
+                     sequence_code,
+                     identificador_unico,
+                     COUNT(*) as total
+                   FROM manifestos
+                   GROUP BY sequence_code, identificador_unico
+                   HAVING COUNT(*) > 1""")) {
             exibirResultado(rs);
         }
         System.out.println();
@@ -143,41 +143,41 @@ public class ValidarManifestosComando implements Comando {
         // Teste 5: Resumo final
         System.out.println("TESTE 5: Resumo final");
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(
-                 """
-                    SELECT 
-                      'Total de manifestos' as metrica,
-                      COUNT(*) as valor
-                    FROM manifestos
-                    UNION ALL
-                    SELECT 
-                      'Com pick_sequence_code' as metrica,
-                      COUNT(*) as valor
-                    FROM manifestos
-                    WHERE pick_sequence_code IS NOT NULL
-                    UNION ALL
-                    SELECT 
-                      'Sem pick_sequence_code (usa hash)' as metrica,
-                      COUNT(*) as valor
-                    FROM manifestos
-                    WHERE pick_sequence_code IS NULL
-                    UNION ALL
-                    SELECT 
-                      'Com identificador_unico NULL' as metrica,
-                      COUNT(*) as valor
-                    FROM manifestos
-                    WHERE identificador_unico IS NULL
-                    UNION ALL
-                    SELECT 
-                      'Duplicados falsos (mesmo sequence_code, sem pick)' as metrica,
-                      COUNT(*) as valor
-                    FROM (
-                      SELECT sequence_code
-                      FROM manifestos
-                      WHERE pick_sequence_code IS NULL
-                      GROUP BY sequence_code
-                      HAVING COUNT(*) > 1
-                    ) as duplicados""")) {
+            ResultSet rs = stmt.executeQuery(
+                """
+                   SELECT
+                     'Total de manifestos' as metrica,
+                     COUNT(*) as valor
+                   FROM manifestos
+                   UNION ALL
+                   SELECT
+                     'Com pick_sequence_code' as metrica,
+                     COUNT(*) as valor
+                   FROM manifestos
+                   WHERE pick_sequence_code IS NOT NULL
+                   UNION ALL
+                   SELECT
+                     'Sem pick_sequence_code (usa hash)' as metrica,
+                     COUNT(*) as valor
+                   FROM manifestos
+                   WHERE pick_sequence_code IS NULL
+                   UNION ALL
+                   SELECT
+                     'Com identificador_unico NULL' as metrica,
+                     COUNT(*) as valor
+                   FROM manifestos
+                   WHERE identificador_unico IS NULL
+                   UNION ALL
+                   SELECT
+                     'Duplicados falsos (mesmo sequence_code, sem pick)' as metrica,
+                     COUNT(*) as valor
+                   FROM (
+                     SELECT sequence_code
+                     FROM manifestos
+                     WHERE pick_sequence_code IS NULL
+                     GROUP BY sequence_code
+                     HAVING COUNT(*) > 1
+                   ) as duplicados""")) {
             exibirResultado(rs);
         }
         System.out.println();
@@ -239,9 +239,7 @@ public class ValidarManifestosComando implements Comando {
         System.out.println();
         
         Integer registrosExtraidos = null;
-        String statusFinal = null;
         String timestampFim = null;
-        String mensagem = null;
         
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
@@ -254,9 +252,9 @@ public class ValidarManifestosComando implements Comando {
                     ORDER BY timestamp_fim DESC""")) {
             if (rs.next()) {
                 registrosExtraidos = rs.getInt("registros_extraidos");
-                statusFinal = rs.getString("status_final");
+                final String statusFinal = rs.getString("status_final");
                 timestampFim = rs.getString("timestamp_fim");
-                mensagem = rs.getString("mensagem");
+                final String mensagem = rs.getString("mensagem");
                 System.out.println("Data/Hora fim: " + timestampFim);
                 System.out.println("Registros extraídos (API): " + registrosExtraidos);
                 System.out.println("Status: " + statusFinal);
