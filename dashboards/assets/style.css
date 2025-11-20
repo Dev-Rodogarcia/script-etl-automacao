@@ -1,0 +1,20 @@
+.barra-lateral{background-color:#1f2937;color:#fff;min-height:100vh;padding:1rem;position:sticky;top:0}
+.titulo-barra-lateral{font-weight:600;margin-bottom:.75rem}
+.conteudo{padding:1rem}
+.cartao-kpi{border:1px solid #e9ecef;border-radius:.5rem;background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%)}
+.cartao-kpi .card-title{font-size:.9rem;color:#6c757d}
+.cartao-kpi .card-value{font-weight:700;margin:0}
+.nav .nav-link{color:#cbd5e1;margin-bottom:.5rem;transition:all .15s ease-in-out}
+.nav .nav-link:hover{background-color:rgba(13,110,253,.15);color:#fff}
+.nav .nav-link.active{background-color:#0d6efd;color:#fff}
+ .btn{border-radius:.5rem}
+ .btn-group .btn{min-width:100px}
+.navbar-logo{height:32px}
+.sidebar-logo{height:28px}
+.checklist-filiais{max-height:220px;overflow:auto;background:#0f172a;border:1px solid #334155;border-radius:.5rem;padding:.25rem;color:#e5e7eb}
+.checklist-filiais input[type="checkbox"]{accent-color:#0d6efd}
+.filial-item{display:block;padding:.25rem .5rem;border-radius:.375rem;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filial-item:hover{background:#111827}
+@media (max-width: 992px){
+  .barra-lateral{min-height:auto}
+}
