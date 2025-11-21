@@ -1,14 +1,17 @@
 package br.com.extrator.modelo.graphql.fretes;
 
-import br.com.extrator.db.entity.FreteEntity;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import br.com.extrator.db.entity.FreteEntity;
 
 /**
  * Mapper (Tradutor) que transforma o FreteNodeDTO (dados brutos do GraphQL)
@@ -32,12 +35,12 @@ public class FreteMapper {
      * @param dto O objeto DTO com os dados do frete.
      * @return Um objeto FreteEntity pronto para ser salvo.
      */
-    public FreteEntity toEntity(FreteNodeDTO dto) {
+    public FreteEntity toEntity(final FreteNodeDTO dto) {
         if (dto == null) {
             return null;
         }
 
-        FreteEntity entity = new FreteEntity();
+        final FreteEntity entity = new FreteEntity();
 
         // 1. Mapeamento dos campos essenciais
         entity.setId(dto.getId());
@@ -86,8 +89,15 @@ public class FreteMapper {
         }
 
         if (dto.getFreightInvoices() != null && !dto.getFreightInvoices().isEmpty()) {
-            // Pegar primeira NF (ou concatenar todas)
-            entity.setNumeroNotaFiscal(dto.getFreightInvoices().get(0).getNumber());
+            final java.util.List<String> numeros = new java.util.ArrayList<>();
+            for (final FreightInvoiceDTO fi : dto.getFreightInvoices()) {
+                if (fi != null && fi.getInvoice() != null && fi.getInvoice().getNumber() != null) {
+                    numeros.add(fi.getInvoice().getNumber());
+                }
+            }
+            if (!numeros.isEmpty()) {
+                entity.setNumeroNotaFiscal(String.join(", ", numeros));
+            }
         }
 
         if (dto.getCustomerPriceTable() != null) {
@@ -114,6 +124,12 @@ public class FreteMapper {
         entity.setTotalCubicVolume(dto.getTotalCubicVolume());
         entity.setSubtotal(dto.getSubtotal());
 
+        if (dto.getCte() != null) {
+            entity.setChaveCte(dto.getCte().getKey());
+            entity.setNumeroCte(dto.getCte().getNumber());
+            entity.setSerieCte(dto.getCte().getSeries());
+        }
+
         // 2. Conversão segura de tipos de data e hora
         try {
             if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
@@ -125,7 +141,7 @@ public class FreteMapper {
             if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
                 entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));
             }
-        } catch (DateTimeParseException e) {
+        } catch (final DateTimeParseException e) {
             logger.error("❌ Erro ao converter data para frete ID {}: serviceAt='{}', createdAt='{}', deliveryPredictionDate='{}' - {}", 
                 dto.getId(), dto.getServiceAt(), dto.getCreatedAt(), dto.getDeliveryPredictionDate(), e.getMessage());
             logger.debug("Stack trace completo:", e);
@@ -133,9 +149,9 @@ public class FreteMapper {
 
         // 3. Empacotamento de todos os metadados
         try {
-            String metadata = objectMapper.writeValueAsString(dto);
+            final String metadata = objectMapper.writeValueAsString(dto);
             entity.setMetadata(metadata);
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("❌ CRÍTICO: Falha ao serializar metadados para frete ID {}: {}", 
                 dto.getId(), e.getMessage(), e);
             entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));

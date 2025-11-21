@@ -24,8 +24,8 @@ public class LogExtracaoRepository {
     /**
      * Grava um novo log de extração
      */
-    public void gravarLogExtracao(LogExtracaoEntity logExtracao) {
-        String sql = """
+    public void gravarLogExtracao(final LogExtracaoEntity logExtracao) {
+        final String sql = """
             INSERT INTO dbo.log_extracoes
             (entidade, timestamp_inicio, timestamp_fim, status_final, registros_extraidos, paginas_processadas, mensagem)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -42,14 +42,14 @@ public class LogExtracaoRepository {
             stmt.setInt(6, logExtracao.getPaginasProcessadas());
             stmt.setString(7, logExtracao.getMensagem());
             
-            int linhasAfetadas = stmt.executeUpdate();
+            final int linhasAfetadas = stmt.executeUpdate();
             
             if (linhasAfetadas > 0) {
                 logger.debug("Log de extração gravado: entidade={}, status={}, registros={}", 
                     logExtracao.getEntidade(), logExtracao.getStatusFinal(), logExtracao.getRegistrosExtraidos());
             }
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("Erro ao gravar log de extração para entidade {}: {}", 
                 logExtracao.getEntidade(), e.getMessage(), e);
             throw new RuntimeException("Falha ao gravar log de extração", e);
@@ -59,8 +59,8 @@ public class LogExtracaoRepository {
     /**
      * Busca o último log de extração para uma entidade
      */
-    public Optional<LogExtracaoEntity> buscarUltimoLogPorEntidade(String entidade) {
-        String sql = """
+    public Optional<LogExtracaoEntity> buscarUltimoLogPorEntidade(final String entidade) {
+        final String sql = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
                    registros_extraidos, paginas_processadas, mensagem
             FROM dbo.log_extracoes
@@ -75,7 +75,7 @@ public class LogExtracaoRepository {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    LogExtracaoEntity log = new LogExtracaoEntity();
+                    final LogExtracaoEntity log = new LogExtracaoEntity();
                     log.setId(rs.getLong("id"));
                     log.setEntidade(rs.getString("entidade"));
                     log.setTimestampInicio(rs.getTimestamp("timestamp_inicio").toLocalDateTime());
@@ -89,7 +89,7 @@ public class LogExtracaoRepository {
                 }
             }
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("Erro ao buscar último log para entidade {}: {}", entidade, e.getMessage(), e);
         }
         
@@ -100,7 +100,7 @@ public class LogExtracaoRepository {
      * Verifica se a tabela log_extracoes existe
      */
     public boolean tabelaExiste() {
-        String sql = """
+        final String sql = """
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.TABLES
             WHERE TABLE_NAME = 'log_extracoes' AND TABLE_SCHEMA = 'dbo'
@@ -114,7 +114,7 @@ public class LogExtracaoRepository {
                 return rs.getInt(1) > 0;
             }
             
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("Erro ao verificar existência da tabela log_extracoes: {}", e.getMessage(), e);
         }
         
@@ -125,40 +125,51 @@ public class LogExtracaoRepository {
      * Cria a tabela log_extracoes se não existir
      */
     public void criarTabelaSeNaoExistir() {
-        if (tabelaExiste()) {
-            logger.debug("Tabela log_extracoes já existe");
-            return;
-        }
-        
-        final String ddlTabela = """
-            CREATE TABLE dbo.log_extracoes (
-                id BIGINT IDENTITY PRIMARY KEY,
-                entidade NVARCHAR(50) NOT NULL,
-                timestamp_inicio DATETIME2 NOT NULL,
-                timestamp_fim DATETIME2 NOT NULL,
-                status_final NVARCHAR(20) NOT NULL,
-                registros_extraidos INT NOT NULL,
-                paginas_processadas INT NOT NULL,
-                mensagem NVARCHAR(MAX)
-            )
-            """;
-
-        final String ddlIndice = """
-            CREATE INDEX idx_entidade_timestamp ON dbo.log_extracoes (entidade, timestamp_fim DESC)
-            """;
-
         try (Connection conn = GerenciadorConexao.obterConexao()) {
-            // Executa DDLs separadamente para maior compatibilidade com o driver do SQL Server
-            try (PreparedStatement stmtTabela = conn.prepareStatement(ddlTabela)) {
-                stmtTabela.executeUpdate();
+            final String ddl =
+                """
+                BEGIN TRY
+                    IF OBJECT_ID('dbo.log_extracoes', 'U') IS NULL
+                    BEGIN
+                        CREATE TABLE dbo.log_extracoes (
+                            id BIGINT IDENTITY PRIMARY KEY,
+                            entidade NVARCHAR(50) NOT NULL,
+                            timestamp_inicio DATETIME2 NOT NULL,
+                            timestamp_fim DATETIME2 NOT NULL,
+                            status_final NVARCHAR(20) NOT NULL,
+                            registros_extraidos INT NOT NULL,
+                            paginas_processadas INT NOT NULL,
+                            mensagem NVARCHAR(MAX)
+                        );
+                    END
+                END TRY
+                BEGIN CATCH
+                    IF ERROR_NUMBER() <> 2714
+                        THROW;
+                END CATCH;
+                
+                BEGIN TRY
+                    IF NOT EXISTS (
+                        SELECT 1 FROM sys.indexes\s
+                        WHERE name = 'idx_entidade_timestamp'\s
+                          AND object_id = OBJECT_ID('dbo.log_extracoes')
+                    )
+                    BEGIN
+                        CREATE INDEX idx_entidade_timestamp ON dbo.log_extracoes (entidade, timestamp_fim DESC);
+                    END
+                END TRY
+                BEGIN CATCH
+                    IF ERROR_NUMBER() <> 1911
+                        THROW;
+                END CATCH;""";
+
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
             }
-            try (PreparedStatement stmtIndice = conn.prepareStatement(ddlIndice)) {
-                stmtIndice.executeUpdate();
-            }
-            logger.info("✅ Tabela dbo.log_extracoes criada com sucesso");
-        } catch (SQLException e) {
-            logger.error("❌ Erro ao criar tabela dbo.log_extracoes: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha ao criar tabela dbo.log_extracoes", e);
+            logger.info("✅ Tabela dbo.log_extracoes verificada/criada com sucesso");
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao verificar/criar tabela dbo.log_extracoes: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao verificar/criar tabela dbo.log_extracoes", e);
         }
     }
 }

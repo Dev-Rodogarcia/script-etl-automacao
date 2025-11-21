@@ -1,11 +1,13 @@
 package br.com.extrator.db.repository;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.db.entity.FaturaPorClienteEntity;
-
-import java.sql.*;
 
 /**
  * Repository para persistência de Faturas por Cliente no banco de dados.
@@ -17,15 +19,15 @@ import java.sql.*;
 public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClienteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FaturaPorClienteRepository.class);
 
-    private static final String NOME_TABELA = "faturas_por_cliente_data_export";
+    private static final String NOME_TABELA = "faturas_por_cliente";
 
     /**
      * Script SQL para criação da tabela se não existir.
      */
     private static final String SQL_CREATE_TABLE = """
-        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'faturas_por_cliente_data_export')
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'faturas_por_cliente')
         BEGIN
-            CREATE TABLE faturas_por_cliente_data_export (
+            CREATE TABLE faturas_por_cliente (
                 unique_id NVARCHAR(100) PRIMARY KEY,
                 valor_frete DECIMAL(18,2),
                 valor_fatura DECIMAL(18,2),
@@ -52,10 +54,10 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 metadata NVARCHAR(MAX),
                 data_extracao DATETIME2 DEFAULT GETDATE()
             );
-            CREATE INDEX IX_fpc_vencimento ON faturas_por_cliente_data_export(data_vencimento_fatura);
-            CREATE INDEX IX_fpc_pagador ON faturas_por_cliente_data_export(pagador_nome);
-            CREATE INDEX IX_fpc_filial ON faturas_por_cliente_data_export(filial);
-            CREATE INDEX IX_fpc_chave_cte ON faturas_por_cliente_data_export(chave_cte);
+            CREATE INDEX IX_fpc_vencimento ON faturas_por_cliente(data_vencimento_fatura);
+            CREATE INDEX IX_fpc_pagador ON faturas_por_cliente(pagador_nome);
+            CREATE INDEX IX_fpc_filial ON faturas_por_cliente(filial);
+            CREATE INDEX IX_fpc_chave_cte ON faturas_por_cliente(chave_cte);
         END
         """;
 
@@ -63,7 +65,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
      * SQL MERGE para INSERT ou UPDATE usando unique_id como chave.
      */
     private static final String SQL_MERGE = """
-        MERGE INTO faturas_por_cliente_data_export AS target
+        MERGE INTO faturas_por_cliente AS target
         USING (SELECT ? AS unique_id) AS source
         ON target.unique_id = source.unique_id
         WHEN MATCHED THEN
@@ -110,6 +112,39 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
     protected void criarTabelaSeNaoExistir(final Connection conexao) throws SQLException {
         executarDDL(conexao, SQL_CREATE_TABLE);
         logger.info("Verificação/criação da tabela {} concluída", NOME_TABELA);
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_faturas_por_cliente_powerbi AS
+            SELECT
+                unique_id AS [ID],
+                filial AS [Filial],
+                pagador_nome AS [Pagador / Nome],
+                pagador_documento AS [Pagador / Documento],
+                numero_nfse AS [Nfse / Número NFS-e],
+                numero_cte AS [CT-e / Número],
+                data_emissao_cte AS [CT-e / Data emissão],
+                chave_cte AS [CT-e / Chave],
+                status_cte AS [CT-e / Status],
+                numero_fatura AS [Fatura / N° Doc],
+                data_emissao_fatura AS [Fatura / Emissão],
+                valor_fatura AS [Fatura / Valor],
+                data_vencimento_fatura AS [Parcelas / Vencimento],
+                data_baixa_fatura AS [Baixa / Data],
+                valor_frete AS [Frete original / Total],
+                tipo_frete AS [Tipo],
+                estado AS [Estado / Nome],
+                classificacao AS [Classificação],
+                remetente_nome AS [Remetente / Nome],
+                destinatario_nome AS [Destinatário / Nome],
+                notas_fiscais AS [NF (Notas Fiscais)],
+                pedidos_cliente AS [Cache / N° Pedido],
+                data_extracao AS [Data de extracao]
+            FROM dbo.faturas_por_cliente;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     @Override
@@ -191,7 +226,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
     /**
      * Valida campos obrigatórios da entidade antes de salvar.
      */
-    private void validarEntidade(FaturaPorClienteEntity entity) {
+    private void validarEntidade(final FaturaPorClienteEntity entity) {
         if (entity.getUniqueId() == null || entity.getUniqueId().trim().isEmpty()) {
             throw new IllegalArgumentException("unique_id não pode ser null ou vazio");
         }

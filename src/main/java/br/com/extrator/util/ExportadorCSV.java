@@ -1,6 +1,6 @@
 package br.com.extrator.util;
 
-import java.io.FileWriter;
+ 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,13 +19,10 @@ public class ExportadorCSV {
     private static final String[] ENTIDADES = {
         "cotacoes",
         "coletas",
-        "faturas_a_pagar",
-        "faturas_a_pagar_data_export",
-        "faturas_por_cliente_data_export",
-        "faturas_a_receber",
+        "contas_a_pagar",
+        "faturas_por_cliente",
         "fretes",
         "manifestos",
-        "ocorrencias",
         "localizacao_cargas"
     };
     
@@ -120,7 +117,9 @@ public class ExportadorCSV {
         // Obter conexão do GerenciadorConexao
         try (Connection conn = GerenciadorConexao.obterConexao();
              Statement stmt = conn.createStatement();
-             FileWriter writer = new FileWriter(nomeArquivo, StandardCharsets.UTF_8)) {
+             java.io.OutputStream os = new java.io.FileOutputStream(nomeArquivo);
+             java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.OutputStreamWriter(os, StandardCharsets.UTF_8))) {
+            os.write(new byte[] {(byte)0xEF, (byte)0xBB, (byte)0xBF});
             
             // Configurar Statement para não limitar resultados
             // SQL Server pode ter limite padrão, então garantimos que não há limitação
@@ -129,15 +128,31 @@ public class ExportadorCSV {
             
             System.out.println("    🔄 Executando query SELECT * FROM " + entidade + "...");
             
-            // Construir query com ordenação por chave primária quando disponível
-            String query = "SELECT * FROM " + entidade;
-            // Adicionar ORDER BY por chave primária para garantir ordem consistente
+            String origem;
             switch (entidade) {
-                case "manifestos", "cotacoes", "faturas_a_pagar_data_export" -> query += " ORDER BY sequence_code";
-                case "localizacao_cargas" -> query += " ORDER BY sequence_number";
-                case "coletas", "fretes" -> query += " ORDER BY id";
-                case "faturas_por_cliente_data_export" -> query += " ORDER BY unique_id";
-                default -> {}
+                case "fretes" -> origem = "dbo.vw_fretes_powerbi";
+                case "coletas" -> origem = "dbo.vw_coletas_powerbi";
+                case "cotacoes" -> origem = "dbo.vw_cotacoes_powerbi";
+                case "contas_a_pagar" -> origem = "dbo.vw_contas_a_pagar_powerbi";
+                case "faturas_por_cliente" -> origem = "dbo.vw_faturas_por_cliente_powerbi";
+                case "manifestos" -> origem = "dbo.vw_manifestos_powerbi";
+                case "localizacao_cargas" -> origem = "dbo.vw_localizacao_cargas_powerbi";
+                default -> origem = entidade;
+            }
+            final boolean usarViewPowerBI = !origem.equals(entidade);
+            String query = "SELECT * FROM " + origem;
+            // Ordenação consistente
+            if (usarViewPowerBI) {
+                // Evitar problemas com nomes com espaços usando posição
+                query += " ORDER BY 1"; // ID
+            } else {
+                switch (entidade) {
+                    case "manifestos", "cotacoes", "contas_a_pagar" -> query += " ORDER BY sequence_code";
+                    case "localizacao_cargas" -> query += " ORDER BY sequence_number";
+                    case "coletas", "fretes" -> query += " ORDER BY id";
+                    case "faturas_por_cliente" -> query += " ORDER BY unique_id";
+                    default -> {}
+                }
             }
             
             try (ResultSet rs = stmt.executeQuery(query)) {
@@ -146,14 +161,14 @@ public class ExportadorCSV {
                 
                 System.out.println("    📋 Colunas encontradas: " + columnCount);
                 
-                // Escrever cabeçalho
+                // Escrever cabeçalho com alias (label) quando existente
                 for (int i = 1; i <= columnCount; i++) {
-                    writer.append(metaData.getColumnName(i));
+                    writer.append(metaData.getColumnLabel(i));
                     if (i < columnCount) {
                         writer.append(";");
                     }
                 }
-                writer.append("\n");
+                writer.append("\r\n");
                 
                 // Escrever dados
                 int count = 0;
@@ -176,7 +191,7 @@ public class ExportadorCSV {
                             writer.append(";");
                         }
                     }
-                    writer.append("\n");
+                    writer.append("\r\n");
                     count++;
                     
                     // Log de progresso

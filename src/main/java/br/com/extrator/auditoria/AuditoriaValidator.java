@@ -106,6 +106,7 @@ public class AuditoriaValidator {
         resultado.setNomeEntidade(nomeEntidade);
         resultado.setDataInicio(dataInicio);
         resultado.setDataFim(dataFim);
+        final String nomeTabela = mapearNomeTabela(nomeEntidade);
         
         // PASSO 1: Consultar log de extrações primeiro
         final LogExtracaoEntity logExtracao = consultarLogExtracao(nomeEntidade, dataInicio);
@@ -136,10 +137,10 @@ public class AuditoriaValidator {
         
         try {
             // ✅ CORREÇÃO: Criar tabela se não existir antes de validar
-            criarTabelaSeNaoExistir(conexao, nomeEntidade);
+            criarTabelaSeNaoExistir(conexao, nomeTabela);
             
             // Verificar se a tabela existe (após tentar criar)
-            if (!verificarExistenciaTabela(conexao, nomeEntidade)) {
+            if (!verificarExistenciaTabela(conexao, nomeTabela)) {
                 final String erro = "Tabela não encontrada: " + nomeEntidade;
                 logger.error("❌ {}", erro);
                 resultado.setErro(erro);
@@ -148,7 +149,7 @@ public class AuditoriaValidator {
             }
             
             // Validar se a coluna data_extracao existe
-            if (!validarColunaExiste(conexao, nomeEntidade, "data_extracao")) {
+            if (!validarColunaExiste(conexao, nomeTabela, "data_extracao")) {
                 final String erro = "Coluna 'data_extracao' não encontrada na tabela: " + nomeEntidade;
                 logger.error("❌ {}", erro);
                 resultado.setErro(erro);
@@ -168,29 +169,29 @@ public class AuditoriaValidator {
                 
             } else {
                 // Se não tem log ou foi incompleto, fazer contagem tradicional no banco
-                final long totalRegistros = contarRegistrosPorDataExtracao(conexao, nomeEntidade, dataInicio, dataFim, resultado);
+                final long totalRegistros = contarRegistrosPorDataExtracao(conexao, nomeTabela, dataInicio, dataFim, resultado);
                 resultado.setTotalRegistros(totalRegistros);
                 
                 // Contar registros das últimas 24 horas
                 final Instant agora = Instant.now();
                 final Instant inicio24h = agora.minusSeconds(24 * 60 * 60);
-                final long registros24h = contarRegistrosPorDataExtracao(conexao, nomeEntidade, inicio24h, agora, null);
+                final long registros24h = contarRegistrosPorDataExtracao(conexao, nomeTabela, inicio24h, agora, null);
                 resultado.setRegistrosUltimas24h(registros24h);
                 
-                logger.debug("Contagem do banco para {}: {} registros", nomeEntidade, totalRegistros);
+                logger.debug("Contagem do banco para {} (tabela: {}): {} registros", nomeEntidade, nomeTabela, totalRegistros);
             }
             
             // Verificar registros com dados nulos críticos
-            final long registrosComNulos = contarRegistrosComNulos(conexao, nomeEntidade);
+            final long registrosComNulos = contarRegistrosComNulos(conexao, nomeTabela);
             resultado.setRegistrosComNulos(registrosComNulos);
             
             // Verificar último registro extraído
-            final Instant ultimaExtracao = obterDataUltimaExtracao(conexao, nomeEntidade);
+            final Instant ultimaExtracao = obterDataUltimaExtracao(conexao, nomeTabela);
             resultado.setUltimaExtracao(ultimaExtracao);
             
             // Se retornou 0 registros, investigar causa raiz
             if (resultado.getTotalRegistros() == 0) {
-                investigarCausaRaizZeroRegistros(conexao, nomeEntidade, resultado);
+                investigarCausaRaizZeroRegistros(conexao, nomeTabela, resultado);
             }
             
             // Determinar status da validação
@@ -223,8 +224,8 @@ public class AuditoriaValidator {
     public boolean verificarExistenciaDadosRecentes(final Connection conexao, final Instant dataInicio, final Instant dataFim) {
         try {
             final List<String> entidades = List.of(
-                "cotacoes", "coletas", "faturas_a_pagar", "faturas_a_receber", 
-                "fretes", "manifestos", "ocorrencias", "localizacao_cargas"
+                "cotacoes", "coletas", "contas_a_pagar", "faturas_por_cliente",
+                "fretes", "manifestos", "localizacao_cargas"
             );
             
             for (final String entidade : entidades) {
@@ -252,8 +253,8 @@ public class AuditoriaValidator {
      */
     public void criarTodasTabelasSeNaoExistirem(final Connection conexao) {
         final List<String> entidades = List.of(
-            "cotacoes", "coletas", "faturas_a_pagar", "faturas_a_receber",
-            "fretes", "manifestos", "ocorrencias", "localizacao_cargas"
+            "cotacoes", "coletas", "contas_a_pagar", "faturas_por_cliente",
+            "fretes", "manifestos", "localizacao_cargas"
         );
         
         logger.info("🔧 Criando tabelas se não existirem...");
@@ -299,20 +300,15 @@ public class AuditoriaValidator {
                     repo.criarTabelaSeNaoExistirPublico(conexao);
                     logger.debug("✅ Tabela localizacao_cargas criada/verificada");
                 }
-                case "faturas_a_pagar" -> {
-                    final br.com.extrator.db.repository.FaturaAPagarRepository repo = new br.com.extrator.db.repository.FaturaAPagarRepository();
-                    repo.criarTabelaSeNaoExistirPublico(conexao);
-                    logger.debug("✅ Tabela faturas_a_pagar criada/verificada");
+                case "contas_a_pagar" -> {
+                    final br.com.extrator.db.repository.ContasAPagarRepository repo = new br.com.extrator.db.repository.ContasAPagarRepository();
+                    repo.criarTabelaSeNaoExistir();
+                    logger.debug("✅ Tabela contas_a_pagar criada/verificada");
                 }
-                case "faturas_a_receber" -> {
-                    final br.com.extrator.db.repository.FaturaAReceberRepository repo = new br.com.extrator.db.repository.FaturaAReceberRepository();
+                case "faturas_por_cliente" -> {
+                    final br.com.extrator.db.repository.FaturaPorClienteRepository repo = new br.com.extrator.db.repository.FaturaPorClienteRepository();
                     repo.criarTabelaSeNaoExistirPublico(conexao);
-                    logger.debug("✅ Tabela faturas_a_receber criada/verificada");
-                }
-                case "ocorrencias" -> {
-                    final br.com.extrator.db.repository.OcorrenciaRepository repo = new br.com.extrator.db.repository.OcorrenciaRepository();
-                    repo.criarTabelaSeNaoExistirPublico(conexao);
-                    logger.debug("✅ Tabela ocorrencias criada/verificada");
+                    logger.debug("✅ Tabela faturas_por_cliente criada/verificada");
                 }
                 default -> logger.warn("⚠️ Entidade desconhecida para criação de tabela: {}", nomeEntidade);
             }
@@ -447,11 +443,10 @@ public class AuditoriaValidator {
         final Map<String, String> camposCriticos = Map.of(
             "cotacoes", "sequence_code IS NULL OR total_value IS NULL",
             "coletas", "id IS NULL",
-            "faturas_a_pagar", "id IS NULL OR document_number IS NULL",
-            "faturas_a_receber", "id IS NULL OR document_number IS NULL",
+            "contas_a_pagar", "sequence_code IS NULL OR document_number IS NULL",
+            "faturas_por_cliente", "unique_id IS NULL OR numero_fatura IS NULL",
             "fretes", "id IS NULL",
             "manifestos", "sequence_code IS NULL",
-            "ocorrencias", "id IS NULL",
             "localizacao_cargas", "sequence_number IS NULL"
         );
         
@@ -568,5 +563,12 @@ public class AuditoriaValidator {
         resultado.setStatus(StatusValidacao.OK);
         resultado.adicionarObservacao(String.format("Extração completa: %d registros salvos com sucesso", 
             logExtracao.getRegistrosExtraidos()));
+    }
+
+    private String mapearNomeTabela(final String nomeEntidade) {
+        return switch (nomeEntidade) {
+            case "faturas_a_pagar_data_export" -> "contas_a_pagar";
+            default -> nomeEntidade;
+        };
     }
 }

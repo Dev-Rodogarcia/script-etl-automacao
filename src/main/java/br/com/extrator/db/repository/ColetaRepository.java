@@ -103,6 +103,39 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 logger.warn("⚠️ Não foi possível ajustar coluna service_end_hour: {} (pode já estar no tamanho correto)", e.getMessage());
             }
         }
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_coletas_powerbi AS
+            SELECT
+                id AS [ID],
+                sequence_code AS [Coleta],
+                cliente_nome AS [Cliente],
+                requester AS [Solicitante],
+                local_coleta AS [Local da Coleta],
+                cidade_coleta AS [Cidade],
+                uf_coleta AS [UF],
+                request_date AS [Solicitacao],
+                request_hour AS [Hora (Solicitacao)],
+                service_date AS [Agendamento],
+                service_start_hour AS [Horario (Inicio)],
+                finish_date AS [Finalizacao],
+                service_end_hour AS [Hora (Fim)],
+                status AS [Status],
+                total_volumes AS [Volumes],
+                total_weight AS [Peso Real],
+                taxed_weight AS [Peso Taxado],
+                total_value AS [Valor NF],
+                usuario_nome AS [Usuario],
+                agent_id AS [Agente],
+                manifest_item_pick_id AS [Numero Manifesto],
+                vehicle_type_id AS [Veiculo],
+                data_extracao AS [Data de extracao]
+            FROM dbo.coletas;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     /**

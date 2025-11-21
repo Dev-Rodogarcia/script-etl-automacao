@@ -81,16 +81,13 @@ echo ================================================================
 echo.
 echo Os seguintes arquivos podem ter sido gerados:
 echo.
-echo   - faturas_a_pagar.csv      (Lancamentos a Pagar - REST legado)
-echo   - faturas_a_pagar_data_export.csv (Contas a Pagar - Data Export)
-echo   - faturas_por_cliente_data_export.csv (Faturas por Cliente - Data Export)
-echo   - faturas_a_receber.csv    (Lancamentos a Receber)
-echo   - fretes.csv               (Fretes)
-echo   - coletas.csv              (Coletas)
-echo   - manifestos.csv           (Manifestos)
-echo   - cotacoes.csv             (Cotacoes)
-echo   - localizacao_carga.csv    (Localizacao da Carga)
-echo   - ocorrencias.csv          (Ocorrencias)
+echo   - contas_a_pagar.csv                 (Contas a Pagar)
+echo   - faturas_por_cliente.csv            (Faturas por Cliente)
+echo   - fretes.csv                          (Fretes)
+echo   - coletas.csv                         (Coletas)
+echo   - manifestos.csv                      (Manifestos)
+echo   - cotacoes.csv                        (Cotacoes)
+echo   - localizacao_carga.csv               (Localizacao da Carga)
 echo.
 echo Verifique a pasta 'exports' para os arquivos gerados.
 echo.

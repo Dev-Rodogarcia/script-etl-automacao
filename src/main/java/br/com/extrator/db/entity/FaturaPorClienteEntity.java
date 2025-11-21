@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
- * Entity que representa a tabela faturas_por_cliente_data_export no banco.
+ * Entity que representa a tabela faturas_por_cliente no banco.
  * Armazena dados híbridos de CT-e e NFS-e com informações de faturamento.
  * 
  * @author Sistema de Extração ESL Cloud
@@ -58,7 +58,7 @@ public class FaturaPorClienteEntity {
         return uniqueId;
     }
 
-    public void setUniqueId(String uniqueId) {
+    public void setUniqueId(final String uniqueId) {
         this.uniqueId = uniqueId;
     }
 
@@ -66,7 +66,7 @@ public class FaturaPorClienteEntity {
         return valorFrete;
     }
 
-    public void setValorFrete(BigDecimal valorFrete) {
+    public void setValorFrete(final BigDecimal valorFrete) {
         this.valorFrete = valorFrete;
     }
 
@@ -74,7 +74,7 @@ public class FaturaPorClienteEntity {
         return valorFatura;
     }
 
-    public void setValorFatura(BigDecimal valorFatura) {
+    public void setValorFatura(final BigDecimal valorFatura) {
         this.valorFatura = valorFatura;
     }
 
@@ -82,7 +82,7 @@ public class FaturaPorClienteEntity {
         return numeroCte;
     }
 
-    public void setNumeroCte(Long numeroCte) {
+    public void setNumeroCte(final Long numeroCte) {
         this.numeroCte = numeroCte;
     }
 
@@ -90,7 +90,7 @@ public class FaturaPorClienteEntity {
         return chaveCte;
     }
 
-    public void setChaveCte(String chaveCte) {
+    public void setChaveCte(final String chaveCte) {
         this.chaveCte = chaveCte;
     }
 
@@ -98,7 +98,7 @@ public class FaturaPorClienteEntity {
         return numeroNfse;
     }
 
-    public void setNumeroNfse(Long numeroNfse) {
+    public void setNumeroNfse(final Long numeroNfse) {
         this.numeroNfse = numeroNfse;
     }
 
@@ -106,7 +106,7 @@ public class FaturaPorClienteEntity {
         return statusCte;
     }
 
-    public void setStatusCte(String statusCte) {
+    public void setStatusCte(final String statusCte) {
         this.statusCte = statusCte;
     }
 
@@ -114,7 +114,7 @@ public class FaturaPorClienteEntity {
         return dataEmissaoCte;
     }
 
-    public void setDataEmissaoCte(OffsetDateTime dataEmissaoCte) {
+    public void setDataEmissaoCte(final OffsetDateTime dataEmissaoCte) {
         this.dataEmissaoCte = dataEmissaoCte;
     }
 
@@ -122,7 +122,7 @@ public class FaturaPorClienteEntity {
         return numeroFatura;
     }
 
-    public void setNumeroFatura(String numeroFatura) {
+    public void setNumeroFatura(final String numeroFatura) {
         this.numeroFatura = numeroFatura;
     }
 
@@ -130,7 +130,7 @@ public class FaturaPorClienteEntity {
         return dataEmissaoFatura;
     }
 
-    public void setDataEmissaoFatura(LocalDate dataEmissaoFatura) {
+    public void setDataEmissaoFatura(final LocalDate dataEmissaoFatura) {
         this.dataEmissaoFatura = dataEmissaoFatura;
     }
 
@@ -138,7 +138,7 @@ public class FaturaPorClienteEntity {
         return dataVencimentoFatura;
     }
 
-    public void setDataVencimentoFatura(LocalDate dataVencimentoFatura) {
+    public void setDataVencimentoFatura(final LocalDate dataVencimentoFatura) {
         this.dataVencimentoFatura = dataVencimentoFatura;
     }
 
@@ -146,7 +146,7 @@ public class FaturaPorClienteEntity {
         return dataBaixaFatura;
     }
 
-    public void setDataBaixaFatura(LocalDate dataBaixaFatura) {
+    public void setDataBaixaFatura(final LocalDate dataBaixaFatura) {
         this.dataBaixaFatura = dataBaixaFatura;
     }
 
@@ -154,7 +154,7 @@ public class FaturaPorClienteEntity {
         return filial;
     }
 
-    public void setFilial(String filial) {
+    public void setFilial(final String filial) {
         this.filial = filial;
     }
 
@@ -162,7 +162,7 @@ public class FaturaPorClienteEntity {
         return tipoFrete;
     }
 
-    public void setTipoFrete(String tipoFrete) {
+    public void setTipoFrete(final String tipoFrete) {
         this.tipoFrete = tipoFrete;
     }
 
@@ -170,7 +170,7 @@ public class FaturaPorClienteEntity {
         return classificacao;
     }
 
-    public void setClassificacao(String classificacao) {
+    public void setClassificacao(final String classificacao) {
         this.classificacao = classificacao;
     }
 
@@ -178,7 +178,7 @@ public class FaturaPorClienteEntity {
         return estado;
     }
 
-    public void setEstado(String estado) {
+    public void setEstado(final String estado) {
         this.estado = estado;
     }
 
@@ -186,7 +186,7 @@ public class FaturaPorClienteEntity {
         return pagadorNome;
     }
 
-    public void setPagadorNome(String pagadorNome) {
+    public void setPagadorNome(final String pagadorNome) {
         this.pagadorNome = pagadorNome;
     }
 
@@ -194,7 +194,7 @@ public class FaturaPorClienteEntity {
         return pagadorDocumento;
     }
 
-    public void setPagadorDocumento(String pagadorDocumento) {
+    public void setPagadorDocumento(final String pagadorDocumento) {
         this.pagadorDocumento = pagadorDocumento;
     }
 
@@ -202,7 +202,7 @@ public class FaturaPorClienteEntity {
         return remetenteNome;
     }
 
-    public void setRemetenteNome(String remetenteNome) {
+    public void setRemetenteNome(final String remetenteNome) {
         this.remetenteNome = remetenteNome;
     }
 
@@ -210,7 +210,7 @@ public class FaturaPorClienteEntity {
         return destinatarioNome;
     }
 
-    public void setDestinatarioNome(String destinatarioNome) {
+    public void setDestinatarioNome(final String destinatarioNome) {
         this.destinatarioNome = destinatarioNome;
     }
 
@@ -218,7 +218,7 @@ public class FaturaPorClienteEntity {
         return vendedorNome;
     }
 
-    public void setVendedorNome(String vendedorNome) {
+    public void setVendedorNome(final String vendedorNome) {
         this.vendedorNome = vendedorNome;
     }
 
@@ -226,7 +226,7 @@ public class FaturaPorClienteEntity {
         return notasFiscais;
     }
 
-    public void setNotasFiscais(String notasFiscais) {
+    public void setNotasFiscais(final String notasFiscais) {
         this.notasFiscais = notasFiscais;
     }
 
@@ -234,7 +234,7 @@ public class FaturaPorClienteEntity {
         return pedidosCliente;
     }
 
-    public void setPedidosCliente(String pedidosCliente) {
+    public void setPedidosCliente(final String pedidosCliente) {
         this.pedidosCliente = pedidosCliente;
     }
 
@@ -242,7 +242,7 @@ public class FaturaPorClienteEntity {
         return metadata;
     }
 
-    public void setMetadata(String metadata) {
+    public void setMetadata(final String metadata) {
         this.metadata = metadata;
     }
 }

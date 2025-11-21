@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.auditoria.CompletudeValidator;
 import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
-import br.com.extrator.runners.RestRunner;
 import br.com.extrator.util.BannerUtil;
 
 /**
@@ -38,7 +37,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
     private static final String PROPRIEDADE_ULTIMO_RUN = "last_successful_run";
     
     // Número de threads para execução paralela dos runners
-    private static final int NUMERO_DE_THREADS = 3;
+    private static final int NUMERO_DE_THREADS = 2;
     
     @Override
     public void executar(final String[] args) throws Exception {
@@ -48,7 +47,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         // Define data de hoje para buscar dados do dia atual
         final LocalDate dataHoje = LocalDate.now();
         
-        logger.info("Iniciando processo de extração de dados das 3 APIs do ESL Cloud");
+        logger.info("Iniciando processo de extração de dados das 2 APIs do ESL Cloud");
         System.out.println("\n" + "=".repeat(60));
         System.out.println("INICIANDO PROCESSO DE EXTRAÇÃO DE DADOS");
         System.out.println("=".repeat(60));
@@ -61,7 +60,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         
         // ========== EXECUÇÃO PARALELA DOS RUNNERS ==========
         logger.info("Iniciando fluxo ETL em modo paralelo com {} threads", NUMERO_DE_THREADS);
-        System.out.println("\n🔄 Iniciando execução paralela dos 3 runners...");
+        System.out.println("\n🔄 Iniciando execução paralela dos 2 runners...");
         
         final ExecutorService executor = Executors.newFixedThreadPool(NUMERO_DE_THREADS);
         // Usar LinkedHashMap para manter ordem de inserção e associar explicitamente nome ao Future
@@ -76,16 +75,12 @@ public class ExecutarFluxoCompletoComando implements Comando {
             // Simplificado: apenas executar o runner, sem try-catch redundante
             // A lógica de sucesso/falha é centralizada no loop de verificação abaixo
             // Usar Map para associar explicitamente nome do runner ao seu Future
-            logger.debug("Submetendo RestRunner...");
-            System.out.println("🔄 [1/3] Submetendo API REST para execução...");
-            runnersFuturos.put("REST", executor.submit(criarCallableRunner(() -> RestRunner.executar(dataHoje))));
-            
             logger.debug("Submetendo GraphQLRunner...");
-            System.out.println("🔄 [2/3] Submetendo API GraphQL para execução...");
+            System.out.println("🔄 [1/2] Submetendo API GraphQL para execução...");
             runnersFuturos.put("GraphQL", executor.submit(criarCallableRunner(() -> GraphQLRunner.executar(dataHoje))));
             
             logger.debug("Submetendo DataExportRunner...");
-            System.out.println("🔄 [3/3] Submetendo API Data Export para execução...");
+            System.out.println("🔄 [2/2] Submetendo API Data Export para execução...");
             runnersFuturos.put("DataExport", executor.submit(criarCallableRunner(() -> DataExportRunner.executar(dataHoje))));
             
             logger.info("Todos os runners foram submetidos. Aguardando conclusão...");
@@ -128,9 +123,9 @@ public class ExecutarFluxoCompletoComando implements Comando {
             System.out.println("\n" + "=".repeat(60));
             System.out.println("📊 RESUMO DA EXECUÇÃO DOS RUNNERS");
             System.out.println("=".repeat(60));
-            System.out.println("✅ Runners bem-sucedidos: " + totalSucessos + "/3");
+            System.out.println("✅ Runners bem-sucedidos: " + totalSucessos + "/2");
             if (totalFalhas > 0) {
-                System.out.println("❌ Runners com falha: " + totalFalhas + "/3");
+                System.out.println("❌ Runners com falha: " + totalFalhas + "/2");
                 System.out.println("⚠️  Runners falhados: " + String.join(", ", runnersFalhados));
             }
             System.out.println("=".repeat(60) + "\n");
@@ -139,7 +134,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
                 logger.warn("Fluxo ETL concluído com {} falha(s). Runners falhados: {}", 
                     totalFalhas, String.join(", ", runnersFalhados));
             } else {
-                logger.info("✅ Fluxo ETL completo. Todos os runners executados com sucesso.");
+                logger.info("✅ Fluxo ETL completo. Runners GraphQL e DataExport executados com sucesso.");
             }
             
         } finally {
@@ -266,7 +261,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
             System.out.println("Início: " + inicioExecucao.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
             System.out.println("Fim: " + fimExecucao.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
             System.out.println("Duração: " + java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes() + " minutos");
-            System.out.println("✅ Todas as 3 APIs foram processadas com sucesso!");
+            System.out.println("✅ Todas as APIs foram processadas com sucesso!");
             System.out.println();
             
             // Grava timestamp apenas se todos os runners sucederam
@@ -278,8 +273,8 @@ public class ExecutarFluxoCompletoComando implements Comando {
             System.out.println("Fim: " + fimExecucao.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")));
             System.out.println("Duração: " + java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes() + " minutos");
             System.out.println("⚠️  Execução concluída com falhas parciais:");
-            System.out.println("   ✅ Runners bem-sucedidos: " + totalSucessos + "/3");
-            System.out.println("   ❌ Runners com falha: " + totalFalhas + "/3 (" + String.join(", ", runnersFalhados) + ")");
+            System.out.println("   ✅ Runners bem-sucedidos: " + totalSucessos + "/2");
+            System.out.println("   ❌ Runners com falha: " + totalFalhas + "/2 (" + String.join(", ", runnersFalhados) + ")");
             System.out.println("💡 Dados dos runners bem-sucedidos foram salvos no banco de dados.");
             System.out.println();
             

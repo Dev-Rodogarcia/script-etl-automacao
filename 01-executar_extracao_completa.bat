@@ -28,12 +28,12 @@ if not exist "target\extrator.jar" (
     exit /b 1
 )
 
-echo Executando: java -jar "target\extrator.jar"
+echo Executando: java -jar "target\extrator.jar" --fluxo-completo
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
 echo.
 
-java -jar "target\extrator.jar"
+java -jar "target\extrator.jar" --fluxo-completo
 
 if %ERRORLEVEL% equ 0 (
     echo.

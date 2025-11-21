@@ -67,7 +67,7 @@ public class AuditoriaService {
             Map<String, Integer> totaisApi = null;
             try {
                 logger.info("🔍 Buscando API...");
-                Optional<Map<String, Integer>> totaisApiOpt = completudeValidator.buscarTotaisEslCloud(java.time.LocalDate.now());
+                final Optional<Map<String, Integer>> totaisApiOpt = completudeValidator.buscarTotaisEslCloud(java.time.LocalDate.now());
                 totaisApi = totaisApiOpt.orElse(null);
             } catch (final Exception e) {
                 logger.error("❌ API falhou: {} - Continuando local", e.getMessage());
@@ -78,8 +78,15 @@ public class AuditoriaService {
             validator.criarTodasTabelasSeNaoExistirem(conexao);
             
             // ✅ FASE 3: Validar com comparação
-            final List<String> ents = List.of("cotacoes", "coletas", "faturas_a_pagar",
-                    "faturas_a_receber", "fretes", "manifestos", "ocorrencias", "localizacao_cargas");
+            final List<String> ents = List.of(
+                "cotacoes",
+                "coletas",
+                "contas_a_pagar",
+                "faturas_por_cliente",
+                "fretes",
+                "manifestos",
+                "localizacao_cargas"
+            );
 
             for (final String e : ents) {
                 try {
@@ -133,10 +140,11 @@ public class AuditoriaService {
     // ✅ NOVO MÉTODO
     private long contarRegistrosNoBanco(final Connection c, final String e, final Instant i, final Instant f)
             throws SQLException {
-        // ✅ CORREÇÃO: Garantir que a tabela existe antes de contar
-        validator.criarTabelaSeNaoExistir(c, e);
+        final String tabela = mapearTabela(e);
+        // ✅ Garantir que a tabela existe antes de contar
+        validator.criarTabelaSeNaoExistir(c, tabela);
         
-        final String sql = String.format("SELECT COUNT(*) FROM %s WHERE data_extracao BETWEEN ? AND ?", e);
+        final String sql = String.format("SELECT COUNT(*) FROM %s WHERE data_extracao BETWEEN ? AND ?", tabela);
         try (PreparedStatement s = c.prepareStatement(sql)) {
             s.setTimestamp(1, Timestamp.from(i));
             s.setTimestamp(2, Timestamp.from(f));
@@ -145,7 +153,7 @@ public class AuditoriaService {
             }
         } catch (final SQLException ex) {
             // Fallback: tentar com created_at
-            final String sql2 = String.format("SELECT COUNT(*) FROM %s WHERE created_at BETWEEN ? AND ?", e);
+            final String sql2 = String.format("SELECT COUNT(*) FROM %s WHERE created_at BETWEEN ? AND ?", tabela);
             try (PreparedStatement s = c.prepareStatement(sql2)) {
                 s.setTimestamp(1, Timestamp.from(i));
                 s.setTimestamp(2, Timestamp.from(f));
@@ -154,6 +162,13 @@ public class AuditoriaService {
                 }
             }
         }
+    }
+
+    private String mapearTabela(final String entidade) {
+        return switch (entidade) {
+            case "faturas_a_pagar_data_export" -> "contas_a_pagar";
+            default -> entidade;
+        };
     }
 
     /**

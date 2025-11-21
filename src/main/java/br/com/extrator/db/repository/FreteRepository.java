@@ -78,6 +78,11 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     total_cubic_volume DECIMAL(18, 3),
                     subtotal DECIMAL(18, 2),
 
+                    -- CT-e (chave, número, série)
+                    chave_cte NVARCHAR(100),
+                    numero_cte INT,
+                    serie_cte INT,
+
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
 
@@ -89,6 +94,45 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             executarDDL(conexao, sql);
             logger.info("Tabela {} criada com sucesso.", NOME_TABELA);
         }
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
+            SELECT
+                id AS [ID],
+                chave_cte AS [Chave CT-e],
+                numero_cte AS [Numero CT-e],
+                serie_cte AS [Serie CT-e],
+                servico_em AS [Data frete],
+                valor_total AS [Valor Total do Servico],
+                valor_notas AS [Valor NF],
+                subtotal AS [Valor Frete],
+                invoices_total_volumes AS [Volumes],
+                taxed_weight AS [Kg Taxado],
+                real_weight AS [Kg Real],
+                total_cubic_volume AS [M3],
+                pagador_nome AS [Pagador],
+                remetente_nome AS [Remetente],
+                origem_cidade AS [Origem],
+                origem_uf AS [UF Origem],
+                destinatario_nome AS [Destinatario],
+                destino_cidade AS [Destino],
+                destino_uf AS [UF Destino],
+                filial_nome AS [Filial],
+                tabela_preco_nome AS [Tabela de Preco],
+                classificacao_nome AS [Classificacao],
+                centro_custo_nome AS [Centro de Custo],
+                usuario_nome AS [Usuario],
+                numero_nota_fiscal AS [NF],
+                status AS [Status],
+                modal AS [Modal],
+                tipo_frete AS [Tipo Frete],
+                data_extracao AS [Data de extracao]
+            FROM dbo.fretes;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     /**
@@ -104,10 +148,10 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
         String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
                 AS source (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                            pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
-                           filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, invoices_total_volumes,
+                           filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
                            taxed_weight, real_weight, total_cubic_volume, subtotal, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
@@ -140,6 +184,9 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     centro_custo_nome = source.centro_custo_nome,
                     usuario_nome = source.usuario_nome,
                     reference_number = source.reference_number,
+                    chave_cte = source.chave_cte,
+                    numero_cte = source.numero_cte,
+                    serie_cte = source.serie_cte,
                     invoices_total_volumes = source.invoices_total_volumes,
                     taxed_weight = source.taxed_weight,
                     real_weight = source.real_weight,
@@ -150,11 +197,11 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                         pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
-                        filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, invoices_total_volumes,
+                        filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
                         taxed_weight, real_weight, total_cubic_volume, subtotal, metadata, data_extracao)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
-                        source.filial_nome, source.numero_nota_fiscal, source.tabela_preco_nome, source.classificacao_nome, source.centro_custo_nome, source.usuario_nome, source.reference_number, source.invoices_total_volumes,
+                        source.filial_nome, source.numero_nota_fiscal, source.tabela_preco_nome, source.classificacao_nome, source.centro_custo_nome, source.usuario_nome, source.reference_number, source.chave_cte, source.numero_cte, source.serie_cte, source.invoices_total_volumes,
                         source.taxed_weight, source.real_weight, source.total_cubic_volume, source.subtotal, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
@@ -191,6 +238,17 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setString(paramIndex++, frete.getCentroCustoNome());
             statement.setString(paramIndex++, frete.getUsuarioNome());
             statement.setString(paramIndex++, frete.getReferenceNumber());
+            statement.setString(paramIndex++, frete.getChaveCte());
+            if (frete.getNumeroCte() != null) {
+                statement.setObject(paramIndex++, frete.getNumeroCte(), Types.INTEGER);
+            } else {
+                statement.setNull(paramIndex++, Types.INTEGER);
+            }
+            if (frete.getSerieCte() != null) {
+                statement.setObject(paramIndex++, frete.getSerieCte(), Types.INTEGER);
+            } else {
+                statement.setNull(paramIndex++, Types.INTEGER);
+            }
             statement.setObject(paramIndex++, frete.getInvoicesTotalVolumes(), Types.INTEGER);
             statement.setBigDecimal(paramIndex++, frete.getTaxedWeight());
             statement.setBigDecimal(paramIndex++, frete.getRealWeight());
@@ -199,9 +257,9 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setString(paramIndex++, frete.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             
-            // Verificar se todos os parâmetros foram definidos (36 parâmetros = paramIndex final = 37)
-            if (paramIndex != 37) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 36, definido %d", paramIndex - 1));
+            // Verificar se todos os parâmetros foram definidos (39 parâmetros = paramIndex final = 40)
+            if (paramIndex != 40) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 39, definido %d", paramIndex - 1));
             }
 
             int rowsAffected = statement.executeUpdate();

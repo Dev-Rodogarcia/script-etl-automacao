@@ -61,8 +61,8 @@ public class ClienteApiGraphQL {
      * @param tipoClasse Classe para desserialização tipada
      * @return ResultadoExtracao indicando se a extração foi completa ou interrompida
      */
-    private <T> ResultadoExtracao<T> executarQueryPaginada(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
-        String chaveEntidade = "GraphQL-" + nomeEntidade;
+    private <T> ResultadoExtracao<T> executarQueryPaginada(final String query, final String nomeEntidade, final Map<String, Object> variaveis, final Class<T> tipoClasse) {
+        final String chaveEntidade = "GraphQL-" + nomeEntidade;
         
         // CIRCUIT BREAKER - Verificar se a entidade está com circuit aberto
         if (entidadesComCircuitAberto.contains(chaveEntidade)) {
@@ -72,7 +72,7 @@ public class ClienteApiGraphQL {
         
         logger.info("🔍 Executando query GraphQL paginada para entidade: {}", nomeEntidade);
         
-        List<T> todasEntidades = new ArrayList<>();
+        final List<T> todasEntidades = new ArrayList<>();
         String cursor = null;
         boolean hasNextPage = true;
         int paginaAtual = 1;
@@ -109,13 +109,13 @@ public class ClienteApiGraphQL {
                 logger.debug("Executando página {} da query GraphQL para {}", paginaAtual, nomeEntidade);
                 
                 // Adicionar cursor às variáveis se não for a primeira página
-                Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
+                final Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
                 if (cursor != null) {
                     variaveisComCursor.put("after", cursor);
                 }
 
                 // Executar a query para esta página
-                PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
+                final PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
                 
                 // Adicionar entidades desta página ao resultado total
                 todasEntidades.addAll(resposta.getEntidades());
@@ -135,7 +135,7 @@ public class ClienteApiGraphQL {
                 
                 // Não é mais necessário pausar entre requisições - o GerenciadorRequisicaoHttp já controla o throttling
                 
-            } catch (Exception e) {
+            } catch (final Exception e) {
                 logger.error("💥 Erro ao executar query GraphQL para entidade {} página {}: {}", 
                         nomeEntidade, paginaAtual, e.getMessage(), e);
                 incrementarContadorFalhas(chaveEntidade, nomeEntidade);
@@ -186,10 +186,10 @@ public class ClienteApiGraphQL {
      * @param dataReferencia Data de referência para buscar as coletas (LocalDate)
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
+    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(final LocalDate dataReferencia) {
         // Query GraphQL expandida conforme documentação em docs/descobertas-endpoints/coletas.md
         // Query: BuscarColetasExpandidaV2, Tipo: Pick
-        String query = """
+        final String query = """
                 query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
                     pick(params: $params, after: $after, first: 100) {
                         edges {
@@ -254,21 +254,21 @@ public class ClienteApiGraphQL {
                 }""";
 
         // Calcular dia anterior (ontem)
-        LocalDate diaAnterior = dataReferencia.minusDays(1);
+        final LocalDate diaAnterior = dataReferencia.minusDays(1);
         
         // Lista consolidada para armazenar todas as coletas
-        List<ColetaNodeDTO> todasColetas = new ArrayList<>();
+        final List<ColetaNodeDTO> todasColetas = new ArrayList<>();
         int totalPaginas = 0;
         boolean ambasCompletas = true;
 
         // 1. Buscar coletas do dia anterior (ontem)
         logger.info("🔍 Coletas - Dia 1/2: {}", diaAnterior);
-        String dataAnteriorFormatada = formatarDataParaApiGraphQL(diaAnterior);
-        Map<String, Object> variaveisDiaAnterior = Map.of(
+        final String dataAnteriorFormatada = formatarDataParaApiGraphQL(diaAnterior);
+        final Map<String, Object> variaveisDiaAnterior = Map.of(
             "params", Map.of("requestDate", dataAnteriorFormatada)
         );
         
-        ResultadoExtracao<ColetaNodeDTO> resultadoDiaAnterior = executarQueryPaginada(query, "pick", variaveisDiaAnterior, ColetaNodeDTO.class);
+        final ResultadoExtracao<ColetaNodeDTO> resultadoDiaAnterior = executarQueryPaginada(query, "pick", variaveisDiaAnterior, ColetaNodeDTO.class);
         todasColetas.addAll(resultadoDiaAnterior.getDados());
         totalPaginas += resultadoDiaAnterior.getPaginasProcessadas();
         
@@ -281,12 +281,12 @@ public class ClienteApiGraphQL {
 
         // 2. Buscar coletas do dia atual (hoje)
         logger.info("🔍 Coletas - Dia 2/2: {}", dataReferencia);
-        String dataAtualFormatada = formatarDataParaApiGraphQL(dataReferencia);
-        Map<String, Object> variaveisDataAtual = Map.of(
+        final String dataAtualFormatada = formatarDataParaApiGraphQL(dataReferencia);
+        final Map<String, Object> variaveisDataAtual = Map.of(
             "params", Map.of("requestDate", dataAtualFormatada)
         );
         
-        ResultadoExtracao<ColetaNodeDTO> resultadoDataAtual = executarQueryPaginada(query, "pick", variaveisDataAtual, ColetaNodeDTO.class);
+        final ResultadoExtracao<ColetaNodeDTO> resultadoDataAtual = executarQueryPaginada(query, "pick", variaveisDataAtual, ColetaNodeDTO.class);
         todasColetas.addAll(resultadoDataAtual.getDados());
         totalPaginas += resultadoDataAtual.getPaginasProcessadas();
         
@@ -305,7 +305,7 @@ public class ClienteApiGraphQL {
             return ResultadoExtracao.completo(todasColetas, totalPaginas, todasColetas.size());
         } else {
             // Se qualquer uma das buscas foi incompleta, marcar o resultado como incompleto
-            ResultadoExtracao.MotivoInterrupcao motivo = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
+            final ResultadoExtracao.MotivoInterrupcao motivo = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
             return ResultadoExtracao.incompleto(todasColetas, motivo, totalPaginas, todasColetas.size());
         }
     }
@@ -320,140 +320,81 @@ public class ClienteApiGraphQL {
      * @param dataReferencia Data de referência que representa o FIM do intervalo de busca.
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    public ResultadoExtracao<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
-        // Query GraphQL expandida conforme documentação em docs/descobertas-endpoints/fretes.md
-        // Query: BuscarFretesExpandidaV3, Tipo: FreightBase
-        String query = """
-                query BuscarFretesExpandidaV3($params: FreightInput!, $after: String) {
-                    freight(params: $params, after: $after, first: 100) {
-                        edges {
-                            node {
-                                id
-                                referenceNumber
-                                serviceAt
-                                total
-                                subtotal
-                                invoicesValue
-                                invoicesTotalVolumes
-                                taxedWeight
-                                realWeight
-                                totalCubicVolume
-                                payer {
-                                    id
-                                    name
-                                }
-                                sender {
-                                    id
-                                    name
-                                    mainAddress {
-                                        city {
-                                            name
-                                            state {
-                                                code
-                                            }
-                                        }
-                                    }
-                                }
-                                receiver {
-                                    id
-                                    name
-                                    mainAddress {
-                                        city {
-                                            name
-                                            state {
-                                                code
-                                            }
-                                        }
-                                    }
-                                }
-                                corporation {
-                                    name
-                                }
-                                customerPriceTable {
-                                    name
-                                }
-                                freightClassification {
-                                    name
-                                }
-                                costCenter {
-                                    name
-                                }
-                                accountingCreditId
-                                accountingCreditInstallmentId
-                                adValoremSubtotal
-                                additionalsSubtotal
-                                admFeeSubtotal
-                                calculationType
-                                collectSubtotal
-                                comments
-                                corporationId
-                                costCenterId
-                                createdAt
-                                cubagesCubedWeight
-                                customerPriceTableId
-                                deliveryDeadlineInDays
-                                deliveryPredictionDate
-                                deliveryPredictionHour
-                                deliveryRegionId
-                                deliverySubtotal
-                                destinationCityId
-                                dispatchSubtotal
-                                draftEmissionAt
-                                emergencySubtotal
-                                emissionType
-                                finishedAt
-                                freightClassificationId
-                                freightCubagesCount
-                                freightInvoicesCount
-                                freightWeightSubtotal
-                                globalized
-                                globalizedType
-                                grisSubtotal
-                                insuranceAccountableType
-                                insuranceEnabled
-                                insuranceId
-                                insuredValue
-                                invoicesWeight
-                                itrSubtotal
-                                km
-                                modal
-                                modalCte
-                                nfseNumber
-                                nfseSeries
-                                otherFees
-                                paymentAccountableType
-                                paymentType
-                                previousDocumentType
-                                priceTableAccountableType
-                                productsValue
-                                redispatchSubtotal
-                                secCatSubtotal
-                                serviceDate
-                                serviceType
-                                status
-                                suframaSubtotal
-                                tdeSubtotal
-                                tollSubtotal
-                                trtSubtotal
-                                type
-                            }
-                        }
-                        pageInfo {
-                            hasNextPage
-                            endCursor
-                        }
+    public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataReferencia) {
+        final String query = """
+                query BuscarFretesProducaoV5_1($params: FreightInput!, $after: String) {
+                  freight(params: $params, after: $after, first: 100) {
+                    edges {
+                      node {
+                        id
+                        referenceNumber
+                        serviceAt
+                        createdAt
+                        cte { key number series }
+                        total
+                        subtotal
+                        invoicesValue
+                        invoicesWeight
+                        taxedWeight
+                        realWeight
+                        totalCubicVolume
+                        invoicesTotalVolumes
+                        freightInvoices { invoice { number series key value weight } }
+                        sender { id name mainAddress { city { name state { code } } } }
+                        receiver { id name mainAddress { city { name state { code } } } }
+                        payer { id name }
+                        modal
+                        modalCte
+                        status
+                        type
+                        serviceDate
+                        serviceType
+                        deliveryPredictionDate
+                        corporation { name }
+                        customerPriceTable { name }
+                        freightClassification { name }
+                        costCenter { name }
+                        destinationCityId
+                        corporationId
+                        freightWeightSubtotal
+                        globalized
+                        globalizedType
+                        grisSubtotal
+                        insuranceAccountableType
+                        insuranceEnabled
+                        insuranceId
+                        insuredValue
+                        itrSubtotal
+                        km
+                        nfseNumber
+                        nfseSeries
+                        otherFees
+                        paymentAccountableType
+                        paymentType
+                        previousDocumentType
+                        priceTableAccountableType
+                        productsValue
+                        redispatchSubtotal
+                        secCatSubtotal
+                        suframaSubtotal
+                        tdeSubtotal
+                        tollSubtotal
+                        trtSubtotal
+                      }
                     }
+                    pageInfo { hasNextPage endCursor }
+                  }
                 }""";
 
         // --- INÍCIO DAS MUDANÇAS ---
 
         // 1. Calcular o intervalo de 24 horas
-        LocalDate dataInicio = dataReferencia.minusDays(1);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
+        final LocalDate dataInicio = dataReferencia.minusDays(1);
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        final String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
 
         // 2. Construir variáveis SEM o corporationId, usando o intervalo de datas
-        Map<String, Object> variaveis = Map.of(
+        final Map<String, Object> variaveis = Map.of(
             "params", Map.of("serviceAt", intervaloServiceAt)
         );
 
@@ -462,7 +403,7 @@ public class ClienteApiGraphQL {
         logger.debug("Executando query GraphQL para fretes - URL: {}{}, Variáveis: {}", 
                     urlBase, endpointGraphQL, variaveis);
 
-        ResultadoExtracao<FreteNodeDTO> resultado = executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
+        final ResultadoExtracao<FreteNodeDTO> resultado = executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
         
         // 4. Atualizar o log de resultado
         if (resultado.getDados().isEmpty()) {
@@ -485,11 +426,11 @@ public class ClienteApiGraphQL {
      * @param tipoClasse   Classe para desserialização tipada
      * @return Resposta paginada contendo entidades tipadas e informações de paginação
      */
-    private <T> PaginatedGraphQLResponse<T> executarQueryGraphQLTipado(String query, String nomeEntidade,
-            Map<String, Object> variaveis, Class<T> tipoClasse) {
+    private <T> PaginatedGraphQLResponse<T> executarQueryGraphQLTipado(final String query, final String nomeEntidade,
+            final Map<String, Object> variaveis, final Class<T> tipoClasse) {
         logger.debug("Executando query GraphQL tipada para {} - URL: {}{}, Variáveis: {}", 
                     nomeEntidade, urlBase, endpointGraphQL, variaveis);
-        List<T> entidades = new ArrayList<>();
+        final List<T> entidades = new ArrayList<>();
         boolean hasNextPage = false;
         String endCursor = null;
 
@@ -501,7 +442,7 @@ public class ClienteApiGraphQL {
 
         try {
             // Construir o corpo da requisição GraphQL usando ObjectMapper
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            final ObjectNode corpoJson = mapeadorJson.createObjectNode();
             corpoJson.put("query", query);
             if (variaveis != null && !variaveis.isEmpty()) {
                 corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
@@ -509,7 +450,7 @@ public class ClienteApiGraphQL {
             final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
 
             // Construir a requisição HTTP
-            HttpRequest requisicao = HttpRequest.newBuilder()
+            final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(urlBase + endpointGraphQL))
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + token)
@@ -518,14 +459,14 @@ public class ClienteApiGraphQL {
                     .build();
 
             // Executar a requisição usando o gerenciador central
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-" + nomeEntidade);
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-" + nomeEntidade);
 
             // Parsear a resposta JSON
-            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+            final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
 
             // Verificar se há erros na resposta GraphQL
             if (respostaJson.has("errors")) {
-                JsonNode erros = respostaJson.get("errors");
+                final JsonNode erros = respostaJson.get("errors");
                 logger.error("Erros na query GraphQL para {}: {}", nomeEntidade, erros.toString());
                 return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
@@ -536,27 +477,27 @@ public class ClienteApiGraphQL {
                 return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
 
-            JsonNode dados = respostaJson.get("data");
+            final JsonNode dados = respostaJson.get("data");
             if (!dados.has(nomeEntidade)) {
                 logger.warn("Campo '{}' não encontrado na resposta GraphQL. Campos disponíveis: {}",
                         nomeEntidade, dados.fieldNames());
                 return new PaginatedGraphQLResponse<>(entidades, false, null);
             }
 
-            JsonNode dadosEntidade = dados.get(nomeEntidade);
+            final JsonNode dadosEntidade = dados.get(nomeEntidade);
 
             // Verificar se a resposta segue o padrão paginado com edges/node
             if (dadosEntidade.has("edges")) {
                 logger.debug("Processando resposta paginada com edges/node para {}", nomeEntidade);
-                JsonNode edges = dadosEntidade.get("edges");
+                final JsonNode edges = dadosEntidade.get("edges");
 
                 if (edges.isArray()) {
-                    for (JsonNode edge : edges) {
+                    for (final JsonNode edge : edges) {
                         if (edge.has("node")) {
-                            JsonNode node = edge.get("node");
+                            final JsonNode node = edge.get("node");
                             try {
                                 // Deserializa diretamente para a classe tipada usando Jackson
-                                T entidade = mapeadorJson.treeToValue(node, tipoClasse);
+                                final T entidade = mapeadorJson.treeToValue(node, tipoClasse);
                                 entidades.add(entidade);
                             } catch (JsonProcessingException | IllegalArgumentException e) {
                                 logger.warn("Erro ao deserializar node de {} para {}: {}", 
@@ -568,7 +509,7 @@ public class ClienteApiGraphQL {
                 
                 // Extrair informações de paginação do pageInfo
                 if (dadosEntidade.has("pageInfo")) {
-                    JsonNode pageInfo = dadosEntidade.get("pageInfo");
+                    final JsonNode pageInfo = dadosEntidade.get("pageInfo");
                     if (pageInfo.has("hasNextPage")) {
                         hasNextPage = pageInfo.get("hasNextPage").asBoolean();
                     }
@@ -582,10 +523,10 @@ public class ClienteApiGraphQL {
                 logger.debug("Processando resposta no formato antigo (array direto) para {}", nomeEntidade);
 
                 if (dadosEntidade.isArray()) {
-                    for (JsonNode item : dadosEntidade) {
+                    for (final JsonNode item : dadosEntidade) {
                         try {
                             // Deserializa diretamente para a classe tipada usando Jackson
-                            T entidade = mapeadorJson.treeToValue(item, tipoClasse);
+                            final T entidade = mapeadorJson.treeToValue(item, tipoClasse);
                             entidades.add(entidade);
                         } catch (JsonProcessingException | IllegalArgumentException e) {
                             logger.warn("Erro ao deserializar item de {} para {}: {}", 
@@ -597,9 +538,9 @@ public class ClienteApiGraphQL {
 
             logger.debug("Query GraphQL tipada concluída para {}. Total encontrado: {}", nomeEntidade, entidades.size());
 
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("Erro de processamento JSON durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             logger.error("Erro durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
         }
 
@@ -616,26 +557,26 @@ public class ClienteApiGraphQL {
 
         try {
             // Query simples para testar a conectividade
-            String queryTeste = "{ __schema { queryType { name } } }";
+            final String queryTeste = "{ __schema { queryType { name } } }";
 
             // Construir o corpo da requisição GraphQL usando ObjectMapper
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            final ObjectNode corpoJson = mapeadorJson.createObjectNode();
             corpoJson.put("query", queryTeste);
-            String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
+            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
 
-            String url = urlBase + endpointGraphQL;
-            HttpRequest requisicao = HttpRequest.newBuilder()
+            final String url = urlBase + endpointGraphQL;
+            final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
                     .build();
 
-            HttpResponse<String> resposta = clienteHttp.send(requisicao, HttpResponse.BodyHandlers.ofString());
+            final HttpResponse<String> resposta = clienteHttp.send(requisicao, HttpResponse.BodyHandlers.ofString());
 
             if (resposta.statusCode() == 200) {
-                JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
-                boolean sucesso = !respostaJson.has("errors");
+                final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+                final boolean sucesso = !respostaJson.has("errors");
 
                 if (sucesso) {
                     logger.info("✅ Validação da API GraphQL bem-sucedida");
@@ -661,7 +602,7 @@ public class ClienteApiGraphQL {
      * @param data A data a ser formatada
      * @return String no formato YYYY-MM-DD
      */
-    private String formatarDataParaApiGraphQL(LocalDate data) {
+    private String formatarDataParaApiGraphQL(final LocalDate data) {
         return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 
@@ -671,8 +612,8 @@ public class ClienteApiGraphQL {
      * @param chaveEntidade Chave identificadora da entidade GraphQL
      * @param nomeEntidade Nome amigável da entidade para logs
      */
-    private void incrementarContadorFalhas(String chaveEntidade, String nomeEntidade) {
-        int falhas = contadorFalhasConsecutivas.getOrDefault(chaveEntidade, 0) + 1;
+    private void incrementarContadorFalhas(final String chaveEntidade, final String nomeEntidade) {
+        final int falhas = contadorFalhasConsecutivas.getOrDefault(chaveEntidade, 0) + 1;
         contadorFalhasConsecutivas.put(chaveEntidade, falhas);
         
         if (falhas >= MAX_FALHAS_CONSECUTIVAS) {

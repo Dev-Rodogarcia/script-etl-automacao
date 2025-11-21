@@ -150,6 +150,40 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             executarDDL(conexao, sqlIndex);
             logger.info("Tabela {} criada com sucesso (chave composta: sequence_code + identificador_unico).", NOME_TABELA);
         }
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
+            SELECT
+                sequence_code AS [Número],
+                branch_nickname AS [Filial],
+                created_at AS [Data criação],
+                classification AS [Classificação],
+                status AS [Status],
+                departured_at AS [Data Saída],
+                closed_at AS [Data Fechamento],
+                invoices_volumes AS [Volumes NF],
+                invoices_count AS [Qtd NF],
+                invoices_value AS [Valor NF],
+                invoices_weight AS [Peso NF],
+                vehicle_owner AS [Proprietário/Nome],
+                driver_name AS [Motorista],
+                vehicle_plate AS [Veículo/Placa],
+                vehicle_type AS [Veículo/Tipo],
+                vehicle_departure_km AS [KM Saída],
+                closing_km AS [KM Fechamento],
+                traveled_km AS [KM Rodado],
+                total_cost AS [Custo Total],
+                paying_total AS [Custo (Líquido)],
+                mdfe_key AS [Chave MDFe],
+                mdfe_status AS [Status MDFe],
+                creation_user_name AS [Usuário],
+                data_extracao AS [Data de extracao]
+            FROM dbo.manifestos;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     /**

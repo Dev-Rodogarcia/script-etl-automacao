@@ -1,137 +1,124 @@
-## 📄 Documentação de Descoberta: API GraphQL (Fretes) 
+## 📄 Documentação de Descoberta: API GraphQL (Fretes)
 
 ### 1\. Objetivo
 
-Identificar e validar o schema da entidade "Fretes" (tipo `FreightBase` na API) para garantir 100% de cobertura estrutural (mapeamento de schema) em relação ao arquivo CSV de origem (`frete_relacao_analitico...csv`).
+Padronizar a extração da entidade "Fretes" (tipo `FreightBase` na API) para garantir **100% de integridade de dados** e **correspondência exata (Join)** com os relatórios analíticos extraídos manualmente (`frete_relacao_analitico...csv`). Esta documentação substitui versões anteriores, corrigindo falhas críticas de mapeamento de chaves fiscais e dados aninhados.
 
 ### 2\. Metodologia de Descoberta e Validação
 
-O processo exigiu múltiplas etapas de *Introspection* para corrigir os erros nos nomes de entidades e campos presumidos pelo guia `03-requisicoes-api-graphql.md`.
+O processo de validação (Versão 5.1) identificou e resolveu três bloqueios críticos que impediam a conciliação dos dados:
 
-1.  **Endpoint e Autenticação (Sucesso):**
+1.  **Correção do JOIN (Chave de Acesso):**
 
-      * O endpoint `POST {{base_url}}/graphql` foi validado.
-      * A autenticação `Bearer {{token_graphql}}` (configurada no ambiente) foi validada com sucesso, retornando `200 OK` nas queries } }, "data": { "\_\_type": { "name": "FreightBase", ... } }, "data": { "freight": { "edges": [...] } }].
+      * **Falha:** A tentativa de usar `referenceNumber` ou `id` resultava em 0% de cruzamento com o CSV manual.
+      * **Descoberta:** Via Introspection, localizamos o objeto aninhado `cte`.
+      * **Correção:** A chave de 44 dígitos (PK real) reside em `cte { key }`.
 
-2.  **Descoberta do Nome da Entidade (Correção):**
+2.  **Dados de Notas Fiscais (NFs):**
 
-      * **Falha:** O teste `__type(name: "Freight")` (sugerido pelo guia) falhou, retornando `null`.
-      * **Descoberta:** A query `ListarTypes` foi executada, listando todos os tipos da API } }].
-      * **Correção:** O nome correto da entidade de "Fretes" foi identificado como `FreightBase` } }].
+      * **Falha:** A lista `freightInvoices` parecia vazia ou sem detalhes na raiz.
+      * **Descoberta:** A estrutura correta é uma tabela de ligação (pivô).
+      * **Correção:** Os dados reais estão em `freightInvoices { invoice { number, series, value } }`.
 
-3.  **Introspection (Nível 1 - FreightBase):**
+3.  **Ambiguidade de Valores Financeiros:**
 
-      * A query `__type(name: "FreightBase")` foi executada com sucesso, retornando a lista completa de **187 campos**.
-      * Isso validou que os 66 campos da query `[ATUAL]` do guia (como `payerId`, `senderId`, `receiverId`, etc.) realmente existem.
-
-4.  **Validação de Dados (Campos Simples):**
-
-      * A query `[ATUAL] Buscar Fretes` (com `totalCount` removido, pois ele não existe "message": "Field 'totalCount' doesn't exist on type 'PageInfo'"]) foi executada com sucesso, retornando dados (`200 OK`) } }].
-
-5.  **Descoberta dos Campos Relacionais (Correção):**
-
-      * **Falha:** A primeira tentativa de query `[EXPANDIDA]` falhou, pois o tipo `Person` (usado para `sender` e `receiver`) não possui o campo `city` "message": "Field 'city' doesn't exist on type 'Person'"].
-      * **Introspection (Nível 2 - Person):** A query `__type(name: "Person")` foi executada com sucesso, revelando que o campo de endereço correto é `mainAddress` (do tipo `Address`).
-      * **Introspection (Nível 3 - Endereço):** A Introspection dos tipos `Address`, `City` e `State` (feita durante a análise de "Coletas") revelou os nomes corretos dos sub-campos (ex: `city { name }` e `state { code }`).
-
-6.  **Validação Final (Sucesso Estrutural):**
-
-      * A query final `BuscarFretesExpandidaV3` (usando `sender { mainAddress { city { name state { code } } } }`) foi executada com sucesso, retornando `200 OK` e o JSON com os dados aninhados de endereço e cliente } } (última resposta JSON)].
-
-7.  **Validação de Volume (Inconclusiva):**
-
-      * A meta era de \~400 fretes.
-      * A API não fornece `totalCount` "message": "Field 'totalCount' doesn't exist on type 'PageInfo'"].
-      * A extração de dados deve ser paginada (usando `endCursor`) até que `hasNextPage` seja `false` } } (última resposta JSON)].
+      * **Análise:** A API separa estritamente `subtotal` (Frete Peso) de `total` (Frete + Taxas/Impostos). O relatório manual muitas vezes replica o valor total na coluna de frete.
+      * **Validação:** O campo `total` da API foi validado com precisão de centavos em relação ao CSV.
 
 -----
 
-### 3\. Configuração Final no Insomnia (Fretes)
+### 3\. Configuração Final no Insomnia (Produção)
 
-Esta é a configuração da requisição que valida o mapeamento completo do schema de Fretes.
+Utilize esta configuração para a extração massiva dos dados.
 
 #### 3.1. Pasta
 
-`API GraphQL / Fretes`
+`API GraphQL / Fretes / Produção`
 
 #### 3.2. Requisição
 
-  * **Nome:** `[EXPANDIDA] Fretes + Relacionamentos (V3)`
+  * **Nome:** `[PRODUÇÃO] Extração Fretes Full Schema (V5.1)`
   * **Método:** `POST`
   * **URL:** `{{base_url}}/graphql`
 
-#### 3.3. Body (Corpo)
+#### 3.3. Body (Query GraphQL Validada)
 
-  * **Tipo:** `GraphQL`
-  * **Painel QUERY (Query Válida):**
-    ```graphql
-    query BuscarFretesExpandidaV3($params: FreightInput!, $after: String) {
-      freight(params: $params, after: $after, first: 100) {
-        edges {
-          node {
-            # --- Campos Simples (Amostra) ---
-            id
-            referenceNumber # (Nº CT-e ou Referência)
-            serviceAt       # (Data Frete)
-            total           # (Valor Total)
+```graphql
+query BuscarFretesProducaoV5_1($params: FreightInput!, $after: String) {
+  freight(params: $params, after: $after, first: 100) {
+    edges {
+      node {
+        # --- 1. Identificadores e Chaves ---
+        id              # ID Interno
+        referenceNumber # Referência da Rota/Cliente
+        serviceAt       # Data de Emissão
 
-            # --- Campos Expandidos (Mapeamento CSV) ---
-            
-            # Mapeia: Pagador
-            payer {
-              id
-              name
-            }
-            
-            # Mapeia: Remetente e Origem
-            sender {
-              id
-              name
-              mainAddress {
-                city {
-                  name # (Origem)
-                  state {
-                    code # (UF Origem)
-                  }
-                }
-              }
-            }
-            
-            # Mapeia: Destinatario e Destino
-            receiver {
-              id
-              name
-              mainAddress {
-                city {
-                  name # (Destino)
-                  state {
-                    code # (UF Destino)
-                  }
-                }
-              }
-            }
-            
-            # (Adicionar aqui os outros 60+ campos simples validados)
-            # (Ex: invoicesValue, taxedWeight, realWeight, etc.)
+        # [CRÍTICO] Objeto Fiscal CT-e (Correção do Join)
+        cte {
+          key     # <--- CHAVE DE 44 DÍGITOS (JOIN)
+          number  # Número do CT-e
+          series  # Série
+        }
+
+        # --- 2. Valores Financeiros ---
+        total           # Valor Total do Serviço (Validado)
+        subtotal        # Valor do Frete Peso
+        invoicesValue   # Valor da Carga (Soma NFs)
+
+        # --- 3. Métricas Físicas ---
+        taxedWeight          # Kg Taxado
+        realWeight           # Kg Real
+        totalCubicVolume     # M3 (Cubagem)
+        invoicesTotalVolumes # Volumes
+
+        # --- 4. Notas Fiscais (Lista Aninhada) ---
+        freightInvoices {
+          invoice {
+            number
+            series
+            key     # Chave da NF-e
+            value   # Valor da Nota
           }
         }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-    }
-    ```
-  * **Painel VARIABLES:**
-    ```json
-    {
-      "params": {
-        "serviceAt": "{{data_inicio}} - {{data_fim}}"
-      }
-    }
-    ```
 
-#### 3.4. Headers (Autenticação)
+        # --- 5. Atores e Endereços (Expandidos) ---
+        sender {
+          name
+          mainAddress { city { name state { code } } }
+        }
+        receiver {
+          name
+          mainAddress { city { name state { code } } }
+        }
+        payer { name }
+        
+        # --- 6. Classificadores ---
+        modal           # Tipo String (ex: "rodo")
+        corporation { name }           # Filial
+        customerPriceTable { name }    # Tabela de Preço
+        freightClassification { name } # Classificação
+        costCenter { name }            # Centro de Custo
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
+
+#### 3.4. Variables (JSON)
+
+```json
+{
+  "params": {
+    "serviceAt": "{{data_inicio}} - {{data_fim}}"
+  }
+}
+```
+
+#### 3.5. Headers
 
 | Header | Valor |
 | :--- | :--- |
@@ -142,107 +129,326 @@ Esta é a configuração da requisição que valida o mapeamento completo do sch
 
 ### 4\. Análise de Cobertura de Schema (CSV vs. API)
 
-O mapeamento estrutural entre o CSV de origem e a query GraphQL expandida foi validado.
+O mapeamento estrutural entre o CSV de origem e a query GraphQL expandida foi validado comparando a API (V5.1) contra o arquivo `frete_relacao_analitico_21-11-2025.csv`.
 
-  * **Fonte CSV:** `frete_relacao_analitico_03-11-2025_19-23.csv`
-  * **Fonte API:** Query `BuscarFretesExpandidaV3` (baseada na Introspection)
-
-| Coluna CSV (Origem) | Query GraphQL (Destino) | Status |
+| Coluna CSV (Manual) | Caminho JSON (API) | Status Validação |
 | :--- | :--- | :--- |
-| `Filial` | `corporation { name }` *(Requer expansão)* | ✅ **Mapeado** |
-| `Pagador` | `payer { name }` | ✅ **Mapeado** |
-| `Remetente` | `sender { name }` | ✅ **Mapeado** |
-| `Origem` | `sender { mainAddress { city { name } } }`| ✅ **Mapeado** |
-| `UF Origem` | `sender { mainAddress { city { state { code } } } }`| ✅ **Mapeado** |
-| `Destinatario` | `receiver { name }` | ✅ **Mapeado** |
-| `Destino` | `receiver { mainAddress { city { name } } }`| ✅ **Mapeado** |
-| `UF Destino` | `receiver { mainAddress { city { state { code } } } }`| ✅ **Mapeado** |
-| `Data frete` | `serviceAt` | ✅ **Mapeado** |
-| `Nº CT-e` | `id` (ou `referenceNumber`) | ✅ **Mapeado** |
-| `NF` | `freightInvoices { number }` *(Requer expansão)* | ✅ **Mapeado** |
-| `Volumes` | `invoicesTotalVolumes` | ✅ **Mapeado** |
-| `Kg Taxado` | `taxedWeight` | ✅ **Mapeado** |
-| `Kg Real` | `realWeight` | ✅ **Mapeado** |
-| `M3` | `totalCubicVolume` | ✅ **Mapeado** |
-| `Valor NF` | `invoicesValue` | ✅ **Mapeado** |
-| `Valor Frete` | `subtotal` | ✅ **Mapeado** |
-| `Valor Total do Servi...`| `total` | ✅ **Mapeado** |
-| `Tabela de Preço` | `customerPriceTable { name }` *(Requer expansão)* | ✅ **Mapeado** |
-| `Classificação` | `freightClassification { name }` *(Requer expansão)* | ✅ **Mapeado** |
-| `Centro de Custo` | `costCenter { name }` *(Requer expansão)* | ✅ **Mapeado** |
-| `Usuário` | `user { name }` *(Requer expansão)* | ✅ **Mapeado** |
-
-*(Nota: Os campos `corporation`, `freightInvoices`, `customerPriceTable`, `freightClassification` e `costCenter` são objetos que também precisam ser expandidos na query, assim como fizemos com `sender` e `receiver`, para obter seus nomes).*
+| `Chave CT-e` | `cte { key }` | ✅ **100% (JOIN)** |
+| `Nº CT-e` | `cte { number }` | ✅ **Validado** |
+| `Série` | `cte { series }` | ✅ **Validado** |
+| `Data frete` | `serviceAt` | ✅ **Validado** |
+| `Valor Total do Serviço`| `total` | ✅ **100% Exato** |
+| `Valor Frete` | `subtotal` | ✅ **Validado** |
+| `Valor NF` | `invoicesValue` | ✅ **100% Exato** |
+| `Kg Taxado` | `taxedWeight` | ✅ **Validado** |
+| `Kg Real` | `realWeight` | ✅ **Validado** |
+| `M3` | `totalCubicVolume` | ✅ **Validado** |
+| `NF` | `freightInvoices { invoice { number } }` | ✅ **Mapeado (Lista)** |
+| `Filial` | `corporation { name }` | ✅ **Validado** |
+| `Remetente` | `sender { name }` | ✅ **Validado** |
+| `Destinatario` | `receiver { name }` | ✅ **Validado** |
+| `Pagador` | `payer { name }` | ✅ **Validado** |
+| `Origem / UF` | `sender { mainAddress { city { name } } }` | ✅ **Validado** |
+| `Destino / UF` | `receiver { mainAddress { city { name } } }`| ✅ **Validado** |
 
 ### 5\. Conclusão
 
-A cobertura do schema para "Fretes" é de **100%**. A API `FreightBase` é altamente relacional e contém todos os campos necessários para preencher o CSV de "Fretes", exigindo a expansão de múltiplos objetos aninhados.
+A validação técnica foi concluída com sucesso.
 
-{
+  * **Cobertura:** 100% dos campos críticos mapeados.
+  * **Integridade:** Join perfeito utilizando a chave de 44 dígitos oculta no objeto `cte`.
+  * **Status:** Aprovado para implementação em produção no pipeline de dados.
+
+
+  {
 	"data": {
 		"freight": {
 			"edges": [
 				{
 					"node": {
-						"id": 41736081,
-						"referenceNumber": "2012129794",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 79.05,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42551850,
+						"referenceNumber": "RJ X NITERÓI ",
+						"serviceAt": "2025-11-21T07:47:00-03:00",
+						"cte": {
+							"key": "33251160960473001304570030000017781255726754",
+							"number": 1778,
+							"series": 3
 						},
+						"total": 111.18,
+						"subtotal": 86.72,
+						"taxedWeight": 54.825,
+						"realWeight": 26.2,
+						"totalCubicVolume": 0.18275,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 1985.9,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "322",
+									"series": "1",
+									"key": "33251117774419000101550010000003221630745914",
+									"value": 1985.9,
+									"weight": 26.2
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "W I N S MARQUES DISTRIBUIDORA DE PRODUTOS E SERVICOS EPP",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "Rio de Janeiro",
 									"state": {
-										"code": "SP"
+										"code": "RJ"
 									}
 								}
 							}
 						},
 						"receiver": {
-							"id": "7416060",
-							"name": "SMART CHILLER INDUSTRIA E COMERCIO LTDA",
+							"name": "RENATA DE OLIVEIRA BENDIA ",
 							"mainAddress": {
 								"city": {
-									"name": "Mairiporã",
+									"name": "Maricá",
 									"state": {
-										"code": "SP"
+										"code": "RJ"
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "W I N S MARQUES DISTRIBUIDORA DE PRODUTOS E SERVICOS EPP"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "PROMOCIONAL RJR"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41736633,
-						"referenceNumber": "2012129622",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 355.67,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42552619,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T08:17:00-03:00",
+						"cte": {
+							"key": "35251160960473001134570030000350131602694953",
+							"number": 35013,
+							"series": 3
 						},
+						"total": 400.0,
+						"subtotal": 352.0,
+						"taxedWeight": 162.0,
+						"realWeight": 162.0,
+						"totalCubicVolume": 0.51948,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 7627.68,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "7301",
+									"series": "1",
+									"key": "35251013638872000121550010000073011801129239",
+									"value": 7627.68,
+									"weight": 162.0
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "BIOSANUS INDUSTRIA DE SUPLEMENTOS ALIMENTARES LTDA",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "Agudos",
 									"state": {
 										"code": "SP"
 									}
 								}
 							}
 						},
+						"receiver": null,
+						"payer": {
+							"name": "BIOSANUS INDUSTRIA DE SUPLEMENTOS ALIMENTARES LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "LABORATORIO FARMACEUTICO TAUHERE O.H. LTDA"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42552825,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T08:20:00-03:00",
+						"cte": {
+							"key": "35251160960473001134570030000350141309821120",
+							"number": 35014,
+							"series": 3
+						},
+						"total": 100.09,
+						"subtotal": 100.09,
+						"taxedWeight": 30.0,
+						"realWeight": 30.0,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 5.16,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "263913",
+									"series": "3",
+									"key": "35251144519650000113550030002639131497937193",
+									"value": 5.16,
+									"weight": 30.0
+								}
+							}
+						],
+						"sender": {
+							"name": "PIZATTO & CIA LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "Dois Córregos",
+									"state": {
+										"code": "SP"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "PIZATTO & CIA LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "PIZATTO"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42558831,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:12:00-03:00",
+						"cte": {
+							"key": "35251160960473000243570030000874851997387531",
+							"number": 87485,
+							"series": 3
+						},
+						"total": 78.02,
+						"subtotal": 68.66,
+						"taxedWeight": 50.5,
+						"realWeight": 50.5,
+						"totalCubicVolume": 0.129654,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 878.09,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "22549",
+									"series": "1",
+									"key": "41251110345032000182550010000225491655450964",
+									"value": 878.09,
+									"weight": 50.5
+								}
+							}
+						],
+						"sender": {
+							"name": "OGGI COMERCIO DE MOVEIS LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "São José dos Pinhais",
+									"state": {
+										"code": "PR"
+									}
+								}
+							}
+						},
 						"receiver": {
-							"id": "7460792",
-							"name": "ZEON REFRIGERACAO LTDA",
+							"name": "OGGI COMERCIO DE MOVEIS LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "São José dos Pinhais",
+									"state": {
+										"code": "PR"
+									}
+								}
+							}
+						},
+						"payer": {
+							"name": "OGGI COMERCIO DE MOVEIS LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "OGGI COMERCIO DE MOVEIS"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42560244,
+						"referenceNumber": "DUQUE DE CAXIAS X SP",
+						"serviceAt": "2025-11-21T10:19:00-03:00",
+						"cte": {
+							"key": "33251160960473001304570030000017791526189005",
+							"number": 1779,
+							"series": 3
+						},
+						"total": 213.43,
+						"subtotal": 213.43,
+						"taxedWeight": 92.0,
+						"realWeight": 92.0,
+						"totalCubicVolume": 0.2737,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 17698.5,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "31237",
+									"series": "55",
+									"key": "33251129348695000189550550000312371570000036",
+									"value": 17698.5,
+									"weight": 92.0
+								}
+							}
+						],
+						"sender": {
+							"name": "SACOR SIDEROTECNICA LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "Duque de Caxias",
+									"state": {
+										"code": "RJ"
+									}
+								}
+							}
+						},
+						"receiver": {
+							"name": "JAPKS LOGISTICA E TRANSPORTES LTDA",
 							"mainAddress": {
 								"city": {
 									"name": "São Paulo",
@@ -251,430 +457,62 @@ A cobertura do schema para "Fretes" é de **100%**. A API `FreightBase` é altam
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "JAPKS LOGISTICA E TRANSPORTES LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "JAPKS"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41732949,
-						"referenceNumber": "2012129587",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 31.05,
-						"payer": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42561469,
+						"referenceNumber": "GUARULHOS X BARIRI",
+						"serviceAt": "2025-11-21T10:40:00-03:00",
+						"cte": {
+							"key": "35251151863654000260570010000000301916680754",
+							"number": 30,
+							"series": 1
 						},
+						"total": 5200.0,
+						"subtotal": 4576.0,
+						"taxedWeight": 4875.0,
+						"realWeight": 3000.0,
+						"totalCubicVolume": 16.25,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 1000000.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "1907",
+									"series": "1",
+									"key": "35251148612683000164550010000019071595248798",
+									"value": 195137.0,
+									"weight": 150.0
+								}
+							},
+							{
+								"invoice": {
+									"number": "1908",
+									"series": "1",
+									"key": "35251148612683000164550010000019081246124144",
+									"value": 804863.0,
+									"weight": 3300.0
+								}
+							}
+						],
 						"sender": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Osasco",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7460792",
-							"name": "ZEON REFRIGERACAO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41735756,
-						"referenceNumber": "2012139773",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 44.03,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7416431",
-							"name": "F SANTOS & FILHOS ACESSORIOS INDUST EIRELI",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736173,
-						"referenceNumber": "2012129588",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 178.74,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7460792",
-							"name": "ZEON REFRIGERACAO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736460,
-						"referenceNumber": "2012129673",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 37.23,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7348024",
-							"name": "THYSSENKRUPP ELEVADORES SA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41735750,
-						"referenceNumber": "2012142033",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 48.7,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7368232",
-							"name": "FRIGOTECNICA IND. E COM. DE EQUIP. P/ REFRIG. LTDA - EPP",
-							"mainAddress": {
-								"city": {
-									"name": "Ribeirão Pires",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41735987,
-						"referenceNumber": "2012129789",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 38.56,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7352696",
-							"name": "NEWSET TECNOLOGIA EM CLIMATIZACAO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736135,
-						"referenceNumber": "2012129721",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 46.65,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7480044",
-							"name": "VIA LOG LOGISTICA E TRANSPORTES LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736177,
-						"referenceNumber": "2012129779",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 57.58,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7480044",
-							"name": "VIA LOG LOGISTICA E TRANSPORTES LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736064,
-						"referenceNumber": "2012129777",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 36.38,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7480044",
-							"name": "VIA LOG LOGISTICA E TRANSPORTES LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41736481,
-						"referenceNumber": "2012129778",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 40.42,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7480044",
-							"name": "VIA LOG LOGISTICA E TRANSPORTES LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41732750,
-						"referenceNumber": "2012137295",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 286.13,
-						"payer": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Osasco",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7416003",
-							"name": "COZIL EQUIPAMENTOS INDUSTRIAIS LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Itaquaquecetuba",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41732742,
-						"referenceNumber": "2012137303",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 104.4,
-						"payer": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
-						},
-						"sender": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Osasco",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						},
-						"receiver": {
-							"id": "7348036",
-							"name": "REFRIGERACAO DUFRIO COMERCIO E IMPORTACAO SA",
+							"name": "SILME INDUSTRIA DE PRENSAS HIDRAULICAS LTDA",
 							"mainAddress": {
 								"city": {
 									"name": "Guarulhos",
@@ -683,34 +521,65 @@ A cobertura do schema para "Fretes" é de **100%**. A API `FreightBase` é altam
 									}
 								}
 							}
-						}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "HIDRODOMI DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "TRANSPORTADORA RODOGARCIA LTDA"
+						},
+						"customerPriceTable": {
+							"name": "HIDRODOMI DO BRASIL"
+						},
+						"freightClassification": {
+							"name": "FECHADO - FTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41732239,
-						"referenceNumber": "2012128715",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 221.63,
-						"payer": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42562545,
+						"referenceNumber": "RJ X SP",
+						"serviceAt": "2025-11-21T10:46:00-03:00",
+						"cte": {
+							"key": "33251160960473001304570030000017801792993962",
+							"number": 1780,
+							"series": 3
 						},
+						"total": 302.21,
+						"subtotal": 302.21,
+						"taxedWeight": 264.0,
+						"realWeight": 264.0,
+						"totalCubicVolume": 0.52,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 6004.48,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "61930",
+									"series": "3",
+									"key": "33251142200550000102550030000619301328115284",
+									"value": 6004.48,
+									"weight": 263.82
+								}
+							}
+						],
 						"sender": {
-							"id": "7346339",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "COGUMELO INDUSTRIA E COMERCIO LTDA",
 							"mainAddress": {
 								"city": {
-									"name": "Osasco",
+									"name": "Rio de Janeiro",
 									"state": {
-										"code": "SP"
+										"code": "RJ"
 									}
 								}
 							}
 						},
 						"receiver": {
-							"id": "7415984",
-							"name": "KHS IND DE MAQUINAS LTDA",
+							"name": "JAPKS LOGISTICA E TRANSPORTES LTDA",
 							"mainAddress": {
 								"city": {
 									"name": "São Paulo",
@@ -719,34 +588,624 @@ A cobertura do schema para "Fretes" é de **100%**. A API `FreightBase` é altam
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "JAPKS LOGISTICA E TRANSPORTES LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "JAPKS"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41735742,
-						"referenceNumber": "2012139770",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 42.69,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42561993,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:47:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031551288078491",
+							"number": 3155,
+							"series": 3
 						},
+						"total": 561.05,
+						"subtotal": 493.72,
+						"taxedWeight": 303.0,
+						"realWeight": 303.0,
+						"totalCubicVolume": 0.495,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 5760.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "79404",
+									"series": "100",
+									"key": "43251187822110000117551000000794041000072362",
+									"value": 5760.0,
+									"weight": 303.0
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "INDUSTRIA QUIMICA MASCIA LTDA",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "Caxias do Sul",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "HIDRODOMI DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "HIDRODOMI DO BRASIL"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42563624,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:50:00-03:00",
+						"cte": {
+							"key": "35251160960473000243570030000875531040199537",
+							"number": 87553,
+							"series": 3
+						},
+						"total": 836.39,
+						"subtotal": 667.94,
+						"taxedWeight": 1560.0,
+						"realWeight": 1560.0,
+						"totalCubicVolume": 1.32,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 9195.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "152950",
+									"series": "1",
+									"key": "35251160755519000101550010001529501037836800",
+									"value": 9195.0,
+									"weight": 1560.0
+								}
+							}
+						],
+						"sender": {
+							"name": "USIQUIMICA DO BRASIL LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "Guarulhos",
 									"state": {
 										"code": "SP"
 									}
 								}
 							}
 						},
+						"receiver": null,
+						"payer": {
+							"name": "KEMIRA CHEMICALS BRASIL LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "KEMIRA - FRACIONADA"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42562599,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:53:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031571027659312",
+							"number": 3157,
+							"series": 3
+						},
+						"total": 203.84,
+						"subtotal": 203.84,
+						"taxedWeight": 208.0,
+						"realWeight": 208.0,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 2980.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "23669",
+									"series": "0",
+									"key": "43251192599901000160550000000236691536092643",
+									"value": 2980.0,
+									"weight": 208.0
+								}
+							}
+						],
+						"sender": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA.",
+							"mainAddress": {
+								"city": {
+									"name": "Estância Velha",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "RUBBERSUL - PORTO ALEGRE"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42562745,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:58:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031581304128372",
+							"number": 3158,
+							"series": 3
+						},
+						"total": 154.92,
+						"subtotal": 136.33,
+						"taxedWeight": 12.48,
+						"realWeight": 4.0,
+						"totalCubicVolume": 0.0416,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 2976.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "3681",
+									"series": "1",
+									"key": "43251108222899000107550010000036811685113972",
+									"value": 470.0,
+									"weight": 2.0
+								}
+							},
+							{
+								"invoice": {
+									"number": "3682",
+									"series": "1",
+									"key": "43251108222899000107550010000036821212299502",
+									"value": 470.0,
+									"weight": 2.0
+								}
+							},
+							{
+								"invoice": {
+									"number": "3683",
+									"series": "1",
+									"key": "43251108222899000107550010000036831572955239",
+									"value": 1040.0,
+									"weight": 2.0
+								}
+							},
+							{
+								"invoice": {
+									"number": "3697",
+									"series": "1",
+									"key": "43251108222899000107550010000036971230948285",
+									"value": 996.0,
+									"weight": 2.0
+								}
+							}
+						],
+						"sender": {
+							"name": "JONAS PIETRO JUNQUEIRA FIGUEIRO LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "Montenegro",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "JONAS PIETRO JUNQUEIRA FIGUEIRO LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "PADRÃO"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42562916,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T10:58:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031591314988193",
+							"number": 3159,
+							"series": 3
+						},
+						"total": 824.62,
+						"subtotal": 824.62,
+						"taxedWeight": 1248.0,
+						"realWeight": 1248.0,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 17952.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "23670",
+									"series": "0",
+									"key": "43251192599901000160550000000236701354960020",
+									"value": 17952.0,
+									"weight": 1248.0
+								}
+							}
+						],
+						"sender": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA.",
+							"mainAddress": {
+								"city": {
+									"name": "Estância Velha",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "RUBBERSUL - PORTO ALEGRE"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42562959,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:02:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031601295585670",
+							"number": 3160,
+							"series": 3
+						},
+						"total": 147.17,
+						"subtotal": 129.51,
+						"taxedWeight": 5.454,
+						"realWeight": 4.0,
+						"totalCubicVolume": 0.01818,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 3552.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "3684",
+									"series": "1",
+									"key": "43251108222899000107550010000036841600672698",
+									"value": 1560.0,
+									"weight": 2.0
+								}
+							},
+							{
+								"invoice": {
+									"number": "3695",
+									"series": "1",
+									"key": "43251108222899000107550010000036951688878924",
+									"value": 1992.0,
+									"weight": 4.0
+								}
+							}
+						],
+						"sender": {
+							"name": "JONAS PIETRO JUNQUEIRA FIGUEIRO LTDA",
+							"mainAddress": {
+								"city": {
+									"name": "Montenegro",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "JONAS PIETRO JUNQUEIRA FIGUEIRO LTDA"
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "PADRÃO"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42563239,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:04:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031611730695230",
+							"number": 3161,
+							"series": 3
+						},
+						"total": 165.42,
+						"subtotal": 165.42,
+						"taxedWeight": 218.0,
+						"realWeight": 218.0,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 3359.0,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "23671",
+									"series": "0",
+									"key": "43251192599901000160550000000236711862896448",
+									"value": 3359.0,
+									"weight": 218.0
+								}
+							}
+						],
+						"sender": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA.",
+							"mainAddress": {
+								"city": {
+									"name": "Estância Velha",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": null,
+						"payer": {
+							"name": "RUBBERSUL IND. E COM. DE ARTEF. DE BORRACHA LTDA."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "RUBBERSUL - PORTO ALEGRE"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42564007,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:17:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031621307099201",
+							"number": 3162,
+							"series": 3
+						},
+						"total": 203.77,
+						"subtotal": 189.51,
+						"taxedWeight": 64.552,
+						"realWeight": 64.552,
+						"totalCubicVolume": 0.648,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 2314.5,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "597070",
+									"series": "4",
+									"key": "43251103746938001387550040005970701645932295",
+									"value": 2314.5,
+									"weight": 64.552
+								}
+							}
+						],
+						"sender": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A.",
+							"mainAddress": {
+								"city": {
+									"name": "São Leopoldo",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
 						"receiver": {
-							"id": "7503791",
-							"name": "ORTOSINTESE IND E COM LTDA",
+							"name": "BANCO DO BRASIL S/A",
+							"mainAddress": {
+								"city": {
+									"name": "Jaboatão dos Guararapes",
+									"state": {
+										"code": "PE"
+									}
+								}
+							}
+						},
+						"payer": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "BR SUPPLY"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42564413,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:21:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031631874303288",
+							"number": 3163,
+							"series": 3
+						},
+						"total": 182.33,
+						"subtotal": 169.57,
+						"taxedWeight": 30.922,
+						"realWeight": 30.922,
+						"totalCubicVolume": 0.283,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 863.34,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "596576",
+									"series": "4",
+									"key": "43251103746938001387550040005965761103307217",
+									"value": 863.34,
+									"weight": 30.922
+								}
+							}
+						],
+						"sender": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A.",
+							"mainAddress": {
+								"city": {
+									"name": "São Leopoldo",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": {
+							"name": "BANCO DO BRASIL S/A",
+							"mainAddress": {
+								"city": {
+									"name": "Moreno",
+									"state": {
+										"code": "PE"
+									}
+								}
+							}
+						},
+						"payer": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "BR SUPPLY"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
+					}
+				},
+				{
+					"node": {
+						"id": 42564760,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:24:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031661689751239",
+							"number": 3166,
+							"series": 3
+						},
+						"total": 127.95,
+						"subtotal": 112.6,
+						"taxedWeight": 17.39,
+						"realWeight": 17.39,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 727.76,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "596870",
+									"series": "4",
+									"key": "43251103746938001387550040005968701585401182",
+									"value": 727.76,
+									"weight": 17.39
+								}
+							}
+						],
+						"sender": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A.",
+							"mainAddress": {
+								"city": {
+									"name": "São Leopoldo",
+									"state": {
+										"code": "RS"
+									}
+								}
+							}
+						},
+						"receiver": {
+							"name": "SAPORE S.A.",
 							"mainAddress": {
 								"city": {
 									"name": "São Paulo",
@@ -755,151 +1214,209 @@ A cobertura do schema para "Fretes" é de **100%**. A API `FreightBase` é altam
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "BR SUPPLY"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41735752,
-						"referenceNumber": "2012129788",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 101.85,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42564839,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:26:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031641314265620",
+							"number": 3164,
+							"series": 3
 						},
+						"total": 372.27,
+						"subtotal": 327.6,
+						"taxedWeight": 437.425,
+						"realWeight": 437.425,
+						"totalCubicVolume": 2.47,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 4938.37,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "597268",
+									"series": "4",
+									"key": "43251103746938001387550040005972681135759926",
+									"value": 4938.37,
+									"weight": 437.425
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A.",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "São Leopoldo",
 									"state": {
-										"code": "SP"
+										"code": "RS"
 									}
 								}
 							}
 						},
 						"receiver": {
-							"id": "9303009",
-							"name": "NOSTRA VIA LOGISTICA E TRANSPORTES LTDA",
+							"name": "PROSEGUR BRASIL SA TRANSPORTADORA D E SEGURANCA",
 							"mainAddress": {
 								"city": {
-									"name": "Carapicuíba",
+									"name": "Curitiba",
 									"state": {
-										"code": "SP"
+										"code": "PR"
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "BR SUPPLY"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41736348,
-						"referenceNumber": "2012129690",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 38.98,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42564959,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:27:00-03:00",
+						"cte": {
+							"key": "43251160960473001568570030000031651081586338",
+							"number": 3165,
+							"series": 3
 						},
+						"total": 96.2,
+						"subtotal": 84.66,
+						"taxedWeight": 4.492,
+						"realWeight": 4.492,
+						"totalCubicVolume": 0.027,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 277.29,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "596736",
+									"series": "4",
+									"key": "43251103746938001387550040005967361521868856",
+									"value": 277.29,
+									"weight": 4.492
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A.",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "São Leopoldo",
 									"state": {
-										"code": "SP"
+										"code": "RS"
 									}
 								}
 							}
 						},
 						"receiver": {
-							"id": "7348523",
-							"name": "MEDCON MED.CONTR.IND E COM LTDA",
+							"name": "MULTILOG BRASIL S/A",
 							"mainAddress": {
 								"city": {
-									"name": "Osasco",
+									"name": "São José dos Pinhais",
 									"state": {
-										"code": "SP"
+										"code": "PR"
 									}
 								}
 							}
-						}
+						},
+						"payer": {
+							"name": "BRS SUPRIMENTOS CORPORATIVOS S.A."
+						},
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+						},
+						"customerPriceTable": {
+							"name": "BR SUPPLY"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				},
 				{
 					"node": {
-						"id": 41736015,
-						"referenceNumber": "2012129677",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 36.34,
-						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+						"id": 42565912,
+						"referenceNumber": "",
+						"serviceAt": "2025-11-21T11:36:00-03:00",
+						"cte": {
+							"key": "35251160960473001134570030000350301773733628",
+							"number": 35030,
+							"series": 3
 						},
+						"total": 2313.98,
+						"subtotal": 2152.0,
+						"taxedWeight": 438.0,
+						"realWeight": 438.0,
+						"totalCubicVolume": 0.0,
+						"invoicesTotalVolumes": 0,
+						"invoicesValue": 14790.01,
+						"freightInvoices": [
+							{
+								"invoice": {
+									"number": "25147",
+									"series": "1",
+									"key": "35251109437423000148550010000251471737101005",
+									"value": 14790.01,
+									"weight": 438.0
+								}
+							}
+						],
 						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
+							"name": "AROMALLIS INDUSTRIA E COMERCIO DE FRAGRANCIAS LTDA",
 							"mainAddress": {
 								"city": {
-									"name": "Embu das Artes",
+									"name": "Torrinha",
 									"state": {
 										"code": "SP"
 									}
 								}
 							}
 						},
-						"receiver": {
-							"id": "9303009",
-							"name": "NOSTRA VIA LOGISTICA E TRANSPORTES LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Carapicuíba",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
-					}
-				},
-				{
-					"node": {
-						"id": 41735772,
-						"referenceNumber": "2012137340",
-						"serviceAt": "2025-11-03T00:00:00-03:00",
-						"total": 36.91,
+						"receiver": null,
 						"payer": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA"
+							"name": "AROMALLIS INDUSTRIA E COMERCIO DE FRAGRANCIAS LTDA"
 						},
-						"sender": {
-							"id": "7347971",
-							"name": "DANFOSS DO BRASIL INDUSTRIA E COMERCIO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "Embu das Artes",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
+						"modal": "rodo",
+						"corporation": {
+							"name": "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
 						},
-						"receiver": {
-							"id": "7347974",
-							"name": "AR BRASIL COMERCIO DE PECAS DE REFRIGERACAO LTDA",
-							"mainAddress": {
-								"city": {
-									"name": "São Paulo",
-									"state": {
-										"code": "SP"
-									}
-								}
-							}
-						}
+						"customerPriceTable": {
+							"name": "ESPECIAL NÍVEL BRASIL"
+						},
+						"freightClassification": {
+							"name": "FRACIONADO - LTL"
+						},
+						"costCenter": null
 					}
 				}
 			],

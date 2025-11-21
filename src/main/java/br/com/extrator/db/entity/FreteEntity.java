@@ -52,6 +52,10 @@ public class FreteEntity {
     private BigDecimal totalCubicVolume;
     private BigDecimal subtotal;
 
+    private String chaveCte;
+    private Integer numeroCte;
+    private Integer serieCte;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -329,6 +333,30 @@ public class FreteEntity {
 
     public void setSubtotal(BigDecimal subtotal) {
         this.subtotal = subtotal;
+    }
+
+    public String getChaveCte() {
+        return chaveCte;
+    }
+
+    public void setChaveCte(final String chaveCte) {
+        this.chaveCte = chaveCte;
+    }
+
+    public Integer getNumeroCte() {
+        return numeroCte;
+    }
+
+    public void setNumeroCte(final Integer numeroCte) {
+        this.numeroCte = numeroCte;
+    }
+
+    public Integer getSerieCte() {
+        return serieCte;
+    }
+
+    public void setSerieCte(final Integer serieCte) {
+        this.serieCte = serieCte;
     }
 
     public String getMetadata() {

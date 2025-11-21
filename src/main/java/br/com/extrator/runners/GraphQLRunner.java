@@ -143,4 +143,113 @@ public final class GraphQLRunner {
             throw new RuntimeException("Falha na extração de fretes", e);
         }
     }
+
+    public static void executar(final LocalDate dataInicio, final String entidade) throws Exception {
+        System.out.println("🔄 Executando runner GraphQL...");
+
+        br.com.extrator.util.CarregadorConfig.validarConexaoBancoDados();
+
+        final ClienteApiGraphQL clienteApiGraphQL = new ClienteApiGraphQL();
+        final ColetaRepository coletaRepository = new ColetaRepository();
+        final FreteRepository freteRepository = new FreteRepository();
+        final LogExtracaoRepository logExtracaoRepository = new LogExtracaoRepository();
+
+        final ColetaMapper coletaMapper = new ColetaMapper();
+        final FreteMapper freteMapper = new FreteMapper();
+
+        logExtracaoRepository.criarTabelaSeNaoExistir();
+
+        final boolean executarColetas = entidade == null || entidade.isBlank() || entidade.equalsIgnoreCase("coletas");
+        final boolean executarFretes = entidade == null || entidade.isBlank() || entidade.equalsIgnoreCase("fretes");
+
+        if (executarColetas) {
+            System.out.println("\n📦 Extraindo Coletas...");
+            LocalDateTime inicioColetas = LocalDateTime.now();
+            try {
+                final ResultadoExtracao<ColetaNodeDTO> resultadoColetas = clienteApiGraphQL.buscarColetas(dataInicio);
+                final List<ColetaNodeDTO> coletasDTO = resultadoColetas.getDados();
+                System.out.println("✓ Extraídas: " + coletasDTO.size() + " coletas" + 
+                                  (resultadoColetas.isCompleto() ? "" : " (INCOMPLETO: " + resultadoColetas.getMotivoInterrupcao() + ")"));
+                int registrosSalvos = 0;
+                if (!coletasDTO.isEmpty()) {
+                    final List<ColetaEntity> coletasEntities = coletasDTO.stream()
+                        .map(coletaMapper::toEntity)
+                        .collect(Collectors.toList());
+                    registrosSalvos = coletaRepository.salvar(coletasEntities);
+                    System.out.println("✓ Salvas: " + registrosSalvos + "/" + coletasDTO.size() + " coletas");
+                }
+                String status = resultadoColetas.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+                String mensagem = resultadoColetas.isCompleto() ? 
+                    "Extração completa" : 
+                    "Extração incompleta: " + resultadoColetas.getMotivoInterrupcao();
+                LogExtracaoEntity logColetas = new LogExtracaoEntity(
+                    "coletas",
+                    inicioColetas,
+                    LocalDateTime.now(),
+                    status,
+                    registrosSalvos,
+                    resultadoColetas.getPaginasProcessadas(),
+                    mensagem
+                );
+                logExtracaoRepository.gravarLogExtracao(logColetas);
+            } catch (RuntimeException | java.sql.SQLException e) {
+                LogExtracaoEntity logErro = new LogExtracaoEntity(
+                    "coletas",
+                    inicioColetas,
+                    LocalDateTime.now(),
+                    "ERRO_API",
+                    0,
+                    0,
+                    "Erro: " + e.getMessage()
+                );
+                logExtracaoRepository.gravarLogExtracao(logErro);
+                throw new RuntimeException("Falha na extração de coletas", e);
+            }
+        }
+
+        if (executarFretes) {
+            System.out.println("\n🚛 Extraindo Fretes...");
+            LocalDateTime inicioFretes = LocalDateTime.now();
+            try {
+                final ResultadoExtracao<FreteNodeDTO> resultadoFretes = clienteApiGraphQL.buscarFretes(dataInicio);
+                final List<FreteNodeDTO> fretesDTO = resultadoFretes.getDados();
+                System.out.println("✓ Extraídos: " + fretesDTO.size() + " fretes" + 
+                                  (resultadoFretes.isCompleto() ? "" : " (INCOMPLETO: " + resultadoFretes.getMotivoInterrupcao() + ")"));
+                int registrosSalvos = 0;
+                if (!fretesDTO.isEmpty()) {
+                    final List<FreteEntity> fretesEntities = fretesDTO.stream()
+                        .map(freteMapper::toEntity)
+                        .collect(Collectors.toList());
+                    registrosSalvos = freteRepository.salvar(fretesEntities);
+                    System.out.println("✓ Salvos: " + registrosSalvos + "/" + fretesDTO.size() + " fretes");
+                }
+                String status = resultadoFretes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+                String mensagem = resultadoFretes.isCompleto() ? 
+                    "Extração completa" : 
+                    "Extração incompleta: " + resultadoFretes.getMotivoInterrupcao();
+                LogExtracaoEntity logFretes = new LogExtracaoEntity(
+                    "fretes",
+                    inicioFretes,
+                    LocalDateTime.now(),
+                    status,
+                    registrosSalvos,
+                    resultadoFretes.getPaginasProcessadas(),
+                    mensagem
+                );
+                logExtracaoRepository.gravarLogExtracao(logFretes);
+            } catch (RuntimeException | java.sql.SQLException e) {
+                LogExtracaoEntity logErro = new LogExtracaoEntity(
+                    "fretes",
+                    inicioFretes,
+                    LocalDateTime.now(),
+                    "ERRO_API",
+                    0,
+                    0,
+                    "Erro: " + e.getMessage()
+                );
+                logExtracaoRepository.gravarLogExtracao(logErro);
+                throw new RuntimeException("Falha na extração de fretes", e);
+            }
+        }
+    }
 }

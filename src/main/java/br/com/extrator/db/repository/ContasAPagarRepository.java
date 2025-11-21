@@ -19,60 +19,94 @@ import br.com.extrator.util.GerenciadorConexao;
 public class ContasAPagarRepository {
     private static final Logger logger = LoggerFactory.getLogger(ContasAPagarRepository.class);
     private static final String NOME_TABELA = "contas_a_pagar";
-    
+
     /**
      * Cria a tabela se não existir.
      */
     public void criarTabelaSeNaoExistir() throws SQLException {
-        final String sql = """
-            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'contas_a_pagar')
-            BEGIN
-                CREATE TABLE contas_a_pagar (
-                    sequence_code BIGINT PRIMARY KEY,
-                    document_number VARCHAR(100),
-                    issue_date DATE,
-                    tipo_lancamento NVARCHAR(100),
-                    valor_original DECIMAL(18,2),
-                    valor_juros DECIMAL(18,2),
-                    valor_desconto DECIMAL(18,2),
-                    valor_a_pagar DECIMAL(18,2),
-                    valor_pago DECIMAL(18,2),
-                    status_pagamento NVARCHAR(50),
-                    mes_competencia INT,
-                    ano_competencia INT,
-                    data_criacao DATETIMEOFFSET,
-                    data_liquidacao DATE,
-                    data_transacao DATE,
-                    nome_fornecedor NVARCHAR(255),
-                    nome_filial NVARCHAR(255),
-                    nome_centro_custo NVARCHAR(255),
-                    valor_centro_custo DECIMAL(18,2),
-                    classificacao_contabil NVARCHAR(100),
-                    descricao_contabil NVARCHAR(255),
-                    valor_contabil DECIMAL(18,2),
-                    area_lancamento NVARCHAR(255),
-                    observacoes NVARCHAR(MAX),
-                    descricao_despesa NVARCHAR(MAX),
-                    nome_usuario NVARCHAR(255),
-                    reconciliado BIT,
-                    metadata NVARCHAR(MAX),
-                    data_extracao DATETIME2 DEFAULT GETDATE()
-                );
-                CREATE INDEX IX_fp_data_export_issue_date ON contas_a_pagar(issue_date);
-                CREATE INDEX IX_fp_data_export_status ON contas_a_pagar(status_pagamento);
-                CREATE INDEX IX_fp_data_export_fornecedor ON contas_a_pagar(nome_fornecedor);
-                CREATE INDEX IX_fp_data_export_filial ON contas_a_pagar(nome_filial);
-                CREATE INDEX IX_fp_data_export_competencia ON contas_a_pagar(ano_competencia, mes_competencia);
-            END
-            """;
-        
+        final String sql = String.join("\n",
+            "IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'contas_a_pagar')",
+            "BEGIN",
+            "    CREATE TABLE contas_a_pagar (",
+            "        sequence_code BIGINT PRIMARY KEY,",
+            "        document_number VARCHAR(100),",
+            "        issue_date DATE,",
+            "        tipo_lancamento NVARCHAR(100),",
+            "        valor_original DECIMAL(18,2),",
+            "        valor_juros DECIMAL(18,2),",
+            "        valor_desconto DECIMAL(18,2),",
+            "        valor_a_pagar DECIMAL(18,2),",
+            "        valor_pago DECIMAL(18,2),",
+            "        status_pagamento NVARCHAR(50),",
+            "        mes_competencia INT,",
+            "        ano_competencia INT,",
+            "        data_criacao DATETIMEOFFSET,",
+            "        data_liquidacao DATE,",
+            "        data_transacao DATE,",
+            "        nome_fornecedor NVARCHAR(255),",
+            "        nome_filial NVARCHAR(255),",
+            "        nome_centro_custo NVARCHAR(255),",
+            "        valor_centro_custo DECIMAL(18,2),",
+            "        classificacao_contabil NVARCHAR(100),",
+            "        descricao_contabil NVARCHAR(255),",
+            "        valor_contabil DECIMAL(18,2),",
+            "        area_lancamento NVARCHAR(255),",
+            "        observacoes NVARCHAR(MAX),",
+            "        descricao_despesa NVARCHAR(MAX),",
+            "        nome_usuario NVARCHAR(255),",
+            "        reconciliado BIT,",
+            "        metadata NVARCHAR(MAX),",
+            "        data_extracao DATETIME2 DEFAULT GETDATE()",
+            "    );",
+            "    CREATE INDEX IX_fp_data_export_issue_date ON contas_a_pagar(issue_date);",
+            "    CREATE INDEX IX_fp_data_export_status ON contas_a_pagar(status_pagamento);",
+            "    CREATE INDEX IX_fp_data_export_fornecedor ON contas_a_pagar(nome_fornecedor);",
+            "    CREATE INDEX IX_fp_data_export_filial ON contas_a_pagar(nome_filial);",
+            "    CREATE INDEX IX_fp_data_export_competencia ON contas_a_pagar(ano_competencia, mes_competencia);",
+            "END"
+        );
+
         try (Connection conn = GerenciadorConexao.obterConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.execute();
             logger.info("✓ Tabela {} verificada/criada com sucesso", NOME_TABELA);
+            criarViewPowerBISeNaoExistir(conn);
         }
     }
-    
+
+    private void criarViewPowerBISeNaoExistir(final Connection conn) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_contas_a_pagar_powerbi AS
+            SELECT
+                sequence_code AS [Lançamento a Pagar/N°],
+                document_number AS [N° Documento],
+                issue_date AS [Emissão],
+                tipo_lancamento AS [Tipo],
+                valor_original AS [Valor],
+                valor_a_pagar AS [Valor a pagar],
+                CASE WHEN status_pagamento = 'PAGO' THEN 'Sim' ELSE 'Não' END AS [Pago],
+                valor_pago AS [Valor pago],
+                nome_fornecedor AS [Fornecedor/Nome],
+                nome_filial AS [Filial],
+                classificacao_contabil AS [Conta Contábil/Classif.],
+                descricao_contabil AS [Conta Contábil/Desc.],
+                valor_contabil AS [Conta Contábil/Valor],
+                nome_centro_custo AS [Centro de custo/Nome],
+                valor_centro_custo AS [Centro de custo/Valor],
+                mes_competencia AS [Mês Competência],
+                ano_competencia AS [Ano Competência],
+                data_criacao AS [Data criação],
+                observacoes AS [Observações],
+                data_liquidacao AS [Baixa/Data liquidação],
+                nome_usuario AS [Usuário/Nome],
+                data_extracao AS [Data de extracao]
+            FROM dbo.contas_a_pagar;
+        """;
+        try (PreparedStatement ps = conn.prepareStatement(sqlView)) {
+            ps.execute();
+        }
+    }
+
     /**
      * Salva lista de entidades usando MERGE (INSERT ou UPDATE).
      */
@@ -81,72 +115,68 @@ public class ContasAPagarRepository {
             logger.warn("Lista de {} vazia, nada a salvar", NOME_TABELA);
             return 0;
         }
-        
+
         criarTabelaSeNaoExistir();
-        
-        final String sqlMerge = """
-            MERGE INTO contas_a_pagar AS target
-            USING (SELECT ? AS sequence_code) AS source
-            ON target.sequence_code = source.sequence_code
-            WHEN MATCHED THEN
-                UPDATE SET
-                    document_number = ?,
-                    issue_date = ?,
-                    tipo_lancamento = ?,
-                    valor_original = ?,
-                    valor_juros = ?,
-                    valor_desconto = ?,
-                    valor_a_pagar = ?,
-                    valor_pago = ?,
-                    status_pagamento = ?,
-                    mes_competencia = ?,
-                    ano_competencia = ?,
-                    data_criacao = ?,
-                    data_liquidacao = ?,
-                    data_transacao = ?,
-                    nome_fornecedor = ?,
-                    nome_filial = ?,
-                    nome_centro_custo = ?,
-                    valor_centro_custo = ?,
-                    classificacao_contabil = ?,
-                    descricao_contabil = ?,
-                    valor_contabil = ?,
-                    area_lancamento = ?,
-                    observacoes = ?,
-                    descricao_despesa = ?,
-                    nome_usuario = ?,
-                    reconciliado = ?,
-                    metadata = ?,
-                    data_extracao = GETDATE()
-            WHEN NOT MATCHED THEN
-                INSERT (sequence_code, document_number, issue_date, tipo_lancamento,
-                        valor_original, valor_juros, valor_desconto, valor_a_pagar, valor_pago,
-                        status_pagamento, mes_competencia, ano_competencia,
-                        data_criacao, data_liquidacao, data_transacao,
-                        nome_fornecedor, nome_filial, nome_centro_custo, valor_centro_custo,
-                        classificacao_contabil, descricao_contabil, valor_contabil, area_lancamento,
-                        observacoes, descricao_despesa, nome_usuario, reconciliado,
-                        metadata, data_extracao)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE());
-            """;
-        
+
+        final String sqlMerge = String.join("\n",
+            "MERGE INTO contas_a_pagar AS target",
+            "USING (SELECT ? AS sequence_code) AS source",
+            "ON target.sequence_code = source.sequence_code",
+            "WHEN MATCHED THEN",
+            "    UPDATE SET",
+            "        document_number = ?,",
+            "        issue_date = ?,",
+            "        tipo_lancamento = ?,",
+            "        valor_original = ?,",
+            "        valor_juros = ?,",
+            "        valor_desconto = ?,",
+            "        valor_a_pagar = ?,",
+            "        valor_pago = ?,",
+            "        status_pagamento = ?,",
+            "        mes_competencia = ?,",
+            "        ano_competencia = ?,",
+            "        data_criacao = ?,",
+            "        data_liquidacao = ?,",
+            "        data_transacao = ?,",
+            "        nome_fornecedor = ?,",
+            "        nome_filial = ?,",
+            "        nome_centro_custo = ?,",
+            "        valor_centro_custo = ?,",
+            "        classificacao_contabil = ?,",
+            "        descricao_contabil = ?,",
+            "        valor_contabil = ?,",
+            "        area_lancamento = ?,",
+            "        observacoes = ?,",
+            "        descricao_despesa = ?,",
+            "        nome_usuario = ?,",
+            "        reconciliado = ?,",
+            "        metadata = ?,",
+            "        data_extracao = GETDATE()",
+            "WHEN NOT MATCHED THEN",
+            "    INSERT (sequence_code, document_number, issue_date, tipo_lancamento,",
+            "            valor_original, valor_juros, valor_desconto, valor_a_pagar, valor_pago,",
+            "            status_pagamento, mes_competencia, ano_competencia,",
+            "            data_criacao, data_liquidacao, data_transacao,",
+            "            nome_fornecedor, nome_filial, nome_centro_custo, valor_centro_custo,",
+            "            classificacao_contabil, descricao_contabil, valor_contabil, area_lancamento,",
+            "            observacoes, descricao_despesa, nome_usuario, reconciliado,",
+            "            metadata, data_extracao)",
+            "    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE());"
+        );
         int totalProcessados = 0;
-        
+
         try (Connection conn = GerenciadorConexao.obterConexao()) {
             conn.setAutoCommit(false);
-            
+
             try (PreparedStatement ps = conn.prepareStatement(sqlMerge)) {
-                
                 for (final ContasAPagarDataExportEntity entity : entidades) {
                     // Validação
                     if (entity.getSequenceCode() == null) {
                         logger.warn("Entidade com sequence_code null ignorada");
                         continue;
                     }
-                    
                     // Parâmetros do MERGE (ON)
                     ps.setLong(1, entity.getSequenceCode());
-                    
                     // Parâmetros do UPDATE
                     ps.setString(2, entity.getDocumentNumber());
                     ps.setObject(3, entity.getIssueDate());
@@ -175,7 +205,6 @@ public class ContasAPagarRepository {
                     ps.setString(26, entity.getNomeUsuario());
                     ps.setObject(27, entity.getReconciliado());
                     ps.setString(28, entity.getMetadata());
-                    
                     // Parâmetros do INSERT (mesmos valores)
                     ps.setLong(29, entity.getSequenceCode());
                     ps.setString(30, entity.getDocumentNumber());
@@ -205,24 +234,22 @@ public class ContasAPagarRepository {
                     ps.setString(54, entity.getNomeUsuario());
                     ps.setObject(55, entity.getReconciliado());
                     ps.setString(56, entity.getMetadata());
-                    
                     final int rowsAffected = ps.executeUpdate();
                     if (rowsAffected > 0) {
                         totalProcessados++;
                     }
                 }
-                
                 conn.commit();
-                logger.info("✓ Processados {}/{} registros em {}", 
+                logger.info("✓ Processados {}/{} registros em {}",
                     totalProcessados, entidades.size(), NOME_TABELA);
-                
+
             } catch (final SQLException e) {
                 conn.rollback();
                 logger.error("Erro ao salvar em {}: {}", NOME_TABELA, e.getMessage());
                 throw e;
             }
         }
-        
+
         return totalProcessados;
     }
 }

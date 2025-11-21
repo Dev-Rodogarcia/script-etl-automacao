@@ -74,6 +74,34 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             executarDDL(conexao, sql);
             logger.info("Tabela {} criada com sucesso.", NOME_TABELA);
         }
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
+            SELECT
+                sequence_code AS [Cotação],
+                requested_at AS [Data],
+                branch_nickname AS [Filial],
+                requester_name AS [Solicitante],
+                customer_name AS [Cliente],
+                customer_doc AS [CNPJ Cliente],
+                origin_city AS [Origem],
+                origin_state AS [UF (Origem)],
+                destination_city AS [Destino],
+                destination_state AS [UF (Destino)],
+                volumes AS [Volumes],
+                real_weight AS [Peso Real],
+                taxed_weight AS [Peso Taxado],
+                invoices_value AS [Valor NF],
+                total_value AS [Valor Frete],
+                price_table AS [Tabela],
+                user_name AS [Usuário],
+                data_extracao AS [Data de extracao]
+            FROM dbo.cotacoes;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     /**

@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 
 import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ClienteApiGraphQL;
-import br.com.extrator.api.ClienteApiRest;
 import br.com.extrator.util.GerenciadorConexao;
 
 /**
@@ -33,21 +32,19 @@ public class CompletudeValidator {
     private static final Logger logger = LoggerFactory.getLogger(CompletudeValidator.class);
     
     // Clientes de API para buscar contagens do ESL Cloud
-    private final ClienteApiRest clienteApiRest;
-    @SuppressWarnings("unused") // Mantido para compatibilidade futura e testes
-    private final ClienteApiGraphQL clienteApiGraphQL; // ⚠️ Não usado atualmente (métodos obterContagemFretes/Coletas removidos)
+    @SuppressWarnings("unused")
+    private final ClienteApiGraphQL clienteApiGraphQL;
     private final ClienteApiDataExport clienteApiDataExport;
     
     // Mapeamento de entidades para nomes de tabelas no banco
     private static final Map<String, String> MAPEAMENTO_ENTIDADES_TABELAS = Map.of(
-        "ocorrencias", "ocorrencias",
-        "faturas_a_receber", "faturas_a_receber",
-        "faturas_a_pagar", "faturas_a_pagar",
         "fretes", "fretes",
         "coletas", "coletas",
         "manifestos", "manifestos",
         "cotacoes", "cotacoes",
-        "localizacao_cargas", "localizacao_cargas"
+        "localizacao_cargas", "localizacao_cargas",
+        "contas_a_pagar", "contas_a_pagar",
+        "faturas_por_cliente", "faturas_por_cliente"
     );
     
     /**
@@ -55,11 +52,10 @@ public class CompletudeValidator {
      * Utiliza injeção de dependência para facilitar testes e manutenção.
      */
     public CompletudeValidator() {
-        this.clienteApiRest = new ClienteApiRest();
         this.clienteApiGraphQL = new ClienteApiGraphQL();
         this.clienteApiDataExport = new ClienteApiDataExport();
         
-        logger.info("CompletudeValidator inicializado com todos os clientes de API");
+        logger.info("CompletudeValidator inicializado (GraphQL + DataExport)");
     }
     
     /**
@@ -69,10 +65,8 @@ public class CompletudeValidator {
      * @param clienteApiGraphQL Cliente da API GraphQL
      * @param clienteApiDataExport Cliente da API DataExport
      */
-    public CompletudeValidator(final ClienteApiRest clienteApiRest, 
-                              final ClienteApiGraphQL clienteApiGraphQL,
+    public CompletudeValidator(final ClienteApiGraphQL clienteApiGraphQL,
                               final ClienteApiDataExport clienteApiDataExport) {
-        this.clienteApiRest = clienteApiRest;
         this.clienteApiGraphQL = clienteApiGraphQL;
         this.clienteApiDataExport = clienteApiDataExport;
         
@@ -96,23 +90,7 @@ public class CompletudeValidator {
         final Map<String, Integer> totaisEslCloud = new HashMap<>();
         
         try {
-            // === API REST - Ocorrências e Faturas ===
-            logger.info("📡 Buscando contagens via API REST...");
-            
-            // Ocorrências
-            final int contagemOcorrencias = clienteApiRest.obterContagemOcorrencias(dataReferencia);
-            totaisEslCloud.put("ocorrencias", contagemOcorrencias);
-            logger.info("✅ Ocorrências: {} registros", contagemOcorrencias);
-            
-            // Faturas a Receber
-            final int contagemFaturasReceber = clienteApiRest.obterContagemFaturasAReceber(dataReferencia);
-            totaisEslCloud.put("faturas_a_receber", contagemFaturasReceber);
-            logger.info("✅ Faturas a Receber: {} registros", contagemFaturasReceber);
-            
-            // Faturas a Pagar
-            final int contagemFaturasPagar = clienteApiRest.obterContagemFaturasAPagar(dataReferencia);
-            totaisEslCloud.put("faturas_a_pagar", contagemFaturasPagar);
-            logger.info("✅ Faturas a Pagar: {} registros", contagemFaturasPagar);
+        // Contagens via APIs disponíveis
             
             // === API GraphQL - Fretes e Coletas ===
             // ⚠️ MÉTODOS REMOVIDOS: obterContagemFretes() e obterContagemColetas()
@@ -120,14 +98,6 @@ public class CompletudeValidator {
             // em docs/descobertas-endpoints/fretes.md linha 29 e coletas.md linha 40-41.
             // A contagem deve ser feita via paginação completa ou removida se não for essencial.
             logger.warn("⚠️ Contagem de Fretes e Coletas via GraphQL não disponível (totalCount não existe na API)");
-            
-            // Fretes - Contagem não disponível via API GraphQL
-            totaisEslCloud.put("fretes", -1); // -1 indica contagem não disponível
-            logger.info("⚠️ Fretes: Contagem não disponível (totalCount não existe na API GraphQL)");
-            
-            // Coletas - Contagem não disponível via API GraphQL
-            totaisEslCloud.put("coletas", -1); // -1 indica contagem não disponível
-            logger.info("⚠️ Coletas: Contagem não disponível (totalCount não existe na API GraphQL)");
             
             // === API DataExport - Manifestos, Cotações e Localizações ===
             logger.info("📊 Buscando contagens via API DataExport...");
@@ -146,9 +116,21 @@ public class CompletudeValidator {
             final int contagemLocalizacoes = clienteApiDataExport.obterContagemLocalizacoesCarga(dataReferencia);
             totaisEslCloud.put("localizacao_cargas", contagemLocalizacoes);
             logger.info("✅ Localizações de Carga: {} registros", contagemLocalizacoes);
+
+            // Contas a Pagar (Data Export)
+            final int contagemContasAPagar = clienteApiDataExport.obterContagemContasAPagar(dataReferencia);
+            totaisEslCloud.put("contas_a_pagar", contagemContasAPagar);
+            logger.info("✅ Contas a Pagar: {} registros", contagemContasAPagar);
+            final var resultadoFaturasPorCliente = clienteApiDataExport.buscarFaturasPorCliente();
+            final int contagemFaturasPorCliente = resultadoFaturasPorCliente.getRegistrosExtraidos();
+            totaisEslCloud.put("faturas_por_cliente", contagemFaturasPorCliente);
+            logger.info("✅ Faturas por Cliente: {} registros", contagemFaturasPorCliente);
             
             // Log do resumo final
-            final int totalGeralRegistros = totaisEslCloud.values().stream().mapToInt(Integer::intValue).sum();
+            final int totalGeralRegistros = totaisEslCloud.values().stream()
+                .filter(v -> v >= 0)
+                .mapToInt(Integer::intValue)
+                .sum();
             logger.info("🎯 Busca de totais ESL Cloud concluída: {} entidades, {} registros totais", 
                     totaisEslCloud.size(), totalGeralRegistros);
             
@@ -201,7 +183,7 @@ public class CompletudeValidator {
                     // Query SQL eficiente para contar registros na data específica
                     // String.format é seguro aqui pois nomeTabela vem de fonte controlada
                     final String sql = String.format(
-                        "SELECT COUNT(*) FROM %s WHERE DATE(data_extracao) = ?", 
+                        "SELECT COUNT(*) FROM %s WHERE CAST(data_extracao AS DATE) = ?", 
                         nomeTabela
                     );
                     
@@ -296,6 +278,19 @@ public class CompletudeValidator {
         logger.info("🔍 Iniciando validação de gaps para ocorrências...");
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
+            final String sqlExisteTabela = """
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_NAME = 'ocorrencias' AND TABLE_SCHEMA = 'dbo'
+            """;
+            try (PreparedStatement stmt = conexao.prepareStatement(sqlExisteTabela);
+                 ResultSet rs = stmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    logger.warn("⚠️ Tabela 'ocorrencias' não encontrada - validação de gaps ignorada");
+                    return StatusValidacao.OK;
+                }
+            }
+            
             // Primeiro, verificar se os IDs são sequenciais
             if (!verificarIdsSequenciais(conexao, "ocorrencias")) {
                 logger.warn("⚠️ IDs das ocorrências não são sequenciais - validação de gaps não aplicável");

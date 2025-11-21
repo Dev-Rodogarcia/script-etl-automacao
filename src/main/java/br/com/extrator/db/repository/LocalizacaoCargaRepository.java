@@ -70,6 +70,34 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             executarDDL(conexao, sql);
             logger.info("Tabela {} criada com sucesso.", NOME_TABELA);
         }
+        criarViewPowerBISeNaoExistir(conexao);
+    }
+
+    private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
+        final String sqlView = """
+            CREATE OR ALTER VIEW dbo.vw_localizacao_cargas_powerbi AS
+            SELECT
+                sequence_number AS [CT-e],
+                type AS [Tipo],
+                service_at AS [Data Emissão],
+                invoices_volumes AS [Volumes],
+                taxed_weight AS [Peso Taxado],
+                invoices_value AS [Valor NF],
+                total_value AS [Valor Frete],
+                service_type AS [Tipo Serviço],
+                branch_nickname AS [Filial Emissora],
+                predicted_delivery_at AS [Previsão Entrega],
+                destination_location_name AS [Cidade Destino],
+                destination_branch_nickname AS [Filial Destino],
+                classification AS [Serviço],
+                status AS [Status Carga],
+                status_branch_nickname AS [Filial Atual],
+                origin_location_name AS [Cidade Origem],
+                origin_branch_nickname AS [Filial Origem],
+                data_extracao AS [Data de extracao]
+            FROM dbo.localizacao_cargas;
+        """;
+        executarDDL(conexao, sqlView);
     }
 
     /**

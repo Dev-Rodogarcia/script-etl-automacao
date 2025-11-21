@@ -5,7 +5,6 @@ import java.time.format.DateTimeFormatter;
 
 import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
-import br.com.extrator.runners.RestRunner;
 import br.com.extrator.util.BannerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,28 +16,27 @@ public class TestarApiComando implements Comando {
     private static final Logger logger = LoggerFactory.getLogger(TestarApiComando.class);
     
     @Override
-    public void executar(String[] args) throws Exception {
-        // Verifica se o tipo de API foi especificado
+    public void executar(final String[] args) throws Exception {
         if (args.length < 2) {
             System.err.println("❌ ERRO: Tipo de API não especificado.");
-            System.err.println("Uso: --testar-api <tipo>");
-            System.err.println("Tipos válidos: rest, graphql, dataexport");
+            System.err.println("Uso: --testar-api <tipo> [entidade]");
+            System.err.println("Tipos válidos: graphql, dataexport");
             System.exit(1);
         }
         
         final String tipoApi = args[1];
+        final String entidade = (args.length >= 3) ? args[2] : null;
         
         // Define data de hoje para buscar dados do dia atual
         final LocalDate dataHoje = LocalDate.now();
         
         // Exibe banner específico da API
         switch (tipoApi.toLowerCase()) {
-            case "rest" -> BannerUtil.exibirBannerApiRest();
             case "graphql" -> BannerUtil.exibirBannerApiGraphQL();
             case "dataexport" -> BannerUtil.exibirBannerApiDataExport();
             default -> {
                 System.err.println("❌ ERRO: Tipo de API inválido: " + tipoApi);
-                System.err.println("Tipos válidos: rest, graphql, dataexport");
+                System.err.println("Tipos válidos: graphql, dataexport");
                 System.exit(1);
             }
         }
@@ -48,12 +46,23 @@ public class TestarApiComando implements Comando {
         
         try {
             switch (tipoApi.toLowerCase()) {
-                case "rest" -> RestRunner.executar(dataHoje);
-                case "graphql" -> GraphQLRunner.executar(dataHoje);
-                case "dataexport" -> DataExportRunner.executar(dataHoje);
+                case "graphql" -> {
+                    if (entidade != null && !entidade.isBlank()) {
+                        GraphQLRunner.executar(dataHoje, entidade);
+                    } else {
+                        GraphQLRunner.executar(dataHoje);
+                    }
+                }
+                case "dataexport" -> {
+                    if (entidade != null && !entidade.isBlank()) {
+                        DataExportRunner.executar(dataHoje, entidade);
+                    } else {
+                        DataExportRunner.executar(dataHoje);
+                    }
+                }
                 default -> {
                     System.err.println("❌ ERRO: Tipo de API inválido: " + tipoApi);
-                    System.err.println("Tipos válidos: rest, graphql, dataexport");
+                    System.err.println("Tipos válidos: graphql, dataexport");
                     System.exit(1);
                 }
             }
@@ -62,7 +71,7 @@ public class TestarApiComando implements Comando {
             BannerUtil.exibirBannerSucesso();
             System.out.println("✅ Teste da API " + tipoApi.toUpperCase() + " concluído com sucesso!");
             
-        } catch (Exception e) {
+        } catch (final Exception e) {
             BannerUtil.exibirBannerErro();
             System.err.println("❌ Erro durante execução: " + e.getMessage());
             logger.error("Erro durante execução: {}", e.getMessage(), e);

@@ -82,6 +82,26 @@ public class FreteNodeDTO {
     @JsonProperty("user")
     private UserDTO user;
 
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CteDTO {
+        @JsonProperty("key")
+        private String key;
+        @JsonProperty("number")
+        private Integer number;
+        @JsonProperty("series")
+        private Integer series;
+
+        public String getKey() { return key; }
+        public void setKey(final String key) { this.key = key; }
+        public Integer getNumber() { return number; }
+        public void setNumber(final Integer number) { this.number = number; }
+        public Integer getSeries() { return series; }
+        public void setSeries(final Integer series) { this.series = series; }
+    }
+
+    @JsonProperty("cte")
+    private CteDTO cte;
+
     // --- Campos Adicionais do CSV (22 campos mapeados) ---
     @JsonProperty("referenceNumber")
     private String referenceNumber;
@@ -280,6 +300,9 @@ public class FreteNodeDTO {
     public void setUser(UserDTO user) {
         this.user = user;
     }
+
+    public CteDTO getCte() { return cte; }
+    public void setCte(final CteDTO cte) { this.cte = cte; }
 
     // --- Getters e Setters para Campos Adicionais do CSV ---
 
