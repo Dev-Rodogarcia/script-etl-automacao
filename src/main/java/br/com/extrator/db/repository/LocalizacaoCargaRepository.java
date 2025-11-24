@@ -94,6 +94,13 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                 status_branch_nickname AS [Filial Atual],
                 origin_location_name AS [Cidade Origem],
                 origin_branch_nickname AS [Filial Origem],
+                TRY_CONVERT(DECIMAL(10,6), JSON_VALUE(metadata, '$.latitude')) AS [Latitude],
+                TRY_CONVERT(DECIMAL(10,6), JSON_VALUE(metadata, '$.longitude')) AS [Longitude],
+                TRY_CONVERT(DECIMAL(10,2), JSON_VALUE(metadata, '$.speed')) AS [Velocidade],
+                TRY_CONVERT(DECIMAL(10,2), JSON_VALUE(metadata, '$.altitude')) AS [Altitude],
+                JSON_VALUE(metadata, '$.device_id') AS [Dispositivo ID],
+                JSON_VALUE(metadata, '$.device_type') AS [Dispositivo Tipo],
+                JSON_VALUE(metadata, '$.address') AS [Endereço],
                 data_extracao AS [Data de extracao]
             FROM dbo.localizacao_cargas;
         """;

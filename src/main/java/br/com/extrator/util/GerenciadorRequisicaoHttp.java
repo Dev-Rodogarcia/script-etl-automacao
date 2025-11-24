@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -203,6 +204,83 @@ public class GerenciadorRequisicaoHttp {
             tipoEntidade != null ? tipoEntidade : "API",
             maxTentativas
         );
+        logger.error(mensagemFalha);
+        throw new RuntimeException(mensagemFalha);
+    }
+
+    /**
+     * Variante que permite especificar o charset da resposta como texto.
+     * Útil para downloads CSV que podem vir em ISO-8859-1/Windows-1252.
+     */
+    public HttpResponse<String> executarRequisicaoComCharset(HttpClient cliente, HttpRequest requisicao, String tipoEntidade, Charset charset) {
+        aplicarThrottling();
+        for (int tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+            try {
+                logger.debug("Executando requisição (charset={}) para {} - Tentativa {}/{}",
+                        charset.displayName(), tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas);
+                HttpResponse<String> resposta = cliente.send(requisicao, HttpResponse.BodyHandlers.ofString(charset));
+                int statusCode = resposta.statusCode();
+                if (statusCode >= 200 && statusCode < 300) {
+                    logger.debug("✓ Requisição bem-sucedida para {} - Status: {}",
+                            tipoEntidade != null ? tipoEntidade : "API", statusCode);
+                    return resposta;
+                }
+                if (!deveRetentar(statusCode)) {
+                    if (statusCode == 404) {
+                        logger.debug("ℹ️ HTTP 404 para {} (esperado). Resposta: {}",
+                                tipoEntidade != null ? tipoEntidade : "API",
+                                resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
+                    } else {
+                        String mensagemErro = String.format(
+                                "✗ Erro definitivo na requisição para %s - HTTP %d (não será retentado). Resposta: %s",
+                                tipoEntidade != null ? tipoEntidade : "API",
+                                statusCode,
+                                resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
+                        logger.error(mensagemErro);
+                    }
+                    return resposta;
+                }
+                if (statusCode == 429) {
+                    logger.warn("⚠️ Rate limit (429) para {} - Tentativa {}/{}. Aguardando {}s...",
+                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, DELAY_HTTP_429_MS / 1000);
+                    if (tentativa < maxTentativas) {
+                        aguardarComTratamentoInterrupcao(DELAY_HTTP_429_MS, "retry após HTTP 429");
+                    }
+                } else if (statusCode >= 500 && statusCode <= 599) {
+                    logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}",
+                            statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas,
+                            resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
+                    if (tentativa < maxTentativas) {
+                        long delayMs = calcularDelayBackoffExponencial(tentativa);
+                        logger.info("🕒 Aguardando {}ms antes da próxima tentativa (backoff exponencial)...", delayMs);
+                        aguardarComTratamentoInterrupcao(delayMs, "backoff exponencial");
+                    }
+                }
+            } catch (HttpTimeoutException e) {
+                logger.error("✗ Timeout na requisição para {} - Tentativa {}/{}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
+                if (tentativa < maxTentativas) {
+                    long delayMs = calcularDelayBackoffExponencial(tentativa);
+                    logger.info("🕒 Aguardando {}ms antes da próxima tentativa após timeout...", delayMs);
+                    aguardarComTratamentoInterrupcao(delayMs, "retry após timeout");
+                }
+            } catch (IOException e) {
+                logger.error("✗ IOException na requisição para {} - Tentativa {}/{}: {}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                if (tentativa < maxTentativas) {
+                    long delayMs = calcularDelayBackoffExponencial(tentativa);
+                    logger.info("🕒 Aguardando {}ms antes da próxima tentativa após IOException...", delayMs);
+                    aguardarComTratamentoInterrupcao(delayMs, "retry após IOException");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Thread interrompida durante requisição", e);
+            }
+        }
+        String mensagemFalha = String.format(
+                "✗ Requisição para %s falhou após %d tentativas. Verifique conectividade e configurações da API.",
+                tipoEntidade != null ? tipoEntidade : "API",
+                maxTentativas);
         logger.error(mensagemFalha);
         throw new RuntimeException(mensagemFalha);
     }

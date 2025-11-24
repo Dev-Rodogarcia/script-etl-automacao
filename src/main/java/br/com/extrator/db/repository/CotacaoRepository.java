@@ -98,6 +98,19 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                 total_value AS [Valor Frete],
                 price_table AS [Tabela],
                 user_name AS [Usuário],
+                -- Campos derivados do metadata para status e evidências de conversão
+                CASE
+                  WHEN JSON_VALUE(metadata, '$.qoe_qes_fit_fhe_cte_issued_at') IS NOT NULL
+                       OR JSON_VALUE(metadata, '$.qoe_qes_fit_nse_issued_at') IS NOT NULL
+                    THEN 'Convertida'
+                  WHEN JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments') IS NOT NULL
+                       AND LEN(JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments')) > 0
+                    THEN 'Reprovada'
+                  ELSE 'Pendente'
+                END AS [Status Conversão],
+                JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments') AS [Motivo Perda],
+                JSON_VALUE(metadata, '$.qoe_qes_fit_fhe_cte_issued_at') AS [CT-e / Data emissão],
+                JSON_VALUE(metadata, '$.qoe_qes_fit_nse_issued_at') AS [NFS-e / Data emissão],
                 data_extracao AS [Data de extracao]
             FROM dbo.cotacoes;
         """;
@@ -203,7 +216,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             }
             
             return rowsAffected;
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("❌ SQLException ao salvar cotação sequence_code={}: {} - SQLState: {} - ErrorCode: {}", 
                         cotacao.getSequenceCode(), e.getMessage(), e.getSQLState(), e.getErrorCode(), e);
             throw e;

@@ -62,6 +62,10 @@ public class FaturaPorClienteMapper {
             entity.setDataVencimentoFatura(converterParaLocalDate(dto.getFaturaDueDate()));
             entity.setDataBaixaFatura(converterParaLocalDate(dto.getFaturaBaixaDate())); // Pode ser null
 
+            entity.setFitAntDocument(dto.getFaturaDocument());
+            entity.setFitAntIssueDate(converterParaLocalDate(dto.getFaturaIssueDate()));
+            entity.setFitAntValue(converterParaBigDecimal(dto.getFaturaValue()));
+
             // 4. Valores (USAR Locale.US)
             entity.setValorFrete(converterParaBigDecimal(dto.getValorFrete()));
             entity.setValorFatura(converterParaBigDecimal(dto.getFaturaValue()));

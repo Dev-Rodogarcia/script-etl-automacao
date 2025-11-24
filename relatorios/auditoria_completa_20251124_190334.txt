@@ -1,0 +1,43 @@
+================================================================================
+RELATÓRIO COMPLETO DE AUDITORIA - ESL CLOUD DATA EXTRACTOR
+================================================================================
+Data/Hora da Auditoria: 24/11/2025 19:03:34
+Sistema: ESL Cloud Data Extraction
+Versão: 1.0-SNAPSHOT
+
+RESUMO GERAL
+----------------------------------------
+Data/Hora da Auditoria: 24/11/2025 19:03:34
+Total de Resultados: 7
+Sucessos: 2
+Alertas: 5
+Erros: 0
+
+DETALHES DOS RESULTADOS
+----------------------------------------
+
+Resultado 1:
+cotacoes: ResultadoValidacaoEntidade{entidade='cotacoes', status=⚠️ Alerta, esperado=234, extraido=214, diferenca=-20, completude=91,5%}
+
+Resultado 2:
+coletas: ResultadoValidacaoEntidade{entidade='coletas', status=✅ OK, registros=174, erro='null'}
+
+Resultado 3:
+contas_a_pagar: ResultadoValidacaoEntidade{entidade='contas_a_pagar', status=⚠️ Alerta, esperado=158, extraido=0, diferenca=-158, completude=0,0%}
+
+Resultado 4:
+faturas_por_cliente: ResultadoValidacaoEntidade{entidade='faturas_por_cliente', status=⚠️ Alerta, esperado=106, extraido=0, diferenca=-106, completude=0,0%}
+
+Resultado 5:
+fretes: ResultadoValidacaoEntidade{entidade='fretes', status=✅ OK, registros=93, erro='null'}
+
+Resultado 6:
+manifestos: ResultadoValidacaoEntidade{entidade='manifestos', status=⚠️ Alerta, esperado=240, extraido=235, diferenca=-5, completude=97,9%}
+
+Resultado 7:
+localizacao_cargas: ResultadoValidacaoEntidade{entidade='localizacao_cargas', status=⚠️ Alerta, esperado=106, extraido=96, diferenca=-10, completude=90,6%}
+
+================================================================================
+FIM DO RELATÓRIO DE AUDITORIA
+Gerado em: 24/11/2025 19:03:34
+================================================================================

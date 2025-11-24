@@ -57,6 +57,11 @@ public class ExportadorCSV {
         System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         System.out.println();
         
+        try {
+            atualizarViewManifestos();
+        } catch (final Exception e) {
+        }
+        
         // Exportar cada entidade
         for (int i = 0; i < ENTIDADES.length; i++) {
             final String entidade = ENTIDADES[i];
@@ -88,6 +93,64 @@ public class ExportadorCSV {
         System.out.println("   2. Abra os CSVs no Excel/Google Sheets");
         System.out.println("   3. Compare com dados do portal");
         System.out.println();
+    }
+    
+    private static void atualizarViewManifestos() throws Exception {
+        try (Connection conn = GerenciadorConexao.obterConexao();
+             Statement stmt = conn.createStatement()) {
+            final String sqlView = """
+                CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
+                SELECT
+                    branch_nickname                                     AS [Filial],
+                    created_at                                          AS [Data criação],
+                    sequence_code                                       AS [Número],
+                    classification                                      AS [Classificação],
+                    departured_at                                       AS [Saída],
+                    closed_at                                           AS [Fechamento],
+                    finished_at                                         AS [Chegada],
+                    vehicle_departure_km                                AS [Km saída],
+                    closing_km                                          AS [Km chegada],
+                    traveled_km                                         AS [KM viagem],
+                    JSON_VALUE(metadata, '$.manual_km')                 AS [Km manual],
+                    status                                              AS [Status],
+                    mdfe_number                                         AS [MDFe],
+                    mdfe_status                                         AS [MDFe/Status],
+                    mdfe_key                                            AS [MDF-es/Chave],
+                    invoices_volumes                                    AS [Volumes NF],
+                    invoices_count                                      AS [Qtd NF],
+                    invoices_value                                      AS [Valor NF],
+                    invoices_weight                                     AS [Peso NF],
+                    total_cubic_volume                                  AS [Total M3],
+                    total_taxed_weight                                  AS [Total peso taxado],
+                    JSON_VALUE(metadata, '$.contract_type')             AS [Tipo de contrato],
+                    JSON_VALUE(metadata, '$.calculation_type')          AS [Tipo de cálculo],
+                    JSON_VALUE(metadata, '$.cargo_type')                AS [Tipo de carga],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.freight_subtotal'))       AS [Valor frete],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fuel_subtotal'))          AS [Combustível],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.toll_subtotal'))          AS [Pedágio],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.daily_subtotal'))         AS [Diária],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.pick_subtotal'))          AS [Coletas.1],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.delivery_subtotal'))      AS [Entregas.1],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.advance_subtotal'))       AS [Adiantamento],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fleet_costs_subtotal'))   AS [Custos Frota],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.additionals_subtotal'))   AS [Adicionais],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.discounts_subtotal'))     AS [Descontos],
+                    operational_expenses_total                          AS [Despesa operacional],
+                    total_cost                                          AS [Custo total],
+                    paying_total                                        AS [Saldo a pagar],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_inss_value'))       AS [Dados do agregado/INSS],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_sest_senat_value')) AS [Dados do agregado/SEST/SENAT],
+                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_ir_value'))         AS [Dados do agregado/IR],
+                    vehicle_owner                                       AS [Proprietário/Nome],
+                    driver_name                                         AS [Motorista],
+                    vehicle_plate                                       AS [Veículo/Placa],
+                    vehicle_type                                        AS [Tipo Veículo/Nome],
+                    creation_user_name                                  AS [Usuário/Emissor],
+                    data_extracao                                       AS [Data de extracao]
+                FROM dbo.manifestos;
+            """;
+            stmt.execute(sqlView);
+        }
     }
     
     /**

@@ -67,6 +67,9 @@ public class ManifestoMapper {
         
         entity.setPickSequenceCode(dto.getPickSequenceCode());
         entity.setContractNumber(dto.getContractNumber());
+        entity.setContractType(dto.getContractType());
+        entity.setCalculationType(dto.getCalculationType());
+        entity.setCargoType(dto.getCargoType());
         
         entity.setDailySubtotal(converterParaBigDecimal(dto.getDailySubtotal(), "daily_subtotal", dto.getSequenceCode()));
         entity.setOperationalExpensesTotal(converterParaBigDecimal(dto.getOperationalExpensesTotal(), "operational_expenses_total", dto.getSequenceCode()));
@@ -74,6 +77,14 @@ public class ManifestoMapper {
         entity.setSestSenatValue(converterParaBigDecimal(dto.getSestSenatValue(), "sest_senat_value", dto.getSequenceCode()));
         entity.setIrValue(converterParaBigDecimal(dto.getIrValue(), "ir_value", dto.getSequenceCode()));
         entity.setPayingTotal(converterParaBigDecimal(dto.getPayingTotal(), "paying_total", dto.getSequenceCode()));
+        entity.setFreightSubtotal(converterParaBigDecimal(dto.getFreightSubtotal(), "freight_subtotal", dto.getSequenceCode()));
+        entity.setFuelSubtotal(converterParaBigDecimal(dto.getFuelSubtotal(), "fuel_subtotal", dto.getSequenceCode()));
+        entity.setTollSubtotal(converterParaBigDecimal(dto.getTollSubtotal(), "toll_subtotal", dto.getSequenceCode()));
+        entity.setDriverServicesTotal(converterParaBigDecimal(dto.getDriverServicesTotal(), "driver_services_total", dto.getSequenceCode()));
+        entity.setManualKm(dto.getManualKm());
+        entity.setGenerateMdfe(dto.getGenerateMdfe());
+        entity.setMonitoringRequest(dto.getMonitoringRequest());
+        entity.setUniqDestinationsCount(dto.getUniqDestinationsCount());
         entity.setCreationUserName(dto.getCreationUserName());
         entity.setAdjustmentUserName(dto.getAdjustmentUserName());
 

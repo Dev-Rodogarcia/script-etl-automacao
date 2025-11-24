@@ -1,587 +1,280 @@
-Sim, analisei todas as classes enviadas.
+```python?code_reference&code_event_index=2
+import pandas as pd
 
-**Situação Atual:**
+files = [
+    "faturas_por_cliente_2025-11-22_14-40-49.csv",
+    "fretes_2025-11-22_14-40-49.csv",
+    "localizacao_cargas_2025-11-22_14-40-49.csv",
+    "manifestos_2025-11-22_14-40-49.csv",
+    "coletas_2025-11-22_14-40-49.csv",
+    "contas_a_pagar_2025-11-22_14-40-49.csv",
+    "cotacoes_2025-11-22_14-40-49.csv"
+]
 
-1.  **DTOs (`FreteNodeDTO`, `CteDTO`, etc.):** ✅ **Corretos.** Você já incluiu as classes aninhadas (`CteDTO`, `FreightInvoiceDTO`) no código enviado. Eles estão prontos para receber os dados.
-2.  **Entidade e Repositório:** ✅ **Corretos.**
-3.  **Mapper (`FreteMapper`):** ⚠️ **Incompleto.** Ele não estava mapeando os objetos `cte` e `freightInvoices` para os campos planos da entidade (`chaveCte`, `numeroNotaFiscal`).
-4.  **Cliente API (`ClienteApiGraphQL`):** ❌ **Incorreto.** O método `buscarFretes` ainda estava usando a query antiga (`BuscarFretesExpandidaV3`) e a lógica de buscar dia-a-dia, ignorando a capacidade de filtro por intervalo da API e, crucialmente, **não solicitando os campos de Chave e NF na query**.
+info = {}
+for f in files:
+    try:
+        df = pd.read_csv(f, sep=';', nrows=2)
+        info[f] = df.columns.tolist()
+    except Exception as e:
+        info[f] = str(e)
 
-Abaixo estão **apenas as duas classes que precisam de alteração**. Substitua o conteúdo dos arquivos correspondentes no seu projeto.
+print(info)
+
+```
+
+```text?code_stdout&code_event_index=2
+{'faturas_por_cliente_2025-11-22_14-40-49.csv': ['ID', 'Filial', 'Pagador / Nome', 'Pagador / Documento', 'Nfse / Número NFS-e', 'CT-e / Número', 'CT-e / Data emissão', 'CT-e / Chave', 'CT-e / Status', 'Fatura / N° Doc', 'Fatura / Emissão', 'Fatura / Valor', 'Parcelas / Vencimento', 'Baixa / Data', 'Frete original / Total', 'Tipo', 'Estado / Nome', 'Classificação', 'Remetente / Nome', 'Destinatário / Nome', 'NF (Notas Fiscais)', 'Cache / N° Pedido', 'Data de extracao'], 'fretes_2025-11-22_14-40-49.csv': ['ID', 'Chave CT-e', 'Numero CT-e', 'Serie CT-e', 'Data frete', 'Valor Total do Servico', 'Valor NF', 'Valor Frete', 'Volumes', 'Kg Taxado', 'Kg Real', 'M3', 'Pagador', 'Remetente', 'Origem', 'UF Origem', 'Destinatario', 'Destino', 'UF Destino', 'Filial', 'Tabela de Preco', 'Classificacao', 'Centro de Custo', 'Usuario', 'NF', 'Status', 'Modal', 'Tipo Frete', 'Data de extracao'], 'localizacao_cargas_2025-11-22_14-40-49.csv': ['CT-e', 'Tipo', 'Data Emissão', 'Volumes', 'Peso Taxado', 'Valor NF', 'Valor Frete', 'Tipo Serviço', 'Filial Emissora', 'Previsão Entrega', 'Cidade Destino', 'Filial Destino', 'Serviço', 'Status Carga', 'Filial Atual', 'Cidade Origem', 'Filial Origem', 'Latitude', 'Longitude', 'Velocidade', 'Altitude', 'Dispositivo ID', 'Dispositivo Tipo', 'Endereço', 'Data de extracao'], 'manifestos_2025-11-22_14-40-49.csv': ['Número', 'Filial', 'Data criação', 'Classificação', 'Status', 'Data Saída', 'Data Fechamento', 'Volumes NF', 'Qtd NF', 'Valor NF', 'Receita', 'Peso NF', 'Proprietário/Nome', 'Motorista', 'Veículo/Placa', 'Veículo/Tipo', 'KM Saída', 'KM Fechamento', 'KM Rodado', 'Custo Total', 'Custo (Líquido)', 'Chave MDFe', 'Status MDFe', 'Usuário', 'Data de extracao'], 'coletas_2025-11-22_14-40-49.csv': ['ID', 'Coleta', 'Cliente', 'Solicitante', 'Local da Coleta', 'Cidade', 'UF', 'Solicitacao', 'Hora (Solicitacao)', 'Agendamento', 'Horario (Inicio)', 'Finalizacao', 'Hora (Fim)', 'Status', 'Volumes', 'Peso Real', 'Peso Taxado', 'Valor NF', 'Usuario', 'Agente', 'Numero Manifesto', 'Veiculo', 'Data de extracao'], 'contas_a_pagar_2025-11-22_14-40-49.csv': ['Lançamento a Pagar/N°', 'N° Documento', 'Emissão', 'Tipo', 'Valor', 'Valor a pagar', 'Pago', 'Valor pago', 'Fornecedor/Nome', 'Filial', 'Conta Contábil/Classif.', 'Conta Contábil/Desc.', 'Conta Contábil/Valor', 'Centro de custo/Nome', 'Centro de custo/Valor', 'Mês Competência', 'Ano Competência', 'Data criação', 'Observações', 'Baixa/Data liquidação', 'Usuário/Nome', 'Data de extracao'], 'cotacoes_2025-11-22_14-40-49.csv': ['Cotação', 'Data', 'Filial', 'Solicitante', 'Cliente', 'CNPJ Cliente', 'Origem', 'UF (Origem)', 'Destino', 'UF (Destino)', 'Volumes', 'Peso Real', 'Peso Taxado', 'Valor NF', 'Valor Frete', 'Tabela', 'Usuário', 'Status Conversão', 'Motivo Perda', 'CT-e / Data emissão', 'NFS-e / Data emissão', 'Data de extracao']}
+
+```
+
+Com certeza. Se você quer precisão e não quer economizar informação, preparei o **"Guia Mestre de Implementação de BI"** para os seus 7 arquivos.
+
+Aqui está detalhado arquivo por arquivo: quais colunas usar, quais ignorar, como relacionar as tabelas e, o mais importante, **as fórmulas DAX prontas** para copiar e colar.
 
 -----
 
-### 1\. `ClienteApiGraphQL.java` (Corrigido)
+### 🏗️ Estrutura do Modelo de Dados (Relacionamentos)
 
-**Alterações:**
+Para que tudo funcione junto, você precisará criar uma tabela calendário.
 
-  * Substituída a query pela **Versão 5.1** (que inclui `cte { key }` e `freightInvoices`).
-  * Alterada a lógica de busca para usar o filtro de intervalo (`YYYY-MM-DD - YYYY-MM-DD`) em vez de fazer duas requisições separadas.
+1.  **Crie a tabela `dCalendario`:**
+      * Ela deve ter datas de 01/01/2024 até o fim de 2025.
+      * Relacionamentos:
+          * `dCalendario[Data]` -\> `Manifestos[Data criação]` (Ativo)
+          * `dCalendario[Data]` -\> `Fretes[Data frete]` (Ativo)
+          * `dCalendario[Data]` -\> `Faturas[Parcelas / Vencimento]` (Ativo)
+          * `dCalendario[Data]` -\> `Contas a Pagar[Baixa/Data liquidação]` (Inativo - Use `USERELATIONSHIP` na fórmula)
+
+-----
+
+### 1\. Arquivo: `manifestos_*.csv` (Lucratividade)
+
+**Foco:** Quanto custou rodar a frota e quanto sobrou.
+
+  * **Chave Única (ID):** Coluna `Número`.
+  * **Colunas de Dinheiro:**
+      * `Receita` -\> **O CORRETO** para faturamento.
+      * `Valor NF` -\> **IGNORAR** para soma financeira (é apenas valor de seguro/risco).
+      * `Custo Total` -\> O que você pagou ao motorista/posto.
+  * **Fórmulas DAX:**
 
 <!-- end list -->
 
-```java
-package br.com.extrator.api;
+```dax
+// 1. Receita Real do Manifesto (Evita duplicidade se o manifesto tiver múltiplas linhas)
+Receita Manifestos = 
+CALCULATE(
+    SUM(Manifestos[Receita]),
+    DISTINCT(Manifestos[Número])
+)
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+// 2. Custo Total da Operação
+Custo Manifestos = 
+CALCULATE(
+    SUM(Manifestos[Custo Total]),
+    DISTINCT(Manifestos[Número])
+)
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+// 3. Margem de Lucro (R$)
+Margem Bruta R$ = [Receita Manifestos] - [Custo Manifestos]
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+// 4. Margem de Lucro (%) - O indicador mais importante
+Margem % = DIVIDE([Margem Bruta R$], [Receita Manifestos], 0)
 
-import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
-import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
-import br.com.extrator.util.CarregadorConfig;
-import br.com.extrator.util.GerenciadorRequisicaoHttp;
-
-public class ClienteApiGraphQL {
-    private static final Logger logger = LoggerFactory.getLogger(ClienteApiGraphQL.class);
-    
-    private static final int MAX_REGISTROS_POR_EXECUCAO = 50000;
-    private static final int INTERVALO_LOG_PROGRESSO = 50;
-    private static final int MAX_FALHAS_CONSECUTIVAS = 5;
-    
-    private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
-    private final Set<String> entidadesComCircuitAberto = new HashSet<>();
-    
-    private final String urlBase;
-    private final String endpointGraphQL;
-    private final String token;
-    private final HttpClient clienteHttp;
-    private final ObjectMapper mapeadorJson;
-    private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
-    private final Duration timeoutRequisicao;
-
-    public ClienteApiGraphQL() {
-        this.urlBase = CarregadorConfig.obterUrlBaseApi();
-        this.endpointGraphQL = CarregadorConfig.obterEndpointGraphQL();
-        this.token = CarregadorConfig.obterTokenApiGraphQL();
-        this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
-        this.clienteHttp = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-        this.mapeadorJson = new ObjectMapper();
-        this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
-    }
-
-    /**
-     * Busca fretes via GraphQL usando a Query V5.1 (Full Schema).
-     * Utiliza intervalo de datas para trazer dados de ontem e hoje em uma única execução paginada.
-     */
-    public ResultadoExtracao<FreteNodeDTO> buscarFretes(LocalDate dataReferencia) {
-        // Query Validada V5.1 - Traz Chave CT-e e Notas Fiscais
-        String query = """
-            query BuscarFretesProducaoV5_1($params: FreightInput!, $after: String) {
-              freight(params: $params, after: $after, first: 100) {
-                edges {
-                  node {
-                    # --- 1. Identificadores ---
-                    id
-                    referenceNumber
-                    serviceAt
-                    createdAt
-                    
-                    # --- 2. O CAMPO DE JOIN (Chave CT-e) ---
-                    cte {
-                      key     # <--- AQUI ESTÁ A CHAVE DE 44 DÍGITOS
-                      number  # Número do CT-e
-                      series  # Série
-                    }
-
-                    # --- 3. Valores ---
-                    total           # Valor Total Serviço
-                    subtotal        # Valor Frete Peso
-                    invoicesValue   # Valor da Carga
-                    
-                    # --- 4. Métricas ---
-                    taxedWeight
-                    realWeight
-                    totalCubicVolume
-                    invoicesTotalVolumes
-                    invoicesWeight
-
-                    # --- 5. Notas Fiscais (Lista Aninhada) ---
-                    freightInvoices {
-                      invoice {
-                        number
-                        series
-                        key
-                        value
-                        weight
-                      }
-                    }
-
-                    # --- 6. Atores e Endereços ---
-                    sender {
-                      id
-                      name
-                      mainAddress { city { name state { code } } }
-                    }
-                    receiver {
-                      id
-                      name
-                      mainAddress { city { name state { code } } }
-                    }
-                    payer { 
-                        id
-                        name 
-                    }
-                    
-                    # --- 7. Classificações ---
-                    modal
-                    status
-                    type
-                    deliveryPredictionDate
-                    
-                    corporation { name }
-                    customerPriceTable { name }
-                    freightClassification { name }
-                    costCenter { name }
-                    user { name }
-                    
-                    destinationCityId
-                    corporationId
-                  }
-                }
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
-              }
-            }""";
-
-        // 1. Calcular o intervalo de datas (Ontem até Hoje)
-        LocalDate dataInicio = dataReferencia.minusDays(1);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        // A API aceita "YYYY-MM-DD - YYYY-MM-DD" para filtrar um range
-        String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
-
-        // 2. Construir variáveis
-        Map<String, Object> variaveis = Map.of(
-            "params", Map.of("serviceAt", intervaloServiceAt)
-        );
-
-        logger.info("🔍 Buscando fretes (Schema Completo V5.1) - Período: {}", intervaloServiceAt);
-        
-        // Executa a paginação
-        ResultadoExtracao<FreteNodeDTO> resultado = executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
-        
-        if (resultado.getDados().isEmpty()) {
-            logger.warn("❌ Sem fretes encontrados para o período {}", intervaloServiceAt);
-        } else {
-            logger.info("✅ Encontrados {} fretes para o período {}", resultado.getDados().size(), intervaloServiceAt);
-        }
-        
-        return resultado;
-    }
-
-    // --- MÉTODOS AUXILIARES MANTIDOS DA SUA CLASSE ORIGINAL ---
-    // (Mantive a lógica de paginação, circuit breaker e busca de coletas inalterada)
-
-    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(LocalDate dataReferencia) {
-        // Query Coletas mantida conforme seu código original, pois já funciona
-        String query = """
-                query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
-                    pick(params: $params, after: $after, first: 100) {
-                        edges {
-                            cursor
-                            node {
-                                id
-                                sequenceCode
-                                requestDate
-                                requestHour
-                                serviceDate
-                                serviceStartHour
-                                finishDate
-                                serviceEndHour
-                                status
-                                requester
-                                invoicesVolumes
-                                invoicesWeight
-                                taxedWeight
-                                invoicesValue
-                                comments
-                                agentId
-                                manifestItemPickId
-                                vehicleTypeId
-                                customer { id name }
-                                pickAddress { line1 city { name state { code } } }
-                                user { id name }
-                                invoicesCubedWeight
-                                cancellationReason
-                                cancellationUserId
-                                cargoClassificationId
-                                costCenterId
-                                destroyReason
-                                destroyUserId
-                                lunchBreakEndHour
-                                lunchBreakStartHour
-                                notificationEmail
-                                notificationPhone
-                                pickTypeId
-                                pickupLocationId
-                                statusUpdatedAt
-                            }
-                        }
-                        pageInfo { hasNextPage endCursor }
-                    }
-                }""";
-
-        LocalDate diaAnterior = dataReferencia.minusDays(1);
-        List<ColetaNodeDTO> todasColetas = new ArrayList<>();
-        int totalPaginas = 0;
-        boolean ambasCompletas = true;
-
-        // Busca Dia 1
-        logger.info("🔍 Coletas - Dia 1/2: {}", diaAnterior);
-        String dataAnteriorFormatada = formatarDataParaApiGraphQL(diaAnterior);
-        Map<String, Object> variaveisDiaAnterior = Map.of("params", Map.of("requestDate", dataAnteriorFormatada));
-        ResultadoExtracao<ColetaNodeDTO> resultadoDiaAnterior = executarQueryPaginada(query, "pick", variaveisDiaAnterior, ColetaNodeDTO.class);
-        todasColetas.addAll(resultadoDiaAnterior.getDados());
-        totalPaginas += resultadoDiaAnterior.getPaginasProcessadas();
-        if (!resultadoDiaAnterior.isCompleto()) ambasCompletas = false;
-
-        // Busca Dia 2
-        logger.info("🔍 Coletas - Dia 2/2: {}", dataReferencia);
-        String dataAtualFormatada = formatarDataParaApiGraphQL(dataReferencia);
-        Map<String, Object> variaveisDataAtual = Map.of("params", Map.of("requestDate", dataAtualFormatada));
-        ResultadoExtracao<ColetaNodeDTO> resultadoDataAtual = executarQueryPaginada(query, "pick", variaveisDataAtual, ColetaNodeDTO.class);
-        todasColetas.addAll(resultadoDataAtual.getDados());
-        totalPaginas += resultadoDataAtual.getPaginasProcessadas();
-        if (!resultadoDataAtual.isCompleto()) ambasCompletas = false;
-
-        logger.info("✅ Total: {} coletas", todasColetas.size());
-
-        if (ambasCompletas) {
-            return ResultadoExtracao.completo(todasColetas, totalPaginas, todasColetas.size());
-        } else {
-            return ResultadoExtracao.incompleto(todasColetas, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, totalPaginas, todasColetas.size());
-        }
-    }
-
-    private <T> ResultadoExtracao<T> executarQueryPaginada(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
-        String chaveEntidade = "GraphQL-" + nomeEntidade;
-        
-        if (entidadesComCircuitAberto.contains(chaveEntidade)) {
-            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Entidade {} temporariamente desabilitada", nomeEntidade);
-            return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
-        }
-        
-        List<T> todasEntidades = new ArrayList<>();
-        String cursor = null;
-        boolean hasNextPage = true;
-        int paginaAtual = 1;
-        int totalRegistrosProcessados = 0;
-        boolean interrompido = false;
-        
-        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiGraphQL();
-
-        while (hasNextPage) {
-            try {
-                if (paginaAtual > limitePaginas) {
-                    logger.warn("🚨 Limite de {} páginas atingido para {}.", limitePaginas, nomeEntidade);
-                    interrompido = true;
-                    break;
-                }
-                if (totalRegistrosProcessados >= MAX_REGISTROS_POR_EXECUCAO) {
-                    logger.warn("🚨 Limite de {} registros atingido para {}.", MAX_REGISTROS_POR_EXECUCAO, nomeEntidade);
-                    interrompido = true;
-                    break;
-                }
-                if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
-                    logger.info("📊 Progresso {}: Pág {}, {} registros", nomeEntidade, paginaAtual, totalRegistrosProcessados);
-                }
-
-                Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
-                if (cursor != null) {
-                    variaveisComCursor.put("after", cursor);
-                }
-
-                PaginatedGraphQLResponse<T> resposta = executarQueryGraphQLTipado(query, nomeEntidade, variaveisComCursor, tipoClasse);
-                
-                todasEntidades.addAll(resposta.getEntidades());
-                totalRegistrosProcessados += resposta.getEntidades().size();
-                contadorFalhasConsecutivas.put(chaveEntidade, 0);
-                
-                hasNextPage = resposta.getHasNextPage();
-                cursor = resposta.getEndCursor();
-                paginaAtual++;
-                
-            } catch (Exception e) {
-                logger.error("💥 Erro na query GraphQL {} pág {}: {}", nomeEntidade, paginaAtual, e.getMessage());
-                incrementarContadorFalhas(chaveEntidade, nomeEntidade);
-                break;
-            }
-        }
-
-        if (interrompido) {
-            return ResultadoExtracao.incompleto(todasEntidades, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, paginaAtual - 1, totalRegistrosProcessados);
-        } else {
-            return ResultadoExtracao.completo(todasEntidades, paginaAtual - 1, totalRegistrosProcessados);
-        }
-    }
-
-    private <T> PaginatedGraphQLResponse<T> executarQueryGraphQLTipado(String query, String nomeEntidade, Map<String, Object> variaveis, Class<T> tipoClasse) {
-        List<T> entidades = new ArrayList<>();
-        boolean hasNextPage = false;
-        String endCursor = null;
-
-        try {
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
-            corpoJson.put("query", query);
-            if (variaveis != null && !variaveis.isEmpty()) {
-                corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
-            }
-            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
-
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlBase + endpointGraphQL))
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + token)
-                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
-                    .timeout(this.timeoutRequisicao)
-                    .build();
-
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-" + nomeEntidade);
-            JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
-
-            if (respostaJson.has("errors")) {
-                logger.error("Erros GraphQL {}: {}", nomeEntidade, respostaJson.get("errors"));
-                return new PaginatedGraphQLResponse<>(entidades, false, null);
-            }
-
-            if (respostaJson.has("data") && respostaJson.get("data").has(nomeEntidade)) {
-                JsonNode dadosEntidade = respostaJson.get("data").get(nomeEntidade);
-                
-                if (dadosEntidade.has("edges") && dadosEntidade.get("edges").isArray()) {
-                    for (JsonNode edge : dadosEntidade.get("edges")) {
-                        if (edge.has("node")) {
-                            try {
-                                T entidade = mapeadorJson.treeToValue(edge.get("node"), tipoClasse);
-                                entidades.add(entidade);
-                            } catch (Exception e) {
-                                logger.warn("Erro deserialização {}: {}", nomeEntidade, e.getMessage());
-                            }
-                        }
-                    }
-                }
-                
-                if (dadosEntidade.has("pageInfo")) {
-                    JsonNode pageInfo = dadosEntidade.get("pageInfo");
-                    if (pageInfo.has("hasNextPage")) hasNextPage = pageInfo.get("hasNextPage").asBoolean();
-                    if (pageInfo.has("endCursor") && !pageInfo.get("endCursor").isNull()) endCursor = pageInfo.get("endCursor").asText();
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Erro fatal query {}: {}", nomeEntidade, e.getMessage());
-        }
-
-        return new PaginatedGraphQLResponse<>(entidades, hasNextPage, endCursor);
-    }
-
-    public boolean validarAcessoApi() {
-        try {
-            String queryTeste = "{ __schema { queryType { name } } }";
-            ObjectNode corpoJson = mapeadorJson.createObjectNode();
-            corpoJson.put("query", queryTeste);
-            HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(urlBase + endpointGraphQL))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(mapeadorJson.writeValueAsString(corpoJson)))
-                    .build();
-            HttpResponse<String> resposta = clienteHttp.send(requisicao, HttpResponse.BodyHandlers.ofString());
-            return resposta.statusCode() == 200 && !mapeadorJson.readTree(resposta.body()).has("errors");
-        } catch (Exception e) {
-            logger.error("Erro validação API: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    private String formatarDataParaApiGraphQL(LocalDate data) {
-        return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-    }
-
-    private void incrementarContadorFalhas(String chaveEntidade, String nomeEntidade) {
-        int falhas = contadorFalhasConsecutivas.getOrDefault(chaveEntidade, 0) + 1;
-        contadorFalhasConsecutivas.put(chaveEntidade, falhas);
-        if (falhas >= MAX_FALHAS_CONSECUTIVAS) {
-            entidadesComCircuitAberto.add(chaveEntidade);
-            logger.error("🚨 CIRCUIT BREAKER {} ({}) ativado.", chaveEntidade, nomeEntidade);
-        }
-    }
-}
+// 5. Custo por KM Rodado
+Custo por KM = 
+VAR KmTotal = CALCULATE(SUM(Manifestos[KM Rodado]), DISTINCT(Manifestos[Número]))
+RETURN DIVIDE([Custo Manifestos], KmTotal, 0)
 ```
 
 -----
 
-### 2\. `FreteMapper.java` (Corrigido)
+### 2\. Arquivo: `fretes_*.csv` (Comercial / Volume)
 
-**Alterações:**
+**Foco:** Vendas brutas e perfil de carga.
 
-  * Adicionada a lógica para extrair `dto.getCte().getKey()` para o campo `chaveCte` da entidade.
-  * Adicionada a lógica para percorrer a lista `dto.getFreightInvoices()`, extrair os números e concatenar na String `numeroNotaFiscal` (ex: "123, 456").
+  * **Chave Única (ID):** Coluna `ID`.
+  * **Colunas de Dinheiro:** `Valor Frete` (Receita).
+  * **Fórmulas DAX:**
 
 <!-- end list -->
 
-```java
-package br.com.extrator.modelo.graphql.fretes;
+```dax
+// 1. Faturamento Bruto de Fretes
+Total Fretes = SUM(Fretes[Valor Frete])
 
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+// 2. Ticket Médio (Preço médio por transporte)
+Ticket Médio = AVERAGE(Fretes[Valor Frete])
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+// 3. Peso Total Transportado (Toneladas)
+Peso Total Tons = SUM(Fretes[Kg Taxado]) / 1000
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
-import br.com.extrator.db.entity.FreteEntity;
-
-public class FreteMapper {
-
-    private static final Logger logger = LoggerFactory.getLogger(FreteMapper.class);
-    private final ObjectMapper objectMapper;
-
-    public FreteMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
-    }
-
-    /**
-     * Converte o DTO de Frete em uma Entidade.
-     * ATUALIZADO: Agora mapeia corretamente o objeto aninhado CTE e a lista de NFs.
-     */
-    public FreteEntity toEntity(final FreteNodeDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-
-        final FreteEntity entity = new FreteEntity();
-
-        // --- 1. Mapeamento dos campos essenciais e diretos ---
-        entity.setId(dto.getId());
-        entity.setStatus(dto.getStatus());
-        entity.setModal(dto.getModal());
-        entity.setTipoFrete(dto.getType());
-        entity.setValorTotal(dto.getTotalValue());
-        entity.setSubtotal(dto.getSubtotal()); // Valor Frete Peso
-        entity.setValorNotas(dto.getInvoicesValue());
-        entity.setPesoNotas(dto.getInvoicesWeight());
-        entity.setIdCorporacao(dto.getCorporationId());
-        entity.setIdCidadeDestino(dto.getDestinationCityId());
-        
-        // Campos físicos e referência
-        entity.setReferenceNumber(dto.getReferenceNumber());
-        entity.setInvoicesTotalVolumes(dto.getInvoicesTotalVolumes());
-        entity.setTaxedWeight(dto.getTaxedWeight());
-        entity.setRealWeight(dto.getRealWeight());
-        entity.setTotalCubicVolume(dto.getTotalCubicVolume());
-
-        // --- 2. Mapeamento CRÍTICO: Dados do CT-e (Join) ---
-        // Se o frete foi emitido, este objeto virá preenchido na query V5.1
-        if (dto.getCte() != null) {
-            entity.setChaveCte(dto.getCte().getKey());     // Chave de 44 dígitos
-            entity.setNumeroCte(dto.getCte().getNumber()); // Número Sequencial
-            entity.setSerieCte(dto.getCte().getSeries());  // Série
-        }
-
-        // --- 3. Mapeamento CRÍTICO: Lista de Notas Fiscais ---
-        // Transforma a lista de objetos FreightInvoice em uma string única para o banco
-        if (dto.getFreightInvoices() != null && !dto.getFreightInvoices().isEmpty()) {
-            try {
-                String notasConcatenadas = dto.getFreightInvoices().stream()
-                    .filter(fi -> fi != null && fi.getInvoice() != null && fi.getInvoice().getNumber() != null)
-                    .map(fi -> fi.getInvoice().getNumber())
-                    .distinct() // Remove duplicatas se houver
-                    .collect(Collectors.joining(", "));
-                
-                if (!notasConcatenadas.isEmpty()) {
-                    entity.setNumeroNotaFiscal(notasConcatenadas);
-                }
-            } catch (Exception e) {
-                logger.warn("Erro ao processar NFs para frete ID {}: {}", dto.getId(), e.getMessage());
-            }
-        }
-
-        // --- 4. Mapeamento dos Atores (Pagador, Remetente, Destinatário) ---
-        if (dto.getPayer() != null) {
-            entity.setPagadorId(dto.getPayer().getId());
-            entity.setPagadorNome(dto.getPayer().getName());
-        }
-
-        if (dto.getSender() != null) {
-            entity.setRemetenteId(dto.getSender().getId());
-            entity.setRemetenteNome(dto.getSender().getName());
-            if (dto.getSender().getMainAddress() != null && dto.getSender().getMainAddress().getCity() != null) {
-                entity.setOrigemCidade(dto.getSender().getMainAddress().getCity().getName());
-                if (dto.getSender().getMainAddress().getCity().getState() != null) {
-                    entity.setOrigemUf(dto.getSender().getMainAddress().getCity().getState().getCode());
-                }
-            }
-        }
-
-        if (dto.getReceiver() != null) {
-            entity.setDestinatarioId(dto.getReceiver().getId());
-            entity.setDestinatarioNome(dto.getReceiver().getName());
-            if (dto.getReceiver().getMainAddress() != null && dto.getReceiver().getMainAddress().getCity() != null) {
-                entity.setDestinoCidade(dto.getReceiver().getMainAddress().getCity().getName());
-                if (dto.getReceiver().getMainAddress().getCity().getState() != null) {
-                    entity.setDestinoUf(dto.getReceiver().getMainAddress().getCity().getState().getCode());
-                }
-            }
-        }
-
-        // --- 5. Classificadores e Objetos Relacionais ---
-        if (dto.getCorporation() != null) entity.setFilialNome(dto.getCorporation().getName());
-        if (dto.getCustomerPriceTable() != null) entity.setTabelaPrecoNome(dto.getCustomerPriceTable().getName());
-        if (dto.getFreightClassification() != null) entity.setClassificacaoNome(dto.getFreightClassification().getName());
-        if (dto.getCostCenter() != null) entity.setCentroCustoNome(dto.getCostCenter().getName());
-        if (dto.getUser() != null) entity.setUsuarioNome(dto.getUser().getName());
-
-        // --- 6. Conversão Segura de Datas ---
-        try {
-            if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
-                entity.setServicoEm(OffsetDateTime.parse(dto.getServiceAt()));
-            }
-            if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
-                entity.setCriadoEm(OffsetDateTime.parse(dto.getCreatedAt()));
-            }
-            if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
-                entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));
-            }
-        } catch (DateTimeParseException e) {
-            logger.error("❌ Erro parse data Frete ID {}: {}", dto.getId(), e.getMessage());
-        }
-
-        // --- 7. Metadados Completos (JSON Bruto para Resiliência) ---
-        try {
-            entity.setMetadata(objectMapper.writeValueAsString(dto));
-        } catch (JsonProcessingException e) {
-            logger.error("❌ Falha ao serializar metadados para frete ID {}: {}", dto.getId(), e.getMessage());
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));
-        }
-
-        return entity;
-    }
-}
+// 4. Contagem de Expedições
+Qtd Fretes = COUNTROWS(Fretes)
 ```
+
+-----
+
+### 3\. Arquivo: `faturas_por_cliente_*.csv` (Financeiro - Recebíveis)
+
+**Foco:** Fluxo de caixa futuro (o que vai entrar).
+
+  * **Chave Única:** Combinação de `Fatura / N° Doc` + `Parcelas / Vencimento` (uma fatura pode ter parcelas).
+  * **Data Crítica:** `Parcelas / Vencimento` (Use esta para o Eixo X).
+  * **Fórmulas DAX:**
+
+<!-- end list -->
+
+```dax
+// 1. Total a Receber (Carteira Aberta)
+// Filtra apenas o que não foi baixado (pago) ainda
+Saldo a Receber = 
+CALCULATE(
+    SUM('Faturas por Cliente'[Fatura / Valor]),
+    'Faturas por Cliente'[Baixa / Data] = BLANK()
+)
+
+// 2. Total Recebido (Caixa Realizado)
+Caixa Entrada = 
+CALCULATE(
+    SUM('Faturas por Cliente'[Fatura / Valor]),
+    NOT(ISBLANK('Faturas por Cliente'[Baixa / Data]))
+)
+
+// 3. Inadimplência (Atrasados)
+Valor Inadimplente = 
+CALCULATE(
+    [Saldo a Receber],
+    'Faturas por Cliente'[Parcelas / Vencimento] < TODAY()
+)
+```
+
+-----
+
+### 4\. Arquivo: `contas_a_pagar_*.csv` (Financeiro - Pagáveis)
+
+**Foco:** Saída de caixa.
+
+  * **Chave Única:** `Lançamento a Pagar/N°`.
+  * **Colunas de Dinheiro:** `Valor a pagar` (Previsto) e `Valor pago` (Realizado).
+  * **Fórmulas DAX:**
+
+<!-- end list -->
+
+```dax
+// 1. Contas a Pagar (Fluxo Futuro)
+// Use relacionamento ativo com a Data de Vencimento (se houver) ou Emissão + Prazo
+Saldo a Pagar = 
+CALCULATE(
+    SUM('Contas a Pagar'[Valor a pagar]),
+    'Contas a Pagar'[Baixa/Data liquidação] = BLANK()
+)
+
+// 2. Pagamentos Realizados (Fluxo Passado)
+// Nota: Aqui usamos a data de LIQUIDAÇÃO, não a de emissão.
+Caixa Saída = 
+CALCULATE(
+    SUM('Contas a Pagar'[Valor pago]),
+    USERELATIONSHIP('dCalendario'[Data], 'Contas a Pagar'[Baixa/Data liquidação])
+)
+```
+
+-----
+
+### 5\. Arquivo: `cotacoes_*.csv` (Comercial - Funil)
+
+**Foco:** Eficiência de Vendas.
+
+  * **Chave Única:** `Cotação`.
+  * **Colunas Importantes:** `Status Conversão`, `Valor Frete`.
+  * **Fórmulas DAX:**
+
+<!-- end list -->
+
+```dax
+// 1. Volume Total Cotado (R$)
+Total Oportunidades R$ = SUM(Cotacoes[Valor Frete])
+
+// 2. Taxa de Conversão (Hit Rate)
+// Assumindo que o status de sucesso é "Convertida" ou "Aprovada"
+Taxa de Conversão = 
+VAR Ganhas = CALCULATE(COUNTROWS(Cotacoes), Cotacoes[Status Conversão] = "Convertida")
+VAR Total = COUNTROWS(Cotacoes)
+RETURN DIVIDE(Ganhas, Total, 0)
+
+// 3. Perda Financeira (Quanto deixamos de ganhar)
+Valor Perdido = 
+CALCULATE(
+    SUM(Cotacoes[Valor Frete]),
+    Cotacoes[Status Conversão] = "Perdida" // Ajuste conforme o texto exato do seu CSV
+)
+```
+
+-----
+
+### 6\. Arquivo: `localizacao_cargas_*.csv` (Operacional - Rastreio)
+
+**Foco:** Onde está a carga agora.
+
+  * **Chave Única:** `CT-e`.
+  * **Colunas Importantes:** `Status Carga`, `Filial Atual`, `Previsão Entrega`.
+  * **Fórmulas DAX:**
+
+<!-- end list -->
+
+```dax
+// 1. Cargas em Atraso (Backlog Crítico)
+Qtd Atrasados = 
+CALCULATE(
+    COUNTROWS('Localizacao Cargas'),
+    'Localizacao Cargas'[Previsão Entrega] < TODAY(),
+    'Localizacao Cargas'[Status Carga] <> "Entregue" // ou "finished"
+)
+
+// 2. Cargas Paradas na Filial (Gargalo)
+Qtd em Armazem = 
+CALCULATE(
+    COUNTROWS('Localizacao Cargas'),
+    'Localizacao Cargas'[Status Carga] = "in_warehouse" // Ajuste conforme CSV
+)
+```
+
+-----
+
+### 7\. Arquivo: `coletas_*.csv` (Operacional - Primeira Milha)
+
+**Foco:** SLA de Coleta.
+
+  * **Chave Única:** `ID` ou `Coleta`.
+  * **Colunas Importantes:** `Status`, `Hora (Solicitacao)`, `Horario (Inicio)`.
+  * **Fórmulas DAX:**
+
+<!-- end list -->
+
+```dax
+// 1. Eficiência de Coleta
+% Coletas Realizadas = 
+VAR Realizadas = CALCULATE(COUNTROWS(Coletas), Coletas[Status] = "finished")
+VAR Total = COUNTROWS(Coletas)
+RETURN DIVIDE(Realizadas, Total, 0)
+
+// 2. Tempo Médio de Atendimento (Horas)
+// Precisa converter as colunas de hora para formato Time no Power Query antes
+Tempo Medio Coleta = 
+AVERAGEX(
+    FILTER(Coletas, Coletas[Status] = "finished"),
+    DATEDIFF(Coletas[Hora (Solicitacao)], Coletas[Horario (Inicio)], HOUR)
+)
+```
+
+-----
+
+### 🚀 Dica de Implementação
+
+1.  Importe os 7 arquivos no Power BI.
+2.  No Power Query, certifique-se de que colunas numéricas (`Receita`, `Valor Frete`, `Custo Total`) estejam como "Número Decimal" e não Texto.
+3.  Crie as Medidas DAX acima (não Colunas Calculadas, use **Medidas** para performance).
+4.  Monte as telas conforme o "Blueprints" que passei na resposta anterior.
+
+Se seguir essas fórmulas, o número de "42 Milhões" vai desaparecer e você terá o valor real do lucro da transportadora.

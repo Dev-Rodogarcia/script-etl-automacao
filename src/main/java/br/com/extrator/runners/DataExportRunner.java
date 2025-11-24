@@ -324,7 +324,7 @@ public final class DataExportRunner {
                 ("Extração incompleta (" + resultadoFaturasAPagar.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
 
             final LogExtracaoEntity logFaturasAPagar = new LogExtracaoEntity(
-                "faturas_a_pagar_data_export",
+                "contas_a_pagar",
                 inicioFaturasAPagar,
                 LocalDateTime.now(),
                 statusFinal,
@@ -336,7 +336,7 @@ public final class DataExportRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             final LogExtracaoEntity logErro = new LogExtracaoEntity(
-                "faturas_a_pagar_data_export",
+                "contas_a_pagar",
                 inicioFaturasAPagar,
                 LocalDateTime.now(),
                 "ERRO_API",
@@ -653,7 +653,7 @@ public final class DataExportRunner {
                     ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
                     ("Extração incompleta (" + resultadoFaturasAPagar.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
                 final LogExtracaoEntity logFaturasAPagar = new LogExtracaoEntity(
-                    "faturas_a_pagar_data_export",
+                    "contas_a_pagar",
                     inicioFaturasAPagar,
                     LocalDateTime.now(),
                     statusFinal,
@@ -664,7 +664,7 @@ public final class DataExportRunner {
                 logExtracaoRepository.gravarLogExtracao(logFaturasAPagar);
             } catch (RuntimeException | java.sql.SQLException e) {
                 final LogExtracaoEntity logErro = new LogExtracaoEntity(
-                    "faturas_a_pagar_data_export",
+                    "contas_a_pagar",
                     inicioFaturasAPagar,
                     LocalDateTime.now(),
                     "ERRO_API",

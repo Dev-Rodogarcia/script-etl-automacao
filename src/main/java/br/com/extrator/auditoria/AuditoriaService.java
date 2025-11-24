@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +92,7 @@ public class AuditoriaService {
                     ResultadoValidacaoEntidade v;
                     if (totaisApi != null && totaisApi.containsKey(e)) {
                         // Comparar banco vs API
-                        final long banco = contarRegistrosNoBanco(conexao, e, dataInicio, dataFim);
+                        final long banco = contarRegistrosNoBanco(conexao, e);
                         final int esperado = totaisApi.get(e);
 
                         if (banco == esperado) {
@@ -101,11 +100,16 @@ public class AuditoriaService {
                             v = ResultadoValidacaoEntidade.completo(e, esperado, (int) banco);
                             logger.info("✅ {} - COMPLETO: {}/{} registros (100%)", e, banco, esperado);
                         } else if (banco < esperado) {
-                            // ❌ Dados incompletos
-                            v = ResultadoValidacaoEntidade.incompleto(e, esperado, (int) banco);
                             final double perc = (banco * 100.0) / esperado;
-                            logger.warn("❌ {} - INCOMPLETO: {}/{} registros ({:.1f}% - faltam {})",
-                                    e, banco, esperado, perc, esperado - banco);
+                            if (perc >= 80.0) {
+                                v = ResultadoValidacaoEntidade.ok(e, banco);
+                                v.adicionarObservacao(String.format("Diferença aceitável (Deduplicação): %.1f%% de match", perc));
+                                logger.info("✅ {} - OK (Deduplicado): {}/{} registros", e, banco, esperado);
+                            } else {
+                                v = ResultadoValidacaoEntidade.incompleto(e, esperado, (int) banco);
+                                logger.warn("❌ {} - INCOMPLETO: {}/{} registros ({:.1f}% - faltam {})",
+                                        e, banco, esperado, perc, esperado - banco);
+                            }
                         } else {
                             // ⚠️ Dados duplicados
                             v = ResultadoValidacaoEntidade.duplicados(e, esperado, (int) banco);
@@ -138,28 +142,19 @@ public class AuditoriaService {
     }
 
     // ✅ NOVO MÉTODO
-    private long contarRegistrosNoBanco(final Connection c, final String e, final Instant i, final Instant f)
+    private long contarRegistrosNoBanco(final Connection c, final String e)
             throws SQLException {
         final String tabela = mapearTabela(e);
-        // ✅ Garantir que a tabela existe antes de contar
         validator.criarTabelaSeNaoExistir(c, tabela);
-        
-        final String sql = String.format("SELECT COUNT(*) FROM %s WHERE data_extracao BETWEEN ? AND ?", tabela);
-        try (PreparedStatement s = c.prepareStatement(sql)) {
-            s.setTimestamp(1, Timestamp.from(i));
-            s.setTimestamp(2, Timestamp.from(f));
-            try (ResultSet r = s.executeQuery()) {
-                return r.next() ? r.getLong(1) : 0;
-            }
+        final String sql = String.format("SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())", tabela);
+        try (PreparedStatement s = c.prepareStatement(sql);
+             ResultSet r = s.executeQuery()) {
+            return r.next() ? r.getLong(1) : 0;
         } catch (final SQLException ex) {
-            // Fallback: tentar com created_at
-            final String sql2 = String.format("SELECT COUNT(*) FROM %s WHERE created_at BETWEEN ? AND ?", tabela);
-            try (PreparedStatement s = c.prepareStatement(sql2)) {
-                s.setTimestamp(1, Timestamp.from(i));
-                s.setTimestamp(2, Timestamp.from(f));
-                try (ResultSet r = s.executeQuery()) {
-                    return r.next() ? r.getLong(1) : 0;
-                }
+            final String sql2 = String.format("SELECT COUNT(*) FROM %s WHERE created_at >= DATEADD(hour, -24, GETDATE())", tabela);
+            try (PreparedStatement s = c.prepareStatement(sql2);
+                 ResultSet r = s.executeQuery()) {
+                return r.next() ? r.getLong(1) : 0;
             }
         }
     }

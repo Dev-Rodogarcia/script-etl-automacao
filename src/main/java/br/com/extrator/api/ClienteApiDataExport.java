@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -142,8 +143,8 @@ public class ClienteApiDataExport {
      */
     public ResultadoExtracao<ManifestoDTO> buscarManifestos() {
         logger.info("Buscando manifestos da API DataExport (últimas 24h)");
-        Instant agora = Instant.now();
-        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final Instant agora = Instant.now();
+        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(templateIdManifestos, TABELA_MANIFESTOS, CAMPO_MANIFESTOS,
                 new TypeReference<List<ManifestoDTO>>() {}, ontem, agora);
     }
@@ -156,8 +157,8 @@ public class ClienteApiDataExport {
      */
     public ResultadoExtracao<CotacaoDTO> buscarCotacoes() {
         logger.info("Buscando cotações da API DataExport (últimas 24h)");
-        Instant agora = Instant.now();
-        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final Instant agora = Instant.now();
+        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(templateIdCotacoes, TABELA_COTACOES, CAMPO_COTACOES,
                 new TypeReference<List<CotacaoDTO>>() {}, ontem, agora);
     }
@@ -170,8 +171,8 @@ public class ClienteApiDataExport {
      */
     public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga() {
         logger.info("Buscando localização de carga da API DataExport (últimas 24h)");
-        Instant agora = Instant.now();
-        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final Instant agora = Instant.now();
+        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(templateIdLocalizacaoCarga, TABELA_LOCALIZACAO_CARGA, CAMPO_LOCALIZACAO_CARGA,
                 new TypeReference<List<LocalizacaoCargaDTO>>() {}, ontem, agora);
     }
@@ -181,8 +182,8 @@ public class ClienteApiDataExport {
      */
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar() {
         logger.info("Buscando Faturas a Pagar da API DataExport (últimas 24h)");
-        Instant agora = Instant.now();
-        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final Instant agora = Instant.now();
+        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(
             TEMPLATE_ID_CONTAS_APAGAR,
             TABELA_CONTAS_APAGAR,
@@ -198,8 +199,8 @@ public class ClienteApiDataExport {
      */
     public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente() {
         logger.info("Buscando Faturas por Cliente da API DataExport (últimas 24h)");
-        Instant agora = Instant.now();
-        Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final Instant agora = Instant.now();
+        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
         return buscarDadosGenericos(
             TEMPLATE_ID_FATURAS_POR_CLIENTE,
             TABELA_FATURAS_POR_CLIENTE,
@@ -222,12 +223,12 @@ public class ClienteApiDataExport {
      * @param dataFim      Data de fim do período
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
-    private <T> ResultadoExtracao<T> buscarDadosGenericos(int templateId, String nomeTabela, String campoData,
-            TypeReference<List<T>> typeReference, Instant dataInicio, Instant dataFim) {
+    private <T> ResultadoExtracao<T> buscarDadosGenericos(final int templateId, final String nomeTabela, final String campoData,
+            final TypeReference<List<T>> typeReference, final Instant dataInicio, final Instant dataFim) {
         
         // Determina o nome amigável do tipo de dados baseado na tabela
-        String tipoAmigavel = obterNomeAmigavelTipo(nomeTabela);
-        String chaveTemplate = "Template-" + templateId;
+        final String tipoAmigavel = obterNomeAmigavelTipo(nomeTabela);
+        final String chaveTemplate = "Template-" + templateId;
         
         // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
         if (templatesComCircuitAberto.contains(chaveTemplate)) {
@@ -237,8 +238,8 @@ public class ClienteApiDataExport {
         }
         
         // Obter valor de 'per' e timeout adequado
-        String valorPer = obterValorPerPorTemplate(templateId);
-        Duration timeout = obterTimeoutPorTemplate(templateId);
+        final String valorPer = obterValorPerPorTemplate(templateId);
+        final Duration timeout = obterTimeoutPorTemplate(templateId);
         
         logger.info("═══════════════════════════════════════════════════════");
         logger.info("INICIANDO EXTRAÇÃO: Template {} - {}", templateId, tipoAmigavel);
@@ -249,12 +250,12 @@ public class ClienteApiDataExport {
         logger.info("Timeout: {} segundos", timeout.getSeconds());
         logger.info("═══════════════════════════════════════════════════════");
 
-        List<T> resultadosFinais = new ArrayList<>();
+        final List<T> resultadosFinais = new ArrayList<>();
         int paginaAtual = 1;
         int totalPaginas = 0;
         int totalRegistrosProcessados = 0;
         boolean interrompido = false;
-        int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
+        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
 
         try {
             while (true) {
@@ -278,14 +279,14 @@ public class ClienteApiDataExport {
                 logger.info("→ Requisitando página {}...", paginaAtual);
 
                 // URL base limpa sem parâmetros de query (filtros e paginação vão no corpo JSON)
-                String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+                final String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
 
                 // Constrói o corpo JSON com search, page, per conforme formato do Postman
-                String corpoJson = construirCorpoRequisicao(templateId, nomeTabela, campoData, dataInicio, dataFim, paginaAtual, valorPer);
+                final String corpoJson = construirCorpoRequisicao(templateId, nomeTabela, campoData, dataInicio, dataFim, paginaAtual, valorPer);
 
                 logger.debug("URL: {} | Corpo: {}", url, corpoJson);
 
-                HttpRequest requisicao = HttpRequest.newBuilder()
+                final HttpRequest requisicao = HttpRequest.newBuilder()
                         .uri(URI.create(url))
                         .header("Authorization", "Bearer " + token)
                         .header("Content-Type", "application/json")
@@ -294,10 +295,10 @@ public class ClienteApiDataExport {
                         .build();
 
                 // Executar requisição com medição de tempo
-                long tempoInicio = System.currentTimeMillis();
-                HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, 
+                final long tempoInicio = System.currentTimeMillis();
+                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, 
                         "DataExport-Template-" + templateId + "-Page-" + paginaAtual);
-                long duracaoMs = System.currentTimeMillis() - tempoInicio;
+                final long duracaoMs = System.currentTimeMillis() - tempoInicio;
 
                 // Verificar resposta
                 if (resposta == null) {
@@ -318,8 +319,8 @@ public class ClienteApiDataExport {
                 // Parse da resposta
                 List<T> registrosPagina;
                 try {
-                    JsonNode raizJson = objectMapper.readTree(resposta.body());
-                    JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
+                    final JsonNode raizJson = objectMapper.readTree(resposta.body());
+                    final JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
 
                     if (dadosNode != null && dadosNode.isArray()) {
                         if (dadosNode.size() == 0) {
@@ -335,7 +336,7 @@ public class ClienteApiDataExport {
                         totalPaginas = paginaAtual - 1;
                         break;
                     }
-                } catch (JsonProcessingException e) {
+                } catch (final JsonProcessingException e) {
                     logger.error("❌ Erro ao parsear JSON da página {}: {}", paginaAtual, e.getMessage());
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
                     throw new RuntimeException("Erro ao parsear página " + paginaAtual, e);
@@ -381,7 +382,7 @@ public class ClienteApiDataExport {
                         totalPaginas > 0 ? totalPaginas : (paginaAtual - 1), totalRegistrosProcessados);
             }
 
-        } catch (RuntimeException e) {
+        } catch (final RuntimeException e) {
             logger.error("❌ ERRO CRÍTICO na extração de {}: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
             throw new RuntimeException("Falha na extração de " + tipoAmigavel, e);
@@ -394,8 +395,8 @@ public class ClienteApiDataExport {
      * @param chaveTemplate Chave identificadora do template
      * @param tipoAmigavel Nome amigável do tipo para logs
      */
-    private void incrementarContadorFalhas(String chaveTemplate, String tipoAmigavel) {
-        int falhas = contadorFalhasConsecutivas.getOrDefault(chaveTemplate, 0) + 1;
+    private void incrementarContadorFalhas(final String chaveTemplate, final String tipoAmigavel) {
+        final int falhas = contadorFalhasConsecutivas.getOrDefault(chaveTemplate, 0) + 1;
         contadorFalhasConsecutivas.put(chaveTemplate, falhas);
         
         if (falhas >= MAX_FALHAS_CONSECUTIVAS) {
@@ -413,7 +414,7 @@ public class ClienteApiDataExport {
      * @param nomeTabela Nome da tabela da API
      * @return Nome amigável para logs
      */
-    private String obterNomeAmigavelTipo(String nomeTabela) {
+    private String obterNomeAmigavelTipo(final String nomeTabela) {
         return switch (nomeTabela) {
             case TABELA_MANIFESTOS -> "Manifestos";
             case TABELA_COTACOES -> "Cotações";
@@ -430,24 +431,24 @@ public class ClienteApiDataExport {
      * @param padrao  Valor padrão caso não seja encontrado
      * @return ID do template configurado ou valor padrão
      */
-    private int carregarTemplateId(String envName, String propKey, int padrao) {
+    private int carregarTemplateId(final String envName, final String propKey, final int padrao) {
         // Tenta primeiro obter da variável de ambiente
-        String valorEnv = System.getenv(envName);
+        final String valorEnv = System.getenv(envName);
         if (valorEnv != null && !valorEnv.trim().isEmpty()) {
             try {
                 return Integer.parseInt(valorEnv.trim());
-            } catch (NumberFormatException e) {
+            } catch (final NumberFormatException e) {
                 logger.warn("Valor inválido na variável de ambiente {}: '{}'. Tentando arquivo de configuração.",
                         envName, valorEnv);
             }
         }
 
         // Fallback para o arquivo config.properties usando CarregadorConfig
-        String valorProp = CarregadorConfig.obterPropriedade(propKey);
+        final String valorProp = CarregadorConfig.obterPropriedade(propKey);
         if (valorProp != null && !valorProp.trim().isEmpty()) {
             try {
                 return Integer.parseInt(valorProp.trim());
-            } catch (NumberFormatException e) {
+            } catch (final NumberFormatException e) {
                 logger.warn("Valor inválido na propriedade {}: '{}'. Usando valor padrão {}.",
                         propKey, valorProp, padrao);
             }
@@ -471,22 +472,22 @@ public class ClienteApiDataExport {
      * @param valorPer Valor de 'per' (registros por página)
      * @return String JSON formatada para o corpo da requisição
      */
-    private String construirCorpoRequisicao(int templateId, String nomeTabela, String campoData, 
-            Instant dataInicio, Instant dataFim, int pagina, String valorPer) {
+    private String construirCorpoRequisicao(final int templateId, final String nomeTabela, final String campoData, 
+            final Instant dataInicio, final Instant dataFim, final int pagina, final String valorPer) {
         try {
-            ObjectNode corpo = objectMapper.createObjectNode();
-            ObjectNode search = objectMapper.createObjectNode();
-            ObjectNode table = objectMapper.createObjectNode();
+            final ObjectNode corpo = objectMapper.createObjectNode();
+            final ObjectNode search = objectMapper.createObjectNode();
+            final ObjectNode table = objectMapper.createObjectNode();
 
             // Formata as datas no formato yyyy-MM-dd - yyyy-MM-dd
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
-            String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
-            String range = dataInicioStr + " - " + dataFimStr;
+            final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            final String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            final String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            final String range = dataInicioStr + " - " + dataFimStr;
 
             // Constrói a estrutura JSON conforme formato do Postman
             if (templateId == TEMPLATE_ID_CONTAS_APAGAR) {
-                ObjectNode searchNested = objectMapper.createObjectNode();
+                final ObjectNode searchNested = objectMapper.createObjectNode();
                 searchNested.put(campoData, range);
                 searchNested.put("created_at", "");
                 search.set(nomeTabela, searchNested);
@@ -499,11 +500,11 @@ public class ClienteApiDataExport {
             corpo.put("page", String.valueOf(pagina));
             corpo.put("per", valorPer);
 
-            String corpoJson = objectMapper.writeValueAsString(corpo);
+            final String corpoJson = objectMapper.writeValueAsString(corpo);
             logger.debug("Corpo JSON construído: {}", corpoJson);
             return corpoJson;
             
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("Erro ao construir corpo da requisição: {}", e.getMessage(), e);
             return "{}";
         }
@@ -588,10 +589,10 @@ public class ClienteApiDataExport {
      * @return Número total de registros encontrados
      * @throws RuntimeException se houver erro no download ou processamento
      */
-    private int obterContagemGenericaCsv(int templateId, String nomeTabela, String campoData, 
-            LocalDate dataReferencia, String tipoAmigavel) {
+    private int obterContagemGenericaCsv(final int templateId, final String nomeTabela, final String campoData, 
+            final LocalDate dataReferencia, final String tipoAmigavel) {
         
-        String chaveTemplate = "Template-" + templateId;
+        final String chaveTemplate = "Template-" + templateId;
         
         // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
         if (templatesComCircuitAberto.contains(chaveTemplate)) {
@@ -603,21 +604,21 @@ public class ClienteApiDataExport {
         logger.info("🔢 Obtendo contagem de {} via CSV - Template: {}, Data: {}", 
                 tipoAmigavel, templateId, dataReferencia);
 
-        Path arquivoTemporario = null;
+        final Path arquivoTemporario = null;
         try {
             // Converter LocalDate para Instant (início e fim do dia)
-            Instant dataInicio = dataReferencia.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
-            Instant dataFim = dataReferencia.plusDays(1).atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+            final Instant dataInicio = dataReferencia.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+            final Instant dataFim = dataReferencia.plusDays(1).atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
 
             // URL para download do CSV
-            String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+            final String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
 
             // Construir corpo da requisição com per=1 para otimização (apenas primeira página)
-            String corpoJson = construirCorpoRequisicaoCsv(nomeTabela, campoData, dataInicio, dataFim);
+            final String corpoJson = construirCorpoRequisicaoCsv(nomeTabela, campoData, dataInicio, dataFim);
 
             logger.debug("Baixando CSV para contagem via URL: {} com corpo: {}", url, corpoJson);
 
-            HttpRequest requisicao = HttpRequest.newBuilder()
+            final HttpRequest requisicao = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Authorization", "Bearer " + token)
                     .header("Content-Type", "application/json")
@@ -627,8 +628,8 @@ public class ClienteApiDataExport {
                     .build();
 
             final long inicioMs = System.currentTimeMillis();
-            HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
-                    this.httpClient, requisicao, "contagem-csv-" + tipoAmigavel.replace(" ", "-"));
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoComCharset(
+                    this.httpClient, requisicao, "contagem-csv-" + tipoAmigavel.replace(" ", "-"), StandardCharsets.ISO_8859_1);
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
 
             if (resposta == null) {
@@ -644,22 +645,13 @@ public class ClienteApiDataExport {
                 throw new RuntimeException(mensagemErro);
             }
 
-            // Criar arquivo temporário no diretório temporário do sistema
-            arquivoTemporario = Files.createTempFile("contagem-" + tipoAmigavel.replace(" ", "-"), ".csv");
-            
-            // Escrever conteúdo CSV no arquivo temporário
-            Files.write(arquivoTemporario, resposta.body().getBytes());
-
-            // Contar linhas usando NIO de forma eficiente (sem carregar tudo na memória)
-            long totalLinhas;
-            try (var linhas = Files.lines(arquivoTemporario)) {
-                totalLinhas = linhas.count();
-            }
+            // Contar linhas diretamente do corpo da resposta para evitar problemas de charset
+            final String conteudoCsv = resposta.body();
+            final long totalLinhas = conteudoCsv.lines().count();
 
             // Subtrair 1 para desconsiderar o cabeçalho
             final int contagem = Math.max(0, (int) (totalLinhas - 1));
 
-            // Reset do contador de falhas em caso de sucesso
             contadorFalhasConsecutivas.put(chaveTemplate, 0);
 
             logger.info("✅ Contagem de {} obtida com sucesso via CSV: {} registros ({} ms)", 
@@ -667,10 +659,6 @@ public class ClienteApiDataExport {
 
             return contagem;
 
-        } catch (final IOException e) {
-            logger.error("Erro de I/O ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
-            incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-            throw new RuntimeException("Erro de I/O ao processar contagem de " + tipoAmigavel + " via CSV", e);
         } catch (final RuntimeException e) {
             logger.error("Erro de runtime ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
@@ -706,7 +694,7 @@ public class ClienteApiDataExport {
      * @param templateId ID do template
      * @return String com o valor de 'per' apropriado
      */
-    private String obterValorPerPorTemplate(int templateId) {
+    private String obterValorPerPorTemplate(final int templateId) {
         return switch (templateId) {
             case 6906 -> "1000";   // Cotações
             case 6399 -> "10000";  // Manifestos
@@ -723,9 +711,9 @@ public class ClienteApiDataExport {
      * @param templateId ID do template
      * @return Duration com o timeout apropriado
      */
-    private Duration obterTimeoutPorTemplate(int templateId) {
+    private Duration obterTimeoutPorTemplate(final int templateId) {
         // Timeout padrão da configuração
-        Duration timeoutPadrao = this.timeoutRequisicao;
+        final Duration timeoutPadrao = this.timeoutRequisicao;
         
         // Timeout aumentado para manifestos (podem ter páginas muito grandes)
         return switch (templateId) {
@@ -747,18 +735,18 @@ public class ClienteApiDataExport {
      * @param dataFim Data de fim do período
      * @return String JSON do corpo da requisição
      */
-    private String construirCorpoRequisicaoCsv(String nomeTabela, String campoData, 
-            Instant dataInicio, Instant dataFim) {
+    private String construirCorpoRequisicaoCsv(final String nomeTabela, final String campoData, 
+            final Instant dataInicio, final Instant dataFim) {
         try {
-            ObjectNode corpo = objectMapper.createObjectNode();
-            ObjectNode search = objectMapper.createObjectNode();
-            ObjectNode table = objectMapper.createObjectNode();
+            final ObjectNode corpo = objectMapper.createObjectNode();
+            final ObjectNode search = objectMapper.createObjectNode();
+            final ObjectNode table = objectMapper.createObjectNode();
 
             // Formatar as datas no formato yyyy-MM-dd - yyyy-MM-dd
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
-            String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
-            String range = dataInicioStr + " - " + dataFimStr;
+            final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            final String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            final String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            final String range = dataInicioStr + " - " + dataFimStr;
 
             // Construir a estrutura JSON
             table.put(campoData, range);
@@ -768,11 +756,11 @@ public class ClienteApiDataExport {
             corpo.put("page", "1"); // Apenas primeira página para contagem
             corpo.put("per", "10000"); // Máximo possível para obter todos os registros
 
-            String corpoJson = objectMapper.writeValueAsString(corpo);
+            final String corpoJson = objectMapper.writeValueAsString(corpo);
             logger.debug("Corpo JSON para contagem CSV construído: {}", corpoJson);
             return corpoJson;
             
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("Erro ao construir corpo da requisição para contagem CSV: {}", e.getMessage(), e);
             return "{}";
         }

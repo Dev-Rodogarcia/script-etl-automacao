@@ -69,6 +69,18 @@ public class ManifestoEntity {
     private String creationUserName; // Usuário (Criação)
     private String adjustmentUserName; // Usuário do Acerto
 
+    private String contractType;
+    private String calculationType;
+    private String cargoType;
+    private BigDecimal freightSubtotal;
+    private BigDecimal fuelSubtotal;
+    private BigDecimal tollSubtotal;
+    private BigDecimal driverServicesTotal;
+    private Boolean manualKm;
+    private Boolean generateMdfe;
+    private Boolean monitoringRequest;
+    private Integer uniqDestinationsCount;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -373,6 +385,94 @@ public class ManifestoEntity {
 
     public void setAdjustmentUserName(final String adjustmentUserName) {
         this.adjustmentUserName = adjustmentUserName;
+    }
+
+    public String getContractType() {
+        return contractType;
+    }
+
+    public void setContractType(final String contractType) {
+        this.contractType = contractType;
+    }
+
+    public String getCalculationType() {
+        return calculationType;
+    }
+
+    public void setCalculationType(final String calculationType) {
+        this.calculationType = calculationType;
+    }
+
+    public String getCargoType() {
+        return cargoType;
+    }
+
+    public void setCargoType(final String cargoType) {
+        this.cargoType = cargoType;
+    }
+
+    public BigDecimal getFreightSubtotal() {
+        return freightSubtotal;
+    }
+
+    public void setFreightSubtotal(final BigDecimal freightSubtotal) {
+        this.freightSubtotal = freightSubtotal;
+    }
+
+    public BigDecimal getFuelSubtotal() {
+        return fuelSubtotal;
+    }
+
+    public void setFuelSubtotal(final BigDecimal fuelSubtotal) {
+        this.fuelSubtotal = fuelSubtotal;
+    }
+
+    public BigDecimal getTollSubtotal() {
+        return tollSubtotal;
+    }
+
+    public void setTollSubtotal(final BigDecimal tollSubtotal) {
+        this.tollSubtotal = tollSubtotal;
+    }
+
+    public BigDecimal getDriverServicesTotal() {
+        return driverServicesTotal;
+    }
+
+    public void setDriverServicesTotal(final BigDecimal driverServicesTotal) {
+        this.driverServicesTotal = driverServicesTotal;
+    }
+
+    public Boolean getManualKm() {
+        return manualKm;
+    }
+
+    public void setManualKm(final Boolean manualKm) {
+        this.manualKm = manualKm;
+    }
+
+    public Boolean getGenerateMdfe() {
+        return generateMdfe;
+    }
+
+    public void setGenerateMdfe(final Boolean generateMdfe) {
+        this.generateMdfe = generateMdfe;
+    }
+
+    public Boolean getMonitoringRequest() {
+        return monitoringRequest;
+    }
+
+    public void setMonitoringRequest(final Boolean monitoringRequest) {
+        this.monitoringRequest = monitoringRequest;
+    }
+
+    public Integer getUniqDestinationsCount() {
+        return uniqDestinationsCount;
+    }
+
+    public void setUniqDestinationsCount(final Integer uniqDestinationsCount) {
+        this.uniqDestinationsCount = uniqDestinationsCount;
     }
 
     public String getMetadata() {

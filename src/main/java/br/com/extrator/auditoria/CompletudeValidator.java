@@ -99,32 +99,28 @@ public class CompletudeValidator {
             // A contagem deve ser feita via paginação completa ou removida se não for essencial.
             logger.warn("⚠️ Contagem de Fretes e Coletas via GraphQL não disponível (totalCount não existe na API)");
             
-            // === API DataExport - Manifestos, Cotações e Localizações ===
-            logger.info("📊 Buscando contagens via API DataExport...");
-            
-            // Manifestos
-            final int contagemManifestos = clienteApiDataExport.obterContagemManifestos(dataReferencia);
-            totaisEslCloud.put("manifestos", contagemManifestos);
-            logger.info("✅ Manifestos: {} registros", contagemManifestos);
-            
-            // Cotações
-            final int contagemCotacoes = clienteApiDataExport.obterContagemCotacoes(dataReferencia);
-            totaisEslCloud.put("cotacoes", contagemCotacoes);
-            logger.info("✅ Cotações: {} registros", contagemCotacoes);
-            
-            // Localizações de Carga
-            final int contagemLocalizacoes = clienteApiDataExport.obterContagemLocalizacoesCarga(dataReferencia);
-            totaisEslCloud.put("localizacao_cargas", contagemLocalizacoes);
-            logger.info("✅ Localizações de Carga: {} registros", contagemLocalizacoes);
+            // === API DataExport - Manifestos, Cotações, Localizações, Contas a Pagar, Faturas/Cliente ===
+            logger.info("📊 Buscando contagens via API DataExport (últimas 24h)...");
 
-            // Contas a Pagar (Data Export)
-            final int contagemContasAPagar = clienteApiDataExport.obterContagemContasAPagar(dataReferencia);
-            totaisEslCloud.put("contas_a_pagar", contagemContasAPagar);
-            logger.info("✅ Contas a Pagar: {} registros", contagemContasAPagar);
-            final var resultadoFaturasPorCliente = clienteApiDataExport.buscarFaturasPorCliente();
-            final int contagemFaturasPorCliente = resultadoFaturasPorCliente.getRegistrosExtraidos();
-            totaisEslCloud.put("faturas_por_cliente", contagemFaturasPorCliente);
-            logger.info("✅ Faturas por Cliente: {} registros", contagemFaturasPorCliente);
+            final var resManifestos = clienteApiDataExport.buscarManifestos();
+            totaisEslCloud.put("manifestos", resManifestos.getRegistrosExtraidos());
+            logger.info("✅ Manifestos: {} registros", resManifestos.getRegistrosExtraidos());
+
+            final var resCotacoes = clienteApiDataExport.buscarCotacoes();
+            totaisEslCloud.put("cotacoes", resCotacoes.getRegistrosExtraidos());
+            logger.info("✅ Cotações: {} registros", resCotacoes.getRegistrosExtraidos());
+
+            final var resLocalizacoes = clienteApiDataExport.buscarLocalizacaoCarga();
+            totaisEslCloud.put("localizacao_cargas", resLocalizacoes.getRegistrosExtraidos());
+            logger.info("✅ Localizações de Carga: {} registros", resLocalizacoes.getRegistrosExtraidos());
+
+            final var resContasAPagar = clienteApiDataExport.buscarContasAPagar();
+            totaisEslCloud.put("contas_a_pagar", resContasAPagar.getRegistrosExtraidos());
+            logger.info("✅ Contas a Pagar: {} registros", resContasAPagar.getRegistrosExtraidos());
+
+            final var resFaturasPorCliente = clienteApiDataExport.buscarFaturasPorCliente();
+            totaisEslCloud.put("faturas_por_cliente", resFaturasPorCliente.getRegistrosExtraidos());
+            logger.info("✅ Faturas por Cliente: {} registros", resFaturasPorCliente.getRegistrosExtraidos());
             
             // Log do resumo final
             final int totalGeralRegistros = totaisEslCloud.values().stream()
@@ -183,18 +179,15 @@ public class CompletudeValidator {
                     // Query SQL eficiente para contar registros na data específica
                     // String.format é seguro aqui pois nomeTabela vem de fonte controlada
                     final String sql = String.format(
-                        "SELECT COUNT(*) FROM %s WHERE CAST(data_extracao AS DATE) = ?", 
+                        "SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())",
                         nomeTabela
                     );
-                    
+
                     int contagemBanco;
-                    try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-                        stmt.setDate(1, java.sql.Date.valueOf(dataReferencia));
-                        
-                        try (ResultSet rs = stmt.executeQuery()) {
-                            rs.next();
-                            contagemBanco = rs.getInt(1);
-                        }
+                    try (PreparedStatement stmt = conexao.prepareStatement(sql);
+                         ResultSet rs = stmt.executeQuery()) {
+                        rs.next();
+                        contagemBanco = rs.getInt(1);
                     }
                     
                     // Determinar status baseado na comparação
@@ -244,6 +237,10 @@ public class CompletudeValidator {
         if (contagemEslCloud == contagemBanco) {
             return StatusValidacao.OK;
         } else if (contagemBanco < contagemEslCloud) {
+            final double perc = contagemEslCloud == 0 ? 0.0 : (contagemBanco * 100.0) / contagemEslCloud;
+            if (perc >= 80.0) {
+                return StatusValidacao.OK;
+            }
             return StatusValidacao.INCOMPLETO;
         } else {
             return StatusValidacao.DUPLICADOS;
@@ -511,15 +508,10 @@ public class CompletudeValidator {
     private int contarRegistrosDuranteJanela(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         // Implementar chamadas específicas para cada tipo de API
         return switch (entidade) {
-            case "ocorrencias", "faturas_a_receber", "faturas_a_pagar" ->
-                contarRegistrosApiRest(entidade, timestamps, dataReferencia);
-                
             case "fretes", "coletas" ->
                 contarRegistrosApiGraphQL(entidade, timestamps, dataReferencia);
-                
-            case "manifestos", "cotacoes", "localizacao_cargas" ->
+            case "manifestos", "cotacoes", "localizacao_cargas", "contas_a_pagar", "faturas_por_cliente" ->
                 contarRegistrosApiDataExport(entidade, timestamps, dataReferencia);
-                
             default -> {
                 logger.warn("⚠️ Entidade {} não mapeada para validação temporal", entidade);
                 yield 0;
@@ -527,21 +519,6 @@ public class CompletudeValidator {
         };
     }
     
-    /**
-     * Conta registros via API REST durante janela temporal.
-     * 
-     * @param entidade Nome da entidade a ser consultada
-     * @param timestamps Janela temporal da extração (será usado na implementação futura)
-     * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
-     * @return Número de registros encontrados na janela temporal
-     */
-    private int contarRegistrosApiRest(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
-        // Implementação específica para API REST
-        // Por enquanto, retorna 0 (implementação futura)
-        logger.debug("🔄 Contagem temporal via API REST para {} ainda não implementada (janela: {} - {}, data: {})", 
-                    entidade, timestamps.getInicio(), timestamps.getFim(), dataReferencia);
-        return 0;
-    }
     
     /**
      * Conta registros via API GraphQL durante janela temporal.

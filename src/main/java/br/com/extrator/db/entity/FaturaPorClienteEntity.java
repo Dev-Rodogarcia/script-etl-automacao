@@ -33,6 +33,10 @@ public class FaturaPorClienteEntity {
     private LocalDate dataVencimentoFatura;
     private LocalDate dataBaixaFatura;
 
+    private String fitAntDocument;
+    private LocalDate fitAntIssueDate;
+    private BigDecimal fitAntValue;
+
     // Classificação Operacional
     private String filial;
     private String tipoFrete;
@@ -150,6 +154,30 @@ public class FaturaPorClienteEntity {
         this.dataBaixaFatura = dataBaixaFatura;
     }
 
+    public String getFitAntDocument() {
+        return fitAntDocument;
+    }
+
+    public void setFitAntDocument(final String fitAntDocument) {
+        this.fitAntDocument = fitAntDocument;
+    }
+
+    public LocalDate getFitAntIssueDate() {
+        return fitAntIssueDate;
+    }
+
+    public void setFitAntIssueDate(final LocalDate fitAntIssueDate) {
+        this.fitAntIssueDate = fitAntIssueDate;
+    }
+
+    public BigDecimal getFitAntValue() {
+        return fitAntValue;
+    }
+
+    public void setFitAntValue(final BigDecimal fitAntValue) {
+        this.fitAntValue = fitAntValue;
+    }
+
     public String getFilial() {
         return filial;
     }
@@ -244,5 +272,12 @@ public class FaturaPorClienteEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean temFaturaConsolidada() {
+        if (numeroFatura != null && dataEmissaoFatura != null && valorFatura != null) {
+            return true;
+        }
+        return fitAntDocument != null && fitAntIssueDate != null && fitAntValue != null;
     }
 }
