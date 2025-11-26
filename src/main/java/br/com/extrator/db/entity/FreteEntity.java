@@ -56,6 +56,30 @@ public class FreteEntity {
     private Integer numeroCte;
     private Integer serieCte;
 
+    private Integer serviceType;
+    private Boolean insuranceEnabled;
+    private BigDecimal grisSubtotal;
+    private BigDecimal tdeSubtotal;
+    private String modalCte;
+    private BigDecimal redispatchSubtotal;
+    private BigDecimal suframaSubtotal;
+    private String paymentType;
+    private String previousDocumentType;
+    private BigDecimal productsValue;
+    private BigDecimal trtSubtotal;
+    private String nfseSeries;
+    private Integer nfseNumber;
+    private Long insuranceId;
+    private BigDecimal otherFees;
+    private BigDecimal km;
+    private Integer paymentAccountableType;
+    private BigDecimal insuredValue;
+    private Boolean globalized;
+    private BigDecimal secCatSubtotal;
+    private String globalizedType;
+    private Integer priceTableAccountableType;
+    private Integer insuranceAccountableType;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -358,6 +382,53 @@ public class FreteEntity {
     public void setSerieCte(final Integer serieCte) {
         this.serieCte = serieCte;
     }
+
+    public Integer getServiceType() { return serviceType; }
+    public void setServiceType(final Integer serviceType) { this.serviceType = serviceType; }
+    public Boolean getInsuranceEnabled() { return insuranceEnabled; }
+    public void setInsuranceEnabled(final Boolean insuranceEnabled) { this.insuranceEnabled = insuranceEnabled; }
+    public BigDecimal getGrisSubtotal() { return grisSubtotal; }
+    public void setGrisSubtotal(final BigDecimal grisSubtotal) { this.grisSubtotal = grisSubtotal; }
+    public BigDecimal getTdeSubtotal() { return tdeSubtotal; }
+    public void setTdeSubtotal(final BigDecimal tdeSubtotal) { this.tdeSubtotal = tdeSubtotal; }
+    public String getModalCte() { return modalCte; }
+    public void setModalCte(final String modalCte) { this.modalCte = modalCte; }
+    public BigDecimal getRedispatchSubtotal() { return redispatchSubtotal; }
+    public void setRedispatchSubtotal(final BigDecimal redispatchSubtotal) { this.redispatchSubtotal = redispatchSubtotal; }
+    public BigDecimal getSuframaSubtotal() { return suframaSubtotal; }
+    public void setSuframaSubtotal(final BigDecimal suframaSubtotal) { this.suframaSubtotal = suframaSubtotal; }
+    public String getPaymentType() { return paymentType; }
+    public void setPaymentType(final String paymentType) { this.paymentType = paymentType; }
+    public String getPreviousDocumentType() { return previousDocumentType; }
+    public void setPreviousDocumentType(final String previousDocumentType) { this.previousDocumentType = previousDocumentType; }
+    public BigDecimal getProductsValue() { return productsValue; }
+    public void setProductsValue(final BigDecimal productsValue) { this.productsValue = productsValue; }
+    public BigDecimal getTrtSubtotal() { return trtSubtotal; }
+    public void setTrtSubtotal(final BigDecimal trtSubtotal) { this.trtSubtotal = trtSubtotal; }
+    public String getNfseSeries() { return nfseSeries; }
+    public void setNfseSeries(final String nfseSeries) { this.nfseSeries = nfseSeries; }
+    public Integer getNfseNumber() { return nfseNumber; }
+    public void setNfseNumber(final Integer nfseNumber) { this.nfseNumber = nfseNumber; }
+    public Long getInsuranceId() { return insuranceId; }
+    public void setInsuranceId(final Long insuranceId) { this.insuranceId = insuranceId; }
+    public BigDecimal getOtherFees() { return otherFees; }
+    public void setOtherFees(final BigDecimal otherFees) { this.otherFees = otherFees; }
+    public BigDecimal getKm() { return km; }
+    public void setKm(final BigDecimal km) { this.km = km; }
+    public Integer getPaymentAccountableType() { return paymentAccountableType; }
+    public void setPaymentAccountableType(final Integer paymentAccountableType) { this.paymentAccountableType = paymentAccountableType; }
+    public BigDecimal getInsuredValue() { return insuredValue; }
+    public void setInsuredValue(final BigDecimal insuredValue) { this.insuredValue = insuredValue; }
+    public Boolean getGlobalized() { return globalized; }
+    public void setGlobalized(final Boolean globalized) { this.globalized = globalized; }
+    public BigDecimal getSecCatSubtotal() { return secCatSubtotal; }
+    public void setSecCatSubtotal(final BigDecimal secCatSubtotal) { this.secCatSubtotal = secCatSubtotal; }
+    public String getGlobalizedType() { return globalizedType; }
+    public void setGlobalizedType(final String globalizedType) { this.globalizedType = globalizedType; }
+    public Integer getPriceTableAccountableType() { return priceTableAccountableType; }
+    public void setPriceTableAccountableType(final Integer priceTableAccountableType) { this.priceTableAccountableType = priceTableAccountableType; }
+    public Integer getInsuranceAccountableType() { return insuranceAccountableType; }
+    public void setInsuranceAccountableType(final Integer insuranceAccountableType) { this.insuranceAccountableType = insuranceAccountableType; }
 
     public String getMetadata() {
         return metadata;

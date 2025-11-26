@@ -81,6 +81,48 @@ public class ManifestoEntity {
     private Boolean monitoringRequest;
     private Integer uniqDestinationsCount;
 
+    private OffsetDateTime mobileReadAt;
+    private BigDecimal km;
+    private Integer deliveryManifestItemsCount;
+    private Integer transferManifestItemsCount;
+    private Integer pickManifestItemsCount;
+    private Integer dispatchDraftManifestItemsCount;
+    private Integer consolidationManifestItemsCount;
+    private Integer reversePickManifestItemsCount;
+    private Integer manifestItemsCount;
+    private Integer finalizedManifestItemsCount;
+    private Integer calculatedPickCount;
+    private Integer calculatedDeliveryCount;
+    private Integer calculatedDispatchCount;
+    private Integer calculatedConsolidationCount;
+    private Integer calculatedReversePickCount;
+    private BigDecimal pickSubtotal;
+    private BigDecimal deliverySubtotal;
+    private BigDecimal dispatchSubtotal;
+    private BigDecimal consolidationSubtotal;
+    private BigDecimal reversePickSubtotal;
+    private BigDecimal advanceSubtotal;
+    private BigDecimal fleetCostsSubtotal;
+    private BigDecimal additionalsSubtotal;
+    private BigDecimal discountsSubtotal;
+    private BigDecimal discountValue;
+    private String adjustmentComments;
+    private String contractStatus;
+    private String iksId;
+    private String programacaoSequenceCode;
+    private OffsetDateTime programacaoStartingAt;
+    private OffsetDateTime programacaoEndingAt;
+    private String trailer1LicensePlate;
+    private BigDecimal trailer1WeightCapacity;
+    private String trailer2LicensePlate;
+    private BigDecimal trailer2WeightCapacity;
+    private BigDecimal vehicleWeightCapacity;
+    private BigDecimal vehicleCubicWeight;
+    private String unloadingRecipientNames;
+    private String deliveryRegionNames;
+    private String programacaoCliente;
+    private String programacaoTipoServico;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -489,6 +531,334 @@ public class ManifestoEntity {
 
     public void setIdentificadorUnico(final String identificadorUnico) {
         this.identificadorUnico = identificadorUnico;
+    }
+
+    public OffsetDateTime getMobileReadAt() {
+        return mobileReadAt;
+    }
+
+    public void setMobileReadAt(final OffsetDateTime mobileReadAt) {
+        this.mobileReadAt = mobileReadAt;
+    }
+
+    public BigDecimal getKm() {
+        return km;
+    }
+
+    public void setKm(final BigDecimal km) {
+        this.km = km;
+    }
+
+    public Integer getDeliveryManifestItemsCount() {
+        return deliveryManifestItemsCount;
+    }
+
+    public void setDeliveryManifestItemsCount(final Integer deliveryManifestItemsCount) {
+        this.deliveryManifestItemsCount = deliveryManifestItemsCount;
+    }
+
+    public Integer getTransferManifestItemsCount() {
+        return transferManifestItemsCount;
+    }
+
+    public void setTransferManifestItemsCount(final Integer transferManifestItemsCount) {
+        this.transferManifestItemsCount = transferManifestItemsCount;
+    }
+
+    public Integer getPickManifestItemsCount() {
+        return pickManifestItemsCount;
+    }
+
+    public void setPickManifestItemsCount(final Integer pickManifestItemsCount) {
+        this.pickManifestItemsCount = pickManifestItemsCount;
+    }
+
+    public Integer getDispatchDraftManifestItemsCount() {
+        return dispatchDraftManifestItemsCount;
+    }
+
+    public void setDispatchDraftManifestItemsCount(final Integer dispatchDraftManifestItemsCount) {
+        this.dispatchDraftManifestItemsCount = dispatchDraftManifestItemsCount;
+    }
+
+    public Integer getConsolidationManifestItemsCount() {
+        return consolidationManifestItemsCount;
+    }
+
+    public void setConsolidationManifestItemsCount(final Integer consolidationManifestItemsCount) {
+        this.consolidationManifestItemsCount = consolidationManifestItemsCount;
+    }
+
+    public Integer getReversePickManifestItemsCount() {
+        return reversePickManifestItemsCount;
+    }
+
+    public void setReversePickManifestItemsCount(final Integer reversePickManifestItemsCount) {
+        this.reversePickManifestItemsCount = reversePickManifestItemsCount;
+    }
+
+    public Integer getManifestItemsCount() {
+        return manifestItemsCount;
+    }
+
+    public void setManifestItemsCount(final Integer manifestItemsCount) {
+        this.manifestItemsCount = manifestItemsCount;
+    }
+
+    public Integer getFinalizedManifestItemsCount() {
+        return finalizedManifestItemsCount;
+    }
+
+    public void setFinalizedManifestItemsCount(final Integer finalizedManifestItemsCount) {
+        this.finalizedManifestItemsCount = finalizedManifestItemsCount;
+    }
+
+    public Integer getCalculatedPickCount() {
+        return calculatedPickCount;
+    }
+
+    public void setCalculatedPickCount(final Integer calculatedPickCount) {
+        this.calculatedPickCount = calculatedPickCount;
+    }
+
+    public Integer getCalculatedDeliveryCount() {
+        return calculatedDeliveryCount;
+    }
+
+    public void setCalculatedDeliveryCount(final Integer calculatedDeliveryCount) {
+        this.calculatedDeliveryCount = calculatedDeliveryCount;
+    }
+
+    public Integer getCalculatedDispatchCount() {
+        return calculatedDispatchCount;
+    }
+
+    public void setCalculatedDispatchCount(final Integer calculatedDispatchCount) {
+        this.calculatedDispatchCount = calculatedDispatchCount;
+    }
+
+    public Integer getCalculatedConsolidationCount() {
+        return calculatedConsolidationCount;
+    }
+
+    public void setCalculatedConsolidationCount(final Integer calculatedConsolidationCount) {
+        this.calculatedConsolidationCount = calculatedConsolidationCount;
+    }
+
+    public Integer getCalculatedReversePickCount() {
+        return calculatedReversePickCount;
+    }
+
+    public void setCalculatedReversePickCount(final Integer calculatedReversePickCount) {
+        this.calculatedReversePickCount = calculatedReversePickCount;
+    }
+
+    public BigDecimal getPickSubtotal() {
+        return pickSubtotal;
+    }
+
+    public void setPickSubtotal(final BigDecimal pickSubtotal) {
+        this.pickSubtotal = pickSubtotal;
+    }
+
+    public BigDecimal getDeliverySubtotal() {
+        return deliverySubtotal;
+    }
+
+    public void setDeliverySubtotal(final BigDecimal deliverySubtotal) {
+        this.deliverySubtotal = deliverySubtotal;
+    }
+
+    public BigDecimal getDispatchSubtotal() {
+        return dispatchSubtotal;
+    }
+
+    public void setDispatchSubtotal(final BigDecimal dispatchSubtotal) {
+        this.dispatchSubtotal = dispatchSubtotal;
+    }
+
+    public BigDecimal getConsolidationSubtotal() {
+        return consolidationSubtotal;
+    }
+
+    public void setConsolidationSubtotal(final BigDecimal consolidationSubtotal) {
+        this.consolidationSubtotal = consolidationSubtotal;
+    }
+
+    public BigDecimal getReversePickSubtotal() {
+        return reversePickSubtotal;
+    }
+
+    public void setReversePickSubtotal(final BigDecimal reversePickSubtotal) {
+        this.reversePickSubtotal = reversePickSubtotal;
+    }
+
+    public BigDecimal getAdvanceSubtotal() {
+        return advanceSubtotal;
+    }
+
+    public void setAdvanceSubtotal(final BigDecimal advanceSubtotal) {
+        this.advanceSubtotal = advanceSubtotal;
+    }
+
+    public BigDecimal getFleetCostsSubtotal() {
+        return fleetCostsSubtotal;
+    }
+
+    public void setFleetCostsSubtotal(final BigDecimal fleetCostsSubtotal) {
+        this.fleetCostsSubtotal = fleetCostsSubtotal;
+    }
+
+    public BigDecimal getAdditionalsSubtotal() {
+        return additionalsSubtotal;
+    }
+
+    public void setAdditionalsSubtotal(final BigDecimal additionalsSubtotal) {
+        this.additionalsSubtotal = additionalsSubtotal;
+    }
+
+    public BigDecimal getDiscountsSubtotal() {
+        return discountsSubtotal;
+    }
+
+    public void setDiscountsSubtotal(final BigDecimal discountsSubtotal) {
+        this.discountsSubtotal = discountsSubtotal;
+    }
+
+    public BigDecimal getDiscountValue() {
+        return discountValue;
+    }
+
+    public void setDiscountValue(final BigDecimal discountValue) {
+        this.discountValue = discountValue;
+    }
+
+    public String getAdjustmentComments() {
+        return adjustmentComments;
+    }
+
+    public void setAdjustmentComments(final String adjustmentComments) {
+        this.adjustmentComments = adjustmentComments;
+    }
+
+    public String getContractStatus() {
+        return contractStatus;
+    }
+
+    public void setContractStatus(final String contractStatus) {
+        this.contractStatus = contractStatus;
+    }
+
+    public String getIksId() {
+        return iksId;
+    }
+
+    public void setIksId(final String iksId) {
+        this.iksId = iksId;
+    }
+
+    public String getProgramacaoSequenceCode() {
+        return programacaoSequenceCode;
+    }
+
+    public void setProgramacaoSequenceCode(final String programacaoSequenceCode) {
+        this.programacaoSequenceCode = programacaoSequenceCode;
+    }
+
+    public OffsetDateTime getProgramacaoStartingAt() {
+        return programacaoStartingAt;
+    }
+
+    public void setProgramacaoStartingAt(final OffsetDateTime programacaoStartingAt) {
+        this.programacaoStartingAt = programacaoStartingAt;
+    }
+
+    public OffsetDateTime getProgramacaoEndingAt() {
+        return programacaoEndingAt;
+    }
+
+    public void setProgramacaoEndingAt(final OffsetDateTime programacaoEndingAt) {
+        this.programacaoEndingAt = programacaoEndingAt;
+    }
+
+    public String getTrailer1LicensePlate() {
+        return trailer1LicensePlate;
+    }
+
+    public void setTrailer1LicensePlate(final String trailer1LicensePlate) {
+        this.trailer1LicensePlate = trailer1LicensePlate;
+    }
+
+    public BigDecimal getTrailer1WeightCapacity() {
+        return trailer1WeightCapacity;
+    }
+
+    public void setTrailer1WeightCapacity(final BigDecimal trailer1WeightCapacity) {
+        this.trailer1WeightCapacity = trailer1WeightCapacity;
+    }
+
+    public String getTrailer2LicensePlate() {
+        return trailer2LicensePlate;
+    }
+
+    public void setTrailer2LicensePlate(final String trailer2LicensePlate) {
+        this.trailer2LicensePlate = trailer2LicensePlate;
+    }
+
+    public BigDecimal getTrailer2WeightCapacity() {
+        return trailer2WeightCapacity;
+    }
+
+    public void setTrailer2WeightCapacity(final BigDecimal trailer2WeightCapacity) {
+        this.trailer2WeightCapacity = trailer2WeightCapacity;
+    }
+
+    public BigDecimal getVehicleWeightCapacity() {
+        return vehicleWeightCapacity;
+    }
+
+    public void setVehicleWeightCapacity(final BigDecimal vehicleWeightCapacity) {
+        this.vehicleWeightCapacity = vehicleWeightCapacity;
+    }
+
+    public BigDecimal getVehicleCubicWeight() {
+        return vehicleCubicWeight;
+    }
+
+    public void setVehicleCubicWeight(final BigDecimal vehicleCubicWeight) {
+        this.vehicleCubicWeight = vehicleCubicWeight;
+    }
+
+    public String getUnloadingRecipientNames() {
+        return unloadingRecipientNames;
+    }
+
+    public void setUnloadingRecipientNames(final String unloadingRecipientNames) {
+        this.unloadingRecipientNames = unloadingRecipientNames;
+    }
+
+    public String getDeliveryRegionNames() {
+        return deliveryRegionNames;
+    }
+
+    public void setDeliveryRegionNames(final String deliveryRegionNames) {
+        this.deliveryRegionNames = deliveryRegionNames;
+    }
+
+    public String getProgramacaoCliente() {
+        return programacaoCliente;
+    }
+
+    public void setProgramacaoCliente(final String programacaoCliente) {
+        this.programacaoCliente = programacaoCliente;
+    }
+
+    public String getProgramacaoTipoServico() {
+        return programacaoTipoServico;
+    }
+
+    public void setProgramacaoTipoServico(final String programacaoTipoServico) {
+        this.programacaoTipoServico = programacaoTipoServico;
     }
 
     /**

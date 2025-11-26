@@ -19,6 +19,7 @@ public class FaturaPorClienteEntity {
     // Valores
     private BigDecimal valorFrete;
     private BigDecimal valorFatura;
+    private BigDecimal thirdPartyCtesValue;
 
     // Documentos Fiscais
     private Long numeroCte;
@@ -32,6 +33,7 @@ public class FaturaPorClienteEntity {
     private LocalDate dataEmissaoFatura;
     private LocalDate dataVencimentoFatura;
     private LocalDate dataBaixaFatura;
+    private LocalDate fitAntOriginalDueDate;
 
     private String fitAntDocument;
     private LocalDate fitAntIssueDate;
@@ -47,7 +49,9 @@ public class FaturaPorClienteEntity {
     private String pagadorNome;
     private String pagadorDocumento;
     private String remetenteNome;
+    private String remetenteDocumento;
     private String destinatarioNome;
+    private String destinatarioDocumento;
     private String vendedorNome;
 
     // Listas (convertidas para texto)
@@ -80,6 +84,14 @@ public class FaturaPorClienteEntity {
 
     public void setValorFatura(final BigDecimal valorFatura) {
         this.valorFatura = valorFatura;
+    }
+
+    public BigDecimal getThirdPartyCtesValue() {
+        return thirdPartyCtesValue;
+    }
+
+    public void setThirdPartyCtesValue(final BigDecimal thirdPartyCtesValue) {
+        this.thirdPartyCtesValue = thirdPartyCtesValue;
     }
 
     public Long getNumeroCte() {
@@ -152,6 +164,14 @@ public class FaturaPorClienteEntity {
 
     public void setDataBaixaFatura(final LocalDate dataBaixaFatura) {
         this.dataBaixaFatura = dataBaixaFatura;
+    }
+
+    public LocalDate getFitAntOriginalDueDate() {
+        return fitAntOriginalDueDate;
+    }
+
+    public void setFitAntOriginalDueDate(final LocalDate fitAntOriginalDueDate) {
+        this.fitAntOriginalDueDate = fitAntOriginalDueDate;
     }
 
     public String getFitAntDocument() {
@@ -234,12 +254,28 @@ public class FaturaPorClienteEntity {
         this.remetenteNome = remetenteNome;
     }
 
+    public String getRemetenteDocumento() {
+        return remetenteDocumento;
+    }
+
+    public void setRemetenteDocumento(final String remetenteDocumento) {
+        this.remetenteDocumento = remetenteDocumento;
+    }
+
     public String getDestinatarioNome() {
         return destinatarioNome;
     }
 
     public void setDestinatarioNome(final String destinatarioNome) {
         this.destinatarioNome = destinatarioNome;
+    }
+
+    public String getDestinatarioDocumento() {
+        return destinatarioDocumento;
+    }
+
+    public void setDestinatarioDocumento(final String destinatarioDocumento) {
+        this.destinatarioDocumento = destinatarioDocumento;
     }
 
     public String getVendedorNome() {

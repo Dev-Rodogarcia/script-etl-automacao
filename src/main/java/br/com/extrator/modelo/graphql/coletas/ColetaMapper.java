@@ -66,7 +66,21 @@ public class ColetaMapper {
             entity.setUsuarioNome(dto.getUser().getName());
         }
 
-        // Mapear campos simples adicionais (22 campos do CSV)
+        entity.setCancellationReason(dto.getCancellationReason());
+        entity.setCancellationUserId(dto.getCancellationUserId());
+        entity.setCargoClassificationId(dto.getCargoClassificationId());
+        entity.setCostCenterId(dto.getCostCenterId());
+        entity.setDestroyReason(dto.getDestroyReason());
+        entity.setDestroyUserId(dto.getDestroyUserId());
+        entity.setInvoicesCubedWeight(dto.getInvoicesCubedWeight());
+        entity.setLunchBreakEndHour(validarCampoHora(dto.getLunchBreakEndHour()));
+        entity.setLunchBreakStartHour(validarCampoHora(dto.getLunchBreakStartHour()));
+        entity.setNotificationEmail(dto.getNotificationEmail());
+        entity.setNotificationPhone(dto.getNotificationPhone());
+        entity.setPickTypeId(dto.getPickTypeId());
+        entity.setPickupLocationId(dto.getPickupLocationId());
+        entity.setStatusUpdatedAt(dto.getStatusUpdatedAt());
+
         // Validação: campos de hora podem vir como datas (ex: "1999-12-31", "2000-01-01") quando não há hora disponível
         entity.setRequestHour(validarCampoHora(dto.getRequestHour()));
         entity.setServiceStartHour(validarCampoHora(dto.getServiceStartHour()));

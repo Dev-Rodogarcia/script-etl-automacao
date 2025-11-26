@@ -90,7 +90,7 @@ public class ContasAPagarMapper {
         
         // GERAR METADATA (JSON completo do DTO)
         try {
-            entity.setMetadata(objectMapper.writeValueAsString(dto));
+            entity.setMetadata(objectMapper.writeValueAsString(dto.getAllProperties()));
         } catch (final com.fasterxml.jackson.core.JsonProcessingException e) {
             logger.warn("Erro ao serializar metadata para Fatura a Pagar (Data Export): {}", e.getMessage());
             entity.setMetadata("{}");

@@ -19,6 +19,7 @@ import java.time.Instant;
 public class ColetaRepository extends AbstractRepository<ColetaEntity> {
     private static final Logger logger = LoggerFactory.getLogger(ColetaRepository.class);
     private static final String NOME_TABELA = "coletas";
+    private static boolean viewVerificada = false;
 
     @Override
     protected String getNomeTabela() {
@@ -68,6 +69,21 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     manifest_item_pick_id BIGINT,
                     vehicle_type_id BIGINT,
 
+                    cancellation_reason NVARCHAR(MAX),
+                    cancellation_user_id BIGINT,
+                    cargo_classification_id BIGINT,
+                    cost_center_id BIGINT,
+                    destroy_reason NVARCHAR(MAX),
+                    destroy_user_id BIGINT,
+                    invoices_cubed_weight DECIMAL(18, 3),
+                    lunch_break_end_hour NVARCHAR(20),
+                    lunch_break_start_hour NVARCHAR(20),
+                    notification_email NVARCHAR(255),
+                    notification_phone NVARCHAR(255),
+                    pick_type_id BIGINT,
+                    pickup_location_id BIGINT,
+                    status_updated_at NVARCHAR(50),
+
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
 
@@ -102,8 +118,96 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             } catch (final SQLException e) {
                 logger.warn("⚠️ Não foi possível ajustar coluna service_end_hour: {} (pode já estar no tamanho correto)", e.getMessage());
             }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD cancellation_reason NVARCHAR(MAX) NULL");
+                logger.debug("Coluna cancellation_reason adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna cancellation_reason: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD cancellation_user_id BIGINT NULL");
+                logger.debug("Coluna cancellation_user_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna cancellation_user_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD cargo_classification_id BIGINT NULL");
+                logger.debug("Coluna cargo_classification_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna cargo_classification_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD cost_center_id BIGINT NULL");
+                logger.debug("Coluna cost_center_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna cost_center_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD destroy_reason NVARCHAR(MAX) NULL");
+                logger.debug("Coluna destroy_reason adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna destroy_reason: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD destroy_user_id BIGINT NULL");
+                logger.debug("Coluna destroy_user_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna destroy_user_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD invoices_cubed_weight DECIMAL(18, 3) NULL");
+                logger.debug("Coluna invoices_cubed_weight adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna invoices_cubed_weight: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ALTER COLUMN lunch_break_end_hour NVARCHAR(20) NULL");
+                logger.debug("Coluna lunch_break_end_hour ajustada para NVARCHAR(20)");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível ajustar coluna lunch_break_end_hour: {} (pode já estar no tamanho correto)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ALTER COLUMN lunch_break_start_hour NVARCHAR(20) NULL");
+                logger.debug("Coluna lunch_break_start_hour ajustada para NVARCHAR(20)");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível ajustar coluna lunch_break_start_hour: {} (pode já estar no tamanho correto)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD notification_email NVARCHAR(255) NULL");
+                logger.debug("Coluna notification_email adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna notification_email: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD notification_phone NVARCHAR(255) NULL");
+                logger.debug("Coluna notification_phone adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna notification_phone: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD pick_type_id BIGINT NULL");
+                logger.debug("Coluna pick_type_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna pick_type_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD pickup_location_id BIGINT NULL");
+                logger.debug("Coluna pickup_location_id adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna pickup_location_id: {} (pode já existir)", e.getMessage());
+            }
+            try {
+                executarDDL(conexao, "ALTER TABLE dbo.coletas ADD status_updated_at NVARCHAR(50) NULL");
+                logger.debug("Coluna status_updated_at adicionada");
+            } catch (final SQLException e) {
+                logger.warn("⚠️ Não foi possível adicionar coluna status_updated_at: {} (pode já existir)", e.getMessage());
+            }
         }
-        criarViewPowerBISeNaoExistir(conexao);
+        if (!viewVerificada) {
+            criarViewPowerBISeNaoExistir(conexao);
+            viewVerificada = true;
+            logger.info("View do Power BI verificada/atualizada para {}.", NOME_TABELA);
+        }
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
@@ -112,11 +216,6 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             SELECT
                 id AS [ID],
                 sequence_code AS [Coleta],
-                cliente_nome AS [Cliente],
-                requester AS [Solicitante],
-                local_coleta AS [Local da Coleta],
-                cidade_coleta AS [Cidade],
-                uf_coleta AS [UF],
                 request_date AS [Solicitacao],
                 request_hour AS [Hora (Solicitacao)],
                 service_date AS [Agendamento],
@@ -124,14 +223,37 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 finish_date AS [Finalizacao],
                 service_end_hour AS [Hora (Fim)],
                 status AS [Status],
+                requester AS [Solicitante],
                 total_volumes AS [Volumes],
                 total_weight AS [Peso Real],
                 taxed_weight AS [Peso Taxado],
                 total_value AS [Valor NF],
-                usuario_nome AS [Usuario],
+                comments AS [Observacoes],
                 agent_id AS [Agente],
                 manifest_item_pick_id AS [Numero Manifesto],
                 vehicle_type_id AS [Veiculo],
+                cliente_id AS [Cliente ID],
+                cliente_nome AS [Cliente],
+                local_coleta AS [Local da Coleta],
+                cidade_coleta AS [Cidade],
+                uf_coleta AS [UF],
+                usuario_id AS [Usuario ID],
+                usuario_nome AS [Usuario],
+                cancellation_reason AS [Motivo Cancel.],
+                cancellation_user_id AS [Usuario Cancel. ID],
+                cargo_classification_id AS [Classificacao Carga ID],
+                cost_center_id AS [Centro de Custo ID],
+                destroy_reason AS [Motivo Exclusao],
+                destroy_user_id AS [Usuario Exclusao ID],
+                invoices_cubed_weight AS [Peso Cubado NF],
+                lunch_break_end_hour AS [Hora Fim Almoco],
+                lunch_break_start_hour AS [Hora Inicio Almoco],
+                notification_email AS [Email Notificacao],
+                notification_phone AS [Telefone Notificacao],
+                pick_type_id AS [Tipo Coleta ID],
+                pickup_location_id AS [Local Coleta ID],
+                status_updated_at AS [Status Atualizado Em],
+                metadata AS [Metadata],
                 data_extracao AS [Data de extracao]
             FROM dbo.coletas;
         """;
@@ -152,12 +274,16 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
         final String sql = String.format("""
             MERGE dbo.%s AS target
             USING (VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )) AS source (
                 id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes,
                 cliente_id, cliente_nome, local_coleta, cidade_coleta, uf_coleta, usuario_id, usuario_nome,
                 request_hour, service_start_hour, finish_date, service_end_hour, requester, taxed_weight,
-                comments, agent_id, manifest_item_pick_id, vehicle_type_id, metadata, data_extracao
+                comments, agent_id, manifest_item_pick_id, vehicle_type_id,
+                cancellation_reason, cancellation_user_id, cargo_classification_id, cost_center_id,
+                destroy_reason, destroy_user_id, invoices_cubed_weight, lunch_break_end_hour, lunch_break_start_hour,
+                notification_email, notification_phone, pick_type_id, pickup_location_id, status_updated_at,
+                metadata, data_extracao
             )
             ON target.id = source.id
             WHEN MATCHED THEN
@@ -186,6 +312,20 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     agent_id = source.agent_id,
                     manifest_item_pick_id = source.manifest_item_pick_id,
                     vehicle_type_id = source.vehicle_type_id,
+                    cancellation_reason = source.cancellation_reason,
+                    cancellation_user_id = source.cancellation_user_id,
+                    cargo_classification_id = source.cargo_classification_id,
+                    cost_center_id = source.cost_center_id,
+                    destroy_reason = source.destroy_reason,
+                    destroy_user_id = source.destroy_user_id,
+                    invoices_cubed_weight = source.invoices_cubed_weight,
+                    lunch_break_end_hour = source.lunch_break_end_hour,
+                    lunch_break_start_hour = source.lunch_break_start_hour,
+                    notification_email = source.notification_email,
+                    notification_phone = source.notification_phone,
+                    pick_type_id = source.pick_type_id,
+                    pickup_location_id = source.pickup_location_id,
+                    status_updated_at = source.status_updated_at,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
@@ -193,13 +333,21 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes,
                     cliente_id, cliente_nome, local_coleta, cidade_coleta, uf_coleta, usuario_id, usuario_nome,
                     request_hour, service_start_hour, finish_date, service_end_hour, requester, taxed_weight,
-                    comments, agent_id, manifest_item_pick_id, vehicle_type_id, metadata, data_extracao
+                    comments, agent_id, manifest_item_pick_id, vehicle_type_id,
+                    cancellation_reason, cancellation_user_id, cargo_classification_id, cost_center_id,
+                    destroy_reason, destroy_user_id, invoices_cubed_weight, lunch_break_end_hour, lunch_break_start_hour,
+                    notification_email, notification_phone, pick_type_id, pickup_location_id, status_updated_at,
+                    metadata, data_extracao
                 )
                 VALUES (
                     source.id, source.sequence_code, source.request_date, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
                     source.cliente_id, source.cliente_nome, source.local_coleta, source.cidade_coleta, source.uf_coleta, source.usuario_id, source.usuario_nome,
                     source.request_hour, source.service_start_hour, source.finish_date, source.service_end_hour, source.requester, source.taxed_weight,
-                    source.comments, source.agent_id, source.manifest_item_pick_id, source.vehicle_type_id, source.metadata, source.data_extracao
+                    source.comments, source.agent_id, source.manifest_item_pick_id, source.vehicle_type_id,
+                    source.cancellation_reason, source.cancellation_user_id, source.cargo_classification_id, source.cost_center_id,
+                    source.destroy_reason, source.destroy_user_id, source.invoices_cubed_weight, source.lunch_break_end_hour, source.lunch_break_start_hour,
+                    source.notification_email, source.notification_phone, source.pick_type_id, source.pickup_location_id, source.status_updated_at,
+                    source.metadata, source.data_extracao
                 );
             """, NOME_TABELA);
 
@@ -215,13 +363,12 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             int expectedCount;
             try {
                 final int metaCount = statement.getParameterMetaData().getParameterCount();
-                expectedCount = (metaCount > 0 ? metaCount : 27);
+                expectedCount = (metaCount > 0 ? metaCount : 41);
                 logger.debug("MERGE de Coletas preparado: {} parâmetro(s) esperado(s)", expectedCount);
             } catch (final SQLException pmEx) {
                 // Alguns drivers podem não suportar ParameterMetaData completamente
                 logger.debug("Não foi possível obter ParameterMetaData: {}", pmEx.getMessage());
-                // Fallback para 27 parâmetros conhecidos
-                expectedCount = 27;
+                expectedCount = 41;
             }
             // Define os parâmetros de forma segura e na ordem correta.
             int paramIndex = 1;
@@ -251,6 +398,20 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             statement.setObject(paramIndex++, coleta.getAgentId(), Types.BIGINT);
             statement.setObject(paramIndex++, coleta.getManifestItemPickId(), Types.BIGINT);
             statement.setObject(paramIndex++, coleta.getVehicleTypeId(), Types.BIGINT);
+            statement.setString(paramIndex++, coleta.getCancellationReason());
+            statement.setObject(paramIndex++, coleta.getCancellationUserId(), Types.BIGINT);
+            statement.setObject(paramIndex++, coleta.getCargoClassificationId(), Types.BIGINT);
+            statement.setObject(paramIndex++, coleta.getCostCenterId(), Types.BIGINT);
+            statement.setString(paramIndex++, coleta.getDestroyReason());
+            statement.setObject(paramIndex++, coleta.getDestroyUserId(), Types.BIGINT);
+            setBigDecimalParameter(statement, paramIndex++, coleta.getInvoicesCubedWeight());
+            statement.setString(paramIndex++, coleta.getLunchBreakEndHour());
+            statement.setString(paramIndex++, coleta.getLunchBreakStartHour());
+            statement.setString(paramIndex++, coleta.getNotificationEmail());
+            statement.setString(paramIndex++, coleta.getNotificationPhone());
+            statement.setObject(paramIndex++, coleta.getPickTypeId(), Types.BIGINT);
+            statement.setObject(paramIndex++, coleta.getPickupLocationId(), Types.BIGINT);
+            statement.setString(paramIndex++, coleta.getStatusUpdatedAt());
             statement.setString(paramIndex++, coleta.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             

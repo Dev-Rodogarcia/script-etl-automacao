@@ -59,6 +59,13 @@ public class CotacaoMapper {
         entity.setRealWeight(dto.getRealWeight());
         entity.setOriginPostalCode(dto.getOriginPostalCode());
         entity.setDestinationPostalCode(dto.getDestinationPostalCode());
+        entity.setCustomerNickname(dto.getCustomerNickname());
+        entity.setSenderDocument(dto.getSenderDocument());
+        entity.setSenderNickname(dto.getSenderNickname());
+        entity.setReceiverDocument(dto.getReceiverDocument());
+        entity.setReceiverNickname(dto.getReceiverNickname());
+        entity.setDisapproveComments(dto.getDisapproveComments());
+        entity.setFreightComments(dto.getFreightComments());
 
         // 2. Conversão segura de tipos de dados (String para tipos específicos)
         try {
@@ -73,6 +80,30 @@ public class CotacaoMapper {
             }
             if (dto.getInvoicesValue() != null && !dto.getInvoicesValue().trim().isEmpty()) {
                 entity.setInvoicesValue(new BigDecimal(dto.getInvoicesValue()));
+            }
+            if (dto.getDiscountSubtotal() != null && !dto.getDiscountSubtotal().trim().isEmpty()) {
+                entity.setDiscountSubtotal(new BigDecimal(dto.getDiscountSubtotal()));
+            }
+            if (dto.getItrSubtotal() != null && !dto.getItrSubtotal().trim().isEmpty()) {
+                entity.setItrSubtotal(new BigDecimal(dto.getItrSubtotal()));
+            }
+            if (dto.getTdeSubtotal() != null && !dto.getTdeSubtotal().trim().isEmpty()) {
+                entity.setTdeSubtotal(new BigDecimal(dto.getTdeSubtotal()));
+            }
+            if (dto.getCollectSubtotal() != null && !dto.getCollectSubtotal().trim().isEmpty()) {
+                entity.setCollectSubtotal(new BigDecimal(dto.getCollectSubtotal()));
+            }
+            if (dto.getDeliverySubtotal() != null && !dto.getDeliverySubtotal().trim().isEmpty()) {
+                entity.setDeliverySubtotal(new BigDecimal(dto.getDeliverySubtotal()));
+            }
+            if (dto.getOtherFees() != null && !dto.getOtherFees().trim().isEmpty()) {
+                entity.setOtherFees(new BigDecimal(dto.getOtherFees()));
+            }
+            if (dto.getCteIssuedAt() != null && !dto.getCteIssuedAt().trim().isEmpty()) {
+                entity.setCteIssuedAt(OffsetDateTime.parse(dto.getCteIssuedAt()));
+            }
+            if (dto.getNfseIssuedAt() != null && !dto.getNfseIssuedAt().trim().isEmpty()) {
+                entity.setNfseIssuedAt(OffsetDateTime.parse(dto.getNfseIssuedAt()));
             }
         } catch (DateTimeParseException | NumberFormatException e) {
             logger.error("❌ Erro ao converter dados para cotação {}: requestedAt='{}', totalValue='{}', taxedWeight='{}', invoicesValue='{}' - {}", 

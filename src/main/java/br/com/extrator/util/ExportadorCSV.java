@@ -6,7 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -59,6 +62,7 @@ public class ExportadorCSV {
         
         try {
             atualizarViewManifestos();
+            atualizarViewsPowerBI();
         } catch (final Exception e) {
         }
         
@@ -94,6 +98,254 @@ public class ExportadorCSV {
         System.out.println("   3. Compare com dados do portal");
         System.out.println();
     }
+
+    private static void atualizarViewsPowerBI() throws Exception {
+        try (Connection conn = GerenciadorConexao.obterConexao();
+             Statement stmt = conn.createStatement()) {
+            final String sqlFaturas = """
+                CREATE OR ALTER VIEW dbo.vw_faturas_por_cliente_powerbi AS
+                SELECT
+                    unique_id AS [ID Único],
+                    filial AS [Filial],
+                    numero_cte AS [CT-e/Número],
+                    chave_cte AS [CT-e/Chave],
+                    data_emissao_cte AS [CT-e/Data de emissão],
+                    valor_frete AS [Frete/Valor dos CT-es],
+                    third_party_ctes_value AS [Terceiros/Valor CT-es],
+                    status_cte AS [CT-e/Status],
+                    tipo_frete AS [Tipo],
+                    classificacao AS [Classificação],
+                    pagador_nome AS [Pagador do frete/Nome],
+                    pagador_documento AS [Pagador do frete/Documento],
+                    remetente_nome AS [Remetente/Nome],
+                    destinatario_nome AS [Destinatário/Nome],
+                    vendedor_nome AS [Vendedor/Nome],
+                    CASE WHEN fit_ant_document IS NOT NULL THEN 'Faturado' ELSE 'Aguardando Faturamento' END AS [Status do Processo],
+                    fit_ant_document AS [Fatura/N° Documento],
+                    fit_ant_issue_date AS [Fatura/Emissão],
+                    fit_ant_value AS [Fatura/Valor],
+                    valor_fatura AS [Fatura/Valor Total],
+                    numero_fatura AS [Fatura/Número],
+                    data_emissao_fatura AS [Fatura/Emissão Fatura],
+                    data_vencimento_fatura AS [Parcelas/Vencimento],
+                    data_baixa_fatura AS [Fatura/Baixa],
+                    fit_ant_ils_original_due_date AS [Fatura/Data Vencimento Original],
+                    metadata AS [Metadata],
+                    data_extracao AS [Data da Última Atualização]
+                FROM dbo.faturas_por_cliente;
+            """;
+            stmt.execute(sqlFaturas);
+
+            final String sqlFretes = """
+                CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
+                SELECT
+                    id AS [ID],
+                    chave_cte AS [Chave CT-e],
+                    numero_cte AS [Nº CT-e],
+                    serie_cte AS [Série],
+                    servico_em AS [Data frete],
+                    criado_em AS [Criado em],
+                    valor_total AS [Valor Total do Serviço],
+                    valor_notas AS [Valor NF],
+                    peso_notas AS [Kg NF],
+                    subtotal AS [Valor Frete],
+                    invoices_total_volumes AS [Volumes],
+                    taxed_weight AS [Kg Taxado],
+                    real_weight AS [Kg Real],
+                    total_cubic_volume AS [M3],
+                    pagador_nome AS [Pagador],
+                    pagador_id AS [Pagador ID],
+                    remetente_nome AS [Remetente],
+                    remetente_id AS [Remetente ID],
+                    origem_cidade AS [Origem],
+                    origem_uf AS [UF Origem],
+                    destinatario_nome AS [Destinatario],
+                    destinatario_id AS [Destinatario ID],
+                    destino_cidade AS [Destino],
+                    destino_uf AS [UF Destino],
+                    filial_nome AS [Filial],
+                    tabela_preco_nome AS [Tabela de Preço],
+                    classificacao_nome AS [Classificação],
+                    centro_custo_nome AS [Centro de Custo],
+                    usuario_nome AS [Usuário],
+                    numero_nota_fiscal AS [NF],
+                    reference_number AS [Referência],
+                    id_corporacao AS [Corp ID],
+                    id_cidade_destino AS [Cidade Destino ID],
+                    data_previsao_entrega AS [Previsão de Entrega],
+                    modal AS [Modal],
+                    status AS [Status],
+                    tipo_frete AS [Tipo Frete],
+                    metadata AS [Metadata],
+                    data_extracao AS [Data de extracao]
+                FROM dbo.fretes;
+            """;
+            stmt.execute(sqlFretes);
+
+            final String sqlCotacoes = """
+                CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
+                SELECT
+                    -- Grupo 1: Dados reais
+                    sequence_code AS [N° Cotação],
+                    requested_at AS [Data Cotação],
+                    branch_nickname AS [Filial],
+                    requester_name AS [Solicitante],
+                    customer_name AS [Cliente Pagador],
+                    customer_doc AS [CNPJ/CPF Cliente],
+                    origin_city AS [Cidade Origem],
+                    origin_state AS [UF Origem],
+                    destination_city AS [Cidade Destino],
+                    destination_state AS [UF Destino],
+                    volumes AS [Volume],
+                    real_weight AS [Peso real],
+                    taxed_weight AS [Peso taxado],
+                    invoices_value AS [Valor NF],
+                    total_value AS [Valor frete],
+                    price_table AS [Tabela],
+                    user_name AS [Usuário],
+                    company_name AS [Empresa],
+                    operation_type AS [Tipo de operação],
+                    origin_postal_code AS [CEP Origem],
+                    destination_postal_code AS [CEP Destino],
+                    metadata AS [Metadata],
+                    data_extracao AS [Data de extracao],
+
+                    -- Grupo 2: Campos principais adicionais
+                    CASE
+                      WHEN cte_issued_at IS NOT NULL OR nfse_issued_at IS NOT NULL THEN 'Convertida'
+                      WHEN disapprove_comments IS NOT NULL AND LEN(disapprove_comments) > 0 THEN 'Reprovada'
+                      ELSE 'Pendente'
+                    END AS [Status Conversão],
+
+                    disapprove_comments AS [Motivo Perda],
+                    freight_comments AS [Observações para o frete],
+                    cte_issued_at AS [CT-e/Data de emissão],
+                    nfse_issued_at AS [Nfse/Data de emissão],
+
+                    customer_nickname AS [Pagador/Nome fantasia],
+                    sender_document AS [Remetente/CNPJ],
+                    sender_nickname AS [Remetente/Nome fantasia],
+                    receiver_document AS [Destinatário/CNPJ],
+                    receiver_nickname AS [Destinatário/Nome fantasia],
+
+                    discount_subtotal AS [Descontos/Subtotal parcelas],
+                    itr_subtotal AS [Trechos/ITR],
+                    tde_subtotal AS [Trechos/TDE],
+                    collect_subtotal AS [Trechos/Coleta],
+                    delivery_subtotal AS [Trechos/Entrega],
+                    other_fees AS [Trechos/Outros valores],
+
+                    operation_type AS [qoe_qes_fon_name],
+                    customer_doc AS [qoe_cor_document],
+                    customer_name AS [qoe_cor_name],
+                    origin_city AS [qoe_qes_ony_name],
+                    origin_state AS [qoe_qes_ony_sae_code],
+                    destination_city AS [qoe_qes_diy_name],
+                    destination_state AS [qoe_qes_diy_sae_code],
+                    price_table AS [qoe_qes_cre_name],
+                    volumes AS [qoe_qes_invoices_volumes],
+                    taxed_weight AS [qoe_qes_taxed_weight],
+                    invoices_value AS [qoe_qes_invoices_value],
+                    total_value AS [qoe_qes_total],
+                    origin_postal_code AS [qoe_qes_origin_postal_code],
+                    destination_postal_code AS [qoe_qes_destination_postal_code],
+                    real_weight AS [qoe_qes_real_weight],
+                    disapprove_comments AS [qoe_qes_disapprove_comments],
+                    freight_comments AS [qoe_qes_freight_comments],
+                    discount_subtotal AS [qoe_qes_fit_fdt_subtotal],
+                    cte_issued_at AS [qoe_qes_fit_fhe_cte_issued_at],
+                    nfse_issued_at AS [qoe_qes_fit_nse_issued_at],
+                    requester_name AS [requester_name],
+                    itr_subtotal AS [qoe_qes_itr_subtotal],
+                    tde_subtotal AS [qoe_qes_tde_subtotal],
+                    collect_subtotal AS [qoe_qes_collect_subtotal],
+                    delivery_subtotal AS [qoe_qes_delivery_subtotal],
+                    other_fees AS [qoe_qes_other_fees],
+                    company_name AS [qoe_crn_psn_name],
+                    customer_nickname AS [qoe_cor_nickname],
+                    branch_nickname AS [qoe_crn_psn_nickname],
+                    sender_document AS [qoe_qes_sdr_document],
+                    sender_nickname AS [qoe_qes_sdr_nickname],
+                    receiver_document AS [qoe_qes_rpt_document],
+                    receiver_nickname AS [qoe_qes_rpt_nickname],
+                    user_name AS [qoe_uer_name],
+                    requested_at AS [requested_at],
+                    sequence_code AS [sequence_code]
+
+                FROM dbo.cotacoes;
+            """;
+            stmt.execute(sqlCotacoes);
+
+            final String sqlContas = """
+                CREATE OR ALTER VIEW dbo.vw_contas_a_pagar_powerbi AS
+                SELECT
+                    sequence_code AS [Lançamento a Pagar/N°],
+                    document_number AS [N° Documento],
+                    issue_date AS [Emissão],
+                    tipo_lancamento AS [Tipo],
+                    valor_original AS [Valor],
+                    valor_juros AS [Juros],
+                    valor_desconto AS [Desconto],
+                    valor_a_pagar AS [Valor a pagar],
+                    CASE WHEN status_pagamento = 'PAGO' THEN 'Sim' ELSE 'Não' END AS [Pago],
+                    valor_pago AS [Valor pago],
+                    nome_fornecedor AS [Fornecedor/Nome],
+                    nome_filial AS [Filial],
+                    classificacao_contabil AS [Conta Contábil/Classificação],
+                    descricao_contabil AS [Conta Contábil/Descrição],
+                    valor_contabil AS [Conta Contábil/Valor],
+                    nome_centro_custo AS [Centro de custo/Nome],
+                    valor_centro_custo AS [Centro de custo/Valor],
+                    area_lancamento AS [Área de Lançamento],
+                    mes_competencia AS [Mês de Competência],
+                    ano_competencia AS [Ano de Competência],
+                    data_criacao AS [Data criação],
+                    observacoes AS [Observações],
+                    descricao_despesa AS [Descrição da despesa],
+                    data_liquidacao AS [Baixa/Data liquidação],
+                    data_transacao AS [Data transação],
+                    nome_usuario AS [Usuário/Nome],
+                    status_pagamento AS [Status Pagamento],
+                    reconciliado AS [Conciliado],
+                    metadata AS [Metadata],
+                    data_extracao AS [Data de extracao]
+                FROM dbo.contas_a_pagar;
+            """;
+            stmt.execute(sqlContas);
+
+            final String sqlLocalizacao = """
+                CREATE OR ALTER VIEW dbo.vw_localizacao_cargas_powerbi AS
+                SELECT
+                    sequence_number AS [N° Minuta],
+                    type AS [Tipo],
+                    service_at AS [Data do frete],
+                    invoices_volumes AS [Volumes],
+                    taxed_weight AS [Peso Taxado],
+                    invoices_value AS [Valor NF],
+                    total_value AS [Valor Frete],
+                    service_type AS [Tipo Serviço],
+                    branch_nickname AS [Filial Emissora],
+                    predicted_delivery_at AS [Previsão Entrega/Previsão de entrega],
+                    destination_location_name AS [Cidade Destino],
+                    destination_branch_nickname AS [Filial Destino],
+                    classification AS [Serviço],
+                    status AS [Status Carga],
+                    status_branch_nickname AS [Filial Atual],
+                    origin_location_name AS [Cidade Origem],
+                    origin_branch_nickname AS [Filial Origem],
+                    TRY_CONVERT(DECIMAL(10,6), JSON_VALUE(metadata, '$.latitude')) AS [Latitude],
+                    TRY_CONVERT(DECIMAL(10,6), JSON_VALUE(metadata, '$.longitude')) AS [Longitude],
+                    TRY_CONVERT(DECIMAL(10,2), JSON_VALUE(metadata, '$.speed')) AS [Velocidade],
+                    TRY_CONVERT(DECIMAL(10,2), JSON_VALUE(metadata, '$.altitude')) AS [Altitude],
+                    JSON_VALUE(metadata, '$.device_id') AS [Dispositivo ID],
+                    JSON_VALUE(metadata, '$.device_type') AS [Dispositivo Tipo],
+                    JSON_VALUE(metadata, '$.address') AS [Endereço],
+                    data_extracao AS [Data de extracao]
+                FROM dbo.localizacao_cargas;
+            """;
+            stmt.execute(sqlLocalizacao);
+        }
+    }
     
     private static void atualizarViewManifestos() throws Exception {
         try (Connection conn = GerenciadorConexao.obterConexao();
@@ -101,51 +353,95 @@ public class ExportadorCSV {
             final String sqlView = """
                 CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
                 SELECT
+                    sequence_code                                       AS [Número],
+                    identificador_unico                                 AS [Identificador Único],
+                    status                                              AS [Status],
+                    classification                                      AS [Classificação],
                     branch_nickname                                     AS [Filial],
                     created_at                                          AS [Data criação],
-                    sequence_code                                       AS [Número],
-                    classification                                      AS [Classificação],
                     departured_at                                       AS [Saída],
                     closed_at                                           AS [Fechamento],
                     finished_at                                         AS [Chegada],
+                    mdfe_number                                         AS [MDFe],
+                    mdfe_key                                            AS [MDF-es/Chave],
+                    mdfe_status                                         AS [MDFe/Status],
+                    distribution_pole                                   AS [Polo de distribuição],
+                    vehicle_plate                                       AS [Veículo/Placa],
+                    vehicle_type                                        AS [Tipo Veículo/Nome],
+                    vehicle_owner                                       AS [Proprietário/Nome],
+                    driver_name                                         AS [Motorista],
                     vehicle_departure_km                                AS [Km saída],
                     closing_km                                          AS [Km chegada],
                     traveled_km                                         AS [KM viagem],
-                    JSON_VALUE(metadata, '$.manual_km')                 AS [Km manual],
-                    status                                              AS [Status],
-                    mdfe_number                                         AS [MDFe],
-                    mdfe_status                                         AS [MDFe/Status],
-                    mdfe_key                                            AS [MDF-es/Chave],
-                    invoices_volumes                                    AS [Volumes NF],
+                    manual_km                                           AS [Km manual],
                     invoices_count                                      AS [Qtd NF],
-                    invoices_value                                      AS [Valor NF],
+                    invoices_volumes                                    AS [Volumes NF],
                     invoices_weight                                     AS [Peso NF],
-                    total_cubic_volume                                  AS [Total M3],
                     total_taxed_weight                                  AS [Total peso taxado],
-                    JSON_VALUE(metadata, '$.contract_type')             AS [Tipo de contrato],
-                    JSON_VALUE(metadata, '$.calculation_type')          AS [Tipo de cálculo],
-                    JSON_VALUE(metadata, '$.cargo_type')                AS [Tipo de carga],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.freight_subtotal'))       AS [Valor frete],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fuel_subtotal'))          AS [Combustível],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.toll_subtotal'))          AS [Pedágio],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.daily_subtotal'))         AS [Diária],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.pick_subtotal'))          AS [Coletas.1],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.delivery_subtotal'))      AS [Entregas.1],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.advance_subtotal'))       AS [Adiantamento],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fleet_costs_subtotal'))   AS [Custos Frota],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.additionals_subtotal'))   AS [Adicionais],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.discounts_subtotal'))     AS [Descontos],
-                    operational_expenses_total                          AS [Despesa operacional],
+                    total_cubic_volume                                  AS [Total M3],
+                    invoices_value                                      AS [Valor NF],
+                    manifest_freights_total                             AS [Fretes/Total],
+                    pick_sequence_code                                   AS [Coleta/Sequence Code],
+                    contract_number                                     AS [Contrato/Número],
+                    contract_type                                       AS [Tipo de contrato],
+                    calculation_type                                    AS [Tipo de cálculo],
+                    cargo_type                                          AS [Tipo de carga],
+                    daily_subtotal                                      AS [Diária],
                     total_cost                                          AS [Custo total],
+                    freight_subtotal                                    AS [Valor frete],
+                    fuel_subtotal                                       AS [Combustível],
+                    toll_subtotal                                       AS [Pedágio],
+                    driver_services_total                               AS [Serviços motorista/Total],
+                    operational_expenses_total                          AS [Despesa operacional],
+                    inss_value                                          AS [Dados do agregado/INSS],
+                    sest_senat_value                                    AS [Dados do agregado/SEST/SENAT],
+                    ir_value                                            AS [Dados do agregado/IR],
                     paying_total                                        AS [Saldo a pagar],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_inss_value'))       AS [Dados do agregado/INSS],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_sest_senat_value')) AS [Dados do agregado/SEST/SENAT],
-                    TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_ir_value'))         AS [Dados do agregado/IR],
-                    vehicle_owner                                       AS [Proprietário/Nome],
-                    driver_name                                         AS [Motorista],
-                    vehicle_plate                                       AS [Veículo/Placa],
-                    vehicle_type                                        AS [Tipo Veículo/Nome],
+                    uniq_destinations_count                             AS [Destinos únicos/Qtd],
+                    generate_mdfe                                       AS [Gerar MDF-e],
+                    monitoring_request                                  AS [Solicitou Monitoramento],
+                    mobile_read_at                                      AS [Leitura Móvel/Em],
+                    km                                                  AS [KM Total],
+                    delivery_manifest_items_count                       AS [Itens/Entrega],
+                    transfer_manifest_items_count                       AS [Itens/Transferência],
+                    pick_manifest_items_count                           AS [Itens/Coleta],
+                    dispatch_draft_manifest_items_count                 AS [Itens/Despacho Rascunho],
+                    consolidation_manifest_items_count                  AS [Itens/Consolidação],
+                    reverse_pick_manifest_items_count                   AS [Itens/Coleta Reversa],
+                    manifest_items_count                                AS [Itens/Total],
+                    finalized_manifest_items_count                      AS [Itens/Finalizados],
+                    calculated_pick_count                               AS [Calculado/Coleta],
+                    calculated_delivery_count                           AS [Calculado/Entrega],
+                    calculated_dispatch_count                           AS [Calculado/Despacho],
+                    calculated_consolidation_count                      AS [Calculado/Consolidação],
+                    calculated_reverse_pick_count                       AS [Calculado/Coleta Reversa],
+                    pick_subtotal                                       AS [Coletas.1],
+                    delivery_subtotal                                   AS [Entregas.1],
+                    dispatch_subtotal                                   AS [Despachos],
+                    consolidation_subtotal                              AS [Consolidações],
+                    reverse_pick_subtotal                               AS [Coleta Reversa],
+                    advance_subtotal                                    AS [Adiantamento],
+                    fleet_costs_subtotal                                AS [Custos Frota],
+                    additionals_subtotal                                AS [Adicionais],
+                    discounts_subtotal                                  AS [Descontos],
+                    discount_value                                      AS [Desconto/Valor],
+                    iks_id                                              AS [IKS ID],
+                    programacao_sequence_code                           AS [Programação/Sequence Code],
+                    programacao_starting_at                             AS [Programação/Início],
+                    programacao_ending_at                               AS [Programação/Término],
+                    trailer1_license_plate                              AS [Carreta 1/Placa],
+                    trailer1_weight_capacity                            AS [Carreta 1/Capacidade Peso],
+                    trailer2_license_plate                              AS [Carreta 2/Placa],
+                    trailer2_weight_capacity                            AS [Carreta 2/Capacidade Peso],
+                    vehicle_weight_capacity                             AS [Veículo/Capacidade Peso],
+                    vehicle_cubic_weight                                AS [Veículo/Peso Cubado],
+                    unloading_recipient_names                           AS [Descarregamento/Destinatários],
+                    delivery_region_names                               AS [Entrega/Regiões],
+                    programacao_cliente                                 AS [Programação/Cliente],
+                    programacao_tipo_servico                            AS [Programação/Tipo Serviço],
                     creation_user_name                                  AS [Usuário/Emissor],
+                    adjustment_user_name                                AS [Usuário/Ajuste],
+                    metadata                                            AS [Metadata],
                     data_extracao                                       AS [Data de extracao]
                 FROM dbo.manifestos;
             """;
@@ -235,7 +531,7 @@ public class ExportadorCSV {
                 
                 // Escrever dados
                 int count = 0;
-                int logInterval = Math.max(100, totalNoBanco / 10); // Log a cada 10% ou 100 registros
+                final int logInterval = Math.max(100, totalNoBanco / 10); // Log a cada 10% ou 100 registros
                 
                 System.out.println("    📝 Escrevendo registros no CSV...");
                 

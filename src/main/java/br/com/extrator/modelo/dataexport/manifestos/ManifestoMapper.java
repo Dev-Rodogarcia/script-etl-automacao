@@ -32,12 +32,12 @@ public class ManifestoMapper {
      * @param dto O objeto DTO com os dados do manifesto.
      * @return Um objeto ManifestoEntity pronto para ser salvo.
      */
-    public ManifestoEntity toEntity(ManifestoDTO dto) {
+    public ManifestoEntity toEntity(final ManifestoDTO dto) {
         if (dto == null) {
             return null;
         }
 
-        ManifestoEntity entity = new ManifestoEntity();
+        final ManifestoEntity entity = new ManifestoEntity();
 
         // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/manifestos.md
         entity.setSequenceCode(dto.getSequenceCode());
@@ -57,6 +57,19 @@ public class ManifestoMapper {
         entity.setTraveledKm(dto.getTraveledKm());
         entity.setInvoicesCount(dto.getInvoicesCount());
         entity.setInvoicesVolumes(dto.getInvoicesVolumes());
+        entity.setDeliveryManifestItemsCount(dto.getDeliveryManifestItemsCount());
+        entity.setTransferManifestItemsCount(dto.getTransferManifestItemsCount());
+        entity.setPickManifestItemsCount(dto.getPickManifestItemsCount());
+        entity.setDispatchDraftManifestItemsCount(dto.getDispatchDraftManifestItemsCount());
+        entity.setConsolidationManifestItemsCount(dto.getConsolidationManifestItemsCount());
+        entity.setReversePickManifestItemsCount(dto.getReversePickManifestItemsCount());
+        entity.setManifestItemsCount(dto.getManifestItemsCount());
+        entity.setFinalizedManifestItemsCount(dto.getFinalizedManifestItemsCount());
+        entity.setCalculatedPickCount(dto.getCalculatedPickCount());
+        entity.setCalculatedDeliveryCount(dto.getCalculatedDeliveryCount());
+        entity.setCalculatedDispatchCount(dto.getCalculatedDispatchCount());
+        entity.setCalculatedConsolidationCount(dto.getCalculatedConsolidationCount());
+        entity.setCalculatedReversePickCount(dto.getCalculatedReversePickCount());
         
         // Converter campos numéricos de String para BigDecimal
         entity.setInvoicesWeight(converterParaBigDecimal(dto.getInvoicesWeight(), "invoices_weight", dto.getSequenceCode()));
@@ -64,6 +77,16 @@ public class ManifestoMapper {
         entity.setTotalCubicVolume(converterParaBigDecimal(dto.getTotalCubicVolume(), "total_cubic_volume", dto.getSequenceCode()));
         entity.setInvoicesValue(converterParaBigDecimal(dto.getInvoicesValue(), "invoices_value", dto.getSequenceCode()));
         entity.setManifestFreightsTotal(converterParaBigDecimal(dto.getManifestFreightsTotal(), "manifest_freights_total", dto.getSequenceCode()));
+        entity.setPickSubtotal(converterParaBigDecimal(dto.getPickSubtotal(), "pick_subtotal", dto.getSequenceCode()));
+        entity.setDeliverySubtotal(converterParaBigDecimal(dto.getDeliverySubtotal(), "delivery_subtotal", dto.getSequenceCode()));
+        entity.setDispatchSubtotal(converterParaBigDecimal(dto.getDispatchSubtotal(), "dispatch_subtotal", dto.getSequenceCode()));
+        entity.setConsolidationSubtotal(converterParaBigDecimal(dto.getConsolidationSubtotal(), "consolidation_subtotal", dto.getSequenceCode()));
+        entity.setReversePickSubtotal(converterParaBigDecimal(dto.getReversePickSubtotal(), "reverse_pick_subtotal", dto.getSequenceCode()));
+        entity.setAdvanceSubtotal(converterParaBigDecimal(dto.getAdvanceSubtotal(), "advance_subtotal", dto.getSequenceCode()));
+        entity.setFleetCostsSubtotal(converterParaBigDecimal(dto.getFleetCostsSubtotal(), "fleet_costs_subtotal", dto.getSequenceCode()));
+        entity.setAdditionalsSubtotal(converterParaBigDecimal(dto.getAdditionalsSubtotal(), "additionals_subtotal", dto.getSequenceCode()));
+        entity.setDiscountsSubtotal(converterParaBigDecimal(dto.getDiscountsSubtotal(), "discounts_subtotal", dto.getSequenceCode()));
+        entity.setDiscountValue(converterParaBigDecimal(dto.getDiscountValue(), "discount_value", dto.getSequenceCode()));
         
         entity.setPickSequenceCode(dto.getPickSequenceCode());
         entity.setContractNumber(dto.getContractNumber());
@@ -87,6 +110,12 @@ public class ManifestoMapper {
         entity.setUniqDestinationsCount(dto.getUniqDestinationsCount());
         entity.setCreationUserName(dto.getCreationUserName());
         entity.setAdjustmentUserName(dto.getAdjustmentUserName());
+        entity.setAdjustmentComments(dto.getAdjustmentComments());
+        entity.setContractStatus(dto.getContractStatus());
+        entity.setIksId(dto.getIksId());
+        entity.setProgramacaoSequenceCode(dto.getProgramacaoSequenceCode());
+        entity.setProgramacaoCliente(dto.getProgramacaoCliente());
+        entity.setProgramacaoTipoServico(dto.getProgramacaoTipoServico());
 
         // 2. Conversão segura de tipos de dados
         try {
@@ -102,7 +131,16 @@ public class ManifestoMapper {
             if (dto.getFinishedAt() != null && !dto.getFinishedAt().trim().isEmpty()) {
                 entity.setFinishedAt(OffsetDateTime.parse(dto.getFinishedAt()));
             }
-        } catch (DateTimeParseException e) {
+            if (dto.getMobileReadAt() != null && !dto.getMobileReadAt().trim().isEmpty()) {
+                entity.setMobileReadAt(OffsetDateTime.parse(dto.getMobileReadAt()));
+            }
+            if (dto.getProgramacaoStartingAt() != null && !dto.getProgramacaoStartingAt().trim().isEmpty()) {
+                entity.setProgramacaoStartingAt(OffsetDateTime.parse(dto.getProgramacaoStartingAt()));
+            }
+            if (dto.getProgramacaoEndingAt() != null && !dto.getProgramacaoEndingAt().trim().isEmpty()) {
+                entity.setProgramacaoEndingAt(OffsetDateTime.parse(dto.getProgramacaoEndingAt()));
+            }
+        } catch (final DateTimeParseException e) {
             logger.error("❌ Erro ao converter datas para manifesto {}: createdAt='{}', departuredAt='{}', closedAt='{}', finishedAt='{}' - {}", 
                 dto.getSequenceCode(), dto.getCreatedAt(), dto.getDeparturedAt(), dto.getClosedAt(), dto.getFinishedAt(), e.getMessage());
             logger.debug("Stack trace completo:", e);
@@ -110,17 +148,38 @@ public class ManifestoMapper {
         
         // Converter totalCost usando o método auxiliar
         entity.setTotalCost(converterParaBigDecimal(dto.getTotalCost(), "total_cost", dto.getSequenceCode()));
+        entity.setKm(converterParaBigDecimal(dto.getKm(), "km", dto.getSequenceCode()));
+        entity.setTrailer1LicensePlate(dto.getTrailer1LicensePlate());
+        entity.setTrailer1WeightCapacity(converterParaBigDecimal(dto.getTrailer1WeightCapacity(), "mft_tl1_weight_capacity", dto.getSequenceCode()));
+        entity.setTrailer2LicensePlate(dto.getTrailer2LicensePlate());
+        entity.setTrailer2WeightCapacity(converterParaBigDecimal(dto.getTrailer2WeightCapacity(), "mft_tl2_weight_capacity", dto.getSequenceCode()));
+        entity.setVehicleWeightCapacity(converterParaBigDecimal(dto.getVehicleWeightCapacity(), "mft_vie_weight_capacity", dto.getSequenceCode()));
+        entity.setVehicleCubicWeight(converterParaBigDecimal(dto.getVehicleCubicWeight(), "mft_vie_cubic_weight", dto.getSequenceCode()));
 
         // 3. Empacotamento de todos os metadados
         try {
-            String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
+            final String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
             entity.setMetadata(metadata);
+            try {
+                if (dto.getOtherProperties() != null) {
+                    final Object ur = dto.getOtherProperties().get("mft_mte_unloading_recipient_names");
+                    if (ur != null) {
+                        entity.setUnloadingRecipientNames(objectMapper.writeValueAsString(ur));
+                    }
+                    final Object dr = dto.getOtherProperties().get("mft_mte_delivery_region_names");
+                    if (dr != null) {
+                        entity.setDeliveryRegionNames(objectMapper.writeValueAsString(dr));
+                    }
+                }
+            } catch (final JsonProcessingException ex) {
+                logger.warn("Erro ao serializar campos de lista para manifesto {}: {}", dto.getSequenceCode(), ex.getMessage());
+            }
             
             // 4. Calcular identificador único APÓS definir metadata
             // Isso permite usar pick_sequence_code ou hash do metadata
             entity.calcularIdentificadorUnico();
             
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("❌ CRÍTICO: Falha ao serializar metadados para manifesto {}: {}", 
                 dto.getSequenceCode(), e.getMessage(), e);
             entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
@@ -140,14 +199,14 @@ public class ManifestoMapper {
      * @param sequenceCode Código sequencial do manifesto (para logs de erro)
      * @return BigDecimal ou null se não puder converter
      */
-    private BigDecimal converterParaBigDecimal(String valor, String nomeCampo, Long sequenceCode) {
+    private BigDecimal converterParaBigDecimal(final String valor, final String nomeCampo, final Long sequenceCode) {
         if (valor == null || valor.trim().isEmpty()) {
             return null;
         }
         
         try {
             return new BigDecimal(valor.trim());
-        } catch (NumberFormatException e) {
+        } catch (final NumberFormatException e) {
             logger.warn("⚠️ Erro ao converter campo '{}' para BigDecimal no manifesto {}: valor='{}'. Definindo como NULL.", 
                 nomeCampo, sequenceCode, valor);
             return null;

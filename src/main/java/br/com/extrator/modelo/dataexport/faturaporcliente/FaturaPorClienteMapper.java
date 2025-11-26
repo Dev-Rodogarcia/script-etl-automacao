@@ -61,6 +61,7 @@ public class FaturaPorClienteMapper {
             entity.setDataEmissaoFatura(converterParaLocalDate(dto.getFaturaIssueDate()));
             entity.setDataVencimentoFatura(converterParaLocalDate(dto.getFaturaDueDate()));
             entity.setDataBaixaFatura(converterParaLocalDate(dto.getFaturaBaixaDate())); // Pode ser null
+            entity.setFitAntOriginalDueDate(converterParaLocalDate(dto.getFaturaOriginalDueDate()));
 
             entity.setFitAntDocument(dto.getFaturaDocument());
             entity.setFitAntIssueDate(converterParaLocalDate(dto.getFaturaIssueDate()));
@@ -69,6 +70,7 @@ public class FaturaPorClienteMapper {
             // 4. Valores (USAR Locale.US)
             entity.setValorFrete(converterParaBigDecimal(dto.getValorFrete()));
             entity.setValorFatura(converterParaBigDecimal(dto.getFaturaValue()));
+            entity.setThirdPartyCtesValue(converterParaBigDecimal(dto.getThirdPartyCtesValue()));
 
             // 5. Classificação Operacional
             entity.setFilial(dto.getFilial());
@@ -80,7 +82,9 @@ public class FaturaPorClienteMapper {
             entity.setPagadorNome(dto.getPagadorNome());
             entity.setPagadorDocumento(dto.getPagadorDocumento());
             entity.setRemetenteNome(dto.getRemetenteNome());
+            entity.setRemetenteDocumento(dto.getRemetenteDocumento());
             entity.setDestinatarioNome(dto.getDestinatarioNome());
+            entity.setDestinatarioDocumento(dto.getDestinatarioDocumento());
             entity.setVendedorNome(dto.getVendedorNome());
 
             // 7. Listas (converter arrays para strings)

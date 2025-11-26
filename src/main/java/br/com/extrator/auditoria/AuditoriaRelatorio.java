@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -50,7 +50,7 @@ public class AuditoriaRelatorio {
      */
     public Path gerarRelatorioCompleto(final List<String> resultados, final String diretorioSaida) throws IOException {
         final String nomeArquivo = String.format("auditoria_completa_%s.txt", 
-                                                Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_ARQUIVO));
+                                                Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_ARQUIVO));
         final Path caminhoArquivo = Paths.get(diretorioSaida, nomeArquivo);
         
         // Criar diretório se não existir
@@ -86,7 +86,7 @@ public class AuditoriaRelatorio {
         }
         
         final String nomeArquivo = String.format("auditoria_problemas_%s.txt", 
-                                                Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_ARQUIVO));
+                                                Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_ARQUIVO));
         final Path caminhoArquivo = Paths.get(diretorioSaida, nomeArquivo);
         
         // Criar diretório se não existir
@@ -96,7 +96,7 @@ public class AuditoriaRelatorio {
             writer.write("=".repeat(80) + "\n");
             writer.write("RELATÓRIO DE PROBLEMAS - AUDITORIA ESL CLOUD\n");
             writer.write("=".repeat(80) + "\n");
-            writer.write(String.format("Data/Hora: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
+            writer.write(String.format("Data/Hora: %s\n", Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO)));
             writer.write(String.format("Total de problemas encontrados: %d\n\n", problemas.size()));
             
             for (final ResultadoValidacaoEntidade resultado : problemas) {
@@ -121,7 +121,7 @@ public class AuditoriaRelatorio {
         System.out.println("\n" + "=".repeat(60));
         System.out.println("📊 RESUMO DA AUDITORIA DE DADOS");
         System.out.println("=".repeat(60));
-        System.out.println("⏰ Data/Hora: " + Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO));
+        System.out.println("⏰ Data/Hora: " + Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO));
         System.out.println("📋 Total de resultados: " + resultados.size());
         
         final long erros = resultados.stream()
@@ -170,7 +170,7 @@ public class AuditoriaRelatorio {
         writer.write("=".repeat(80) + "\n");
         writer.write("RELATÓRIO COMPLETO DE AUDITORIA - ESL CLOUD DATA EXTRACTOR\n");
         writer.write("=".repeat(80) + "\n");
-        writer.write(String.format("Data/Hora da Auditoria: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
+        writer.write(String.format("Data/Hora da Auditoria: %s\n", Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO)));
         writer.write("Sistema: ESL Cloud Data Extraction\n");
         writer.write("Versão: 1.0-SNAPSHOT\n\n");
     }
@@ -181,7 +181,7 @@ public class AuditoriaRelatorio {
     private void escreverResumoGeral(final FileWriter writer, final List<String> resultados) throws IOException {
         writer.write("RESUMO GERAL\n");
         writer.write("-".repeat(40) + "\n");
-        writer.write("Data/Hora da Auditoria: " + Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO) + "\n");
+        writer.write("Data/Hora da Auditoria: " + Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO) + "\n");
         writer.write("Total de Resultados: " + resultados.size() + "\n");
         
         final long erros = resultados.stream()
@@ -236,7 +236,7 @@ public class AuditoriaRelatorio {
         
         if (resultado.getUltimaExtracao() != null) {
             writer.write(String.format("   Última extração: %s\n", 
-                resultado.getUltimaExtracao().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
+                resultado.getUltimaExtracao().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO)));
         }
         
         writer.write("\n" + "-".repeat(60) + "\n\n");
@@ -248,7 +248,7 @@ public class AuditoriaRelatorio {
     private void escreverRodapeRelatorio(final FileWriter writer) throws IOException {
         writer.write("=".repeat(80) + "\n");
         writer.write("FIM DO RELATÓRIO DE AUDITORIA\n");
-        writer.write(String.format("Gerado em: %s\n", Instant.now().atZone(ZoneOffset.UTC).format(FORMATTER_RELATORIO)));
+        writer.write(String.format("Gerado em: %s\n", Instant.now().atZone(ZoneId.systemDefault()).format(FORMATTER_RELATORIO)));
         writer.write("=".repeat(80) + "\n");
     }
 }

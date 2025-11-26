@@ -19,6 +19,7 @@ import br.com.extrator.util.GerenciadorConexao;
 public class ContasAPagarRepository {
     private static final Logger logger = LoggerFactory.getLogger(ContasAPagarRepository.class);
     private static final String NOME_TABELA = "contas_a_pagar";
+    private static boolean viewVerificada = false;
 
     /**
      * Cria a tabela se não existir.
@@ -70,7 +71,52 @@ public class ContasAPagarRepository {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.execute();
             logger.info("✓ Tabela {} verificada/criada com sucesso", NOME_TABELA);
-            criarViewPowerBISeNaoExistir(conn);
+
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "valor_juros", "DECIMAL(18,2)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "valor_desconto", "DECIMAL(18,2)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "valor_pago", "DECIMAL(18,2)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "status_pagamento", "NVARCHAR(50)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "mes_competencia", "INT");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "ano_competencia", "INT");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "data_criacao", "DATETIMEOFFSET");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "data_liquidacao", "DATE");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "data_transacao", "DATE");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "nome_fornecedor", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "nome_filial", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "nome_centro_custo", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "valor_centro_custo", "DECIMAL(18,2)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "classificacao_contabil", "NVARCHAR(100)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "descricao_contabil", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "valor_contabil", "DECIMAL(18,2)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "area_lancamento", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "observacoes", "NVARCHAR(MAX)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "descricao_despesa", "NVARCHAR(MAX)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "nome_usuario", "NVARCHAR(255)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "reconciliado", "BIT");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "metadata", "NVARCHAR(MAX)");
+            adicionarColunaSeNaoExistir(conn, NOME_TABELA, "data_extracao", "DATETIME2");
+
+            if (!viewVerificada) {
+                criarViewPowerBISeNaoExistir(conn);
+                viewVerificada = true;
+                logger.info("View do Power BI verificada/atualizada para {}.", NOME_TABELA);
+            }
+        }
+    }
+
+    private boolean colunaExiste(final Connection conn, final String tabela, final String coluna) throws SQLException {
+        final java.sql.DatabaseMetaData md = conn.getMetaData();
+        try (java.sql.ResultSet rs = md.getColumns(null, null, tabela.toUpperCase(), coluna.toUpperCase())) {
+            return rs.next();
+        }
+    }
+
+    private void adicionarColunaSeNaoExistir(final Connection conn, final String tabela, final String coluna, final String definicao) throws SQLException {
+        if (!colunaExiste(conn, tabela, coluna)) {
+            try (PreparedStatement ps = conn.prepareStatement("ALTER TABLE " + tabela + " ADD " + coluna + " " + definicao)) {
+                ps.execute();
+                logger.info("✓ Coluna adicionada: {}.{}", tabela, coluna);
+            }
         }
     }
 
@@ -83,22 +129,30 @@ public class ContasAPagarRepository {
                 issue_date AS [Emissão],
                 tipo_lancamento AS [Tipo],
                 valor_original AS [Valor],
+                valor_juros AS [Juros],
+                valor_desconto AS [Desconto],
                 valor_a_pagar AS [Valor a pagar],
                 CASE WHEN status_pagamento = 'PAGO' THEN 'Sim' ELSE 'Não' END AS [Pago],
                 valor_pago AS [Valor pago],
                 nome_fornecedor AS [Fornecedor/Nome],
                 nome_filial AS [Filial],
-                classificacao_contabil AS [Conta Contábil/Classif.],
-                descricao_contabil AS [Conta Contábil/Desc.],
+                classificacao_contabil AS [Conta Contábil/Classificação],
+                descricao_contabil AS [Conta Contábil/Descrição],
                 valor_contabil AS [Conta Contábil/Valor],
                 nome_centro_custo AS [Centro de custo/Nome],
                 valor_centro_custo AS [Centro de custo/Valor],
-                mes_competencia AS [Mês Competência],
-                ano_competencia AS [Ano Competência],
+                area_lancamento AS [Área de Lançamento],
+                mes_competencia AS [Mês de Competência],
+                ano_competencia AS [Ano de Competência],
                 data_criacao AS [Data criação],
                 observacoes AS [Observações],
+                descricao_despesa AS [Descrição da despesa],
                 data_liquidacao AS [Baixa/Data liquidação],
+                data_transacao AS [Data transação],
                 nome_usuario AS [Usuário/Nome],
+                status_pagamento AS [Status Pagamento],
+                reconciliado AS [Conciliado],
+                metadata AS [Metadata],
                 data_extracao AS [Data de extracao]
             FROM dbo.contas_a_pagar;
         """;

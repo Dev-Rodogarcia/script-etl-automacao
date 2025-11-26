@@ -38,6 +38,22 @@ public class CotacaoEntity {
     private String originPostalCode; // CEP Origem
     private String destinationPostalCode; // CEP Destino
 
+    private String customerNickname;
+    private String disapproveComments;
+    private String freightComments;
+    private BigDecimal discountSubtotal;
+    private BigDecimal itrSubtotal;
+    private BigDecimal tdeSubtotal;
+    private BigDecimal collectSubtotal;
+    private BigDecimal deliverySubtotal;
+    private BigDecimal otherFees;
+    private OffsetDateTime cteIssuedAt;
+    private OffsetDateTime nfseIssuedAt;
+    private String senderDocument;
+    private String senderNickname;
+    private String receiverDocument;
+    private String receiverNickname;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -211,6 +227,126 @@ public class CotacaoEntity {
 
     public void setDestinationPostalCode(final String destinationPostalCode) {
         this.destinationPostalCode = destinationPostalCode;
+    }
+
+    public String getCustomerNickname() {
+        return customerNickname;
+    }
+
+    public void setCustomerNickname(final String customerNickname) {
+        this.customerNickname = customerNickname;
+    }
+
+    public String getDisapproveComments() {
+        return disapproveComments;
+    }
+
+    public void setDisapproveComments(final String disapproveComments) {
+        this.disapproveComments = disapproveComments;
+    }
+
+    public String getFreightComments() {
+        return freightComments;
+    }
+
+    public void setFreightComments(final String freightComments) {
+        this.freightComments = freightComments;
+    }
+
+    public BigDecimal getDiscountSubtotal() {
+        return discountSubtotal;
+    }
+
+    public void setDiscountSubtotal(final BigDecimal discountSubtotal) {
+        this.discountSubtotal = discountSubtotal;
+    }
+
+    public BigDecimal getItrSubtotal() {
+        return itrSubtotal;
+    }
+
+    public void setItrSubtotal(final BigDecimal itrSubtotal) {
+        this.itrSubtotal = itrSubtotal;
+    }
+
+    public BigDecimal getTdeSubtotal() {
+        return tdeSubtotal;
+    }
+
+    public void setTdeSubtotal(final BigDecimal tdeSubtotal) {
+        this.tdeSubtotal = tdeSubtotal;
+    }
+
+    public BigDecimal getCollectSubtotal() {
+        return collectSubtotal;
+    }
+
+    public void setCollectSubtotal(final BigDecimal collectSubtotal) {
+        this.collectSubtotal = collectSubtotal;
+    }
+
+    public BigDecimal getDeliverySubtotal() {
+        return deliverySubtotal;
+    }
+
+    public void setDeliverySubtotal(final BigDecimal deliverySubtotal) {
+        this.deliverySubtotal = deliverySubtotal;
+    }
+
+    public BigDecimal getOtherFees() {
+        return otherFees;
+    }
+
+    public void setOtherFees(final BigDecimal otherFees) {
+        this.otherFees = otherFees;
+    }
+
+    public OffsetDateTime getCteIssuedAt() {
+        return cteIssuedAt;
+    }
+
+    public void setCteIssuedAt(final OffsetDateTime cteIssuedAt) {
+        this.cteIssuedAt = cteIssuedAt;
+    }
+
+    public OffsetDateTime getNfseIssuedAt() {
+        return nfseIssuedAt;
+    }
+
+    public void setNfseIssuedAt(final OffsetDateTime nfseIssuedAt) {
+        this.nfseIssuedAt = nfseIssuedAt;
+    }
+
+    public String getSenderDocument() {
+        return senderDocument;
+    }
+
+    public void setSenderDocument(final String senderDocument) {
+        this.senderDocument = senderDocument;
+    }
+
+    public String getSenderNickname() {
+        return senderNickname;
+    }
+
+    public void setSenderNickname(final String senderNickname) {
+        this.senderNickname = senderNickname;
+    }
+
+    public String getReceiverDocument() {
+        return receiverDocument;
+    }
+
+    public void setReceiverDocument(final String receiverDocument) {
+        this.receiverDocument = receiverDocument;
+    }
+
+    public String getReceiverNickname() {
+        return receiverNickname;
+    }
+
+    public void setReceiverNickname(final String receiverNickname) {
+        this.receiverNickname = receiverNickname;
     }
 
     public String getMetadata() {

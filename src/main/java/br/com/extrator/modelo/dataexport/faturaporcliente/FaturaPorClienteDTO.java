@@ -1,7 +1,12 @@
 package br.com.extrator.modelo.dataexport.faturaporcliente;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -17,6 +22,7 @@ public class FaturaPorClienteDTO {
 
     // Documentos Fiscais
     @JsonProperty("fit_nse_number")
+    @JsonAlias({"nfse_number"})
     private Long nfseNumber;
 
     @JsonProperty("fit_fhe_cte_number")
@@ -50,9 +56,15 @@ public class FaturaPorClienteDTO {
     @JsonProperty("fit_ant_ils_atn_transaction_date")
     private String faturaBaixaDate;
 
+    @JsonProperty("fit_ant_ils_original_due_date")
+    private String faturaOriginalDueDate;
+
     // Valores
     @JsonProperty("total")
     private String valorFrete;
+
+    @JsonProperty("third_party_ctes_value")
+    private String thirdPartyCtesValue;
 
     @JsonProperty("type")
     private String tipoFrete;
@@ -77,8 +89,14 @@ public class FaturaPorClienteDTO {
     @JsonProperty("fit_rpt_name")
     private String remetenteNome;
 
+    @JsonProperty("fit_rpt_document")
+    private String remetenteDocumento;
+
     @JsonProperty("fit_sdr_name")
     private String destinatarioNome;
+
+    @JsonProperty("fit_sdr_document")
+    private String destinatarioDocumento;
 
     @JsonProperty("fit_sps_slr_psn_name")
     private String vendedorNome;
@@ -90,12 +108,14 @@ public class FaturaPorClienteDTO {
     @JsonProperty("fit_fte_invoices_order_number")
     private List<String> pedidosCliente;
 
+    private final Map<String, Object> otherProperties = new LinkedHashMap<>();
+
     // Getters e Setters
     public Long getNfseNumber() {
         return nfseNumber;
     }
 
-    public void setNfseNumber(Long nfseNumber) {
+    public void setNfseNumber(final Long nfseNumber) {
         this.nfseNumber = nfseNumber;
     }
 
@@ -103,7 +123,7 @@ public class FaturaPorClienteDTO {
         return cteNumber;
     }
 
-    public void setCteNumber(Long cteNumber) {
+    public void setCteNumber(final Long cteNumber) {
         this.cteNumber = cteNumber;
     }
 
@@ -111,7 +131,7 @@ public class FaturaPorClienteDTO {
         return cteIssuedAt;
     }
 
-    public void setCteIssuedAt(String cteIssuedAt) {
+    public void setCteIssuedAt(final String cteIssuedAt) {
         this.cteIssuedAt = cteIssuedAt;
     }
 
@@ -119,7 +139,7 @@ public class FaturaPorClienteDTO {
         return cteKey;
     }
 
-    public void setCteKey(String cteKey) {
+    public void setCteKey(final String cteKey) {
         this.cteKey = cteKey;
     }
 
@@ -127,7 +147,7 @@ public class FaturaPorClienteDTO {
         return cteStatusResult;
     }
 
-    public void setCteStatusResult(String cteStatusResult) {
+    public void setCteStatusResult(final String cteStatusResult) {
         this.cteStatusResult = cteStatusResult;
     }
 
@@ -135,7 +155,7 @@ public class FaturaPorClienteDTO {
         return cteStatus;
     }
 
-    public void setCteStatus(String cteStatus) {
+    public void setCteStatus(final String cteStatus) {
         this.cteStatus = cteStatus;
     }
 
@@ -143,7 +163,7 @@ public class FaturaPorClienteDTO {
         return faturaDocument;
     }
 
-    public void setFaturaDocument(String faturaDocument) {
+    public void setFaturaDocument(final String faturaDocument) {
         this.faturaDocument = faturaDocument;
     }
 
@@ -151,7 +171,7 @@ public class FaturaPorClienteDTO {
         return faturaIssueDate;
     }
 
-    public void setFaturaIssueDate(String faturaIssueDate) {
+    public void setFaturaIssueDate(final String faturaIssueDate) {
         this.faturaIssueDate = faturaIssueDate;
     }
 
@@ -159,7 +179,7 @@ public class FaturaPorClienteDTO {
         return faturaValue;
     }
 
-    public void setFaturaValue(String faturaValue) {
+    public void setFaturaValue(final String faturaValue) {
         this.faturaValue = faturaValue;
     }
 
@@ -167,7 +187,7 @@ public class FaturaPorClienteDTO {
         return faturaDueDate;
     }
 
-    public void setFaturaDueDate(String faturaDueDate) {
+    public void setFaturaDueDate(final String faturaDueDate) {
         this.faturaDueDate = faturaDueDate;
     }
 
@@ -175,23 +195,39 @@ public class FaturaPorClienteDTO {
         return faturaBaixaDate;
     }
 
-    public void setFaturaBaixaDate(String faturaBaixaDate) {
+    public void setFaturaBaixaDate(final String faturaBaixaDate) {
         this.faturaBaixaDate = faturaBaixaDate;
+    }
+
+    public String getFaturaOriginalDueDate() {
+        return faturaOriginalDueDate;
+    }
+
+    public void setFaturaOriginalDueDate(final String faturaOriginalDueDate) {
+        this.faturaOriginalDueDate = faturaOriginalDueDate;
     }
 
     public String getValorFrete() {
         return valorFrete;
     }
 
-    public void setValorFrete(String valorFrete) {
+    public void setValorFrete(final String valorFrete) {
         this.valorFrete = valorFrete;
+    }
+
+    public String getThirdPartyCtesValue() {
+        return thirdPartyCtesValue;
+    }
+
+    public void setThirdPartyCtesValue(final String thirdPartyCtesValue) {
+        this.thirdPartyCtesValue = thirdPartyCtesValue;
     }
 
     public String getTipoFrete() {
         return tipoFrete;
     }
 
-    public void setTipoFrete(String tipoFrete) {
+    public void setTipoFrete(final String tipoFrete) {
         this.tipoFrete = tipoFrete;
     }
 
@@ -199,7 +235,7 @@ public class FaturaPorClienteDTO {
         return filial;
     }
 
-    public void setFilial(String filial) {
+    public void setFilial(final String filial) {
         this.filial = filial;
     }
 
@@ -207,7 +243,7 @@ public class FaturaPorClienteDTO {
         return estado;
     }
 
-    public void setEstado(String estado) {
+    public void setEstado(final String estado) {
         this.estado = estado;
     }
 
@@ -215,7 +251,7 @@ public class FaturaPorClienteDTO {
         return classificacao;
     }
 
-    public void setClassificacao(String classificacao) {
+    public void setClassificacao(final String classificacao) {
         this.classificacao = classificacao;
     }
 
@@ -223,7 +259,7 @@ public class FaturaPorClienteDTO {
         return pagadorNome;
     }
 
-    public void setPagadorNome(String pagadorNome) {
+    public void setPagadorNome(final String pagadorNome) {
         this.pagadorNome = pagadorNome;
     }
 
@@ -231,7 +267,7 @@ public class FaturaPorClienteDTO {
         return pagadorDocumento;
     }
 
-    public void setPagadorDocumento(String pagadorDocumento) {
+    public void setPagadorDocumento(final String pagadorDocumento) {
         this.pagadorDocumento = pagadorDocumento;
     }
 
@@ -239,23 +275,39 @@ public class FaturaPorClienteDTO {
         return remetenteNome;
     }
 
-    public void setRemetenteNome(String remetenteNome) {
+    public void setRemetenteNome(final String remetenteNome) {
         this.remetenteNome = remetenteNome;
+    }
+
+    public String getRemetenteDocumento() {
+        return remetenteDocumento;
+    }
+
+    public void setRemetenteDocumento(final String remetenteDocumento) {
+        this.remetenteDocumento = remetenteDocumento;
     }
 
     public String getDestinatarioNome() {
         return destinatarioNome;
     }
 
-    public void setDestinatarioNome(String destinatarioNome) {
+    public void setDestinatarioNome(final String destinatarioNome) {
         this.destinatarioNome = destinatarioNome;
+    }
+
+    public String getDestinatarioDocumento() {
+        return destinatarioDocumento;
+    }
+
+    public void setDestinatarioDocumento(final String destinatarioDocumento) {
+        this.destinatarioDocumento = destinatarioDocumento;
     }
 
     public String getVendedorNome() {
         return vendedorNome;
     }
 
-    public void setVendedorNome(String vendedorNome) {
+    public void setVendedorNome(final String vendedorNome) {
         this.vendedorNome = vendedorNome;
     }
 
@@ -263,7 +315,7 @@ public class FaturaPorClienteDTO {
         return notasFiscais;
     }
 
-    public void setNotasFiscais(List<String> notasFiscais) {
+    public void setNotasFiscais(final List<String> notasFiscais) {
         this.notasFiscais = notasFiscais;
     }
 
@@ -271,7 +323,17 @@ public class FaturaPorClienteDTO {
         return pedidosCliente;
     }
 
-    public void setPedidosCliente(List<String> pedidosCliente) {
+    public void setPedidosCliente(final List<String> pedidosCliente) {
         this.pedidosCliente = pedidosCliente;
+    }
+
+    @JsonAnySetter
+    public void setOtherProperty(final String name, final Object value) {
+        otherProperties.put(name, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getOtherProperties() {
+        return otherProperties;
     }
 }

@@ -20,6 +20,7 @@ import br.com.extrator.db.entity.LocalizacaoCargaEntity;
 public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCargaEntity> {
     private static final Logger logger = LoggerFactory.getLogger(LocalizacaoCargaRepository.class);
     private static final String NOME_TABELA = "localizacao_cargas";
+    private static boolean viewVerificada = false;
 
     @Override
     protected String getNomeTabela() {
@@ -70,23 +71,27 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             executarDDL(conexao, sql);
             logger.info("Tabela {} criada com sucesso.", NOME_TABELA);
         }
-        criarViewPowerBISeNaoExistir(conexao);
+        if (!viewVerificada) {
+            criarViewPowerBISeNaoExistir(conexao);
+            viewVerificada = true;
+            logger.info("View do Power BI verificada/atualizada para {}.", NOME_TABELA);
+        }
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
         final String sqlView = """
             CREATE OR ALTER VIEW dbo.vw_localizacao_cargas_powerbi AS
             SELECT
-                sequence_number AS [CT-e],
+                sequence_number AS [N° Minuta],
                 type AS [Tipo],
-                service_at AS [Data Emissão],
+                service_at AS [Data do frete],
                 invoices_volumes AS [Volumes],
                 taxed_weight AS [Peso Taxado],
                 invoices_value AS [Valor NF],
                 total_value AS [Valor Frete],
                 service_type AS [Tipo Serviço],
                 branch_nickname AS [Filial Emissora],
-                predicted_delivery_at AS [Previsão Entrega],
+                predicted_delivery_at AS [Previsão Entrega/Previsão de entrega],
                 destination_location_name AS [Cidade Destino],
                 destination_branch_nickname AS [Filial Destino],
                 classification AS [Serviço],
@@ -101,6 +106,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                 JSON_VALUE(metadata, '$.device_id') AS [Dispositivo ID],
                 JSON_VALUE(metadata, '$.device_type') AS [Dispositivo Tipo],
                 JSON_VALUE(metadata, '$.address') AS [Endereço],
+                metadata AS [Metadata],
                 data_extracao AS [Data de extracao]
             FROM dbo.localizacao_cargas;
         """;

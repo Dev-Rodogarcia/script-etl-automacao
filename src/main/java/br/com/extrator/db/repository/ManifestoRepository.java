@@ -28,6 +28,7 @@ import br.com.extrator.db.entity.ManifestoEntity;
 public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     private static final Logger logger = LoggerFactory.getLogger(ManifestoRepository.class);
     private static final String NOME_TABELA = "manifestos";
+    private static boolean viewVerificada = false;
 
     @Override
     protected String getNomeTabela() {
@@ -131,6 +132,47 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     generate_mdfe BIT,
                     monitoring_request BIT,
                     uniq_destinations_count INT,
+                    mobile_read_at DATETIMEOFFSET,
+                    km DECIMAL(18, 2),
+                    delivery_manifest_items_count INT,
+                    transfer_manifest_items_count INT,
+                    pick_manifest_items_count INT,
+                    dispatch_draft_manifest_items_count INT,
+                    consolidation_manifest_items_count INT,
+                    reverse_pick_manifest_items_count INT,
+                    manifest_items_count INT,
+                    finalized_manifest_items_count INT,
+                    calculated_pick_count INT,
+                    calculated_delivery_count INT,
+                    calculated_dispatch_count INT,
+                    calculated_consolidation_count INT,
+                    calculated_reverse_pick_count INT,
+                    pick_subtotal DECIMAL(18, 2),
+                    delivery_subtotal DECIMAL(18, 2),
+                    dispatch_subtotal DECIMAL(18, 2),
+                    consolidation_subtotal DECIMAL(18, 2),
+                    reverse_pick_subtotal DECIMAL(18, 2),
+                    advance_subtotal DECIMAL(18, 2),
+                    fleet_costs_subtotal DECIMAL(18, 2),
+                    additionals_subtotal DECIMAL(18, 2),
+                    discounts_subtotal DECIMAL(18, 2),
+                    discount_value DECIMAL(18, 2),
+                    adjustment_comments NVARCHAR(MAX),
+                    contract_status NVARCHAR(50),
+                    iks_id NVARCHAR(100),
+                    programacao_sequence_code NVARCHAR(50),
+                    programacao_starting_at DATETIMEOFFSET,
+                    programacao_ending_at DATETIMEOFFSET,
+                    trailer1_license_plate NVARCHAR(10),
+                    trailer1_weight_capacity DECIMAL(18, 2),
+                    trailer2_license_plate NVARCHAR(10),
+                    trailer2_weight_capacity DECIMAL(18, 2),
+                    vehicle_weight_capacity DECIMAL(18, 2),
+                    vehicle_cubic_weight DECIMAL(18, 2),
+                    unloading_recipient_names NVARCHAR(MAX),
+                    delivery_region_names NVARCHAR(MAX),
+                    programacao_cliente NVARCHAR(255),
+                    programacao_tipo_servico NVARCHAR(255),
                     creation_user_name NVARCHAR(255),
                     adjustment_user_name NVARCHAR(255),
 
@@ -161,58 +203,163 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             executarDDL(conexao, sqlIndex);
             logger.info("Tabela {} criada com sucesso (chave composta: sequence_code + identificador_unico).", NOME_TABELA);
         }
-        criarViewPowerBISeNaoExistir(conexao);
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "mobile_read_at", "DATETIMEOFFSET");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "km", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "delivery_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "transfer_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "pick_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "dispatch_draft_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "consolidation_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "reverse_pick_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "finalized_manifest_items_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "calculated_pick_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "calculated_delivery_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "calculated_dispatch_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "calculated_consolidation_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "calculated_reverse_pick_count", "INT");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "pick_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "delivery_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "dispatch_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "consolidation_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "reverse_pick_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "advance_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "fleet_costs_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "additionals_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "discounts_subtotal", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "discount_value", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "adjustment_comments", "NVARCHAR(MAX)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "contract_status", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "iks_id", "NVARCHAR(100)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "programacao_sequence_code", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "programacao_starting_at", "DATETIMEOFFSET");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "programacao_ending_at", "DATETIMEOFFSET");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "trailer1_license_plate", "NVARCHAR(10)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "trailer1_weight_capacity", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "trailer2_license_plate", "NVARCHAR(10)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "trailer2_weight_capacity", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "vehicle_weight_capacity", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "vehicle_cubic_weight", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "unloading_recipient_names", "NVARCHAR(MAX)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "delivery_region_names", "NVARCHAR(MAX)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "programacao_cliente", "NVARCHAR(255)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "programacao_tipo_servico", "NVARCHAR(255)");
+        if (!viewVerificada) {
+            criarViewPowerBISeNaoExistir(conexao);
+            viewVerificada = true;
+            logger.info("View do Power BI verificada/atualizada para {}.", NOME_TABELA);
+        }
+    }
+
+    private boolean colunaExiste(final Connection conn, final String tabela, final String coluna) throws SQLException {
+        final java.sql.DatabaseMetaData md = conn.getMetaData();
+        try (java.sql.ResultSet rs = md.getColumns(null, null, tabela.toUpperCase(), coluna.toUpperCase())) {
+            return rs.next();
+        }
+    }
+
+    private void adicionarColunaSeNaoExistir(final Connection conn, final String tabela, final String coluna, final String definicao) throws SQLException {
+        if (!colunaExiste(conn, tabela, coluna)) {
+            try (PreparedStatement ps = conn.prepareStatement("ALTER TABLE " + tabela + " ADD " + coluna + " " + definicao)) {
+                ps.execute();
+                logger.info("Coluna adicionada: {}.{}", tabela, coluna);
+            }
+        }
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
         final String sqlView = """
             CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
             SELECT
+                sequence_code                                       AS [Número],
+                identificador_unico                                 AS [Identificador Único],
+                status                                              AS [Status],
+                classification                                      AS [Classificação],
                 branch_nickname                                     AS [Filial],
                 created_at                                          AS [Data criação],
-                sequence_code                                       AS [Número],
-                classification                                      AS [Classificação],
                 departured_at                                       AS [Saída],
                 closed_at                                           AS [Fechamento],
                 finished_at                                         AS [Chegada],
+                mdfe_number                                         AS [MDFe],
+                mdfe_key                                            AS [MDF-es/Chave],
+                mdfe_status                                         AS [MDFe/Status],
+                distribution_pole                                   AS [Polo de distribuição],
+                vehicle_plate                                       AS [Veículo/Placa],
+                vehicle_type                                        AS [Tipo Veículo/Nome],
+                vehicle_owner                                       AS [Proprietário/Nome],
+                driver_name                                         AS [Motorista],
                 vehicle_departure_km                                AS [Km saída],
                 closing_km                                          AS [Km chegada],
                 traveled_km                                         AS [KM viagem],
-                JSON_VALUE(metadata, '$.manual_km')                 AS [Km manual],
-                status                                              AS [Status],
-                mdfe_number                                         AS [MDFe],
-                mdfe_status                                         AS [MDFe/Status],
-                mdfe_key                                            AS [MDF-es/Chave],
-                invoices_volumes                                    AS [Volumes NF],
+                manual_km                                           AS [Km manual],
                 invoices_count                                      AS [Qtd NF],
-                invoices_value                                      AS [Valor NF],
+                invoices_volumes                                    AS [Volumes NF],
                 invoices_weight                                     AS [Peso NF],
-                total_cubic_volume                                  AS [Total M3],
                 total_taxed_weight                                  AS [Total peso taxado],
-                JSON_VALUE(metadata, '$.contract_type')             AS [Tipo de contrato],
-                JSON_VALUE(metadata, '$.calculation_type')          AS [Tipo de cálculo],
-                JSON_VALUE(metadata, '$.cargo_type')                AS [Tipo de carga],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.freight_subtotal'))       AS [Valor frete],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fuel_subtotal'))          AS [Combustível],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.toll_subtotal'))          AS [Pedágio],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.daily_subtotal'))         AS [Diária],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.pick_subtotal'))          AS [Coletas.1],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.delivery_subtotal'))      AS [Entregas.1],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.advance_subtotal'))       AS [Adiantamento],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.fleet_costs_subtotal'))   AS [Custos Frota],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.additionals_subtotal'))   AS [Adicionais],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.discounts_subtotal'))     AS [Descontos],
-                operational_expenses_total                          AS [Despesa operacional],
+                total_cubic_volume                                  AS [Total M3],
+                invoices_value                                      AS [Valor NF],
+                manifest_freights_total                             AS [Fretes/Total],
+                pick_sequence_code                                   AS [Coleta/Sequence Code],
+                contract_number                                     AS [Contrato/Número],
+                contract_type                                       AS [Tipo de contrato],
+                calculation_type                                    AS [Tipo de cálculo],
+                cargo_type                                          AS [Tipo de carga],
+                daily_subtotal                                      AS [Diária],
                 total_cost                                          AS [Custo total],
+                freight_subtotal                                    AS [Valor frete],
+                fuel_subtotal                                       AS [Combustível],
+                toll_subtotal                                       AS [Pedágio],
+                driver_services_total                               AS [Serviços motorista/Total],
+                operational_expenses_total                          AS [Despesa operacional],
+                inss_value                                          AS [Dados do agregado/INSS],
+                sest_senat_value                                    AS [Dados do agregado/SEST/SENAT],
+                ir_value                                            AS [Dados do agregado/IR],
                 paying_total                                        AS [Saldo a pagar],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_inss_value'))       AS [Dados do agregado/INSS],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_sest_senat_value')) AS [Dados do agregado/SEST/SENAT],
-                TRY_CONVERT(DECIMAL(18,2), JSON_VALUE(metadata, '$.mft_a_t_ir_value'))         AS [Dados do agregado/IR],
-                vehicle_owner                                       AS [Proprietário/Nome],
-                driver_name                                         AS [Motorista],
-                vehicle_plate                                       AS [Veículo/Placa],
-                vehicle_type                                        AS [Tipo Veículo/Nome],
+                uniq_destinations_count                             AS [Destinos únicos/Qtd],
+                generate_mdfe                                       AS [Gerar MDF-e],
+                monitoring_request                                  AS [Solicitou Monitoramento],
+                mobile_read_at                                      AS [Leitura Móvel/Em],
+                km                                                  AS [KM Total],
+                delivery_manifest_items_count                       AS [Itens/Entrega],
+                transfer_manifest_items_count                       AS [Itens/Transferência],
+                pick_manifest_items_count                           AS [Itens/Coleta],
+                dispatch_draft_manifest_items_count                 AS [Itens/Despacho Rascunho],
+                consolidation_manifest_items_count                  AS [Itens/Consolidação],
+                reverse_pick_manifest_items_count                   AS [Itens/Coleta Reversa],
+                manifest_items_count                                AS [Itens/Total],
+                finalized_manifest_items_count                      AS [Itens/Finalizados],
+                calculated_pick_count                               AS [Calculado/Coleta],
+                calculated_delivery_count                           AS [Calculado/Entrega],
+                calculated_dispatch_count                           AS [Calculado/Despacho],
+                calculated_consolidation_count                      AS [Calculado/Consolidação],
+                calculated_reverse_pick_count                       AS [Calculado/Coleta Reversa],
+                pick_subtotal                                       AS [Coletas.1],
+                delivery_subtotal                                   AS [Entregas.1],
+                dispatch_subtotal                                   AS [Despachos],
+                consolidation_subtotal                              AS [Consolidações],
+                reverse_pick_subtotal                               AS [Coleta Reversa],
+                advance_subtotal                                    AS [Adiantamento],
+                fleet_costs_subtotal                                AS [Custos Frota],
+                additionals_subtotal                                AS [Adicionais],
+                discounts_subtotal                                  AS [Descontos],
+                discount_value                                      AS [Desconto/Valor],
+                iks_id                                              AS [IKS ID],
+                programacao_sequence_code                           AS [Programação/Sequence Code],
+                programacao_starting_at                             AS [Programação/Início],
+                programacao_ending_at                               AS [Programação/Término],
+                trailer1_license_plate                              AS [Carreta 1/Placa],
+                trailer1_weight_capacity                            AS [Carreta 1/Capacidade Peso],
+                trailer2_license_plate                              AS [Carreta 2/Placa],
+                trailer2_weight_capacity                            AS [Carreta 2/Capacidade Peso],
+                vehicle_weight_capacity                             AS [Veículo/Capacidade Peso],
+                vehicle_cubic_weight                                AS [Veículo/Peso Cubado],
+                unloading_recipient_names                           AS [Descarregamento/Destinatários],
+                delivery_region_names                               AS [Entrega/Regiões],
+                programacao_cliente                                 AS [Programação/Cliente],
+                programacao_tipo_servico                            AS [Programação/Tipo Serviço],
                 creation_user_name                                  AS [Usuário/Emissor],
+                adjustment_user_name                                AS [Usuário/Ajuste],
+                metadata                                            AS [Metadata],
                 data_extracao                                       AS [Data de extracao]
             FROM dbo.manifestos;
         """;
@@ -456,6 +603,66 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             if (rowsAffected > 0) {
                 logger.debug("✅ Manifesto sequence_code={}, identificador_unico={} salvo com sucesso: {} linha(s) afetada(s)", 
                             manifesto.getSequenceCode(), manifesto.getIdentificadorUnico(), rowsAffected);
+                final String sqlUpdateExtras = String.format(
+                    """
+                        UPDATE %s SET \
+                        mobile_read_at = ?, km = ?, \
+                        delivery_manifest_items_count = ?, transfer_manifest_items_count = ?, pick_manifest_items_count = ?, dispatch_draft_manifest_items_count = ?, consolidation_manifest_items_count = ?, reverse_pick_manifest_items_count = ?, manifest_items_count = ?, finalized_manifest_items_count = ?, \
+                        calculated_pick_count = ?, calculated_delivery_count = ?, calculated_dispatch_count = ?, calculated_consolidation_count = ?, calculated_reverse_pick_count = ?, \
+                        pick_subtotal = ?, delivery_subtotal = ?, dispatch_subtotal = ?, consolidation_subtotal = ?, reverse_pick_subtotal = ?, advance_subtotal = ?, fleet_costs_subtotal = ?, additionals_subtotal = ?, discounts_subtotal = ?, discount_value = ?, \
+                        adjustment_comments = ?, contract_status = ?, iks_id = ?, programacao_sequence_code = ?, programacao_starting_at = ?, programacao_ending_at = ?, \
+                        trailer1_license_plate = ?, trailer1_weight_capacity = ?, trailer2_license_plate = ?, trailer2_weight_capacity = ?, vehicle_weight_capacity = ?, vehicle_cubic_weight = ?, \
+                        unloading_recipient_names = ?, delivery_region_names = ?, programacao_cliente = ?, programacao_tipo_servico = ? \
+                        WHERE sequence_code = ? AND COALESCE(pick_sequence_code, -1) = COALESCE(?, -1) AND COALESCE(mdfe_number, -1) = COALESCE(?, -1)""",
+                    NOME_TABELA);
+                try (PreparedStatement upd = conexao.prepareStatement(sqlUpdateExtras)) {
+                    int i = 1;
+                    if (manifesto.getMobileReadAt() != null) { upd.setObject(i++, manifesto.getMobileReadAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    setBigDecimalParameter(upd, i++, manifesto.getKm());
+                    upd.setObject(i++, manifesto.getDeliveryManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getTransferManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getPickManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getDispatchDraftManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getConsolidationManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getReversePickManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getFinalizedManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedPickCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedDeliveryCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedDispatchCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedConsolidationCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedReversePickCount(), Types.INTEGER);
+                    setBigDecimalParameter(upd, i++, manifesto.getPickSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDeliverySubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDispatchSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getConsolidationSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getReversePickSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getAdvanceSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getFleetCostsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getAdditionalsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDiscountsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDiscountValue());
+                    upd.setString(i++, truncate(manifesto.getAdjustmentComments(), 4000, "adjustment_comments"));
+                    upd.setString(i++, truncate(manifesto.getContractStatus(), 50, "contract_status"));
+                    upd.setString(i++, truncate(manifesto.getIksId(), 100, "iks_id"));
+                    upd.setString(i++, truncate(manifesto.getProgramacaoSequenceCode(), 50, "programacao_sequence_code"));
+                    if (manifesto.getProgramacaoStartingAt() != null) { upd.setObject(i++, manifesto.getProgramacaoStartingAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    if (manifesto.getProgramacaoEndingAt() != null) { upd.setObject(i++, manifesto.getProgramacaoEndingAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    upd.setString(i++, truncate(manifesto.getTrailer1LicensePlate(), 10, "trailer1_license_plate"));
+                    setBigDecimalParameter(upd, i++, manifesto.getTrailer1WeightCapacity());
+                    upd.setString(i++, truncate(manifesto.getTrailer2LicensePlate(), 10, "trailer2_license_plate"));
+                    setBigDecimalParameter(upd, i++, manifesto.getTrailer2WeightCapacity());
+                    setBigDecimalParameter(upd, i++, manifesto.getVehicleWeightCapacity());
+                    setBigDecimalParameter(upd, i++, manifesto.getVehicleCubicWeight());
+                    upd.setString(i++, manifesto.getUnloadingRecipientNames());
+                    upd.setString(i++, manifesto.getDeliveryRegionNames());
+                    upd.setString(i++, truncate(manifesto.getProgramacaoCliente(), 255, "programacao_cliente"));
+                    upd.setString(i++, truncate(manifesto.getProgramacaoTipoServico(), 255, "programacao_tipo_servico"));
+                    upd.setObject(i++, manifesto.getSequenceCode(), Types.BIGINT);
+                    upd.setObject(i++, manifesto.getPickSequenceCode(), Types.BIGINT);
+                    upd.setObject(i++, manifesto.getMdfeNumber(), Types.INTEGER);
+                    upd.executeUpdate();
+                }
             }
             
             return rowsAffected;
@@ -618,6 +825,64 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             if (rowsAffected > 0) {
                 logger.debug("✅ Manifesto sequence_code={} salvo com sucesso (estrutura antiga): {} linha(s) afetada(s)", 
                             manifesto.getSequenceCode(), rowsAffected);
+                final String sqlUpdateExtras = String.format(
+                    """
+                        UPDATE %s SET \
+                        mobile_read_at = ?, km = ?, \
+                        delivery_manifest_items_count = ?, transfer_manifest_items_count = ?, pick_manifest_items_count = ?, dispatch_draft_manifest_items_count = ?, consolidation_manifest_items_count = ?, reverse_pick_manifest_items_count = ?, manifest_items_count = ?, finalized_manifest_items_count = ?, \
+                        calculated_pick_count = ?, calculated_delivery_count = ?, calculated_dispatch_count = ?, calculated_consolidation_count = ?, calculated_reverse_pick_count = ?, \
+                        pick_subtotal = ?, delivery_subtotal = ?, dispatch_subtotal = ?, consolidation_subtotal = ?, reverse_pick_subtotal = ?, advance_subtotal = ?, fleet_costs_subtotal = ?, additionals_subtotal = ?, discounts_subtotal = ?, discount_value = ?, \
+                        adjustment_comments = ?, contract_status = ?, iks_id = ?, programacao_sequence_code = ?, programacao_starting_at = ?, programacao_ending_at = ?, \
+                        trailer1_license_plate = ?, trailer1_weight_capacity = ?, trailer2_license_plate = ?, trailer2_weight_capacity = ?, vehicle_weight_capacity = ?, vehicle_cubic_weight = ?, \
+                        unloading_recipient_names = ?, delivery_region_names = ?, programacao_cliente = ?, programacao_tipo_servico = ? \
+                        WHERE sequence_code = ?""",
+                    NOME_TABELA);
+                try (PreparedStatement upd = conexao.prepareStatement(sqlUpdateExtras)) {
+                    int i = 1;
+                    if (manifesto.getMobileReadAt() != null) { upd.setObject(i++, manifesto.getMobileReadAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    setBigDecimalParameter(upd, i++, manifesto.getKm());
+                    upd.setObject(i++, manifesto.getDeliveryManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getTransferManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getPickManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getDispatchDraftManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getConsolidationManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getReversePickManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getFinalizedManifestItemsCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedPickCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedDeliveryCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedDispatchCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedConsolidationCount(), Types.INTEGER);
+                    upd.setObject(i++, manifesto.getCalculatedReversePickCount(), Types.INTEGER);
+                    setBigDecimalParameter(upd, i++, manifesto.getPickSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDeliverySubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDispatchSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getConsolidationSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getReversePickSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getAdvanceSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getFleetCostsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getAdditionalsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDiscountsSubtotal());
+                    setBigDecimalParameter(upd, i++, manifesto.getDiscountValue());
+                    upd.setString(i++, truncate(manifesto.getAdjustmentComments(), 4000, "adjustment_comments"));
+                    upd.setString(i++, truncate(manifesto.getContractStatus(), 50, "contract_status"));
+                    upd.setString(i++, truncate(manifesto.getIksId(), 100, "iks_id"));
+                    upd.setString(i++, truncate(manifesto.getProgramacaoSequenceCode(), 50, "programacao_sequence_code"));
+                    if (manifesto.getProgramacaoStartingAt() != null) { upd.setObject(i++, manifesto.getProgramacaoStartingAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    if (manifesto.getProgramacaoEndingAt() != null) { upd.setObject(i++, manifesto.getProgramacaoEndingAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }
+                    upd.setString(i++, truncate(manifesto.getTrailer1LicensePlate(), 10, "trailer1_license_plate"));
+                    setBigDecimalParameter(upd, i++, manifesto.getTrailer1WeightCapacity());
+                    upd.setString(i++, truncate(manifesto.getTrailer2LicensePlate(), 10, "trailer2_license_plate"));
+                    setBigDecimalParameter(upd, i++, manifesto.getTrailer2WeightCapacity());
+                    setBigDecimalParameter(upd, i++, manifesto.getVehicleWeightCapacity());
+                    setBigDecimalParameter(upd, i++, manifesto.getVehicleCubicWeight());
+                    upd.setString(i++, manifesto.getUnloadingRecipientNames());
+                    upd.setString(i++, manifesto.getDeliveryRegionNames());
+                    upd.setString(i++, truncate(manifesto.getProgramacaoCliente(), 255, "programacao_cliente"));
+                    upd.setString(i++, truncate(manifesto.getProgramacaoTipoServico(), 255, "programacao_tipo_servico"));
+                    upd.setObject(i++, manifesto.getSequenceCode(), Types.BIGINT);
+                    upd.executeUpdate();
+                }
             }
             
             return rowsAffected;

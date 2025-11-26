@@ -20,6 +20,7 @@ import br.com.extrator.db.entity.FreteEntity;
 public class FreteRepository extends AbstractRepository<FreteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FreteRepository.class);
     private static final String NOME_TABELA = "fretes";
+    private static boolean viewVerificada = false;
 
     @Override
     protected String getNomeTabela() {
@@ -32,11 +33,11 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
      * para armazenar o JSON completo, garantindo resiliência.
      */
     @Override
-    protected void criarTabelaSeNaoExistir(Connection conexao) throws SQLException {
+    protected void criarTabelaSeNaoExistir(final Connection conexao) throws SQLException {
         if (!verificarTabelaExiste(conexao, NOME_TABELA)) {
             logger.info("Criando tabela {} com arquitetura híbrida...", NOME_TABELA);
 
-            String sql = """
+            final String sql = """
                 CREATE TABLE fretes (
                     -- Coluna de Chave Primária
                     id BIGINT PRIMARY KEY,
@@ -66,7 +67,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     destino_cidade NVARCHAR(255),
                     destino_uf NVARCHAR(10),
                     filial_nome NVARCHAR(255),
-                    numero_nota_fiscal NVARCHAR(100),
+                    numero_nota_fiscal NVARCHAR(MAX),
                     tabela_preco_nome NVARCHAR(255),
                     classificacao_nome NVARCHAR(255),
                     centro_custo_nome NVARCHAR(255),
@@ -83,6 +84,30 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     numero_cte INT,
                     serie_cte INT,
 
+                    service_type INT,
+                    insurance_enabled BIT,
+                    gris_subtotal DECIMAL(18, 2),
+                    tde_subtotal DECIMAL(18, 2),
+                    modal_cte NVARCHAR(50),
+                    redispatch_subtotal DECIMAL(18, 2),
+                    suframa_subtotal DECIMAL(18, 2),
+                    payment_type NVARCHAR(50),
+                    previous_document_type NVARCHAR(50),
+                    products_value DECIMAL(18, 2),
+                    trt_subtotal DECIMAL(18, 2),
+                    nfse_series NVARCHAR(50),
+                    nfse_number INT,
+                    insurance_id BIGINT,
+                    other_fees DECIMAL(18, 2),
+                    km DECIMAL(18, 2),
+                    payment_accountable_type INT,
+                    insured_value DECIMAL(18, 2),
+                    globalized BIT,
+                    sec_cat_subtotal DECIMAL(18, 2),
+                    globalized_type NVARCHAR(50),
+                    price_table_accountable_type INT,
+                    insurance_accountable_type INT,
+
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
 
@@ -94,7 +119,33 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             executarDDL(conexao, sql);
             logger.info("Tabela {} criada com sucesso.", NOME_TABELA);
         }
-        criarViewPowerBISeNaoExistir(conexao);
+        ajustarTamanhoColunaNotasSeNecessario(conexao);
+        adicionarColunasNovasSeNecessario(conexao);
+        if (!viewVerificada) {
+            criarViewPowerBISeNaoExistir(conexao);
+            viewVerificada = true;
+            logger.info("View do Power BI verificada/atualizada para {}.", NOME_TABELA);
+        }
+    }
+
+    private void ajustarTamanhoColunaNotasSeNecessario(final Connection conexao) throws SQLException {
+        final String sqlVerifica = """
+            SELECT CHARACTER_MAXIMUM_LENGTH
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'fretes' AND COLUMN_NAME = 'numero_nota_fiscal'
+        """;
+        Integer tamanho = null;
+        try (PreparedStatement stmt = conexao.prepareStatement(sqlVerifica);
+             java.sql.ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                tamanho = rs.getInt(1);
+            }
+        }
+        if (tamanho != null && tamanho != -1) { // -1 indica NVARCHAR(MAX)
+            final String alterar = "ALTER TABLE dbo.fretes ALTER COLUMN numero_nota_fiscal NVARCHAR(MAX)";
+            executarDDL(conexao, alterar);
+            logger.info("🔧 Ajustado tamanho de 'numero_nota_fiscal' para NVARCHAR(MAX) em dbo.fretes");
+        }
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
@@ -103,36 +154,106 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             SELECT
                 id AS [ID],
                 chave_cte AS [Chave CT-e],
-                numero_cte AS [Numero CT-e],
-                serie_cte AS [Serie CT-e],
+                numero_cte AS [Nº CT-e],
+                serie_cte AS [Série],
                 servico_em AS [Data frete],
-                valor_total AS [Valor Total do Servico],
+                criado_em AS [Criado em],
+                valor_total AS [Valor Total do Serviço],
                 valor_notas AS [Valor NF],
+                peso_notas AS [Kg NF],
                 subtotal AS [Valor Frete],
                 invoices_total_volumes AS [Volumes],
                 taxed_weight AS [Kg Taxado],
                 real_weight AS [Kg Real],
                 total_cubic_volume AS [M3],
                 pagador_nome AS [Pagador],
+                pagador_id AS [Pagador ID],
                 remetente_nome AS [Remetente],
+                remetente_id AS [Remetente ID],
                 origem_cidade AS [Origem],
                 origem_uf AS [UF Origem],
                 destinatario_nome AS [Destinatario],
+                destinatario_id AS [Destinatario ID],
                 destino_cidade AS [Destino],
                 destino_uf AS [UF Destino],
                 filial_nome AS [Filial],
-                tabela_preco_nome AS [Tabela de Preco],
-                classificacao_nome AS [Classificacao],
+                tabela_preco_nome AS [Tabela de Preço],
+                classificacao_nome AS [Classificação],
                 centro_custo_nome AS [Centro de Custo],
-                usuario_nome AS [Usuario],
+                usuario_nome AS [Usuário],
                 numero_nota_fiscal AS [NF],
-                status AS [Status],
+                reference_number AS [Referência],
+                id_corporacao AS [Corp ID],
+                id_cidade_destino AS [Cidade Destino ID],
+                data_previsao_entrega AS [Previsão de Entrega],
                 modal AS [Modal],
+                status AS [Status],
                 tipo_frete AS [Tipo Frete],
+                service_type AS [Service Type],
+                insurance_enabled AS [Seguro Habilitado],
+                gris_subtotal AS [GRIS],
+                tde_subtotal AS [TDE],
+                modal_cte AS [Modal CT-e],
+                redispatch_subtotal AS [Redispatch],
+                suframa_subtotal AS [SUFRAMA],
+                payment_type AS [Tipo Pagamento],
+                previous_document_type AS [Doc Anterior],
+                products_value AS [Valor Produtos],
+                trt_subtotal AS [TRT],
+                nfse_series AS [Série NFS-e],
+                nfse_number AS [Nº NFS-e],
+                insurance_id AS [Seguro ID],
+                other_fees AS [Outras Tarifas],
+                km AS [KM],
+                payment_accountable_type AS [Tipo Contábil Pagamento],
+                insured_value AS [Valor Segurado],
+                globalized AS [Globalizado],
+                sec_cat_subtotal AS [SEC/CAT],
+                globalized_type AS [Tipo Globalizado],
+                price_table_accountable_type AS [Tipo Contábil Tabela],
+                insurance_accountable_type AS [Tipo Contábil Seguro],
+                metadata AS [Metadata],
                 data_extracao AS [Data de extracao]
             FROM dbo.fretes;
         """;
         executarDDL(conexao, sqlView);
+    }
+
+    private void adicionarColunaSeNaoExistir(final Connection conexao, final String nomeColuna, final String tipoDef) throws SQLException {
+        final String verifica = "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='fretes' AND COLUMN_NAME='" + nomeColuna + "'";
+        try (PreparedStatement stmt = conexao.prepareStatement(verifica); java.sql.ResultSet rs = stmt.executeQuery()) {
+            if (!rs.next()) {
+                final String alterar = "ALTER TABLE dbo.fretes ADD " + nomeColuna + " " + tipoDef;
+                executarDDL(conexao, alterar);
+                logger.info("Adicionada coluna {} em dbo.fretes", nomeColuna);
+            }
+        }
+    }
+
+    private void adicionarColunasNovasSeNecessario(final Connection conexao) throws SQLException {
+        adicionarColunaSeNaoExistir(conexao, "service_type", "INT");
+        adicionarColunaSeNaoExistir(conexao, "insurance_enabled", "BIT");
+        adicionarColunaSeNaoExistir(conexao, "gris_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "tde_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "modal_cte", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "redispatch_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "suframa_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "payment_type", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "previous_document_type", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "products_value", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "trt_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_series", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_number", "INT");
+        adicionarColunaSeNaoExistir(conexao, "insurance_id", "BIGINT");
+        adicionarColunaSeNaoExistir(conexao, "other_fees", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "km", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "payment_accountable_type", "INT");
+        adicionarColunaSeNaoExistir(conexao, "insured_value", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "globalized", "BIT");
+        adicionarColunaSeNaoExistir(conexao, "sec_cat_subtotal", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "globalized_type", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "price_table_accountable_type", "INT");
+        adicionarColunaSeNaoExistir(conexao, "insurance_accountable_type", "INT");
     }
 
     /**
@@ -140,19 +261,30 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
      * A lógica é segura e baseada na nova arquitetura de Entidade.
      */
     @Override
-    protected int executarMerge(Connection conexao, FreteEntity frete) throws SQLException {
+    protected int executarMerge(final Connection conexao, final FreteEntity frete) throws SQLException {
         // Para Fretes, o 'id' é a única chave confiável para o MERGE.
         if (frete.getId() == null) {
             throw new SQLException("Não é possível executar o MERGE para Frete sem um ID.");
         }
 
-        String sql = String.format("""
+        final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+            USING (VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?
+            ))
                 AS source (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                            pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
                            filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
-                           taxed_weight, real_weight, total_cubic_volume, subtotal, metadata, data_extracao)
+                           taxed_weight, real_weight, total_cubic_volume, subtotal,
+                           service_type, insurance_enabled, gris_subtotal, tde_subtotal, modal_cte, redispatch_subtotal, suframa_subtotal, payment_type, previous_document_type,
+                           products_value, trt_subtotal, nfse_series, nfse_number, insurance_id, other_fees, km, payment_accountable_type, insured_value, globalized, sec_cat_subtotal, globalized_type, price_table_accountable_type, insurance_accountable_type,
+                           metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -192,17 +324,46 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     real_weight = source.real_weight,
                     total_cubic_volume = source.total_cubic_volume,
                     subtotal = source.subtotal,
+                    service_type = source.service_type,
+                    insurance_enabled = source.insurance_enabled,
+                    gris_subtotal = source.gris_subtotal,
+                    tde_subtotal = source.tde_subtotal,
+                    modal_cte = source.modal_cte,
+                    redispatch_subtotal = source.redispatch_subtotal,
+                    suframa_subtotal = source.suframa_subtotal,
+                    payment_type = source.payment_type,
+                    previous_document_type = source.previous_document_type,
+                    products_value = source.products_value,
+                    trt_subtotal = source.trt_subtotal,
+                    nfse_series = source.nfse_series,
+                    nfse_number = source.nfse_number,
+                    insurance_id = source.insurance_id,
+                    other_fees = source.other_fees,
+                    km = source.km,
+                    payment_accountable_type = source.payment_accountable_type,
+                    insured_value = source.insured_value,
+                    globalized = source.globalized,
+                    sec_cat_subtotal = source.sec_cat_subtotal,
+                    globalized_type = source.globalized_type,
+                    price_table_accountable_type = source.price_table_accountable_type,
+                    insurance_accountable_type = source.insurance_accountable_type,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                         pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
                         filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
-                        taxed_weight, real_weight, total_cubic_volume, subtotal, metadata, data_extracao)
+                        taxed_weight, real_weight, total_cubic_volume, subtotal,
+                        service_type, insurance_enabled, gris_subtotal, tde_subtotal, modal_cte, redispatch_subtotal, suframa_subtotal, payment_type, previous_document_type,
+                        products_value, trt_subtotal, nfse_series, nfse_number, insurance_id, other_fees, km, payment_accountable_type, insured_value, globalized, sec_cat_subtotal, globalized_type, price_table_accountable_type, insurance_accountable_type,
+                        metadata, data_extracao)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
                         source.filial_nome, source.numero_nota_fiscal, source.tabela_preco_nome, source.classificacao_nome, source.centro_custo_nome, source.usuario_nome, source.reference_number, source.chave_cte, source.numero_cte, source.serie_cte, source.invoices_total_volumes,
-                        source.taxed_weight, source.real_weight, source.total_cubic_volume, source.subtotal, source.metadata, source.data_extracao);
+                        source.taxed_weight, source.real_weight, source.total_cubic_volume, source.subtotal,
+                        source.service_type, source.insurance_enabled, source.gris_subtotal, source.tde_subtotal, source.modal_cte, source.redispatch_subtotal, source.suframa_subtotal, source.payment_type, source.previous_document_type,
+                        source.products_value, source.trt_subtotal, source.nfse_series, source.nfse_number, source.insurance_id, source.other_fees, source.km, source.payment_accountable_type, source.insured_value, source.globalized, source.sec_cat_subtotal, source.globalized_type, source.price_table_accountable_type, source.insurance_accountable_type,
+                        source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -254,15 +415,41 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setBigDecimal(paramIndex++, frete.getRealWeight());
             statement.setBigDecimal(paramIndex++, frete.getTotalCubicVolume());
             statement.setBigDecimal(paramIndex++, frete.getSubtotal());
+            if (frete.getServiceType() != null) {
+                statement.setObject(paramIndex++, frete.getServiceType(), Types.INTEGER);
+            } else { statement.setNull(paramIndex++, Types.INTEGER); }
+            if (frete.getInsuranceEnabled() != null) {
+                statement.setObject(paramIndex++, frete.getInsuranceEnabled(), Types.BOOLEAN);
+            } else { statement.setNull(paramIndex++, Types.BOOLEAN); }
+            statement.setBigDecimal(paramIndex++, frete.getGrisSubtotal());
+            statement.setBigDecimal(paramIndex++, frete.getTdeSubtotal());
+            statement.setString(paramIndex++, frete.getModalCte());
+            statement.setBigDecimal(paramIndex++, frete.getRedispatchSubtotal());
+            statement.setBigDecimal(paramIndex++, frete.getSuframaSubtotal());
+            statement.setString(paramIndex++, frete.getPaymentType());
+            statement.setString(paramIndex++, frete.getPreviousDocumentType());
+            statement.setBigDecimal(paramIndex++, frete.getProductsValue());
+            statement.setBigDecimal(paramIndex++, frete.getTrtSubtotal());
+            statement.setString(paramIndex++, frete.getNfseSeries());
+            if (frete.getNfseNumber() != null) { statement.setObject(paramIndex++, frete.getNfseNumber(), Types.INTEGER); } else { statement.setNull(paramIndex++, Types.INTEGER); }
+            if (frete.getInsuranceId() != null) { statement.setObject(paramIndex++, frete.getInsuranceId(), Types.BIGINT); } else { statement.setNull(paramIndex++, Types.BIGINT); }
+            statement.setBigDecimal(paramIndex++, frete.getOtherFees());
+            statement.setBigDecimal(paramIndex++, frete.getKm());
+            if (frete.getPaymentAccountableType() != null) { statement.setObject(paramIndex++, frete.getPaymentAccountableType(), Types.INTEGER); } else { statement.setNull(paramIndex++, Types.INTEGER); }
+            statement.setBigDecimal(paramIndex++, frete.getInsuredValue());
+            if (frete.getGlobalized() != null) { statement.setObject(paramIndex++, frete.getGlobalized(), Types.BOOLEAN); } else { statement.setNull(paramIndex++, Types.BOOLEAN); }
+            statement.setBigDecimal(paramIndex++, frete.getSecCatSubtotal());
+            statement.setString(paramIndex++, frete.getGlobalizedType());
+            if (frete.getPriceTableAccountableType() != null) { statement.setObject(paramIndex++, frete.getPriceTableAccountableType(), Types.INTEGER); } else { statement.setNull(paramIndex++, Types.INTEGER); }
+            if (frete.getInsuranceAccountableType() != null) { statement.setObject(paramIndex++, frete.getInsuranceAccountableType(), Types.INTEGER); } else { statement.setNull(paramIndex++, Types.INTEGER); }
             statement.setString(paramIndex++, frete.getMetadata());
-            setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
-            
-            // Verificar se todos os parâmetros foram definidos (39 parâmetros = paramIndex final = 40)
-            if (paramIndex != 40) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 39, definido %d", paramIndex - 1));
+            setInstantParameter(statement, paramIndex++, Instant.now());
+            final int expected = statement.getParameterMetaData().getParameterCount();
+            if ((paramIndex - 1) != expected) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado %d, definido %d", expected, (paramIndex - 1)));
             }
 
-            int rowsAffected = statement.executeUpdate();
+            final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Frete ID {}: {} linha(s) afetada(s)", frete.getId(), rowsAffected);
             return rowsAffected;
         }

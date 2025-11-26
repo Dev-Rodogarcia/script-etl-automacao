@@ -157,48 +157,71 @@ public class CompletudeValidator {
     public Map<String, StatusValidacao> validarCompletude(final Map<String, Integer> totaisEslCloud, 
                                                          final LocalDate dataReferencia) {
         logger.info("🔍 Iniciando validação de completude para {} entidades na data: {}", 
-                totaisEslCloud.size(), dataReferencia);
+                MAPEAMENTO_ENTIDADES_TABELAS.size(), dataReferencia);
         
         final Map<String, StatusValidacao> resultadosValidacao = new HashMap<>();
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             
-            for (final Map.Entry<String, Integer> entrada : totaisEslCloud.entrySet()) {
-                final String nomeEntidade = entrada.getKey();
-                final int contagemEslCloud = entrada.getValue();
-                
-                // Obter nome da tabela correspondente
+            for (final String nomeEntidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
                 final String nomeTabela = MAPEAMENTO_ENTIDADES_TABELAS.get(nomeEntidade);
                 if (nomeTabela == null) {
-                    logger.warn("⚠️ Entidade '{}' não possui mapeamento para tabela. Pulando validação.", nomeEntidade);
                     resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
                     continue;
                 }
-                
                 try {
-                    // Query SQL eficiente para contar registros na data específica
-                    // String.format é seguro aqui pois nomeTabela vem de fonte controlada
-                    final String sql = String.format(
-                        "SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())",
-                        nomeTabela
-                    );
+                    final String sqlLog = """
+                        SELECT TOP 1 timestamp_inicio, timestamp_fim, registros_extraidos
+                        FROM dbo.log_extracoes
+                        WHERE entidade = ? AND CAST(timestamp_inicio AS DATE) = ? AND status_final = 'COMPLETO'
+                        ORDER BY timestamp_fim DESC
+                    """;
+                    java.sql.Timestamp tsInicio = null;
+                    java.sql.Timestamp tsFim = null;
+                    int contagemEslCloud = -1;
+                    try (PreparedStatement stmtLog = conexao.prepareStatement(sqlLog)) {
+                        stmtLog.setString(1, nomeEntidade);
+                        stmtLog.setDate(2, java.sql.Date.valueOf(dataReferencia));
+                        try (ResultSet rsLog = stmtLog.executeQuery()) {
+                            if (rsLog.next()) {
+                                tsInicio = rsLog.getTimestamp("timestamp_inicio");
+                                tsFim = rsLog.getTimestamp("timestamp_fim");
+                                contagemEslCloud = rsLog.getInt("registros_extraidos");
+                            }
+                        }
+                    }
 
                     int contagemBanco;
-                    try (PreparedStatement stmt = conexao.prepareStatement(sql);
-                         ResultSet rs = stmt.executeQuery()) {
-                        rs.next();
-                        contagemBanco = rs.getInt(1);
+                    if (tsInicio != null && tsFim != null) {
+                        final String sqlDb = String.format(
+                            "SELECT COUNT(*) FROM %s WHERE data_extracao >= ? AND data_extracao <= ?",
+                            nomeTabela
+                        );
+                        try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb)) {
+                            stmtDb.setTimestamp(1, tsInicio);
+                            stmtDb.setTimestamp(2, tsFim);
+                            try (ResultSet rsDb = stmtDb.executeQuery()) {
+                                rsDb.next();
+                                contagemBanco = rsDb.getInt(1);
+                            }
+                        }
+                    } else {
+                        final String sqlDb = String.format(
+                            "SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())",
+                            nomeTabela
+                        );
+                        try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb);
+                             ResultSet rsDb = stmtDb.executeQuery()) {
+                            rsDb.next();
+                            contagemBanco = rsDb.getInt(1);
+                        }
+                        contagemEslCloud = totaisEslCloud.getOrDefault(nomeEntidade, contagemEslCloud);
                     }
-                    
-                    // Determinar status baseado na comparação
+
                     final StatusValidacao status = determinarStatusValidacao(contagemEslCloud, contagemBanco);
                     resultadosValidacao.put(nomeEntidade, status);
-                    
-                    // Log com status visual claro
                     final String iconeStatus = obterIconeStatus(status);
-                    logger.info("{} {}: ESL Cloud={}, Banco={}", 
-                            iconeStatus, nomeEntidade, contagemEslCloud, contagemBanco);
-                    
+                    logger.info("{} {}: ESL Cloud={}, Banco={}", iconeStatus, nomeEntidade, contagemEslCloud, contagemBanco);
                 } catch (final SQLException e) {
                     logger.error("❌ Erro SQL ao validar entidade '{}': {}", nomeEntidade, e.getMessage(), e);
                     resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);

@@ -121,6 +121,75 @@ public class FreteNodeDTO {
     @JsonProperty("subtotal")
     private BigDecimal subtotal;
 
+    @JsonProperty("serviceType")
+    private Integer serviceType;
+
+    @JsonProperty("insuranceEnabled")
+    private Boolean insuranceEnabled;
+
+    @JsonProperty("grisSubtotal")
+    private BigDecimal grisSubtotal;
+
+    @JsonProperty("tdeSubtotal")
+    private BigDecimal tdeSubtotal;
+
+    @JsonProperty("modalCte")
+    private String modalCte;
+
+    @JsonProperty("redispatchSubtotal")
+    private BigDecimal redispatchSubtotal;
+
+    @JsonProperty("suframaSubtotal")
+    private BigDecimal suframaSubtotal;
+
+    @JsonProperty("paymentType")
+    private String paymentType;
+
+    @JsonProperty("previousDocumentType")
+    private String previousDocumentType;
+
+    @JsonProperty("productsValue")
+    private BigDecimal productsValue;
+
+    @JsonProperty("trtSubtotal")
+    private BigDecimal trtSubtotal;
+
+    @JsonProperty("nfseSeries")
+    private String nfseSeries;
+
+    @JsonProperty("nfseNumber")
+    private Integer nfseNumber;
+
+    @JsonProperty("insuranceId")
+    private Long insuranceId;
+
+    @JsonProperty("otherFees")
+    private BigDecimal otherFees;
+
+    @JsonProperty("km")
+    private BigDecimal km;
+
+    @JsonProperty("paymentAccountableType")
+    private Integer paymentAccountableType;
+
+    @JsonProperty("insuredValue")
+    private BigDecimal insuredValue;
+
+    @JsonProperty("globalized")
+    private Boolean globalized;
+
+    @JsonProperty("secCatSubtotal")
+    private BigDecimal secCatSubtotal;
+
+    @JsonProperty("globalizedType")
+    private String globalizedType;
+
+    @JsonProperty("priceTableAccountableType")
+    private Integer priceTableAccountableType;
+
+    @JsonProperty("insuranceAccountableType")
+    private Integer insuranceAccountableType;
+
     // --- Contêiner Dinâmico ("Resto") ---
     private final Map<String, Object> otherProperties = new HashMap<>();
 
@@ -233,7 +302,7 @@ public class FreteNodeDTO {
         return payer;
     }
 
-    public void setPayer(PayerDTO payer) {
+    public void setPayer(final PayerDTO payer) {
         this.payer = payer;
     }
 
@@ -241,7 +310,7 @@ public class FreteNodeDTO {
         return sender;
     }
 
-    public void setSender(SenderDTO sender) {
+    public void setSender(final SenderDTO sender) {
         this.sender = sender;
     }
 
@@ -249,7 +318,7 @@ public class FreteNodeDTO {
         return receiver;
     }
 
-    public void setReceiver(ReceiverDTO receiver) {
+    public void setReceiver(final ReceiverDTO receiver) {
         this.receiver = receiver;
     }
 
@@ -257,7 +326,7 @@ public class FreteNodeDTO {
         return corporation;
     }
 
-    public void setCorporation(CorporationDTO corporation) {
+    public void setCorporation(final CorporationDTO corporation) {
         this.corporation = corporation;
     }
 
@@ -265,7 +334,7 @@ public class FreteNodeDTO {
         return freightInvoices;
     }
 
-    public void setFreightInvoices(List<FreightInvoiceDTO> freightInvoices) {
+    public void setFreightInvoices(final List<FreightInvoiceDTO> freightInvoices) {
         this.freightInvoices = freightInvoices;
     }
 
@@ -273,7 +342,7 @@ public class FreteNodeDTO {
         return customerPriceTable;
     }
 
-    public void setCustomerPriceTable(CustomerPriceTableDTO customerPriceTable) {
+    public void setCustomerPriceTable(final CustomerPriceTableDTO customerPriceTable) {
         this.customerPriceTable = customerPriceTable;
     }
 
@@ -281,7 +350,7 @@ public class FreteNodeDTO {
         return freightClassification;
     }
 
-    public void setFreightClassification(FreightClassificationDTO freightClassification) {
+    public void setFreightClassification(final FreightClassificationDTO freightClassification) {
         this.freightClassification = freightClassification;
     }
 
@@ -289,7 +358,7 @@ public class FreteNodeDTO {
         return costCenter;
     }
 
-    public void setCostCenter(CostCenterDTO costCenter) {
+    public void setCostCenter(final CostCenterDTO costCenter) {
         this.costCenter = costCenter;
     }
 
@@ -297,7 +366,7 @@ public class FreteNodeDTO {
         return user;
     }
 
-    public void setUser(UserDTO user) {
+    public void setUser(final UserDTO user) {
         this.user = user;
     }
 
@@ -310,7 +379,7 @@ public class FreteNodeDTO {
         return referenceNumber;
     }
 
-    public void setReferenceNumber(String referenceNumber) {
+    public void setReferenceNumber(final String referenceNumber) {
         this.referenceNumber = referenceNumber;
     }
 
@@ -318,7 +387,7 @@ public class FreteNodeDTO {
         return invoicesTotalVolumes;
     }
 
-    public void setInvoicesTotalVolumes(Integer invoicesTotalVolumes) {
+    public void setInvoicesTotalVolumes(final Integer invoicesTotalVolumes) {
         this.invoicesTotalVolumes = invoicesTotalVolumes;
     }
 
@@ -326,7 +395,7 @@ public class FreteNodeDTO {
         return taxedWeight;
     }
 
-    public void setTaxedWeight(BigDecimal taxedWeight) {
+    public void setTaxedWeight(final BigDecimal taxedWeight) {
         this.taxedWeight = taxedWeight;
     }
 
@@ -334,7 +403,7 @@ public class FreteNodeDTO {
         return realWeight;
     }
 
-    public void setRealWeight(BigDecimal realWeight) {
+    public void setRealWeight(final BigDecimal realWeight) {
         this.realWeight = realWeight;
     }
 
@@ -342,7 +411,7 @@ public class FreteNodeDTO {
         return totalCubicVolume;
     }
 
-    public void setTotalCubicVolume(BigDecimal totalCubicVolume) {
+    public void setTotalCubicVolume(final BigDecimal totalCubicVolume) {
         this.totalCubicVolume = totalCubicVolume;
     }
 
@@ -350,9 +419,56 @@ public class FreteNodeDTO {
         return subtotal;
     }
 
-    public void setSubtotal(BigDecimal subtotal) {
+    public void setSubtotal(final BigDecimal subtotal) {
         this.subtotal = subtotal;
     }
+
+    public Integer getServiceType() { return serviceType; }
+    public void setServiceType(final Integer serviceType) { this.serviceType = serviceType; }
+    public Boolean getInsuranceEnabled() { return insuranceEnabled; }
+    public void setInsuranceEnabled(final Boolean insuranceEnabled) { this.insuranceEnabled = insuranceEnabled; }
+    public BigDecimal getGrisSubtotal() { return grisSubtotal; }
+    public void setGrisSubtotal(final BigDecimal grisSubtotal) { this.grisSubtotal = grisSubtotal; }
+    public BigDecimal getTdeSubtotal() { return tdeSubtotal; }
+    public void setTdeSubtotal(final BigDecimal tdeSubtotal) { this.tdeSubtotal = tdeSubtotal; }
+    public String getModalCte() { return modalCte; }
+    public void setModalCte(final String modalCte) { this.modalCte = modalCte; }
+    public BigDecimal getRedispatchSubtotal() { return redispatchSubtotal; }
+    public void setRedispatchSubtotal(final BigDecimal redispatchSubtotal) { this.redispatchSubtotal = redispatchSubtotal; }
+    public BigDecimal getSuframaSubtotal() { return suframaSubtotal; }
+    public void setSuframaSubtotal(final BigDecimal suframaSubtotal) { this.suframaSubtotal = suframaSubtotal; }
+    public String getPaymentType() { return paymentType; }
+    public void setPaymentType(final String paymentType) { this.paymentType = paymentType; }
+    public String getPreviousDocumentType() { return previousDocumentType; }
+    public void setPreviousDocumentType(final String previousDocumentType) { this.previousDocumentType = previousDocumentType; }
+    public BigDecimal getProductsValue() { return productsValue; }
+    public void setProductsValue(final BigDecimal productsValue) { this.productsValue = productsValue; }
+    public BigDecimal getTrtSubtotal() { return trtSubtotal; }
+    public void setTrtSubtotal(final BigDecimal trtSubtotal) { this.trtSubtotal = trtSubtotal; }
+    public String getNfseSeries() { return nfseSeries; }
+    public void setNfseSeries(final String nfseSeries) { this.nfseSeries = nfseSeries; }
+    public Integer getNfseNumber() { return nfseNumber; }
+    public void setNfseNumber(final Integer nfseNumber) { this.nfseNumber = nfseNumber; }
+    public Long getInsuranceId() { return insuranceId; }
+    public void setInsuranceId(final Long insuranceId) { this.insuranceId = insuranceId; }
+    public BigDecimal getOtherFees() { return otherFees; }
+    public void setOtherFees(final BigDecimal otherFees) { this.otherFees = otherFees; }
+    public BigDecimal getKm() { return km; }
+    public void setKm(final BigDecimal km) { this.km = km; }
+    public Integer getPaymentAccountableType() { return paymentAccountableType; }
+    public void setPaymentAccountableType(final Integer paymentAccountableType) { this.paymentAccountableType = paymentAccountableType; }
+    public BigDecimal getInsuredValue() { return insuredValue; }
+    public void setInsuredValue(final BigDecimal insuredValue) { this.insuredValue = insuredValue; }
+    public Boolean getGlobalized() { return globalized; }
+    public void setGlobalized(final Boolean globalized) { this.globalized = globalized; }
+    public BigDecimal getSecCatSubtotal() { return secCatSubtotal; }
+    public void setSecCatSubtotal(final BigDecimal secCatSubtotal) { this.secCatSubtotal = secCatSubtotal; }
+    public String getGlobalizedType() { return globalizedType; }
+    public void setGlobalizedType(final String globalizedType) { this.globalizedType = globalizedType; }
+    public Integer getPriceTableAccountableType() { return priceTableAccountableType; }
+    public void setPriceTableAccountableType(final Integer priceTableAccountableType) { this.priceTableAccountableType = priceTableAccountableType; }
+    public Integer getInsuranceAccountableType() { return insuranceAccountableType; }
+    public void setInsuranceAccountableType(final Integer insuranceAccountableType) { this.insuranceAccountableType = insuranceAccountableType; }
 
     @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {

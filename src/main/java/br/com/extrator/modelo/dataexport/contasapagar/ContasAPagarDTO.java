@@ -1,5 +1,10 @@
 package br.com.extrator.modelo.dataexport.contasapagar;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -105,6 +110,8 @@ public class ContasAPagarDTO {
     // RECONCILIAÇÃO
     @JsonProperty("ant_ils_atn_reconciled")
     private Boolean reconciled;
+
+    private final Map<String, Object> otherProperties = new LinkedHashMap<>();
     
     // CONSTRUTOR VAZIO
     public ContasAPagarDTO() {}
@@ -325,5 +332,48 @@ public class ContasAPagarDTO {
     
     public void setReconciled(final Boolean reconciled) {
         this.reconciled = reconciled;
+    }
+
+    @JsonAnySetter
+    public void add(final String key, final Object value) {
+        this.otherProperties.put(key, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getAllProperties() {
+        final Map<String, Object> all = new LinkedHashMap<>();
+        all.put("ant_ils_sequence_code", sequenceCode);
+        all.put("document", documentNumber);
+        all.put("issue_date", issueDate);
+        all.put("type", type);
+        all.put("value", originalValue);
+        all.put("interest_value", interestValue);
+        all.put("discount_value", discountValue);
+        all.put("value_to_pay", valueToPay);
+        all.put("paid", paid);
+        all.put("paid_value", paidValue);
+        all.put("competence_month", competenceMonth);
+        all.put("competence_year", competenceYear);
+        all.put("created_at", createdAt);
+        all.put("ant_ils_atn_liquidation_date", liquidationDate);
+        all.put("ant_ils_atn_transaction_date", transactionDate);
+        all.put("ant_rir_name", providerName);
+        all.put("ant_crn_psn_nickname", branchName);
+        all.put("ant_ces_acr_name", costCenterName);
+        all.put("ant_ces_value", costCenterValue);
+        all.put("ant_ils_pas_ant_classification", accountingClassification);
+        all.put("ant_ils_pas_ant_name", accountingDescription);
+        all.put("ant_ils_pas_value", accountingValue);
+        all.put("ant_aln_name", launchAreaName);
+        all.put("ant_ils_comments", comments);
+        all.put("ant_ils_expense_description", expenseDescription);
+        all.put("ant_uer_name", userName);
+        all.put("ant_ils_atn_reconciled", reconciled);
+        if (otherProperties != null && !otherProperties.isEmpty()) {
+            for (final Map.Entry<String, Object> e : otherProperties.entrySet()) {
+                all.putIfAbsent(e.getKey(), e.getValue());
+            }
+        }
+        return all;
     }
 }

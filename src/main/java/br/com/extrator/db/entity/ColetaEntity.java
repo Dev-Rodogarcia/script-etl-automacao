@@ -42,6 +42,21 @@ public class ColetaEntity {
     private Long manifestItemPickId;
     private Long vehicleTypeId;
 
+    private String cancellationReason;
+    private Long cancellationUserId;
+    private Long cargoClassificationId;
+    private Long costCenterId;
+    private String destroyReason;
+    private Long destroyUserId;
+    private BigDecimal invoicesCubedWeight;
+    private String lunchBreakEndHour;
+    private String lunchBreakStartHour;
+    private String notificationEmail;
+    private String notificationPhone;
+    private Long pickTypeId;
+    private Long pickupLocationId;
+    private String statusUpdatedAt;
+
     // --- Coluna de Metadados ---
     private String metadata;
 
@@ -119,7 +134,7 @@ public class ColetaEntity {
         return clienteId;
     }
 
-    public void setClienteId(Long clienteId) {
+    public void setClienteId(final Long clienteId) {
         this.clienteId = clienteId;
     }
 
@@ -127,7 +142,7 @@ public class ColetaEntity {
         return clienteNome;
     }
 
-    public void setClienteNome(String clienteNome) {
+    public void setClienteNome(final String clienteNome) {
         this.clienteNome = clienteNome;
     }
 
@@ -135,7 +150,7 @@ public class ColetaEntity {
         return localColeta;
     }
 
-    public void setLocalColeta(String localColeta) {
+    public void setLocalColeta(final String localColeta) {
         this.localColeta = localColeta;
     }
 
@@ -143,7 +158,7 @@ public class ColetaEntity {
         return cidadeColeta;
     }
 
-    public void setCidadeColeta(String cidadeColeta) {
+    public void setCidadeColeta(final String cidadeColeta) {
         this.cidadeColeta = cidadeColeta;
     }
 
@@ -151,7 +166,7 @@ public class ColetaEntity {
         return ufColeta;
     }
 
-    public void setUfColeta(String ufColeta) {
+    public void setUfColeta(final String ufColeta) {
         this.ufColeta = ufColeta;
     }
 
@@ -159,7 +174,7 @@ public class ColetaEntity {
         return usuarioId;
     }
 
-    public void setUsuarioId(Long usuarioId) {
+    public void setUsuarioId(final Long usuarioId) {
         this.usuarioId = usuarioId;
     }
 
@@ -167,7 +182,7 @@ public class ColetaEntity {
         return usuarioNome;
     }
 
-    public void setUsuarioNome(String usuarioNome) {
+    public void setUsuarioNome(final String usuarioNome) {
         this.usuarioNome = usuarioNome;
     }
 
@@ -175,7 +190,7 @@ public class ColetaEntity {
         return requestHour;
     }
 
-    public void setRequestHour(String requestHour) {
+    public void setRequestHour(final String requestHour) {
         this.requestHour = requestHour;
     }
 
@@ -183,7 +198,7 @@ public class ColetaEntity {
         return serviceStartHour;
     }
 
-    public void setServiceStartHour(String serviceStartHour) {
+    public void setServiceStartHour(final String serviceStartHour) {
         this.serviceStartHour = serviceStartHour;
     }
 
@@ -191,7 +206,7 @@ public class ColetaEntity {
         return finishDate;
     }
 
-    public void setFinishDate(LocalDate finishDate) {
+    public void setFinishDate(final LocalDate finishDate) {
         this.finishDate = finishDate;
     }
 
@@ -199,7 +214,7 @@ public class ColetaEntity {
         return serviceEndHour;
     }
 
-    public void setServiceEndHour(String serviceEndHour) {
+    public void setServiceEndHour(final String serviceEndHour) {
         this.serviceEndHour = serviceEndHour;
     }
 
@@ -207,7 +222,7 @@ public class ColetaEntity {
         return requester;
     }
 
-    public void setRequester(String requester) {
+    public void setRequester(final String requester) {
         this.requester = requester;
     }
 
@@ -215,7 +230,7 @@ public class ColetaEntity {
         return taxedWeight;
     }
 
-    public void setTaxedWeight(BigDecimal taxedWeight) {
+    public void setTaxedWeight(final BigDecimal taxedWeight) {
         this.taxedWeight = taxedWeight;
     }
 
@@ -223,7 +238,7 @@ public class ColetaEntity {
         return comments;
     }
 
-    public void setComments(String comments) {
+    public void setComments(final String comments) {
         this.comments = comments;
     }
 
@@ -231,7 +246,7 @@ public class ColetaEntity {
         return agentId;
     }
 
-    public void setAgentId(Long agentId) {
+    public void setAgentId(final Long agentId) {
         this.agentId = agentId;
     }
 
@@ -239,7 +254,7 @@ public class ColetaEntity {
         return manifestItemPickId;
     }
 
-    public void setManifestItemPickId(Long manifestItemPickId) {
+    public void setManifestItemPickId(final Long manifestItemPickId) {
         this.manifestItemPickId = manifestItemPickId;
     }
 
@@ -247,7 +262,7 @@ public class ColetaEntity {
         return vehicleTypeId;
     }
 
-    public void setVehicleTypeId(Long vehicleTypeId) {
+    public void setVehicleTypeId(final Long vehicleTypeId) {
         this.vehicleTypeId = vehicleTypeId;
     }
 
@@ -257,5 +272,117 @@ public class ColetaEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(final String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public Long getCancellationUserId() {
+        return cancellationUserId;
+    }
+
+    public void setCancellationUserId(final Long cancellationUserId) {
+        this.cancellationUserId = cancellationUserId;
+    }
+
+    public Long getCargoClassificationId() {
+        return cargoClassificationId;
+    }
+
+    public void setCargoClassificationId(final Long cargoClassificationId) {
+        this.cargoClassificationId = cargoClassificationId;
+    }
+
+    public Long getCostCenterId() {
+        return costCenterId;
+    }
+
+    public void setCostCenterId(final Long costCenterId) {
+        this.costCenterId = costCenterId;
+    }
+
+    public String getDestroyReason() {
+        return destroyReason;
+    }
+
+    public void setDestroyReason(final String destroyReason) {
+        this.destroyReason = destroyReason;
+    }
+
+    public Long getDestroyUserId() {
+        return destroyUserId;
+    }
+
+    public void setDestroyUserId(final Long destroyUserId) {
+        this.destroyUserId = destroyUserId;
+    }
+
+    public BigDecimal getInvoicesCubedWeight() {
+        return invoicesCubedWeight;
+    }
+
+    public void setInvoicesCubedWeight(final BigDecimal invoicesCubedWeight) {
+        this.invoicesCubedWeight = invoicesCubedWeight;
+    }
+
+    public String getLunchBreakEndHour() {
+        return lunchBreakEndHour;
+    }
+
+    public void setLunchBreakEndHour(final String lunchBreakEndHour) {
+        this.lunchBreakEndHour = lunchBreakEndHour;
+    }
+
+    public String getLunchBreakStartHour() {
+        return lunchBreakStartHour;
+    }
+
+    public void setLunchBreakStartHour(final String lunchBreakStartHour) {
+        this.lunchBreakStartHour = lunchBreakStartHour;
+    }
+
+    public String getNotificationEmail() {
+        return notificationEmail;
+    }
+
+    public void setNotificationEmail(final String notificationEmail) {
+        this.notificationEmail = notificationEmail;
+    }
+
+    public String getNotificationPhone() {
+        return notificationPhone;
+    }
+
+    public void setNotificationPhone(final String notificationPhone) {
+        this.notificationPhone = notificationPhone;
+    }
+
+    public Long getPickTypeId() {
+        return pickTypeId;
+    }
+
+    public void setPickTypeId(final Long pickTypeId) {
+        this.pickTypeId = pickTypeId;
+    }
+
+    public Long getPickupLocationId() {
+        return pickupLocationId;
+    }
+
+    public void setPickupLocationId(final Long pickupLocationId) {
+        this.pickupLocationId = pickupLocationId;
+    }
+
+    public String getStatusUpdatedAt() {
+        return statusUpdatedAt;
+    }
+
+    public void setStatusUpdatedAt(final String statusUpdatedAt) {
+        this.statusUpdatedAt = statusUpdatedAt;
     }
 }

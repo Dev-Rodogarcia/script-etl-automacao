@@ -1,337 +1,86 @@
--- ==============================================================================
--- VALIDAÇÃO DIÁRIA ESL CLOUD EXTRACTOR
--- Script SQL para validar integridade dos dados extraídos
--- ==============================================================================
+DECLARE @missing NVARCHAR(MAX);
 
-USE esl_cloud;
-
-PRINT '===============================================================================';
-PRINT '                    VALIDAÇÃO DIÁRIA - ESL CLOUD EXTRACTOR';
-PRINT '                           ' + CONVERT(VARCHAR, GETDATE(), 120);
-PRINT '===============================================================================';
-PRINT '';
-
--- ==============================================================================
--- 1. RESUMO GERAL DOS DADOS
--- ==============================================================================
-
-PRINT '📊 RESUMO GERAL DOS DADOS:';
-PRINT '';
-
-SELECT 
-    'cotacoes' as tabela,
-    COUNT(*) as total_registros,
-    COUNT(DISTINCT data_referencia) as dias_distintos,
-    MIN(data_referencia) as data_mais_antiga,
-    MAX(data_referencia) as data_mais_recente
-FROM cotacoes
-UNION ALL
-SELECT 
-    'coletas' as tabela,
-    COUNT(*) as total_registros,
-    COUNT(DISTINCT data_referencia) as dias_distintos,
-    MIN(data_referencia) as data_mais_antiga,
-    MAX(data_referencia) as data_mais_recente
-FROM coletas
-UNION ALL
-SELECT 
-    'ocorrencias' as tabela,
-    COUNT(*) as total_registros,
-    COUNT(DISTINCT CAST(created_at AS DATE)) as dias_distintos,
-    MIN(CAST(created_at AS DATE)) as data_mais_antiga,
-    MAX(CAST(created_at AS DATE)) as data_mais_recente
-FROM ocorrencias
-UNION ALL
-SELECT 
-    'manifestos' as tabela,
-    COUNT(*) as total_registros,
-    COUNT(DISTINCT CAST(data_extracao AS DATE)) as dias_distintos,
-    MIN(CAST(data_extracao AS DATE)) as data_mais_antiga,
-    MAX(CAST(data_extracao AS DATE)) as data_mais_recente
-FROM manifestos;
-
-PRINT '';
-
--- ==============================================================================
--- 2. VALIDAÇÃO CONTRA LOG_EXTRACOES (FONTE DE VERDADE)
--- ==============================================================================
-
-PRINT '🔍 VALIDAÇÃO CONTRA LOG_EXTRACOES:';
-PRINT '';
-
--- Buscar última extração de cada tipo
-WITH ultima_extracao AS (
-    SELECT 
-        tipo_extracao,
-        MAX(data_extracao) as ultima_data,
-        data_referencia,
-        registros_extraidos
-    FROM log_extracoes 
-    WHERE status = 'SUCESSO'
-    GROUP BY tipo_extracao, data_referencia, registros_extraidos
-),
-contagens_banco AS (
-    SELECT 'cotacoes' as tipo, COUNT(*) as total FROM cotacoes
+WITH expected AS (
+    SELECT 'cotacoes' AS tabela, v.col AS coluna FROM (VALUES
+        ('sequence_code'),('requested_at'),('operation_type'),('customer_doc'),('customer_name'),
+        ('origin_city'),('origin_state'),('destination_city'),('destination_state'),('price_table'),
+        ('volumes'),('taxed_weight'),('invoices_value'),('total_value'),('user_name'),
+        ('branch_nickname'),('company_name'),('requester_name'),('real_weight'),('origin_postal_code'),
+        ('destination_postal_code'),('customer_nickname'),('sender_document'),('sender_nickname'),
+        ('receiver_document'),('receiver_nickname'),('disapprove_comments'),('freight_comments'),
+        ('discount_subtotal'),('itr_subtotal'),('tde_subtotal'),('collect_subtotal'),('delivery_subtotal'),
+        ('other_fees'),('cte_issued_at'),('nfse_issued_at'),('metadata'),('data_extracao')
+    ) AS v(col)
     UNION ALL
-    SELECT 'coletas' as tipo, COUNT(*) as total FROM coletas  
+    SELECT 'fretes', v.col FROM (VALUES
+        ('id'),('servico_em'),('criado_em'),('status'),('modal'),('tipo_frete'),('valor_total'),('valor_notas'),('peso_notas'),
+        ('id_corporacao'),('id_cidade_destino'),('data_previsao_entrega'),('pagador_id'),('pagador_nome'),('remetente_id'),('remetente_nome'),
+        ('origem_cidade'),('origem_uf'),('destinatario_id'),('destinatario_nome'),('destino_cidade'),('destino_uf'),('filial_nome'),
+        ('numero_nota_fiscal'),('tabela_preco_nome'),('classificacao_nome'),('centro_custo_nome'),('usuario_nome'),('reference_number'),
+        ('chave_cte'),('numero_cte'),('serie_cte'),('invoices_total_volumes'),('taxed_weight'),('real_weight'),('total_cubic_volume'),
+        ('subtotal'),
+        ('service_type'),('insurance_enabled'),('gris_subtotal'),('tde_subtotal'),('modal_cte'),('redispatch_subtotal'),('suframa_subtotal'),('payment_type'),('previous_document_type'),
+        ('products_value'),('trt_subtotal'),('nfse_series'),('nfse_number'),('insurance_id'),('other_fees'),('km'),('payment_accountable_type'),('insured_value'),('globalized'),('sec_cat_subtotal'),('globalized_type'),('price_table_accountable_type'),('insurance_accountable_type'),
+        ('metadata'),('data_extracao')
+    ) AS v(col)
     UNION ALL
-    SELECT 'ocorrencias' as tipo, COUNT(*) as total FROM ocorrencias
+    SELECT 'coletas', v.col FROM (VALUES
+        ('id'),('sequence_code'),('request_date'),('service_date'),('status'),('total_value'),('total_weight'),('total_volumes'),
+        ('cliente_id'),('cliente_nome'),('local_coleta'),('cidade_coleta'),('uf_coleta'),('usuario_id'),('usuario_nome'),
+        ('request_hour'),('service_start_hour'),('finish_date'),('service_end_hour'),('requester'),('taxed_weight'),('comments'),
+        ('agent_id'),('manifest_item_pick_id'),('vehicle_type_id'),('cancellation_reason'),('cancellation_user_id'),('cargo_classification_id'),
+        ('cost_center_id'),('destroy_reason'),('destroy_user_id'),('invoices_cubed_weight'),('lunch_break_end_hour'),('lunch_break_start_hour'),
+        ('notification_email'),('notification_phone'),('pick_type_id'),('pickup_location_id'),('status_updated_at'),('metadata'),('data_extracao')
+    ) AS v(col)
     UNION ALL
-    SELECT 'manifestos' as tipo, COUNT(*) as total FROM manifestos
+    SELECT 'contas_a_pagar', v.col FROM (VALUES
+        ('sequence_code'),('document_number'),('issue_date'),('tipo_lancamento'),('valor_original'),('valor_juros'),('valor_desconto'),
+        ('valor_a_pagar'),('valor_pago'),('status_pagamento'),('mes_competencia'),('ano_competencia'),('data_criacao'),('data_liquidacao'),
+        ('data_transacao'),('nome_fornecedor'),('nome_filial'),('nome_centro_custo'),('valor_centro_custo'),('classificacao_contabil'),
+        ('descricao_contabil'),('valor_contabil'),('area_lancamento'),('observacoes'),('descricao_despesa'),('nome_usuario'),('reconciliado'),
+        ('metadata'),('data_extracao')
+    ) AS v(col)
+    UNION ALL
+    SELECT 'faturas_por_cliente', v.col FROM (VALUES
+        ('unique_id'),('valor_frete'),('valor_fatura'),('third_party_ctes_value'),('numero_cte'),('chave_cte'),('numero_nfse'),('status_cte'),
+        ('data_emissao_cte'),('numero_fatura'),('data_emissao_fatura'),('data_vencimento_fatura'),('data_baixa_fatura'),('fit_ant_ils_original_due_date'),
+        ('fit_ant_document'),('fit_ant_issue_date'),('fit_ant_value'),('filial'),('tipo_frete'),('classificacao'),('estado'),
+        ('pagador_nome'),('pagador_documento'),('remetente_nome'),('remetente_documento'),('destinatario_nome'),('destinatario_documento'),
+        ('vendedor_nome'),('notas_fiscais'),('pedidos_cliente'),('metadata'),('data_extracao')
+    ) AS v(col)
+    UNION ALL
+    SELECT 'localizacao_cargas', v.col FROM (VALUES
+        ('sequence_number'),('type'),('service_at'),('invoices_volumes'),('taxed_weight'),('invoices_value'),('total_value'),('service_type'),
+        ('branch_nickname'),('predicted_delivery_at'),('destination_location_name'),('destination_branch_nickname'),('classification'),('metadata'),('data_extracao')
+    ) AS v(col)
+    UNION ALL
+    SELECT 'manifestos', v.col FROM (VALUES
+        ('sequence_code'),('identificador_unico'),('status'),('created_at'),('departured_at'),('closed_at'),('finished_at'),('mdfe_number'),('mdfe_key'),
+        ('mdfe_status'),('distribution_pole'),('classification'),('vehicle_plate'),('vehicle_type'),('vehicle_owner'),('driver_name'),('branch_nickname'),
+        ('vehicle_departure_km'),('closing_km'),('traveled_km'),('invoices_count'),('invoices_volumes'),('invoices_weight'),('total_taxed_weight'),
+        ('total_cubic_volume'),('invoices_value'),('manifest_freights_total'),('pick_sequence_code'),('contract_number'),('contract_type'),
+        ('calculation_type'),('cargo_type'),('daily_subtotal'),('total_cost'),('freight_subtotal'),('fuel_subtotal'),('toll_subtotal'),('driver_services_total'),
+        ('operational_expenses_total'),('inss_value'),('sest_senat_value'),('ir_value'),('paying_total'),('manual_km'),('generate_mdfe'),('monitoring_request'),
+        ('uniq_destinations_count'),('mobile_read_at'),('km'),('manifest_items_count'),('finalized_manifest_items_count'),('metadata'),('data_extracao')
+    ) AS v(col)
+), actual AS (
+    SELECT LOWER(TABLE_NAME) AS tabela, LOWER(COLUMN_NAME) AS coluna
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'dbo'
+), missing AS (
+    SELECT e.tabela, e.coluna
+    FROM expected e
+    LEFT JOIN actual a ON a.tabela = e.tabela AND a.coluna = e.coluna
+    WHERE a.coluna IS NULL
 )
-SELECT 
-    COALESCE(l.tipo_extracao, c.tipo) as tipo_dados,
-    COALESCE(l.registros_extraidos, 0) as log_extracoes,
-    COALESCE(c.total, 0) as banco_atual,
-    CASE 
-        WHEN l.registros_extraidos = c.total THEN '✅ OK'
-        WHEN l.registros_extraidos > c.total THEN '⚠️ BANCO MENOR'
-        WHEN l.registros_extraidos < c.total THEN '⚠️ BANCO MAIOR'
-        ELSE '❌ SEM DADOS'
-    END as status_validacao,
-    ABS(COALESCE(l.registros_extraidos, 0) - COALESCE(c.total, 0)) as diferenca
-FROM ultima_extracao l
-FULL OUTER JOIN contagens_banco c ON l.tipo_extracao = c.tipo
-ORDER BY tipo_dados;
+SELECT @missing = STRING_AGG(e.tabela + '.' + e.coluna, ', ') FROM missing e;
 
-PRINT '';
-
--- ==============================================================================
--- 3. DETECÇÃO DE DUPLICATAS
--- ==============================================================================
-
-PRINT '🔍 VERIFICAÇÃO DE DUPLICATAS:';
-PRINT '';
-
--- Cotações duplicadas
-SELECT 'cotacoes' as tabela, COUNT(*) as duplicatas_encontradas
-FROM (
-    SELECT codigo_produto, data_referencia, COUNT(*) as qtd
-    FROM cotacoes
-    GROUP BY codigo_produto, data_referencia
-    HAVING COUNT(*) > 1
-) dup_cotacoes
-
-UNION ALL
-
--- Coletas duplicadas  
-SELECT 'coletas' as tabela, COUNT(*) as duplicatas_encontradas
-FROM (
-    SELECT codigo_produto, data_referencia, COUNT(*) as qtd
-    FROM coletas
-    GROUP BY codigo_produto, data_referencia
-    HAVING COUNT(*) > 1
-) dup_coletas
-
-UNION ALL
-
--- Ocorrências duplicadas
-SELECT 'ocorrencias' as tabela, COUNT(*) as duplicatas_encontradas
-FROM (
-    SELECT id_ocorrencia, COUNT(*) as qtd
-    FROM ocorrencias
-    GROUP BY id_ocorrencia
-    HAVING COUNT(*) > 1
-) dup_ocorrencias
-
-UNION ALL
-
--- Manifestos duplicados (por sequence_code)
-SELECT 'manifestos' as tabela, COUNT(*) as duplicatas_encontradas
-FROM (
-    SELECT sequence_code, COUNT(*) as qtd
-    FROM manifestos
-    GROUP BY sequence_code
-    HAVING COUNT(*) > 1
-) dup_manifestos;
-
-PRINT '';
-
--- ==============================================================================
--- 4. ANÁLISE DE VOLUME POR DIA (ÚLTIMOS 7 DIAS)
--- ==============================================================================
-
-PRINT '📈 VOLUME DOS ÚLTIMOS 7 DIAS:';
-PRINT '';
-
--- Cotações por dia
-SELECT 
-    'cotacoes' as tipo,
-    data_referencia,
-    COUNT(*) as registros,
-    CASE 
-        WHEN COUNT(*) < 50 THEN '⚠️ BAIXO'
-        WHEN COUNT(*) > 500 THEN '⚠️ ALTO'
-        ELSE '✅ NORMAL'
-    END as status_volume
-FROM cotacoes
-WHERE data_referencia >= DATEADD(day, -7, GETDATE())
-GROUP BY data_referencia
-
-UNION ALL
-
--- Coletas por dia
-SELECT 
-    'coletas' as tipo,
-    data_referencia,
-    COUNT(*) as registros,
-    CASE 
-        WHEN COUNT(*) < 30 THEN '⚠️ BAIXO'
-        WHEN COUNT(*) > 300 THEN '⚠️ ALTO'
-        ELSE '✅ NORMAL'
-    END as status_volume
-FROM coletas
-WHERE data_referencia >= DATEADD(day, -7, GETDATE())
-GROUP BY data_referencia
-
-UNION ALL
-
--- Ocorrências por dia
-SELECT 
-    'ocorrencias' as tipo,
-    CAST(created_at AS DATE) as data_referencia,
-    COUNT(*) as registros,
-    CASE 
-        WHEN COUNT(*) < 10 THEN '⚠️ BAIXO'
-        WHEN COUNT(*) > 100 THEN '⚠️ ALTO'
-        ELSE '✅ NORMAL'
-    END as status_volume
-FROM ocorrencias
-WHERE created_at >= DATEADD(day, -7, GETDATE())
-GROUP BY CAST(created_at AS DATE)
-
-UNION ALL
-
--- Manifestos por dia
-SELECT 
-    'manifestos' as tipo,
-    CAST(data_extracao AS DATE) as data_referencia,
-    COUNT(*) as registros,
-    CASE 
-        WHEN COUNT(*) < 50 THEN '⚠️ BAIXO'
-        WHEN COUNT(*) > 500 THEN '⚠️ ALTO'
-        ELSE '✅ NORMAL'
-    END as status_volume
-FROM manifestos
-WHERE data_extracao >= DATEADD(day, -7, GETDATE())
-GROUP BY CAST(data_extracao AS DATE)
-
-ORDER BY tipo, data_referencia DESC;
-
-PRINT '';
-
--- ==============================================================================
--- 5. VERIFICAÇÃO DE DADOS INVÁLIDOS
--- ==============================================================================
-
-PRINT '🔍 VERIFICAÇÃO DE DADOS INVÁLIDOS:';
-PRINT '';
-
--- Cotações com problemas
-SELECT 'cotacoes_preco_zero' as problema, COUNT(*) as quantidade
-FROM cotacoes WHERE preco <= 0
-
-UNION ALL
-
-SELECT 'cotacoes_sem_codigo' as problema, COUNT(*) as quantidade  
-FROM cotacoes WHERE codigo_produto IS NULL OR codigo_produto = ''
-
-UNION ALL
-
--- Coletas com problemas
-SELECT 'coletas_quantidade_zero' as problema, COUNT(*) as quantidade
-FROM coletas WHERE quantidade <= 0
-
-UNION ALL
-
-SELECT 'coletas_sem_codigo' as problema, COUNT(*) as quantidade
-FROM coletas WHERE codigo_produto IS NULL OR codigo_produto = ''
-
-UNION ALL
-
--- Ocorrências com problemas
-SELECT 'ocorrencias_sem_id' as problema, COUNT(*) as quantidade
-FROM ocorrencias WHERE id_ocorrencia IS NULL
-
-UNION ALL
-
-SELECT 'ocorrencias_data_futura' as problema, COUNT(*) as quantidade
-FROM ocorrencias WHERE created_at > GETDATE()
-
-UNION ALL
-
--- Manifestos com problemas
-SELECT 'manifestos_sem_sequence_code' as problema, COUNT(*) as quantidade
-FROM manifestos WHERE sequence_code IS NULL;
-
-PRINT '';
-
--- ==============================================================================
--- 6. HISTÓRICO DE EXTRAÇÕES (ÚLTIMAS 10)
--- ==============================================================================
-
-PRINT '📋 HISTÓRICO DE EXTRAÇÕES (ÚLTIMAS 10):';
-PRINT '';
-
-SELECT TOP 10
-    data_extracao,
-    tipo_extracao,
-    data_referencia,
-    registros_extraidos,
-    status,
-    CASE 
-        WHEN status = 'SUCESSO' THEN '✅'
-        WHEN status = 'ERRO' THEN '❌'
-        ELSE '⚠️'
-    END as icone_status
-FROM log_extracoes
-ORDER BY data_extracao DESC;
-
-PRINT '';
-
--- ==============================================================================
--- 7. RESUMO FINAL E ALERTAS
--- ==============================================================================
-
-PRINT '🎯 RESUMO FINAL:';
-PRINT '';
-
-DECLARE @total_problemas INT = 0;
-
--- Contar problemas encontrados
-SELECT @total_problemas = (
-    -- Duplicatas
-    (SELECT COUNT(*) FROM (
-        SELECT codigo_produto, data_referencia FROM cotacoes GROUP BY codigo_produto, data_referencia HAVING COUNT(*) > 1
-    ) dup1) +
-    (SELECT COUNT(*) FROM (
-        SELECT codigo_produto, data_referencia FROM coletas GROUP BY codigo_produto, data_referencia HAVING COUNT(*) > 1  
-    ) dup2) +
-    (SELECT COUNT(*) FROM (
-        SELECT id_ocorrencia FROM ocorrencias GROUP BY id_ocorrencia HAVING COUNT(*) > 1
-    ) dup3) +
-    (SELECT COUNT(*) FROM (
-        SELECT sequence_code FROM manifestos GROUP BY sequence_code HAVING COUNT(*) > 1
-    ) dup4) +
-    -- Dados inválidos
-    (SELECT COUNT(*) FROM cotacoes WHERE preco <= 0 OR codigo_produto IS NULL OR codigo_produto = '') +
-    (SELECT COUNT(*) FROM coletas WHERE quantidade <= 0 OR codigo_produto IS NULL OR codigo_produto = '') +
-    (SELECT COUNT(*) FROM ocorrencias WHERE id_ocorrencia IS NULL OR created_at > GETDATE()) +
-    (SELECT COUNT(*) FROM manifestos WHERE sequence_code IS NULL)
-);
-
-IF @total_problemas = 0
+IF @missing IS NOT NULL AND LEN(@missing) > 0
 BEGIN
-    PRINT '✅ VALIDAÇÃO CONCLUÍDA: Nenhum problema encontrado!';
-    PRINT '✅ Sistema operando normalmente.';
+    DECLARE @msg NVARCHAR(MAX) = 'Faltam colunas: ' + @missing;
+    THROW 50001, @msg, 1;
 END
 ELSE
 BEGIN
-    PRINT '⚠️ ATENÇÃO: ' + CAST(@total_problemas AS VARCHAR) + ' problema(s) encontrado(s)!';
-    PRINT '⚠️ Revise os detalhes acima e considere executar limpeza de dados.';
+    SELECT 'OK' AS status, GETDATE() AS verificado_em;
 END
-
-PRINT '';
-PRINT '===============================================================================';
-PRINT 'Validação concluída em: ' + CONVERT(VARCHAR, GETDATE(), 120);
-PRINT '===============================================================================';

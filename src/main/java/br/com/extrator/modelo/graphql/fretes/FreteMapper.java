@@ -124,6 +124,30 @@ public class FreteMapper {
         entity.setTotalCubicVolume(dto.getTotalCubicVolume());
         entity.setSubtotal(dto.getSubtotal());
 
+        entity.setServiceType(dto.getServiceType());
+        entity.setInsuranceEnabled(dto.getInsuranceEnabled());
+        entity.setGrisSubtotal(dto.getGrisSubtotal());
+        entity.setTdeSubtotal(dto.getTdeSubtotal());
+        entity.setModalCte(dto.getModalCte());
+        entity.setRedispatchSubtotal(dto.getRedispatchSubtotal());
+        entity.setSuframaSubtotal(dto.getSuframaSubtotal());
+        entity.setPaymentType(dto.getPaymentType());
+        entity.setPreviousDocumentType(dto.getPreviousDocumentType());
+        entity.setProductsValue(dto.getProductsValue());
+        entity.setTrtSubtotal(dto.getTrtSubtotal());
+        entity.setNfseSeries(dto.getNfseSeries());
+        entity.setNfseNumber(dto.getNfseNumber());
+        entity.setInsuranceId(dto.getInsuranceId());
+        entity.setOtherFees(dto.getOtherFees());
+        entity.setKm(dto.getKm());
+        entity.setPaymentAccountableType(dto.getPaymentAccountableType());
+        entity.setInsuredValue(dto.getInsuredValue());
+        entity.setGlobalized(dto.getGlobalized());
+        entity.setSecCatSubtotal(dto.getSecCatSubtotal());
+        entity.setGlobalizedType(dto.getGlobalizedType());
+        entity.setPriceTableAccountableType(dto.getPriceTableAccountableType());
+        entity.setInsuranceAccountableType(dto.getInsuranceAccountableType());
+
         if (dto.getCte() != null) {
             entity.setChaveCte(dto.getCte().getKey());
             entity.setNumeroCte(dto.getCte().getNumber());
