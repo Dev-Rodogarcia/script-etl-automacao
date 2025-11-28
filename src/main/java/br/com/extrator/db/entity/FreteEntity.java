@@ -49,12 +49,14 @@ public class FreteEntity {
     private Integer invoicesTotalVolumes;
     private BigDecimal taxedWeight;
     private BigDecimal realWeight;
+    private BigDecimal cubagesCubedWeight;
     private BigDecimal totalCubicVolume;
     private BigDecimal subtotal;
 
     private String chaveCte;
     private Integer numeroCte;
     private Integer serieCte;
+    private OffsetDateTime cteIssuedAt;
 
     private Integer serviceType;
     private Boolean insuranceEnabled;
@@ -67,6 +69,10 @@ public class FreteEntity {
     private String previousDocumentType;
     private BigDecimal productsValue;
     private BigDecimal trtSubtotal;
+    private BigDecimal freightWeightSubtotal;
+    private BigDecimal adValoremSubtotal;
+    private BigDecimal tollSubtotal;
+    private BigDecimal itrSubtotal;
     private String nfseSeries;
     private Integer nfseNumber;
     private Long insuranceId;
@@ -79,6 +85,17 @@ public class FreteEntity {
     private String globalizedType;
     private Integer priceTableAccountableType;
     private Integer insuranceAccountableType;
+
+    private String filialCnpj;
+    private String remetenteDocumento;
+    private String destinatarioDocumento;
+    private String pagadorDocumento;
+
+    private String fiscalCstType;
+    private String fiscalCfopCode;
+    private BigDecimal fiscalTaxValue;
+    private BigDecimal fiscalPisValue;
+    private BigDecimal fiscalCofinsValue;
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -343,6 +360,14 @@ public class FreteEntity {
         this.realWeight = realWeight;
     }
 
+    public BigDecimal getCubagesCubedWeight() {
+        return cubagesCubedWeight;
+    }
+
+    public void setCubagesCubedWeight(BigDecimal cubagesCubedWeight) {
+        this.cubagesCubedWeight = cubagesCubedWeight;
+    }
+
     public BigDecimal getTotalCubicVolume() {
         return totalCubicVolume;
     }
@@ -383,6 +408,9 @@ public class FreteEntity {
         this.serieCte = serieCte;
     }
 
+    public OffsetDateTime getCteIssuedAt() { return cteIssuedAt; }
+    public void setCteIssuedAt(final OffsetDateTime cteIssuedAt) { this.cteIssuedAt = cteIssuedAt; }
+
     public Integer getServiceType() { return serviceType; }
     public void setServiceType(final Integer serviceType) { this.serviceType = serviceType; }
     public Boolean getInsuranceEnabled() { return insuranceEnabled; }
@@ -405,6 +433,15 @@ public class FreteEntity {
     public void setProductsValue(final BigDecimal productsValue) { this.productsValue = productsValue; }
     public BigDecimal getTrtSubtotal() { return trtSubtotal; }
     public void setTrtSubtotal(final BigDecimal trtSubtotal) { this.trtSubtotal = trtSubtotal; }
+
+    public BigDecimal getFreightWeightSubtotal() { return freightWeightSubtotal; }
+    public void setFreightWeightSubtotal(final BigDecimal freightWeightSubtotal) { this.freightWeightSubtotal = freightWeightSubtotal; }
+    public BigDecimal getAdValoremSubtotal() { return adValoremSubtotal; }
+    public void setAdValoremSubtotal(final BigDecimal adValoremSubtotal) { this.adValoremSubtotal = adValoremSubtotal; }
+    public BigDecimal getTollSubtotal() { return tollSubtotal; }
+    public void setTollSubtotal(final BigDecimal tollSubtotal) { this.tollSubtotal = tollSubtotal; }
+    public BigDecimal getItrSubtotal() { return itrSubtotal; }
+    public void setItrSubtotal(final BigDecimal itrSubtotal) { this.itrSubtotal = itrSubtotal; }
     public String getNfseSeries() { return nfseSeries; }
     public void setNfseSeries(final String nfseSeries) { this.nfseSeries = nfseSeries; }
     public Integer getNfseNumber() { return nfseNumber; }
@@ -429,6 +466,26 @@ public class FreteEntity {
     public void setPriceTableAccountableType(final Integer priceTableAccountableType) { this.priceTableAccountableType = priceTableAccountableType; }
     public Integer getInsuranceAccountableType() { return insuranceAccountableType; }
     public void setInsuranceAccountableType(final Integer insuranceAccountableType) { this.insuranceAccountableType = insuranceAccountableType; }
+
+    public String getFilialCnpj() { return filialCnpj; }
+    public void setFilialCnpj(final String filialCnpj) { this.filialCnpj = filialCnpj; }
+    public String getRemetenteDocumento() { return remetenteDocumento; }
+    public void setRemetenteDocumento(final String remetenteDocumento) { this.remetenteDocumento = remetenteDocumento; }
+    public String getDestinatarioDocumento() { return destinatarioDocumento; }
+    public void setDestinatarioDocumento(final String destinatarioDocumento) { this.destinatarioDocumento = destinatarioDocumento; }
+    public String getPagadorDocumento() { return pagadorDocumento; }
+    public void setPagadorDocumento(final String pagadorDocumento) { this.pagadorDocumento = pagadorDocumento; }
+
+    public String getFiscalCstType() { return fiscalCstType; }
+    public void setFiscalCstType(final String fiscalCstType) { this.fiscalCstType = fiscalCstType; }
+    public String getFiscalCfopCode() { return fiscalCfopCode; }
+    public void setFiscalCfopCode(final String fiscalCfopCode) { this.fiscalCfopCode = fiscalCfopCode; }
+    public BigDecimal getFiscalTaxValue() { return fiscalTaxValue; }
+    public void setFiscalTaxValue(final BigDecimal fiscalTaxValue) { this.fiscalTaxValue = fiscalTaxValue; }
+    public BigDecimal getFiscalPisValue() { return fiscalPisValue; }
+    public void setFiscalPisValue(final BigDecimal fiscalPisValue) { this.fiscalPisValue = fiscalPisValue; }
+    public BigDecimal getFiscalCofinsValue() { return fiscalCofinsValue; }
+    public void setFiscalCofinsValue(final BigDecimal fiscalCofinsValue) { this.fiscalCofinsValue = fiscalCofinsValue; }
 
     public String getMetadata() {
         return metadata;

@@ -91,16 +91,31 @@ public class FreteNodeDTO {
         @JsonProperty("series")
         private Integer series;
 
+        @JsonProperty("issuedAt")
+        private String issuedAt;
+
         public String getKey() { return key; }
         public void setKey(final String key) { this.key = key; }
         public Integer getNumber() { return number; }
         public void setNumber(final Integer number) { this.number = number; }
         public Integer getSeries() { return series; }
         public void setSeries(final Integer series) { this.series = series; }
+
+        public String getIssuedAt() { return issuedAt; }
+        public void setIssuedAt(final String issuedAt) { this.issuedAt = issuedAt; }
     }
 
     @JsonProperty("cte")
     private CteDTO cte;
+
+    @JsonProperty("originCity")
+    private CityDTO originCity;
+
+    @JsonProperty("destinationCity")
+    private CityDTO destinationCity;
+
+    @JsonProperty("fiscalDetail")
+    private FiscalDetailDTO fiscalDetail;
 
     // --- Campos Adicionais do CSV (22 campos mapeados) ---
     @JsonProperty("referenceNumber")
@@ -115,11 +130,26 @@ public class FreteNodeDTO {
     @JsonProperty("realWeight")
     private BigDecimal realWeight;
 
+    @JsonProperty("cubagesCubedWeight")
+    private BigDecimal cubagesCubedWeight;
+
     @JsonProperty("totalCubicVolume")
     private BigDecimal totalCubicVolume;
 
     @JsonProperty("subtotal")
     private BigDecimal subtotal;
+
+    @JsonProperty("freightWeightSubtotal")
+    private BigDecimal freightWeightSubtotal;
+
+    @JsonProperty("adValoremSubtotal")
+    private BigDecimal adValoremSubtotal;
+
+    @JsonProperty("tollSubtotal")
+    private BigDecimal tollSubtotal;
+
+    @JsonProperty("itrSubtotal")
+    private BigDecimal itrSubtotal;
 
     @JsonProperty("serviceType")
     private Integer serviceType;
@@ -373,6 +403,13 @@ public class FreteNodeDTO {
     public CteDTO getCte() { return cte; }
     public void setCte(final CteDTO cte) { this.cte = cte; }
 
+    public CityDTO getOriginCity() { return originCity; }
+    public void setOriginCity(final CityDTO originCity) { this.originCity = originCity; }
+    public CityDTO getDestinationCity() { return destinationCity; }
+    public void setDestinationCity(final CityDTO destinationCity) { this.destinationCity = destinationCity; }
+    public FiscalDetailDTO getFiscalDetail() { return fiscalDetail; }
+    public void setFiscalDetail(final FiscalDetailDTO fiscalDetail) { this.fiscalDetail = fiscalDetail; }
+
     // --- Getters e Setters para Campos Adicionais do CSV ---
 
     public String getReferenceNumber() {
@@ -407,6 +444,9 @@ public class FreteNodeDTO {
         this.realWeight = realWeight;
     }
 
+    public BigDecimal getCubagesCubedWeight() { return cubagesCubedWeight; }
+    public void setCubagesCubedWeight(final BigDecimal cubagesCubedWeight) { this.cubagesCubedWeight = cubagesCubedWeight; }
+
     public BigDecimal getTotalCubicVolume() {
         return totalCubicVolume;
     }
@@ -422,6 +462,15 @@ public class FreteNodeDTO {
     public void setSubtotal(final BigDecimal subtotal) {
         this.subtotal = subtotal;
     }
+
+    public BigDecimal getFreightWeightSubtotal() { return freightWeightSubtotal; }
+    public void setFreightWeightSubtotal(final BigDecimal freightWeightSubtotal) { this.freightWeightSubtotal = freightWeightSubtotal; }
+    public BigDecimal getAdValoremSubtotal() { return adValoremSubtotal; }
+    public void setAdValoremSubtotal(final BigDecimal adValoremSubtotal) { this.adValoremSubtotal = adValoremSubtotal; }
+    public BigDecimal getTollSubtotal() { return tollSubtotal; }
+    public void setTollSubtotal(final BigDecimal tollSubtotal) { this.tollSubtotal = tollSubtotal; }
+    public BigDecimal getItrSubtotal() { return itrSubtotal; }
+    public void setItrSubtotal(final BigDecimal itrSubtotal) { this.itrSubtotal = itrSubtotal; }
 
     public Integer getServiceType() { return serviceType; }
     public void setServiceType(final Integer serviceType) { this.serviceType = serviceType; }

@@ -15,7 +15,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução e sistema robusto de deduplicação.
 
-**Versão:** 2.2.0 | **Última Atualização:** 22/11/2025 | **Status:** ✅ Estável
+**Versão:** 2.2.1 | **Última Atualização:** 28/11/2025 | **Status:** ✅ Estável
 
 ---
 
@@ -70,6 +70,154 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **Validação Automática**: Comandos para validar integridade dos dados
 
 ---
+
+## 🆕 Novidades 2.2.1 (28/11/2025)
+
+- Fretes armazenando corretamente: ajuste no `MERGE` de `FreteRepository` (alinhamento 1–1 entre colunas e placeholders)
+- Views do Power BI revisadas e limpas:
+  - `vw_cotacoes_powerbi`: remoção de colunas duplicadas e inclusão de status de conversão e campos fiscais
+  - `vw_fretes_powerbi`: inclusão de CT-e/NFS-e, campos fiscais (CST/CFOP/ICMS/PIS/COFINS), totais e subtotais
+- Exportação CSV atualizada para usar exclusivamente as views `vw_*_powerbi`
+- Requisições HTTP com backoff exponencial e throttling mínimo de `2200ms` (retry até 5 tentativas)
+- Logs estruturados e mais verbosos para auditoria
+
+### Views para Power BI
+
+As views abaixo são criadas/atualizadas automaticamente pelo `ExportadorCSV` e refletem os campos canônicos para análise no Power BI.
+
+```sql
+-- Fretes
+CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
+SELECT
+    id AS [ID],
+    chave_cte AS [Chave CT-e],
+    numero_cte AS [Nº CT-e],
+    serie_cte AS [Série],
+    cte_issued_at AS [CT-e Emissão],
+    servico_em AS [Data frete],
+    criado_em AS [Criado em],
+    valor_total AS [Valor Total do Serviço],
+    valor_notas AS [Valor NF],
+    peso_notas AS [Kg NF],
+    subtotal AS [Valor Frete],
+    invoices_total_volumes AS [Volumes],
+    taxed_weight AS [Kg Taxado],
+    real_weight AS [Kg Real],
+    cubages_cubed_weight AS [Kg Cubado],
+    total_cubic_volume AS [M3],
+    pagador_nome AS [Pagador],
+    pagador_documento AS [Pagador Doc],
+    pagador_id AS [Pagador ID],
+    remetente_nome AS [Remetente],
+    remetente_documento AS [Remetente Doc],
+    remetente_id AS [Remetente ID],
+    origem_cidade AS [Origem],
+    origem_uf AS [UF Origem],
+    destinatario_nome AS [Destinatario],
+    destinatario_documento AS [Destinatario Doc],
+    destinatario_id AS [Destinatario ID],
+    destino_cidade AS [Destino],
+    destino_uf AS [UF Destino],
+    filial_nome AS [Filial],
+    filial_cnpj AS [Filial CNPJ],
+    tabela_preco_nome AS [Tabela de Preço],
+    classificacao_nome AS [Classificação],
+    centro_custo_nome AS [Centro de Custo],
+    usuario_nome AS [Usuário],
+    numero_nota_fiscal AS [NF],
+    reference_number AS [Referência],
+    id_corporacao AS [Corp ID],
+    id_cidade_destino AS [Cidade Destino ID],
+    data_previsao_entrega AS [Previsão de Entrega],
+    modal AS [Modal],
+    status AS [Status],
+    tipo_frete AS [Tipo Frete],
+    service_type AS [Service Type],
+    insurance_enabled AS [Seguro Habilitado],
+    gris_subtotal AS [GRIS],
+    tde_subtotal AS [TDE],
+    freight_weight_subtotal AS [Frete Peso],
+    ad_valorem_subtotal AS [Ad Valorem],
+    toll_subtotal AS [Pedágio],
+    itr_subtotal AS [ITR],
+    modal_cte AS [Modal CT-e],
+    redispatch_subtotal AS [Redispatch],
+    suframa_subtotal AS [SUFRAMA],
+    payment_type AS [Tipo Pagamento],
+    previous_document_type AS [Doc Anterior],
+    products_value AS [Valor Produtos],
+    trt_subtotal AS [TRT],
+    fiscal_cst_type AS [ICMS CST],
+    fiscal_cfop_code AS [CFOP],
+    fiscal_tax_value AS [Valor ICMS],
+    fiscal_pis_value AS [Valor PIS],
+    fiscal_cofins_value AS [Valor COFINS],
+    nfse_series AS [Série NFS-e],
+    nfse_number AS [Nº NFS-e],
+    insurance_id AS [Seguro ID],
+    other_fees AS [Outras Tarifas],
+    km AS [KM],
+    payment_accountable_type AS [Tipo Contábil Pagamento],
+    insured_value AS [Valor Segurado],
+    globalized AS [Globalizado],
+    sec_cat_subtotal AS [SEC/CAT],
+    globalized_type AS [Tipo Globalizado],
+    price_table_accountable_type AS [Tipo Contábil Tabela],
+    insurance_accountable_type AS [Tipo Contábil Seguro],
+    metadata AS [Metadata],
+    data_extracao AS [Data de extracao]
+FROM dbo.fretes;
+```
+
+```sql
+-- Cotações
+CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
+SELECT
+    sequence_code AS [N° Cotação],
+    requested_at AS [Data Cotação],
+    branch_nickname AS [Filial],
+    requester_name AS [Solicitante],
+    customer_name AS [Cliente Pagador],
+    customer_doc AS [CNPJ/CPF Cliente],
+    origin_city AS [Cidade Origem],
+    origin_state AS [UF Origem],
+    destination_city AS [Cidade Destino],
+    destination_state AS [UF Destino],
+    volumes AS [Volume],
+    real_weight AS [Peso real],
+    taxed_weight AS [Peso taxado],
+    invoices_value AS [Valor NF],
+    total_value AS [Valor frete],
+    price_table AS [Tabela],
+    user_name AS [Usuário],
+    company_name AS [Empresa],
+    operation_type AS [Tipo de operação],
+    origin_postal_code AS [CEP Origem],
+    destination_postal_code AS [CEP Destino],
+    metadata AS [Metadata],
+    data_extracao AS [Data de extracao],
+    CASE
+      WHEN cte_issued_at IS NOT NULL OR nfse_issued_at IS NOT NULL THEN 'Convertida'
+      WHEN disapprove_comments IS NOT NULL AND LEN(disapprove_comments) > 0 THEN 'Reprovada'
+      ELSE 'Pendente'
+    END AS [Status Conversão],
+    disapprove_comments AS [Motivo Perda],
+    freight_comments AS [Observações para o frete],
+    cte_issued_at AS [CT-e/Data de emissão],
+    nfse_issued_at AS [Nfse/Data de emissão],
+    customer_nickname AS [Pagador/Nome fantasia],
+    sender_document AS [Remetente/CNPJ],
+    sender_nickname AS [Remetente/Nome fantasia],
+    receiver_document AS [Destinatário/CNPJ],
+    receiver_nickname AS [Destinatário/Nome fantasia],
+    discount_subtotal AS [Descontos/Subtotal parcelas],
+    itr_subtotal AS [Trechos/ITR],
+    tde_subtotal AS [Trechos/TDE],
+    collect_subtotal AS [Trechos/Coleta],
+    delivery_subtotal AS [Trechos/Entrega],
+    other_fees AS [Trechos/Outros valores]
+FROM dbo.cotacoes;
+```
 
 ## 🏗️ Arquitetura do Sistema
 
@@ -1188,6 +1336,8 @@ $env:DB_PASSWORD="sua_senha"
 # Exportar CSV
 06-exportar_csv.bat
 ```
+
+- As views `vw_fretes_powerbi` e `vw_cotacoes_powerbi` são criadas/alteradas automaticamente ao exportar e consolidam apenas os campos canônicos (sem duplicidades)
 
 #### Opção 2: Linha de Comando
 

@@ -57,35 +57,61 @@ public class FreteMapper {
         if (dto.getPayer() != null) {
             entity.setPagadorId(dto.getPayer().getId());
             entity.setPagadorNome(dto.getPayer().getName());
+            final String pagadorDoc = dto.getPayer().getCnpj() != null && !dto.getPayer().getCnpj().isBlank()
+                ? dto.getPayer().getCnpj()
+                : dto.getPayer().getCpf();
+            entity.setPagadorDocumento(pagadorDoc);
         }
 
         if (dto.getSender() != null) {
             entity.setRemetenteId(dto.getSender().getId());
             entity.setRemetenteNome(dto.getSender().getName());
-            if (dto.getSender().getMainAddress() != null && 
-                dto.getSender().getMainAddress().getCity() != null) {
-                entity.setOrigemCidade(dto.getSender().getMainAddress().getCity().getName());
-                if (dto.getSender().getMainAddress().getCity().getState() != null) {
-                    entity.setOrigemUf(dto.getSender().getMainAddress().getCity().getState().getCode());
-                }
+            final String remetenteDoc = dto.getSender().getCnpj() != null && !dto.getSender().getCnpj().isBlank()
+                ? dto.getSender().getCnpj()
+                : dto.getSender().getCpf();
+            entity.setRemetenteDocumento(remetenteDoc);
+        }
+
+        if (dto.getOriginCity() != null) {
+            entity.setOrigemCidade(dto.getOriginCity().getName());
+            if (dto.getOriginCity().getState() != null) {
+                entity.setOrigemUf(dto.getOriginCity().getState().getCode());
+            }
+        } else if (dto.getSender() != null && dto.getSender().getMainAddress() != null 
+                   && dto.getSender().getMainAddress().getCity() != null) {
+            entity.setOrigemCidade(dto.getSender().getMainAddress().getCity().getName());
+            if (dto.getSender().getMainAddress().getCity().getState() != null) {
+                entity.setOrigemUf(dto.getSender().getMainAddress().getCity().getState().getCode());
             }
         }
 
         if (dto.getReceiver() != null) {
             entity.setDestinatarioId(dto.getReceiver().getId());
             entity.setDestinatarioNome(dto.getReceiver().getName());
-            if (dto.getReceiver().getMainAddress() != null && 
-                dto.getReceiver().getMainAddress().getCity() != null) {
-                entity.setDestinoCidade(dto.getReceiver().getMainAddress().getCity().getName());
-                if (dto.getReceiver().getMainAddress().getCity().getState() != null) {
-                    entity.setDestinoUf(dto.getReceiver().getMainAddress().getCity().getState().getCode());
-                }
+            final String destinatarioDoc = dto.getReceiver().getCnpj() != null && !dto.getReceiver().getCnpj().isBlank()
+                ? dto.getReceiver().getCnpj()
+                : dto.getReceiver().getCpf();
+            entity.setDestinatarioDocumento(destinatarioDoc);
+        }
+
+        if (dto.getDestinationCity() != null) {
+            entity.setDestinoCidade(dto.getDestinationCity().getName());
+            if (dto.getDestinationCity().getState() != null) {
+                entity.setDestinoUf(dto.getDestinationCity().getState().getCode());
+            }
+        } else if (dto.getReceiver() != null && dto.getReceiver().getMainAddress() != null 
+                   && dto.getReceiver().getMainAddress().getCity() != null) {
+            entity.setDestinoCidade(dto.getReceiver().getMainAddress().getCity().getName());
+            if (dto.getReceiver().getMainAddress().getCity().getState() != null) {
+                entity.setDestinoUf(dto.getReceiver().getMainAddress().getCity().getState().getCode());
             }
         }
 
         // Mapear campos expandidos adicionais
         if (dto.getCorporation() != null) {
-            entity.setFilialNome(dto.getCorporation().getName());
+            final String apelido = dto.getCorporation().getNickname();
+            entity.setFilialNome(apelido != null && !apelido.isBlank() ? apelido : dto.getCorporation().getName());
+            entity.setFilialCnpj(dto.getCorporation().getCnpj());
         }
 
         if (dto.getFreightInvoices() != null && !dto.getFreightInvoices().isEmpty()) {
@@ -121,6 +147,7 @@ public class FreteMapper {
         entity.setInvoicesTotalVolumes(dto.getInvoicesTotalVolumes());
         entity.setTaxedWeight(dto.getTaxedWeight());
         entity.setRealWeight(dto.getRealWeight());
+        entity.setCubagesCubedWeight(dto.getCubagesCubedWeight());
         entity.setTotalCubicVolume(dto.getTotalCubicVolume());
         entity.setSubtotal(dto.getSubtotal());
 
@@ -135,6 +162,10 @@ public class FreteMapper {
         entity.setPreviousDocumentType(dto.getPreviousDocumentType());
         entity.setProductsValue(dto.getProductsValue());
         entity.setTrtSubtotal(dto.getTrtSubtotal());
+        entity.setFreightWeightSubtotal(dto.getFreightWeightSubtotal());
+        entity.setAdValoremSubtotal(dto.getAdValoremSubtotal());
+        entity.setTollSubtotal(dto.getTollSubtotal());
+        entity.setItrSubtotal(dto.getItrSubtotal());
         entity.setNfseSeries(dto.getNfseSeries());
         entity.setNfseNumber(dto.getNfseNumber());
         entity.setInsuranceId(dto.getInsuranceId());
@@ -147,6 +178,14 @@ public class FreteMapper {
         entity.setGlobalizedType(dto.getGlobalizedType());
         entity.setPriceTableAccountableType(dto.getPriceTableAccountableType());
         entity.setInsuranceAccountableType(dto.getInsuranceAccountableType());
+
+        if (dto.getFiscalDetail() != null) {
+            entity.setFiscalCstType(dto.getFiscalDetail().getCstType());
+            entity.setFiscalCfopCode(dto.getFiscalDetail().getCfopCode());
+            entity.setFiscalTaxValue(dto.getFiscalDetail().getTaxValue() != null ? java.math.BigDecimal.valueOf(dto.getFiscalDetail().getTaxValue()) : null);
+            entity.setFiscalPisValue(dto.getFiscalDetail().getPisValue() != null ? java.math.BigDecimal.valueOf(dto.getFiscalDetail().getPisValue()) : null);
+            entity.setFiscalCofinsValue(dto.getFiscalDetail().getCofinsValue() != null ? java.math.BigDecimal.valueOf(dto.getFiscalDetail().getCofinsValue()) : null);
+        }
 
         if (dto.getCte() != null) {
             entity.setChaveCte(dto.getCte().getKey());
@@ -161,6 +200,9 @@ public class FreteMapper {
             }
             if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
                 entity.setCriadoEm(OffsetDateTime.parse(dto.getCreatedAt()));
+            }
+            if (dto.getCte() != null && dto.getCte().getIssuedAt() != null && !dto.getCte().getIssuedAt().trim().isEmpty()) {
+                entity.setCteIssuedAt(OffsetDateTime.parse(dto.getCte().getIssuedAt()));
             }
             if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
                 entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));

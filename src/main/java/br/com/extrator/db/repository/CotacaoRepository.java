@@ -134,9 +134,6 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
         final String sqlView = """
                     CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
                     SELECT
-                        -- ========================================================================
-                        -- GRUPO 1: DADOS REAIS (Mapeados da tabela 'cotacoes')
-                        -- ========================================================================
                         sequence_code                                   AS [N° Cotação],
                         requested_at                                    AS [Data Cotação],
                         branch_nickname                                 AS [Filial],
@@ -158,12 +155,8 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                         operation_type                                  AS [Tipo de operação],
                         origin_postal_code                              AS [CEP Origem],
                         destination_postal_code                         AS [CEP Destino],
-                    metadata                                         AS [Metadata],
-                    data_extracao                                   AS [Data de extracao],
-
-                        -- ========================================================================
-                        -- GRUPO 2: CAMPOS DO METADATA (Extraídos do JSON 'metadata')
-                        -- ========================================================================
+                        metadata                                        AS [Metadata],
+                        data_extracao                                   AS [Data de extracao],
                         CASE
                             WHEN cte_issued_at IS NOT NULL
                                 OR nfse_issued_at IS NOT NULL
@@ -173,62 +166,21 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                             THEN 'Reprovada'
                             ELSE 'Pendente'
                         END                                             AS [Status Conversão],
-
                         disapprove_comments                             AS [Motivo Perda],
                         freight_comments                                AS [Observações para o frete],
                         cte_issued_at                                   AS [CT-e/Data de emissão],
                         nfse_issued_at                                  AS [Nfse/Data de emissão],
-
                         customer_nickname                               AS [Pagador/Nome fantasia],
-                        sender_document                                  AS [Remetente/CNPJ],
-                        sender_nickname                                  AS [Remetente/Nome fantasia],
-                        receiver_document                                AS [Destinatário/CNPJ],
-                        receiver_nickname                                AS [Destinatário/Nome fantasia],
-
+                        sender_document                                 AS [Remetente/CNPJ],
+                        sender_nickname                                 AS [Remetente/Nome fantasia],
+                        receiver_document                               AS [Destinatário/CNPJ],
+                        receiver_nickname                               AS [Destinatário/Nome fantasia],
                         discount_subtotal                               AS [Descontos/Subtotal parcelas],
                         itr_subtotal                                    AS [Trechos/ITR],
                         tde_subtotal                                    AS [Trechos/TDE],
                         collect_subtotal                                AS [Trechos/Coleta],
                         delivery_subtotal                               AS [Trechos/Entrega],
-                        other_fees                                      AS [Trechos/Outros valores],
-
-                        operation_type                                  AS [qoe_qes_fon_name],
-                        customer_doc                                    AS [qoe_cor_document],
-                        customer_name                                   AS [qoe_cor_name],
-                        origin_city                                     AS [qoe_qes_ony_name],
-                        origin_state                                    AS [qoe_qes_ony_sae_code],
-                        destination_city                                AS [qoe_qes_diy_name],
-                        destination_state                               AS [qoe_qes_diy_sae_code],
-                        price_table                                     AS [qoe_qes_cre_name],
-                        volumes                                         AS [qoe_qes_invoices_volumes],
-                        taxed_weight                                    AS [qoe_qes_taxed_weight],
-                        invoices_value                                  AS [qoe_qes_invoices_value],
-                        total_value                                     AS [qoe_qes_total],
-                        origin_postal_code                              AS [qoe_qes_origin_postal_code],
-                        destination_postal_code                         AS [qoe_qes_destination_postal_code],
-                        real_weight                                     AS [qoe_qes_real_weight],
-                        disapprove_comments                             AS [qoe_qes_disapprove_comments],
-                        freight_comments                                AS [qoe_qes_freight_comments],
-                        discount_subtotal                               AS [qoe_qes_fit_fdt_subtotal],
-                        cte_issued_at                                   AS [qoe_qes_fit_fhe_cte_issued_at],
-                        nfse_issued_at                                  AS [qoe_qes_fit_nse_issued_at],
-                        requester_name                                  AS [requester_name],
-                        itr_subtotal                                    AS [qoe_qes_itr_subtotal],
-                        tde_subtotal                                    AS [qoe_qes_tde_subtotal],
-                        collect_subtotal                                AS [qoe_qes_collect_subtotal],
-                        delivery_subtotal                               AS [qoe_qes_delivery_subtotal],
-                        other_fees                                      AS [qoe_qes_other_fees],
-                        company_name                                    AS [qoe_crn_psn_name],
-                        customer_nickname                               AS [qoe_cor_nickname],
-                        branch_nickname                                 AS [qoe_crn_psn_nickname],
-                        sender_document                                  AS [qoe_qes_sdr_document],
-                        sender_nickname                                  AS [qoe_qes_sdr_nickname],
-                        receiver_document                                AS [qoe_qes_rpt_document],
-                        receiver_nickname                                AS [qoe_qes_rpt_nickname],
-                        user_name                                       AS [qoe_uer_name],
-                        requested_at                                    AS [requested_at],
-                        sequence_code                                   AS [sequence_code]
-
+                        other_fees                                      AS [Trechos/Outros valores]
                     FROM dbo.cotacoes;
                 """;
         executarDDL(conexao, sqlView);

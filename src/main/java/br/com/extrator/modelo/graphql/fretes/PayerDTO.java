@@ -13,6 +13,12 @@ public class PayerDTO {
     @JsonProperty("name")
     private String name;
 
+    @JsonProperty("cnpj")
+    private String cnpj;
+
+    @JsonProperty("cpf")
+    private String cpf;
+
     public Long getId() {
         return id;
     }
@@ -28,5 +34,20 @@ public class PayerDTO {
     public void setName(String name) {
         this.name = name;
     }
-}
 
+    public String getCnpj() {
+        return cnpj;
+    }
+
+    public void setCnpj(String cnpj) {
+        this.cnpj = cnpj;
+    }
+
+    public String getCpf() {
+        return cpf;
+    }
+
+    public void setCpf(String cpf) {
+        this.cpf = cpf;
+    }
+}

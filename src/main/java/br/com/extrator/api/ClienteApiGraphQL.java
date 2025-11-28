@@ -322,7 +322,7 @@ public class ClienteApiGraphQL {
      */
     public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataReferencia) {
         final String query = """
-                query BuscarFretesProducaoV5_1($params: FreightInput!, $after: String) {
+                query BuscarFretes_Master_V6($params: FreightInput!, $after: String) {
                   freight(params: $params, after: $after, first: 100) {
                     edges {
                       node {
@@ -330,19 +330,20 @@ public class ClienteApiGraphQL {
                         referenceNumber
                         serviceAt
                         createdAt
-                        cte { key number series }
+                        cte { key number series issuedAt emissionType }
                         total
                         subtotal
                         invoicesValue
                         invoicesWeight
                         taxedWeight
                         realWeight
+                        cubagesCubedWeight
                         totalCubicVolume
                         invoicesTotalVolumes
                         freightInvoices { invoice { number series key value weight } }
-                        sender { id name mainAddress { city { name state { code } } } }
-                        receiver { id name mainAddress { city { name state { code } } } }
-                        payer { id name }
+                        sender { id name cnpj cpf inscricaoEstadual mainAddress { city { name state { code } } } }
+                        receiver { id name cnpj cpf inscricaoEstadual mainAddress { city { name state { code } } } }
+                        payer { id name cnpj cpf }
                         modal
                         modalCte
                         status
@@ -350,21 +351,26 @@ public class ClienteApiGraphQL {
                         serviceDate
                         serviceType
                         deliveryPredictionDate
-                        corporation { name }
+                        corporation { name nickname cnpj }
                         customerPriceTable { name }
                         freightClassification { name }
                         costCenter { name }
+                        originCity { name state { code } }
+                        destinationCity { name state { code } }
                         destinationCityId
                         corporationId
+                        freightWeightSubtotal
                         freightWeightSubtotal
                         globalized
                         globalizedType
                         grisSubtotal
+                        adValoremSubtotal
                         insuranceAccountableType
                         insuranceEnabled
                         insuranceId
                         insuredValue
                         itrSubtotal
+                        tollSubtotal
                         km
                         nfseNumber
                         nfseSeries
@@ -378,7 +384,7 @@ public class ClienteApiGraphQL {
                         secCatSubtotal
                         suframaSubtotal
                         tdeSubtotal
-                        tollSubtotal
+                        fiscalDetail { cstType cfopCode calculationBasis taxRate taxValue pisRate pisValue cofinsRate cofinsValue hasDifal }
                         trtSubtotal
                       }
                     }

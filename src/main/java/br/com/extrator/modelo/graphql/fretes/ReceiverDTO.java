@@ -13,6 +13,15 @@ public class ReceiverDTO {
     @JsonProperty("name")
     private String name;
 
+    @JsonProperty("cnpj")
+    private String cnpj;
+
+    @JsonProperty("cpf")
+    private String cpf;
+
+    @JsonProperty("inscricaoEstadual")
+    private String inscricaoEstadual;
+
     @JsonProperty("mainAddress")
     private MainAddressDTO mainAddress;
 
@@ -32,6 +41,30 @@ public class ReceiverDTO {
         this.name = name;
     }
 
+    public String getCnpj() {
+        return cnpj;
+    }
+
+    public void setCnpj(String cnpj) {
+        this.cnpj = cnpj;
+    }
+
+    public String getCpf() {
+        return cpf;
+    }
+
+    public void setCpf(String cpf) {
+        this.cpf = cpf;
+    }
+
+    public String getInscricaoEstadual() {
+        return inscricaoEstadual;
+    }
+
+    public void setInscricaoEstadual(String inscricaoEstadual) {
+        this.inscricaoEstadual = inscricaoEstadual;
+    }
+
     public MainAddressDTO getMainAddress() {
         return mainAddress;
     }
@@ -40,4 +73,3 @@ public class ReceiverDTO {
         this.mainAddress = mainAddress;
     }
 }
-
