@@ -121,6 +121,9 @@ public class ColetaNodeDTO {
     @JsonProperty("user")
     private UserDTO user;
 
+    @JsonProperty("corporation")
+    private Corporation corporation;
+
     // --- Campos Adicionais do CSV (22 campos mapeados) ---
     @JsonProperty("finishDate")
     private String finishDate; // Recebido como String YYYY-MM-DD
@@ -409,6 +412,14 @@ public class ColetaNodeDTO {
         this.user = user;
     }
 
+    public Corporation getCorporation() {
+        return corporation;
+    }
+
+    public void setCorporation(Corporation corporation) {
+        this.corporation = corporation;
+    }
+
     // --- Getters e Setters para Campos Adicionais do CSV ---
 
     public String getFinishDate() {
@@ -422,5 +433,31 @@ public class ColetaNodeDTO {
     @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {
         return otherProperties;
+    }
+
+    public static class Corporation {
+        @JsonProperty("id")
+        private Long id;
+
+        @JsonProperty("person")
+        private Person person;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public Person getPerson() { return person; }
+        public void setPerson(Person person) { this.person = person; }
+    }
+
+    public static class Person {
+        @JsonProperty("nickname")
+        private String nickname;
+
+        @JsonProperty("cnpj")
+        private String cnpj;
+
+        public String getNickname() { return nickname; }
+        public void setNickname(String nickname) { this.nickname = nickname; }
+        public String getCnpj() { return cnpj; }
+        public void setCnpj(String cnpj) { this.cnpj = cnpj; }
     }
 }

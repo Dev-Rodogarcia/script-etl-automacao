@@ -1,12 +1,15 @@
 package br.com.extrator.modelo.graphql.coletas;
 
-import br.com.extrator.db.entity.ColetaEntity;
+import java.time.LocalDate;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.time.LocalDate;
+
+import br.com.extrator.db.entity.ColetaEntity;
 
 /**
  * Mapper (Tradutor) que transforma o ColetaNodeDTO (dados brutos do GraphQL)
@@ -49,15 +52,27 @@ public class ColetaMapper {
         if (dto.getCustomer() != null) {
             entity.setClienteId(dto.getCustomer().getId());
             entity.setClienteNome(dto.getCustomer().getName());
+            entity.setClienteDoc(dto.getCustomer().getCnpj());
         }
 
         if (dto.getPickAddress() != null) {
             entity.setLocalColeta(dto.getPickAddress().getLine1());
+            entity.setNumeroColeta(dto.getSequenceCode() != null ? String.valueOf(dto.getSequenceCode()) : null);
+            entity.setBairroColeta(dto.getPickAddress().getNeighborhood());
+            entity.setCepColeta(dto.getPickAddress().getPostalCode());
             if (dto.getPickAddress().getCity() != null) {
                 entity.setCidadeColeta(dto.getPickAddress().getCity().getName());
                 if (dto.getPickAddress().getCity().getState() != null) {
                     entity.setUfColeta(dto.getPickAddress().getCity().getState().getCode());
                 }
+            }
+        }
+
+        if (dto.getCorporation() != null) {
+            entity.setFilialId(dto.getCorporation().getId());
+            if (dto.getCorporation().getPerson() != null) {
+                entity.setFilialNome(dto.getCorporation().getPerson().getNickname());
+                entity.setFilialCnpj(dto.getCorporation().getPerson().getCnpj());
             }
         }
 

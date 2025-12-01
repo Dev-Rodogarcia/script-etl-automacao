@@ -13,6 +13,9 @@ public class CustomerDTO {
     @JsonProperty("name")
     private String name;
 
+    @JsonProperty("cnpj")
+    private String cnpj;
+
     public Long getId() {
         return id;
     }
@@ -28,5 +31,12 @@ public class CustomerDTO {
     public void setName(String name) {
         this.name = name;
     }
-}
 
+    public String getCnpj() {
+        return cnpj;
+    }
+
+    public void setCnpj(String cnpj) {
+        this.cnpj = cnpj;
+    }
+}

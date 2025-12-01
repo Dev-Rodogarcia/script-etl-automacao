@@ -3,11 +3,12 @@ package br.com.extrator.comandos;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
 import br.com.extrator.util.BannerUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Comando responsável por testar uma API específica do sistema.

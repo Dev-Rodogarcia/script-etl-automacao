@@ -191,66 +191,58 @@ public class ClienteApiGraphQL {
         // Query: BuscarColetasExpandidaV2, Tipo: Pick
         final String query = """
                 query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
-                    pick(params: $params, after: $after, first: 100) {
-                        edges {
-                            cursor
-                            node {
-                                id
-                                sequenceCode
-                                requestDate
-                                requestHour
-                                serviceDate
-                                serviceStartHour
-                                finishDate
-                                serviceEndHour
-                                status
-                                requester
-                                invoicesVolumes
-                                invoicesWeight
-                                taxedWeight
-                                invoicesValue
-                                comments
-                                agentId
-                                manifestItemPickId
-                                vehicleTypeId
-                                customer {
-                                    id
-                                    name
-                                }
-                                pickAddress {
-                                    line1
-                                    city {
-                                        name
-                                        state {
-                                            code
-                                        }
-                                    }
-                                }
-                                user {
-                                    id
-                                    name
-                                }
-                                invoicesCubedWeight
-                                cancellationReason
-                                cancellationUserId
-                                cargoClassificationId
-                                costCenterId
-                                destroyReason
-                                destroyUserId
-                                lunchBreakEndHour
-                                lunchBreakStartHour
-                                notificationEmail
-                                notificationPhone
-                                pickTypeId
-                                pickupLocationId
-                                statusUpdatedAt
-                            }
+                  pick(params: $params, after: $after, first: 100) {
+                    edges {
+                      cursor
+                      node {
+                        id
+                        status
+                        requestDate
+                        serviceDate
+                        sequenceCode
+                        requestHour
+                        serviceStartHour
+                        finishDate
+                        serviceEndHour
+                        requester
+                        corporation {
+                          id
+                          person { nickname cnpj }
                         }
-                        pageInfo {
-                            hasNextPage
-                            endCursor
+                        customer { id name cnpj }
+                        pickAddress {
+                          line1
+                          number
+                          neighborhood
+                          postalCode
+                          city { name state { code } }
                         }
+                        invoicesValue
+                        invoicesWeight
+                        invoicesVolumes
+                        user { id name }
+                        comments
+                        agentId
+                        manifestItemPickId
+                        vehicleTypeId
+                        invoicesCubedWeight
+                        cancellationReason
+                        cancellationUserId
+                        cargoClassificationId
+                        costCenterId
+                        destroyReason
+                        destroyUserId
+                        lunchBreakEndHour
+                        lunchBreakStartHour
+                        notificationEmail
+                        notificationPhone
+                        pickTypeId
+                        pickupLocationId
+                        statusUpdatedAt
+                      }
                     }
+                    pageInfo { hasNextPage endCursor }
+                  }
                 }""";
 
         // Calcular dia anterior (ontem)

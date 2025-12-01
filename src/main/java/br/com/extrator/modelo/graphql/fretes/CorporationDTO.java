@@ -7,14 +7,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Conforme documentação em docs/descobertas-endpoints/fretes.md linha 152.
  */
 public class CorporationDTO {
+    @JsonProperty("id")
+    private Long id;
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("nickname")
-    private String nickname;
-
-    @JsonProperty("cnpj")
-    private String cnpj;
+    @JsonProperty("person")
+    private PersonDTO person;
 
     public String getName() {
         return name;
@@ -24,14 +23,22 @@ public class CorporationDTO {
         this.name = name;
     }
 
-    public String getNickname() {
-        return nickname;
-    }
+    public Long getId() { return id; }
+    public void setId(final Long id) { this.id = id; }
 
-    public void setNickname(final String nickname) {
-        this.nickname = nickname;
-    }
+    public PersonDTO getPerson() { return person; }
+    public void setPerson(final PersonDTO person) { this.person = person; }
 
-    public String getCnpj() { return cnpj; }
-    public void setCnpj(final String cnpj) { this.cnpj = cnpj; }
+    public static class PersonDTO {
+        @JsonProperty("nickname")
+        private String nickname;
+
+        @JsonProperty("cnpj")
+        private String cnpj;
+
+        public String getNickname() { return nickname; }
+        public void setNickname(final String nickname) { this.nickname = nickname; }
+        public String getCnpj() { return cnpj; }
+        public void setCnpj(final String cnpj) { this.cnpj = cnpj; }
+    }
 }

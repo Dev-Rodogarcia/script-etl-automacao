@@ -26,9 +26,16 @@ public class ColetaEntity {
     // --- Campos Expandidos (22 campos do CSV) ---
     private Long clienteId;
     private String clienteNome;
+    private String clienteDoc;
     private String localColeta;
+    private String numeroColeta;
     private String cidadeColeta;
+    private String bairroColeta;
     private String ufColeta;
+    private String cepColeta;
+    private Long filialId;
+    private String filialNome;
+    private String filialCnpj;
     private Long usuarioId;
     private String usuarioNome;
     private String requestHour;
@@ -146,12 +153,28 @@ public class ColetaEntity {
         this.clienteNome = clienteNome;
     }
 
+    public String getClienteDoc() {
+        return clienteDoc;
+    }
+
+    public void setClienteDoc(final String clienteDoc) {
+        this.clienteDoc = clienteDoc;
+    }
+
     public String getLocalColeta() {
         return localColeta;
     }
 
     public void setLocalColeta(final String localColeta) {
         this.localColeta = localColeta;
+    }
+
+    public String getNumeroColeta() {
+        return numeroColeta;
+    }
+
+    public void setNumeroColeta(final String numeroColeta) {
+        this.numeroColeta = numeroColeta;
     }
 
     public String getCidadeColeta() {
@@ -162,12 +185,52 @@ public class ColetaEntity {
         this.cidadeColeta = cidadeColeta;
     }
 
+    public String getBairroColeta() {
+        return bairroColeta;
+    }
+
+    public void setBairroColeta(final String bairroColeta) {
+        this.bairroColeta = bairroColeta;
+    }
+
     public String getUfColeta() {
         return ufColeta;
     }
 
     public void setUfColeta(final String ufColeta) {
         this.ufColeta = ufColeta;
+    }
+
+    public String getCepColeta() {
+        return cepColeta;
+    }
+
+    public void setCepColeta(final String cepColeta) {
+        this.cepColeta = cepColeta;
+    }
+
+    public Long getFilialId() {
+        return filialId;
+    }
+
+    public void setFilialId(final Long filialId) {
+        this.filialId = filialId;
+    }
+
+    public String getFilialNome() {
+        return filialNome;
+    }
+
+    public void setFilialNome(final String filialNome) {
+        this.filialNome = filialNome;
+    }
+
+    public String getFilialCnpj() {
+        return filialCnpj;
+    }
+
+    public void setFilialCnpj(final String filialCnpj) {
+        this.filialCnpj = filialCnpj;
     }
 
     public Long getUsuarioId() {

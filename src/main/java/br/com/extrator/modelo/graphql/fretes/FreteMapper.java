@@ -50,7 +50,9 @@ public class FreteMapper {
         entity.setValorTotal(dto.getTotalValue());
         entity.setValorNotas(dto.getInvoicesValue());
         entity.setPesoNotas(dto.getInvoicesWeight());
-        entity.setIdCorporacao(dto.getCorporationId());
+        if (dto.getCorporation() != null) {
+            entity.setIdCorporacao(dto.getCorporation().getId());
+        }
         entity.setIdCidadeDestino(dto.getDestinationCityId());
 
         // 1.1. Mapeamento dos campos expandidos (22 campos do CSV)
@@ -108,10 +110,12 @@ public class FreteMapper {
         }
 
         // Mapear campos expandidos adicionais
-        if (dto.getCorporation() != null) {
-            final String apelido = dto.getCorporation().getNickname();
-            entity.setFilialNome(apelido != null && !apelido.isBlank() ? apelido : dto.getCorporation().getName());
-            entity.setFilialCnpj(dto.getCorporation().getCnpj());
+        if (dto.getCorporation() != null && dto.getCorporation().getPerson() != null) {
+            final String apelido = dto.getCorporation().getPerson().getNickname();
+            if (apelido != null && !apelido.isBlank()) {
+                entity.setFilialNome(apelido);
+            }
+            entity.setFilialCnpj(dto.getCorporation().getPerson().getCnpj());
         }
 
         if (dto.getFreightInvoices() != null && !dto.getFreightInvoices().isEmpty()) {

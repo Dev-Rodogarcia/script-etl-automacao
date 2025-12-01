@@ -13,10 +13,10 @@ import br.com.extrator.db.entity.LogExtracaoEntity;
 import br.com.extrator.db.repository.ColetaRepository;
 import br.com.extrator.db.repository.FreteRepository;
 import br.com.extrator.db.repository.LogExtracaoRepository;
-import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.modelo.graphql.coletas.ColetaMapper;
-import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
+import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.modelo.graphql.fretes.FreteMapper;
+import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
 
 /**
  * Runner independente para a API GraphQL (Coletas e Fretes).
@@ -27,7 +27,6 @@ public final class GraphQLRunner {
 
     public static void executar(final LocalDate dataInicio) throws Exception {
         System.out.println("🔄 Executando runner GraphQL...");
-
         br.com.extrator.util.CarregadorConfig.validarConexaoBancoDados();
 
         final ClienteApiGraphQL clienteApiGraphQL = new ClienteApiGraphQL();
@@ -43,7 +42,7 @@ public final class GraphQLRunner {
 
         // Coletas
         System.out.println("\n📦 Extraindo Coletas...");
-        LocalDateTime inicioColetas = LocalDateTime.now();
+        final LocalDateTime inicioColetas = LocalDateTime.now();
         try {
             final ResultadoExtracao<ColetaNodeDTO> resultadoColetas = clienteApiGraphQL.buscarColetas(dataInicio);
             final List<ColetaNodeDTO> coletasDTO = resultadoColetas.getDados();
@@ -60,12 +59,12 @@ public final class GraphQLRunner {
             }
 
             // Registrar no log
-            String status = resultadoColetas.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-            String mensagem = resultadoColetas.isCompleto() ? 
+            final String status = resultadoColetas.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+            final String mensagem = resultadoColetas.isCompleto() ? 
                 "Extração completa" : 
                 "Extração incompleta: " + resultadoColetas.getMotivoInterrupcao();
             
-            LogExtracaoEntity logColetas = new LogExtracaoEntity(
+            final LogExtracaoEntity logColetas = new LogExtracaoEntity(
                 "coletas",
                 inicioColetas,
                 LocalDateTime.now(),
@@ -78,7 +77,7 @@ public final class GraphQLRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
-            LogExtracaoEntity logErro = new LogExtracaoEntity(
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
                 "coletas",
                 inicioColetas,
                 LocalDateTime.now(),
@@ -95,7 +94,7 @@ public final class GraphQLRunner {
 
         // Fretes
         System.out.println("\n🚛 Extraindo Fretes...");
-        LocalDateTime inicioFretes = LocalDateTime.now();
+        final LocalDateTime inicioFretes = LocalDateTime.now();
         try {
             final ResultadoExtracao<FreteNodeDTO> resultadoFretes = clienteApiGraphQL.buscarFretes(dataInicio);
             final List<FreteNodeDTO> fretesDTO = resultadoFretes.getDados();
@@ -112,12 +111,12 @@ public final class GraphQLRunner {
             }
 
             // Registrar no log
-            String status = resultadoFretes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-            String mensagem = resultadoFretes.isCompleto() ? 
+            final String status = resultadoFretes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+            final String mensagem = resultadoFretes.isCompleto() ? 
                 "Extração completa" : 
                 "Extração incompleta: " + resultadoFretes.getMotivoInterrupcao();
             
-            LogExtracaoEntity logFretes = new LogExtracaoEntity(
+            final LogExtracaoEntity logFretes = new LogExtracaoEntity(
                 "fretes",
                 inicioFretes,
                 LocalDateTime.now(),
@@ -130,7 +129,7 @@ public final class GraphQLRunner {
 
         } catch (RuntimeException | java.sql.SQLException e) {
             // Registrar erro no log
-            LogExtracaoEntity logErro = new LogExtracaoEntity(
+            final LogExtracaoEntity logErro = new LogExtracaoEntity(
                 "fretes",
                 inicioFretes,
                 LocalDateTime.now(),
@@ -146,7 +145,6 @@ public final class GraphQLRunner {
 
     public static void executar(final LocalDate dataInicio, final String entidade) throws Exception {
         System.out.println("🔄 Executando runner GraphQL...");
-
         br.com.extrator.util.CarregadorConfig.validarConexaoBancoDados();
 
         final ClienteApiGraphQL clienteApiGraphQL = new ClienteApiGraphQL();
@@ -159,12 +157,12 @@ public final class GraphQLRunner {
 
         logExtracaoRepository.criarTabelaSeNaoExistir();
 
-        final boolean executarColetas = entidade == null || entidade.isBlank() || entidade.equalsIgnoreCase("coletas");
-        final boolean executarFretes = entidade == null || entidade.isBlank() || entidade.equalsIgnoreCase("fretes");
+        final boolean executarColetas = entidade == null || entidade.isBlank() || "coletas".equalsIgnoreCase(entidade);
+        final boolean executarFretes = entidade == null || entidade.isBlank() || "fretes".equalsIgnoreCase(entidade);
 
         if (executarColetas) {
             System.out.println("\n📦 Extraindo Coletas...");
-            LocalDateTime inicioColetas = LocalDateTime.now();
+            final LocalDateTime inicioColetas = LocalDateTime.now();
             try {
                 final ResultadoExtracao<ColetaNodeDTO> resultadoColetas = clienteApiGraphQL.buscarColetas(dataInicio);
                 final List<ColetaNodeDTO> coletasDTO = resultadoColetas.getDados();
@@ -178,11 +176,11 @@ public final class GraphQLRunner {
                     registrosSalvos = coletaRepository.salvar(coletasEntities);
                     System.out.println("✓ Salvas: " + registrosSalvos + "/" + coletasDTO.size() + " coletas");
                 }
-                String status = resultadoColetas.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-                String mensagem = resultadoColetas.isCompleto() ? 
+                final String status = resultadoColetas.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+                final String mensagem = resultadoColetas.isCompleto() ? 
                     "Extração completa" : 
                     "Extração incompleta: " + resultadoColetas.getMotivoInterrupcao();
-                LogExtracaoEntity logColetas = new LogExtracaoEntity(
+                final LogExtracaoEntity logColetas = new LogExtracaoEntity(
                     "coletas",
                     inicioColetas,
                     LocalDateTime.now(),
@@ -193,7 +191,7 @@ public final class GraphQLRunner {
                 );
                 logExtracaoRepository.gravarLogExtracao(logColetas);
             } catch (RuntimeException | java.sql.SQLException e) {
-                LogExtracaoEntity logErro = new LogExtracaoEntity(
+                final LogExtracaoEntity logErro = new LogExtracaoEntity(
                     "coletas",
                     inicioColetas,
                     LocalDateTime.now(),
@@ -209,7 +207,7 @@ public final class GraphQLRunner {
 
         if (executarFretes) {
             System.out.println("\n🚛 Extraindo Fretes...");
-            LocalDateTime inicioFretes = LocalDateTime.now();
+            final LocalDateTime inicioFretes = LocalDateTime.now();
             try {
                 final ResultadoExtracao<FreteNodeDTO> resultadoFretes = clienteApiGraphQL.buscarFretes(dataInicio);
                 final List<FreteNodeDTO> fretesDTO = resultadoFretes.getDados();
@@ -223,11 +221,11 @@ public final class GraphQLRunner {
                     registrosSalvos = freteRepository.salvar(fretesEntities);
                     System.out.println("✓ Salvos: " + registrosSalvos + "/" + fretesDTO.size() + " fretes");
                 }
-                String status = resultadoFretes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
-                String mensagem = resultadoFretes.isCompleto() ? 
+                final String status = resultadoFretes.isCompleto() ? "COMPLETO" : "INCOMPLETO";
+                final String mensagem = resultadoFretes.isCompleto() ? 
                     "Extração completa" : 
                     "Extração incompleta: " + resultadoFretes.getMotivoInterrupcao();
-                LogExtracaoEntity logFretes = new LogExtracaoEntity(
+                final LogExtracaoEntity logFretes = new LogExtracaoEntity(
                     "fretes",
                     inicioFretes,
                     LocalDateTime.now(),
@@ -238,7 +236,7 @@ public final class GraphQLRunner {
                 );
                 logExtracaoRepository.gravarLogExtracao(logFretes);
             } catch (RuntimeException | java.sql.SQLException e) {
-                LogExtracaoEntity logErro = new LogExtracaoEntity(
+                final LogExtracaoEntity logErro = new LogExtracaoEntity(
                     "fretes",
                     inicioFretes,
                     LocalDateTime.now(),
@@ -252,4 +250,6 @@ public final class GraphQLRunner {
             }
         }
     }
+
+    
 }
