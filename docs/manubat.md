@@ -20,16 +20,21 @@ if not defined JAVA_HOME (
 )
 
 set "MVN_CMD="
-for /f "delims=" %%M in ('where mvn 2^>nul') do set "MVN_CMD=%%M"
-if /i "%MVN_CMD%"=="%~f0" set "MVN_CMD="
-if not defined MVN_CMD if defined MAVEN_HOME set "MVN_CMD=%MAVEN_HOME%\bin\mvn.cmd"
-if not defined MVN_CMD set "MVN_CMD=mvn"
+for /f "delims=" %%M in ('where mvn.cmd 2^>nul') do (
+  if /i not "%%~fM"=="%~f0" (
+    set "MVN_CMD=%%~fM"
+    goto :foundmvn
+  )
+)
+:foundmvn
+if not defined MVN_CMD if defined MAVEN_HOME if exist "%MAVEN_HOME%\bin\mvn.cmd" set "MVN_CMD=%MAVEN_HOME%\bin\mvn.cmd"
+if not defined MVN_CMD set "MVN_CMD=mvn.cmd"
 
 if "%~1"=="" (
   echo Nenhum objetivo informado. Executando: mvn clean package -DskipTests
-  "%MVN_CMD%" clean package -DskipTests
+  call "%MVN_CMD%" clean package -DskipTests
   exit /b %ERRORLEVEL%
 ) else (
-  "%MVN_CMD%" %*
+  call "%MVN_CMD%" %*
   exit /b %ERRORLEVEL%
 )

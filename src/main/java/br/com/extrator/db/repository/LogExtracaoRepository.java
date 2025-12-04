@@ -258,4 +258,100 @@ public class LogExtracaoRepository {
             throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_clientes", e);
         }
     }
+
+    public void criarOuAtualizarViewDimVeiculos() {
+        try (Connection conn = br.com.extrator.util.GerenciadorConexao.obterConexao()) {
+            boolean existe = false;
+            try (PreparedStatement s = conn.prepareStatement(
+                "SELECT 1 FROM sys.views WHERE name = 'vw_manifestos_powerbi' AND schema_id = SCHEMA_ID('dbo')")) {
+                try (ResultSet rs = s.executeQuery()) {
+                    if (rs.next()) existe = true;
+                }
+            }
+            final String ddl;
+            if (existe) {
+                ddl = """
+                    CREATE OR ALTER VIEW dbo.vw_dim_veiculos AS \
+                    SELECT DISTINCT UPPER(TRIM([Veículo/Placa])) AS Placa, \
+                    MAX(UPPER(TRIM([Tipo Veículo/Nome]))) AS TipoVeiculo, \
+                    MAX(UPPER(TRIM([Proprietário/Nome]))) AS Proprietario \
+                    FROM dbo.vw_manifestos_powerbi \
+                    WHERE [Veículo/Placa] IS NOT NULL AND TRIM([Veículo/Placa]) <> '' \
+                    GROUP BY UPPER(TRIM([Veículo/Placa]))""";
+            } else {
+                ddl = """
+                    CREATE OR ALTER VIEW dbo.vw_dim_veiculos AS \
+                    SELECT TOP 0 CAST(NULL AS NVARCHAR(50)) AS Placa, \
+                    CAST(NULL AS NVARCHAR(255)) AS TipoVeiculo, CAST(NULL AS NVARCHAR(255)) AS Proprietario FROM sys.objects""";
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
+            }
+            logger.info("✅ View dbo.vw_dim_veiculos criada/atualizada");
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar/atualizar view dbo.vw_dim_veiculos: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_veiculos", e);
+        }
+    }
+
+    public void criarOuAtualizarViewDimMotoristas() {
+        try (Connection conn = br.com.extrator.util.GerenciadorConexao.obterConexao()) {
+            boolean existe = false;
+            try (PreparedStatement s = conn.prepareStatement(
+                "SELECT 1 FROM sys.views WHERE name = 'vw_manifestos_powerbi' AND schema_id = SCHEMA_ID('dbo')")) {
+                try (ResultSet rs = s.executeQuery()) {
+                    if (rs.next()) existe = true;
+                }
+            }
+            final String ddl;
+            if (existe) {
+                ddl = """
+                    CREATE OR ALTER VIEW dbo.vw_dim_motoristas AS \
+                    SELECT DISTINCT UPPER(TRIM([Motorista])) AS NomeMotorista \
+                    FROM dbo.vw_manifestos_powerbi \
+                    WHERE [Motorista] IS NOT NULL AND TRIM([Motorista]) <> '' AND [Motorista] NOT LIKE '%MOTORISTA%'""";
+            } else {
+                ddl = "CREATE OR ALTER VIEW dbo.vw_dim_motoristas AS " +
+                    "SELECT TOP 0 CAST(NULL AS NVARCHAR(255)) AS NomeMotorista FROM sys.objects";
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
+            }
+            logger.info("✅ View dbo.vw_dim_motoristas criada/atualizada");
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar/atualizar view dbo.vw_dim_motoristas: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_motoristas", e);
+        }
+    }
+
+    public void criarOuAtualizarViewDimPlanoContas() {
+        try (Connection conn = br.com.extrator.util.GerenciadorConexao.obterConexao()) {
+            boolean existe = false;
+            try (PreparedStatement s = conn.prepareStatement(
+                "SELECT 1 FROM sys.views WHERE name = 'vw_contas_a_pagar_powerbi' AND schema_id = SCHEMA_ID('dbo')")) {
+                try (ResultSet rs = s.executeQuery()) {
+                    if (rs.next()) existe = true;
+                }
+            }
+            final String ddl;
+            if (existe) {
+                ddl = """
+                    CREATE OR ALTER VIEW dbo.vw_dim_planocontas AS \
+                    SELECT DISTINCT [Conta Contábil/Classificação] AS Classificacao, \
+                    UPPER(TRIM([Conta Contábil/Descrição])) AS Descricao \
+                    FROM dbo.vw_contas_a_pagar_powerbi \
+                    WHERE [Conta Contábil/Classificação] IS NOT NULL""";
+            } else {
+                ddl = "CREATE OR ALTER VIEW dbo.vw_dim_planocontas AS " +
+                    "SELECT TOP 0 CAST(NULL AS NVARCHAR(255)) AS Classificacao, CAST(NULL AS NVARCHAR(255)) AS Descricao FROM sys.objects";
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
+            }
+            logger.info("✅ View dbo.vw_dim_planocontas criada/atualizada");
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar/atualizar view dbo.vw_dim_planocontas: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_planocontas", e);
+        }
+    }
 }

@@ -494,6 +494,8 @@ public final class DataExportRunner {
                     mensagem
                 );
                 logExtracaoRepository.gravarLogExtracao(logManifestos);
+                logExtracaoRepository.criarOuAtualizarViewDimVeiculos();
+                logExtracaoRepository.criarOuAtualizarViewDimMotoristas();
             } catch (RuntimeException | java.sql.SQLException e) {
                 final LogExtracaoEntity logErro = new LogExtracaoEntity(
                     "manifestos",
@@ -663,6 +665,7 @@ public final class DataExportRunner {
                     mensagem
                 );
                 logExtracaoRepository.gravarLogExtracao(logFaturasAPagar);
+                logExtracaoRepository.criarOuAtualizarViewDimPlanoContas();
             } catch (RuntimeException | java.sql.SQLException e) {
                 final LogExtracaoEntity logErro = new LogExtracaoEntity(
                     "contas_a_pagar",
