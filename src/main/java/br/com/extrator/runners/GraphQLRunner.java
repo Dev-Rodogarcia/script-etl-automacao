@@ -141,6 +141,8 @@ public final class GraphQLRunner {
             logExtracaoRepository.gravarLogExtracao(logErro);
             throw new RuntimeException("Falha na extração de fretes", e);
         }
+        logExtracaoRepository.criarOuAtualizarViewDimFiliais();
+        logExtracaoRepository.criarOuAtualizarViewDimClientes();
     }
 
     public static void executar(final LocalDate dataInicio, final String entidade) throws Exception {
@@ -249,6 +251,8 @@ public final class GraphQLRunner {
                 throw new RuntimeException("Falha na extração de fretes", e);
             }
         }
+        logExtracaoRepository.criarOuAtualizarViewDimFiliais();
+        logExtracaoRepository.criarOuAtualizarViewDimClientes();
     }
 
     

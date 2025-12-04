@@ -163,7 +163,7 @@ public final class DataExportRunner {
                 if (cotacoesEntities.size() != cotacoesUnicas.size()) {
                     final int duplicadosRemovidos = cotacoesEntities.size() - cotacoesUnicas.size();
                     System.out.println("⚠️ Removidos " + duplicadosRemovidos + " duplicados da resposta da API antes de salvar");
-                    logger.warn("🔄 API retornou {} duplicados para cotações. Removidos antes de salvar. Total único: {}", 
+                    logger.warn("🔄 API retornou {} duplicados para cotações. Removidos antes de salvar. Total único: {}",
                         duplicadosRemovidos, cotacoesUnicas.size());
                 }
                 
@@ -422,6 +422,7 @@ public final class DataExportRunner {
             logExtracaoRepository.gravarLogExtracao(logErro);
             throw new RuntimeException("Falha na extração de faturas por cliente", e);
         }
+        logExtracaoRepository.criarOuAtualizarViewDimFiliais();
     }
 
     public static void executar(final LocalDate dataInicio, final String entidade) throws Exception {
@@ -446,11 +447,11 @@ public final class DataExportRunner {
         logExtracaoRepository.criarTabelaSeNaoExistir();
 
         final String ent = entidade == null ? "" : entidade.trim().toLowerCase();
-        final boolean executarManifestos = ent.isEmpty() || ent.equals("manifestos");
-        final boolean executarCotacoes = ent.isEmpty() || ent.equals("cotacoes") || ent.equals("cotacao");
-        final boolean executarLocalizacao = ent.isEmpty() || ent.equals("localizacao_carga") || ent.equals("localizacao_de_carga") || ent.equals("localizacao-carga") || ent.equals("localizacao de carga");
-        final boolean executarContasAPagar = ent.isEmpty() || ent.equals("contas_a_pagar") || ent.equals("contasapagar") || ent.equals("contas a pagar") || ent.equals("contas-a-pagar") || ent.equals("constas a pagar") || ent.equals("constas-a-pagar");
-        final boolean executarFaturasPorCliente = ent.isEmpty() || ent.equals("faturas_por_cliente") || ent.equals("faturasporcliente") || ent.equals("faturas por cliente") || ent.equals("faturas-por-cliente");
+        final boolean executarManifestos = ent.isEmpty() || "manifestos".equals(ent);
+        final boolean executarCotacoes = ent.isEmpty() || "cotacoes".equals(ent) || "cotacao".equals(ent);
+        final boolean executarLocalizacao = ent.isEmpty() || "localizacao_carga".equals(ent) || "localizacao_de_carga".equals(ent) || "localizacao-carga".equals(ent) || "localizacao de carga".equals(ent);
+        final boolean executarContasAPagar = ent.isEmpty() || "contas_a_pagar".equals(ent) || "contasapagar".equals(ent) || "contas a pagar".equals(ent) || "contas-a-pagar".equals(ent) || "constas a pagar".equals(ent) || "constas-a-pagar".equals(ent);
+        final boolean executarFaturasPorCliente = ent.isEmpty() || "faturas_por_cliente".equals(ent) || "faturasporcliente".equals(ent) || "faturas por cliente".equals(ent) || "faturas-por-cliente".equals(ent);
 
         if (executarManifestos) {
             System.out.println("\n🧾 Extraindo Manifestos (últimas 24h)...");
@@ -686,7 +687,8 @@ public final class DataExportRunner {
                     clienteApiDataExport.buscarFaturasPorCliente();
                 final List<FaturaPorClienteDTO> faturasPorClienteDTO = resultadoFaturasPorCliente.getDados();
                 System.out.println("✓ Extraídas: " + faturasPorClienteDTO.size() + " faturas por cliente" +
-                                  (resultadoFaturasPorCliente.isCompleto() ? "" : " (INCOMPLETO: " + resultadoFaturasPorCliente.getMotivoInterrupcao() + ")"));
+                        (resultadoFaturasPorCliente.isCompleto() ? "" : 
+                         " (INCOMPLETO: " + resultadoFaturasPorCliente.getMotivoInterrupcao() + ")"));
                 int totalUnicos = 0;
                 int registrosSalvos = 0;
                 final int registrosExtraidos = resultadoFaturasPorCliente.getRegistrosExtraidos();
@@ -709,8 +711,11 @@ public final class DataExportRunner {
                 final LogExtracaoEntity.StatusExtracao statusFinal =
                     resultadoFaturasPorCliente.isCompleto() ? LogExtracaoEntity.StatusExtracao.COMPLETO : LogExtracaoEntity.StatusExtracao.INCOMPLETO_LIMITE;
                 final String mensagem = resultadoFaturasPorCliente.isCompleto() ?
-                    ("Extração completa – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
-                    ("Extração incompleta (" + resultadoFaturasPorCliente.getMotivoInterrupcao() + ") – extraídos " + registrosExtraidos + " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
+                    ("Extração completa – extraídos " + registrosExtraidos + 
+                     " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)") :
+                    ("Extração incompleta (" + resultadoFaturasPorCliente.getMotivoInterrupcao() + 
+                     ") – extraídos " + registrosExtraidos + 
+                     " (únicos: " + totalUnicos + "), processados " + registrosSalvos + " (INSERTs + UPDATEs)");
                 final LogExtracaoEntity logFaturasPorCliente = new LogExtracaoEntity(
                     "faturas_por_cliente",
                     inicioFaturasPorCliente,
@@ -735,6 +740,7 @@ public final class DataExportRunner {
                 throw new RuntimeException("Falha na extração de faturas por cliente", e);
             }
         }
+        logExtracaoRepository.criarOuAtualizarViewDimFiliais();
     }
     
     /**

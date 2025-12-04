@@ -3,6 +3,7 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,9 +106,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 ? AS destinatario_documento,
                 ? AS vendedor_nome,
                 ? AS notas_fiscais,
-                ? AS pedidos_cliente,
-                ? AS metadata,
-                GETDATE() AS data_extracao
+                    ? AS pedidos_cliente,
+                    ? AS metadata,
+                    ? AS data_extracao
         ) AS source
         ON target.unique_id = source.unique_id
         WHEN MATCHED THEN
@@ -264,6 +265,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             pstmt.setString(idx++, entity.getNotasFiscais());
             pstmt.setString(idx++, entity.getPedidosCliente());
             pstmt.setString(idx++, entity.getMetadata());
+            setInstantParameter(pstmt, idx++, Instant.now());
 
             final int rowsAffected = pstmt.executeUpdate();
             if (rowsAffected == 0) {

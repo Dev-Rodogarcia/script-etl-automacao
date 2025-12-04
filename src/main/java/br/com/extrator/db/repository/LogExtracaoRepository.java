@@ -144,14 +144,15 @@ public class LogExtracaoRepository {
                     END
                 END TRY
                 BEGIN CATCH
-                    IF ERROR_NUMBER() <> 2714
+                    -- Ignora erro de objeto já existente
+                    IF ERROR_MESSAGE() NOT LIKE '%already exists%'
                         THROW;
                 END CATCH;
                 
                 BEGIN TRY
                     IF NOT EXISTS (
-                        SELECT 1 FROM sys.indexes\s
-                        WHERE name = 'idx_entidade_timestamp'\s
+                        SELECT 1 FROM sys.indexes
+                        WHERE name = 'idx_entidade_timestamp'
                           AND object_id = OBJECT_ID('dbo.log_extracoes')
                     )
                     BEGIN
@@ -159,7 +160,8 @@ public class LogExtracaoRepository {
                     END
                 END TRY
                 BEGIN CATCH
-                    IF ERROR_NUMBER() <> 1911
+                    -- Ignora erro de índice já existente, repropaga demais
+                    IF ERROR_MESSAGE() NOT LIKE '%already exists%'
                         THROW;
                 END CATCH;""";
 
@@ -170,6 +172,90 @@ public class LogExtracaoRepository {
         } catch (final SQLException e) {
             logger.error("❌ Erro ao verificar/criar tabela dbo.log_extracoes: {}", e.getMessage(), e);
             throw new RuntimeException("Falha ao verificar/criar tabela dbo.log_extracoes", e);
+        }
+    }
+
+    public void criarOuAtualizarViewDimFiliais() {
+        try (Connection conn = br.com.extrator.util.GerenciadorConexao.obterConexao()) {
+            final String[] fontes = new String[]{
+                "vw_fretes_powerbi",
+                "vw_manifestos_powerbi",
+                "vw_contas_a_pagar_powerbi",
+                "vw_faturas_por_cliente_powerbi"
+            };
+            final java.util.List<String> existentes = new java.util.ArrayList<>();
+            for (final String v : fontes) {
+                try (PreparedStatement s = conn.prepareStatement(
+                    "SELECT 1 FROM sys.views WHERE name = ? AND schema_id = SCHEMA_ID('dbo')")) {
+                    s.setString(1, v);
+                    try (ResultSet rs = s.executeQuery()) {
+                        if (rs.next()) existentes.add(v);
+                    }
+                }
+            }
+            final StringBuilder sb = new StringBuilder();
+            if (existentes.isEmpty()) {
+                sb.append("SELECT TOP 0 CAST(NULL AS NVARCHAR(255)) AS [NomeFilial] FROM sys.objects");
+            } else {
+                boolean first = true;
+                for (final String v : existentes) {
+                    if (!first) sb.append(" UNION ");
+                    sb.append("SELECT DISTINCT [Filial] AS [NomeFilial] FROM dbo.").append(v);
+                    first = false;
+                }
+            }
+            final String ddl = "CREATE OR ALTER VIEW dbo.vw_dim_filiais AS " + sb.toString();
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
+            }
+            logger.info("✅ View dbo.vw_dim_filiais criada/atualizada com {} fonte(s)", existentes.size());
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar/atualizar view dbo.vw_dim_filiais: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_filiais", e);
+        }
+    }
+
+    public void criarOuAtualizarViewDimClientes() {
+        try (Connection conn = br.com.extrator.util.GerenciadorConexao.obterConexao()) {
+            final String[] fontes = new String[]{
+                "vw_fretes_powerbi",
+                "vw_coletas_powerbi"
+            };
+            final java.util.List<String> existentes = new java.util.ArrayList<>();
+            for (final String v : fontes) {
+                try (PreparedStatement s = conn.prepareStatement(
+                    "SELECT 1 FROM sys.views WHERE name = ? AND schema_id = SCHEMA_ID('dbo')")) {
+                    s.setString(1, v);
+                    try (ResultSet rs = s.executeQuery()) {
+                        if (rs.next()) existentes.add(v);
+                    }
+                }
+            }
+            final StringBuilder sb = new StringBuilder();
+            if (existentes.isEmpty()) {
+                sb.append("SELECT TOP 0 CAST(NULL AS BIGINT) AS [ID], CAST(NULL AS NVARCHAR(255)) AS [Nome] FROM sys.objects");
+            } else {
+                boolean first = true;
+                for (final String v : existentes) {
+                    if (!first) sb.append(" UNION ");
+                    if ("vw_fretes_powerbi".equals(v)) {
+                        sb.append("SELECT DISTINCT [Pagador ID] AS [ID], [Pagador] AS [Nome] FROM dbo.").append(v)
+                          .append(" WHERE [Pagador ID] IS NOT NULL");
+                    } else if ("vw_coletas_powerbi".equals(v)) {
+                        sb.append("SELECT DISTINCT [Cliente ID] AS [ID], [Cliente] AS [Nome] FROM dbo.").append(v)
+                          .append(" WHERE [Cliente ID] IS NOT NULL");
+                    }
+                    first = false;
+                }
+            }
+            final String ddl = "CREATE OR ALTER VIEW dbo.vw_dim_clientes AS " + sb.toString();
+            try (PreparedStatement stmt = conn.prepareStatement(ddl)) {
+                stmt.executeUpdate();
+            }
+            logger.info("✅ View dbo.vw_dim_clientes criada/atualizada com {} fonte(s)", existentes.size());
+        } catch (final SQLException e) {
+            logger.error("❌ Erro ao criar/atualizar view dbo.vw_dim_clientes: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao criar/atualizar view dbo.vw_dim_clientes", e);
         }
     }
 }

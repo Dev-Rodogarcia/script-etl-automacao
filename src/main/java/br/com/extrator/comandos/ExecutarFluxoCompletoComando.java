@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.auditoria.CompletudeValidator;
+import br.com.extrator.db.repository.LogExtracaoRepository;
 import br.com.extrator.runners.DataExportRunner;
 import br.com.extrator.runners.GraphQLRunner;
 import br.com.extrator.util.BannerUtil;
@@ -141,6 +142,16 @@ public class ExecutarFluxoCompletoComando implements Comando {
             // Sempre desligar o pool de threads, caso contrário a aplicação não encerrará
             executor.shutdown();
             logger.debug("ExecutorService encerrado");
+        }
+
+        try {
+            final LogExtracaoRepository dimRepo = new LogExtracaoRepository();
+            dimRepo.criarOuAtualizarViewDimFiliais();
+            System.out.println("✅ View vw_dim_filiais criada/atualizada automaticamente");
+            logger.info("✅ View vw_dim_filiais criada/atualizada após execução dos runners");
+        } catch (final Exception e) {
+            System.err.println("⚠️ Não foi possível criar/atualizar vw_dim_filiais: " + e.getMessage());
+            logger.warn("⚠️ Não foi possível criar/atualizar vw_dim_filiais automaticamente: {}", e.getMessage(), e);
         }
         
         // ========== PASSO B: VALIDAÇÃO DE COMPLETUDE ==========
