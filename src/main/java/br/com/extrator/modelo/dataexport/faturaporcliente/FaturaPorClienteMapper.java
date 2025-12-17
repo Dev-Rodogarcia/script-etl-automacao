@@ -1,12 +1,5 @@
 package br.com.extrator.modelo.dataexport.faturaporcliente;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import br.com.extrator.db.entity.FaturaPorClienteEntity;
-
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
@@ -14,6 +7,14 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import br.com.extrator.db.entity.FaturaPorClienteEntity;
 
 /**
  * Mapper para converter FaturaPorClienteDTO em FaturaPorClienteEntity.
@@ -37,24 +38,42 @@ public class FaturaPorClienteMapper {
     /**
      * Converte DTO para Entity, aplicando todas as transformações necessárias.
      */
-    public FaturaPorClienteEntity toEntity(FaturaPorClienteDTO dto) {
+    public FaturaPorClienteEntity toEntity(final FaturaPorClienteDTO dto) {
         if (dto == null) {
             throw new IllegalArgumentException("DTO não pode ser null");
         }
 
-        FaturaPorClienteEntity entity = new FaturaPorClienteEntity();
+        final FaturaPorClienteEntity entity = new FaturaPorClienteEntity();
 
         try {
             // 1. Calcular identificador único (PRIMEIRA PRIORIDADE)
-            String uniqueId = calcularIdentificadorUnico(dto);
+            final String uniqueId = calcularIdentificadorUnico(dto);
             entity.setUniqueId(uniqueId);
 
-            // 2. Documentos Fiscais
-            entity.setNumeroCte(dto.getCteNumber());
-            entity.setChaveCte(dto.getCteKey());
-            entity.setNumeroNfse(dto.getNfseNumber());
-            entity.setStatusCte(traduzirStatus(dto.getCteStatus()));
-            entity.setDataEmissaoCte(converterParaOffsetDateTime(dto.getCteIssuedAt()));
+            // 2. Documentos Fiscais (exclusividade NFS-e tem prioridade)
+            final boolean isNfse = dto.getNfseNumber() != null;
+            if (isNfse) {
+                entity.setNumeroNfse(dto.getNfseNumber());
+                entity.setNumeroCte(null);
+                entity.setChaveCte(null);
+                entity.setStatusCte(null);
+                entity.setDataEmissaoCte(null);
+            } else {
+                final boolean isCte = (dto.getCteKey() != null && !dto.getCteKey().trim().isEmpty()) || dto.getCteNumber() != null;
+                if (isCte) {
+                    entity.setNumeroCte(dto.getCteNumber());
+                    entity.setChaveCte(dto.getCteKey());
+                    entity.setNumeroNfse(null);
+                    entity.setStatusCte(traduzirStatus(dto.getCteStatus()));
+                    entity.setDataEmissaoCte(converterParaOffsetDateTime(dto.getCteIssuedAt()));
+                } else {
+                    entity.setNumeroCte(null);
+                    entity.setChaveCte(null);
+                    entity.setNumeroNfse(null);
+                    entity.setStatusCte(null);
+                    entity.setDataEmissaoCte(null);
+                }
+            }
 
             // 3. Dados da Fatura
             entity.setNumeroFatura(dto.getFaturaDocument());
@@ -92,10 +111,10 @@ public class FaturaPorClienteMapper {
             entity.setPedidosCliente(converterListaParaString(dto.getPedidosCliente()));
 
             // 8. Metadata (JSON completo do DTO)
-            String metadata = objectMapper.writeValueAsString(dto);
+            final String metadata = objectMapper.writeValueAsString(dto);
             entity.setMetadata(metadata);
 
-        } catch (JsonProcessingException e) {
+        } catch (final JsonProcessingException e) {
             logger.error("Erro ao mapear FaturaPorClienteDTO para Entity: {}", e.getMessage(), e);
             throw new RuntimeException("Falha no mapeamento de Fatura por Cliente", e);
         }
@@ -109,52 +128,29 @@ public class FaturaPorClienteMapper {
      * 2. Se não tiver CT-e mas tiver NFS-e → usar formato NFSE-{numero}
      * 3. Fallback: hash dos dados principais
      */
-    private String calcularIdentificadorUnico(FaturaPorClienteDTO dto) {
-        // Prioridade 1: Chave de CT-e
-        if (dto.getCteKey() != null && !dto.getCteKey().trim().isEmpty()) {
-            return dto.getCteKey().trim();
-        }
-
-        // Prioridade 2: Número de NFS-e
+    private String calcularIdentificadorUnico(final FaturaPorClienteDTO dto) {
         if (dto.getNfseNumber() != null) {
             return "NFSE-" + dto.getNfseNumber();
         }
-
-        // Prioridade 3: Hash dos dados principais (fallback)
-        String dadosCombinados = String.format("%s|%s|%s|%s",
-                dto.getFaturaDocument() != null ? dto.getFaturaDocument() : "",
-                dto.getPagadorDocumento() != null ? dto.getPagadorDocumento() : "",
-                dto.getFaturaIssueDate() != null ? dto.getFaturaIssueDate() : "",
-                dto.getValorFrete() != null ? dto.getValorFrete() : "");
-
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(dadosCombinados.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return "HASH-" + hexString.toString().substring(0, 32); // Primeiros 32 chars
-        } catch (java.security.NoSuchAlgorithmException e) {
-            logger.error("Erro ao gerar hash para identificador único: {}", e.getMessage());
-            // Fallback final: usar timestamp
-            return "UNKNOWN-" + System.currentTimeMillis();
+        if (dto.getCteKey() != null && !dto.getCteKey().trim().isEmpty()) {
+            return dto.getCteKey().trim();
         }
+        final String uuid = java.util.UUID.randomUUID().toString();
+        logger.warn("Gerando unique_id via UUID por ausência de CT-e key e NFS-e number: {}", uuid);
+        return uuid;
     }
 
     /**
      * Converte string para BigDecimal usando Locale.US (ponto decimal).
      * CRÍTICO: Usar Locale.US para evitar erro de parsing (123.69 != 12369.00).
      */
-    private BigDecimal converterParaBigDecimal(String valor) {
+    private BigDecimal converterParaBigDecimal(final String valor) {
         if (valor == null || valor.trim().isEmpty()) {
             return null;
         }
         try {
             // Remove espaços e usa Locale.US para parsing correto
-            String valorLimpo = valor.trim();
+            final String valorLimpo = valor.trim();
             return (BigDecimal) numberFormatUS.parse(valorLimpo);
         } catch (java.text.ParseException | ClassCastException e) {
             logger.warn("Erro ao converter valor '{}' para BigDecimal: {}", valor, e.getMessage());
@@ -165,13 +161,13 @@ public class FaturaPorClienteMapper {
     /**
      * Converte string ISO para LocalDate (formato yyyy-MM-dd).
      */
-    private LocalDate converterParaLocalDate(String data) {
+    private LocalDate converterParaLocalDate(final String data) {
         if (data == null || data.trim().isEmpty()) {
             return null;
         }
         try {
             return LocalDate.parse(data.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
-        } catch (DateTimeParseException e) {
+        } catch (final DateTimeParseException e) {
             logger.warn("Erro ao converter data '{}' para LocalDate: {}", data, e.getMessage());
             return null;
         }
@@ -180,13 +176,13 @@ public class FaturaPorClienteMapper {
     /**
      * Converte string ISO para OffsetDateTime.
      */
-    private OffsetDateTime converterParaOffsetDateTime(String dataHora) {
+    private OffsetDateTime converterParaOffsetDateTime(final String dataHora) {
         if (dataHora == null || dataHora.trim().isEmpty()) {
             return null;
         }
         try {
             return OffsetDateTime.parse(dataHora.trim(), DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        } catch (DateTimeParseException e) {
+        } catch (final DateTimeParseException e) {
             logger.warn("Erro ao converter data/hora '{}' para OffsetDateTime: {}", dataHora, e.getMessage());
             return null;
         }
@@ -195,7 +191,7 @@ public class FaturaPorClienteMapper {
     /**
      * Traduz status do CT-e (ex: "authorized" -> "Autorizado").
      */
-    private String traduzirStatus(String status) {
+    private String traduzirStatus(final String status) {
         if (status == null || status.trim().isEmpty()) {
             return null;
         }
@@ -211,12 +207,12 @@ public class FaturaPorClienteMapper {
     /**
      * Traduz tipo de frete (ex: "Freight::Normal" -> "Normal").
      */
-    private String traduzirTipoFrete(String tipo) {
+    private String traduzirTipoFrete(final String tipo) {
         if (tipo == null || tipo.trim().isEmpty()) {
             return null;
         }
         // Remove prefixo "Freight::" se presente
-        String tipoLimpo = tipo.replace("Freight::", "").trim();
+        final String tipoLimpo = tipo.replace("Freight::", "").trim();
         return tipoLimpo;
     }
 
@@ -224,7 +220,7 @@ public class FaturaPorClienteMapper {
      * Converte lista de strings para string única com separação por vírgula.
      * Exemplo: ["78427", "78428"] -> "78427, 78428"
      */
-    private String converterListaParaString(java.util.List<String> lista) {
+    private String converterListaParaString(final java.util.List<String> lista) {
         if (lista == null || lista.isEmpty()) {
             return null;
         }

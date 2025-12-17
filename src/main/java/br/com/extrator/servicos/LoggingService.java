@@ -23,6 +23,7 @@ public class LoggingService {
     private static final String DIRETORIO_LOGS = "logs";
     private static final DateTimeFormatter FORMATTER_ARQUIVO = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter FORMATTER_LOG = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final int MAX_LOG_FILES = 20;
     
     private PrintStream originalOut;
     private PrintStream originalErr;
@@ -148,6 +149,7 @@ public class LoggingService {
             Files.write(caminhoArquivo, conteudoLog.toString().getBytes("UTF-8"));
             
             System.out.println("📄 Log salvo em: " + caminhoArquivo.toAbsolutePath());
+            aplicarRetencaoLogs();
             
         } catch (IOException e) {
             System.err.println("❌ Erro ao salvar log em arquivo: " + e.getMessage());
@@ -179,6 +181,38 @@ public class LoggingService {
             }
         } catch (IOException e) {
             System.err.println("❌ Erro ao criar diretório de logs: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Aplica retenção máxima de arquivos .log na pasta de logs.
+     * Mantém apenas os MAX_LOG_FILES mais recentes, removendo os demais (mais antigos).
+     */
+    private static void aplicarRetencaoLogs() {
+        try {
+            final File pastaLogs = new File(DIRETORIO_LOGS);
+            if (!pastaLogs.exists()) {
+                return;
+            }
+            final File[] arquivosLog = pastaLogs.listFiles((dir, name) -> name.toLowerCase().endsWith(".log"));
+            if (arquivosLog == null) {
+                return;
+            }
+            if (arquivosLog.length <= MAX_LOG_FILES) {
+                return;
+            }
+            java.util.Arrays.sort(arquivosLog, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+            final int excedente = arquivosLog.length - MAX_LOG_FILES;
+            for (int i = 0; i < excedente; i++) {
+                try {
+                    Files.deleteIfExists(arquivosLog[i].toPath());
+                    logger.debug("🧹 Log antigo removido por retenção: {}", arquivosLog[i].getName());
+                } catch (final IOException | SecurityException e) {
+                    logger.warn("Falha ao remover log antigo {}: {}", arquivosLog[i].getName(), e.getMessage());
+                }
+            }
+        } catch (final SecurityException e) {
+            logger.warn("Não foi possível aplicar retenção de logs: {}", e.getMessage());
         }
     }
     
@@ -220,23 +254,8 @@ public class LoggingService {
         
         @Override
         public void close() throws IOException {
-            IOException exception = null;
-            try {
-                out1.close();
-            } catch (IOException e) {
-                exception = e;
-            }
-            try {
-                out2.close();
-            } catch (IOException e) {
-                if (exception != null) {
-                    e.addSuppressed(exception);
-                }
-                throw e;
-            }
-            if (exception != null) {
-                throw exception;
-            }
+            try { out1.flush(); } catch (IOException ignored) {}
+            try { out2.flush(); } catch (IOException ignored) {}
         }
     }
     
@@ -264,7 +283,7 @@ public class LoggingService {
                     }
                 }
             }
-        } catch (final Exception e) {
+        } catch (final SecurityException e) {
             logger.warn("Não foi possível organizar logs .txt: {}", e.getMessage());
         }
     }

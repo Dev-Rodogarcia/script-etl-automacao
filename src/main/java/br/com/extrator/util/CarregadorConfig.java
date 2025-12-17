@@ -1,14 +1,14 @@
 package br.com.extrator.util;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Classe responsável por carregar as configurações do arquivo config.properties
@@ -33,7 +33,7 @@ public class CarregadorConfig {
                 }
                 propriedades.load(input);
                 logger.info("Arquivo de configuração carregado com sucesso");
-            } catch (IOException ex) {
+            } catch (final IOException ex) {
                 logger.error("Erro ao carregar o arquivo de configuração", ex);
                 throw new RuntimeException("Erro ao carregar arquivo de configuração", ex);
             }
@@ -50,9 +50,9 @@ public class CarregadorConfig {
     public static void validarConexaoBancoDados() {
         logger.info("Validando conexão com o banco de dados...");
 
-        String url = obterUrlBancoDados();
-        String usuario = obterUsuarioBancoDados();
-        String senha = obterSenhaBancoDados();
+        final String url = obterUrlBancoDados();
+        final String usuario = obterUsuarioBancoDados();
+        final String senha = obterSenhaBancoDados();
 
         if (url == null || url.trim().isEmpty()) {
             logger.error("URL do banco de dados não configurada");
@@ -77,7 +77,7 @@ public class CarregadorConfig {
                 logger.error("Conexão com banco de dados inválida");
                 throw new RuntimeException("Falha na validação: Conexão com banco de dados inválida");
             }
-        } catch (SQLException e) {
+        } catch (final SQLException e) {
             logger.error("Erro ao conectar com o banco de dados: {}", e.getMessage());
 
             // Mensagens de erro mais específicas baseadas no código de erro
@@ -104,11 +104,11 @@ public class CarregadorConfig {
      * @return Valor da variável de ambiente
      * @throws IllegalStateException Se a variável de ambiente não existir ou estiver vazia
      */
-    private static String obterConfiguracaoObrigatoria(String nomeVariavelAmbiente) {
-        String valor = System.getenv(nomeVariavelAmbiente);
+    private static String obterConfiguracaoObrigatoria(final String nomeVariavelAmbiente) {
+        final String valor = System.getenv(nomeVariavelAmbiente);
         
         if (valor == null || valor.trim().isEmpty()) {
-            String mensagem = String.format(
+            final String mensagem = String.format(
                 "Variável de ambiente obrigatória '%s' não encontrada ou está vazia. " +
                 "Configure esta variável de ambiente antes de executar a aplicação.",
                 nomeVariavelAmbiente
@@ -130,17 +130,17 @@ public class CarregadorConfig {
      * @return Valor da configuração (variável de ambiente ou fallback para
      *         properties)
      */
-    private static String obterConfiguracao(String nomeVariavelAmbiente, String nomeChaveProperties) {
+    private static String obterConfiguracao(final String nomeVariavelAmbiente, final String nomeChaveProperties) {
         // Tenta primeiro obter da variável de ambiente
-        String valorAmbiente = System.getenv(nomeVariavelAmbiente);
+        final String valorAmbiente = System.getenv(nomeVariavelAmbiente);
         if (valorAmbiente != null && !valorAmbiente.trim().isEmpty()) {
             logger.debug("Configuração '{}' obtida da variável de ambiente", nomeVariavelAmbiente);
             return valorAmbiente;
         }
 
         // Fallback para o arquivo config.properties
-        Properties props = carregarPropriedades();
-        String valorProperties = props.getProperty(nomeChaveProperties);
+        final Properties props = carregarPropriedades();
+        final String valorProperties = props.getProperty(nomeChaveProperties);
         if (valorProperties == null) {
             logger.warn(
                     "Configuração '{}' não encontrada nem em variável de ambiente '{}' nem no arquivo de configuração '{}'",
@@ -157,9 +157,9 @@ public class CarregadorConfig {
      * @param chave Nome da propriedade
      * @return Valor da propriedade
      */
-    public static String obterPropriedade(String chave) {
-        Properties props = carregarPropriedades();
-        String valor = props.getProperty(chave);
+    public static String obterPropriedade(final String chave) {
+        final Properties props = carregarPropriedades();
+        final String valor = props.getProperty(chave);
         if (valor == null) {
             logger.warn("Propriedade '{}' não encontrada no arquivo de configuração", chave);
         }
@@ -243,6 +243,15 @@ public class CarregadorConfig {
     public static String obterSenhaBancoDados() {
         return obterConfiguracaoObrigatoria("DB_PASSWORD");
     }
+    
+    /**
+     * Obtém o nome do banco de dados alvo.
+     * Prioriza variável de ambiente DB_NAME; fallback para config.properties (db.name).
+     */
+    public static String obterNomeBancoDados() {
+        final String valor = obterConfiguracao("DB_NAME", "db.name");
+        return valor;
+    }
 
     /**
      * Obtém o tempo de espaçamento padrão (throttling) entre requisições em
@@ -251,7 +260,7 @@ public class CarregadorConfig {
      * @return O tempo de throttling em ms.
      */
     public static long obterThrottlingPadrao() {
-        String valor = obterConfiguracao("API_THROTTLING_PADRAO_MS", "api.throttling.padrao_ms");
+        final String valor = obterConfiguracao("API_THROTTLING_PADRAO_MS", "api.throttling.padrao_ms");
         try {
             return Long.parseLong(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -267,7 +276,7 @@ public class CarregadorConfig {
      * @return O número máximo de tentativas.
      */
     public static int obterMaxTentativasRetry() {
-        String valor = obterConfiguracao("API_RETRY_MAX_TENTATIVAS", "api.retry.max_tentativas");
+        final String valor = obterConfiguracao("API_RETRY_MAX_TENTATIVAS", "api.retry.max_tentativas");
         try {
             return Integer.parseInt(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -282,7 +291,7 @@ public class CarregadorConfig {
      * @return O tempo de delay base em ms.
      */
     public static long obterDelayBaseRetry() {
-        String valor = obterConfiguracao("API_RETRY_DELAY_BASE_MS", "api.retry.delay_base_ms");
+        final String valor = obterConfiguracao("API_RETRY_DELAY_BASE_MS", "api.retry.delay_base_ms");
         try {
             return Long.parseLong(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -298,7 +307,7 @@ public class CarregadorConfig {
      * @return O multiplicador.
      */
     public static double obterMultiplicadorRetry() {
-        String valor = obterConfiguracao("API_RETRY_MULTIPLICADOR", "api.retry.multiplicador");
+        final String valor = obterConfiguracao("API_RETRY_MULTIPLICADOR", "api.retry.multiplicador");
         try {
             return Double.parseDouble(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -313,9 +322,9 @@ public class CarregadorConfig {
      * @return Duration com o timeout configurado (padrão: 120 segundos)
      */
     public static java.time.Duration obterTimeoutApiRest() {
-        String valor = obterConfiguracao("API_REST_TIMEOUT_SECONDS", "api.rest.timeout.seconds");
+        final String valor = obterConfiguracao("API_REST_TIMEOUT_SECONDS", "api.rest.timeout.seconds");
         try {
-            long segundos = Long.parseLong(valor);
+            final long segundos = Long.parseLong(valor);
             return java.time.Duration.ofSeconds(segundos);
         } catch (NumberFormatException | NullPointerException e) {
             logger.warn("Propriedade 'api.rest.timeout.seconds' não encontrada ou inválida. Usando valor padrão: 120 segundos");
@@ -339,7 +348,7 @@ public class CarregadorConfig {
      * @return O intervalo mínimo de throttling em ms
      */
     public static long obterThrottlingMinimo() {
-        String valor = obterConfiguracao("API_THROTTLING_MINIMO_MS", "api.throttling.minimo_ms");
+        final String valor = obterConfiguracao("API_THROTTLING_MINIMO_MS", "api.throttling.minimo_ms");
         try {
             return Long.parseLong(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -354,7 +363,7 @@ public class CarregadorConfig {
      * @return Limite máximo de páginas (padrão: 500)
      */
     public static int obterLimitePaginasApiRest() {
-        String valor = obterConfiguracao("API_REST_MAX_PAGINAS", "api.rest.max.paginas");
+        final String valor = obterConfiguracao("API_REST_MAX_PAGINAS", "api.rest.max.paginas");
         try {
             return Integer.parseInt(valor);
         } catch (NumberFormatException | NullPointerException e) {
@@ -369,12 +378,33 @@ public class CarregadorConfig {
      * @return Limite máximo de páginas (padrão: 2000)
      */
     public static int obterLimitePaginasApiGraphQL() {
-        String valor = obterConfiguracao("API_GRAPHQL_MAX_PAGINAS", "api.graphql.max.paginas");
+        final String valor = obterConfiguracao("API_GRAPHQL_MAX_PAGINAS", "api.graphql.max.paginas");
         try {
             return Integer.parseInt(valor);
         } catch (NumberFormatException | NullPointerException e) {
             logger.warn("Propriedade 'api.graphql.max.paginas' não encontrada ou inválida. Usando valor padrão: 2000");
             return 2000; // Valor padrão aumentado de 1000 para 2000
+        }
+    }
+
+    public static int obterLimitePaginasFaturasGraphQL() {
+        final String valor = obterConfiguracao("API_GRAPHQL_FATURAS_MAX_PAGINAS", "api.graphql.faturas.max_paginas");
+        try {
+            return Integer.parseInt(valor);
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.graphql.faturas.max_paginas' não encontrada ou inválida. Usando valor padrão: 200");
+            return 200;
+        }
+    }
+
+    public static int obterDiasJanelaFaturasGraphQL() {
+        final String valor = obterConfiguracao("API_GRAPHQL_FATURAS_DIAS_JANELA", "api.graphql.faturas.dias_janela");
+        try {
+            final int dias = Integer.parseInt(valor);
+            return dias <= 0 ? 2 : dias;
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.warn("Propriedade 'api.graphql.faturas.dias_janela' não encontrada ou inválida. Usando valor padrão: 2");
+            return 2;
         }
     }
 
@@ -384,7 +414,7 @@ public class CarregadorConfig {
      * @return Limite máximo de páginas (padrão: 500)
      */
     public static int obterLimitePaginasApiDataExport() {
-        String valor = obterConfiguracao("API_DATAEXPORT_MAX_PAGINAS", "api.dataexport.max.paginas");
+        final String valor = obterConfiguracao("API_DATAEXPORT_MAX_PAGINAS", "api.dataexport.max.paginas");
         try {
             return Integer.parseInt(valor);
         } catch (NumberFormatException | NullPointerException e) {

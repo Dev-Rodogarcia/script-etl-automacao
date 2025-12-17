@@ -46,6 +46,7 @@ public class Main {
     private static Map<String, Comando> criarMapaComandos() {
         Map<String, Comando> comandos = new HashMap<>();
         comandos.put("--fluxo-completo", new ExecutarFluxoCompletoComando());
+        comandos.put("--loop", new br.com.extrator.comandos.LoopExtracaoComando());
         comandos.put("--validar", new ValidarAcessoComando());
         comandos.put("--ajuda", new ExibirAjudaComando());
         comandos.put("--help", new ExibirAjudaComando());

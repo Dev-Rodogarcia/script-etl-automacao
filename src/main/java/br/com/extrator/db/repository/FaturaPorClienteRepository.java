@@ -37,6 +37,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 numero_cte BIGINT,
                 chave_cte NVARCHAR(100),
                 numero_nfse BIGINT,
+                serie_nfse NVARCHAR(50),
                 status_cte NVARCHAR(255),
                 data_emissao_cte DATETIMEOFFSET,
                 numero_fatura NVARCHAR(50),
@@ -162,6 +163,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "fit_ant_ils_original_due_date", "DATE");
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "remetente_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "destinatario_documento", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "serie_nfse", "NVARCHAR(50)");
         if (!viewVerificada) {
             criarViewPowerBISeNaoExistir(conexao);
             viewVerificada = true;
@@ -191,7 +193,13 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             SELECT
                 unique_id AS [ID Único],
                 filial AS [Filial],
+                estado AS [Estado],
                 numero_cte AS [CT-e/Número],
+                CASE 
+                    WHEN numero_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_cte)
+                    WHEN numero_nfse IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_nfse)
+                    ELSE NULL
+                END AS [Número do Documento],
                 chave_cte AS [CT-e/Chave],
                 data_emissao_cte AS [CT-e/Data de emissão],
                 valor_frete AS [Frete/Valor dos CT-es],
@@ -206,6 +214,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 destinatario_nome AS [Destinatário/Nome],
                 destinatario_documento AS [Destinatário/Documento],
                 vendedor_nome AS [Vendedor/Nome],
+                numero_nfse AS [NFS-e/Número],
+                serie_nfse AS [NFS-e/Série],
+                numero_nfse AS [fit_nse_number],
                 CASE WHEN fit_ant_document IS NOT NULL THEN 'Faturado' ELSE 'Aguardando Faturamento' END AS [Status do Processo],
                 fit_ant_document AS [Fatura/N° Documento],
                 fit_ant_issue_date AS [Fatura/Emissão],
@@ -216,6 +227,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 data_vencimento_fatura AS [Parcelas/Vencimento],
                 data_baixa_fatura AS [Fatura/Baixa],
                 fit_ant_ils_original_due_date AS [Fatura/Data Vencimento Original],
+                notas_fiscais AS [Notas Fiscais],
+                pedidos_cliente AS [Pedidos/Cliente],
                 metadata AS [Metadata],
                 data_extracao AS [Data da Última Atualização]
             FROM dbo.faturas_por_cliente;
@@ -285,5 +298,36 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             throw new IllegalArgumentException("unique_id não pode ser null ou vazio");
         }
         // Validações adicionais podem ser adicionadas aqui
+    }
+
+    public int enriquecerNumeroNfseViaTabelaPonte() throws SQLException {
+        try (Connection conn = obterConexao();
+             PreparedStatement ps = conn.prepareStatement("""
+                UPDATE fpc
+                SET 
+                    fpc.numero_nfse = f.nfse_number,
+                    fpc.serie_nfse  = f.nfse_series
+                FROM dbo.faturas_por_cliente fpc
+                INNER JOIN dbo.faturas_graphql fg ON fg.document = fpc.fit_ant_document
+                INNER JOIN dbo.fretes f ON f.accounting_credit_id = fg.id
+                WHERE f.nfse_number IS NOT NULL
+            """)) {
+            return ps.executeUpdate();
+        }
+    }
+
+    public int enriquecerPagadorViaTabelaPonte() throws SQLException {
+        try (Connection conn = obterConexao();
+             PreparedStatement ps = conn.prepareStatement("""
+                UPDATE fpc
+                SET 
+                    fpc.pagador_nome = COALESCE(fpc.pagador_nome, fg.customer_name),
+                    fpc.pagador_documento = COALESCE(fpc.pagador_documento, fg.customer_cnpj)
+                FROM dbo.faturas_por_cliente fpc
+                INNER JOIN dbo.faturas_graphql fg ON fg.document = fpc.fit_ant_document
+                WHERE fpc.pagador_nome IS NULL OR fpc.pagador_documento IS NULL
+            """)) {
+            return ps.executeUpdate();
+        }
     }
 }

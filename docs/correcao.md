@@ -1,280 +1,237 @@
-```python?code_reference&code_event_index=2
-import pandas as pd
+Com base na análise profunda do arquivo `Model.bim` fornecido, preparei uma documentação técnica detalhada. O objetivo é permitir que você replique a lógica de negócios, transformações (ETL) e cálculos (KPIs) no seu ambiente Python (Pandas/Polars/Dash), sem a necessidade de classes, focando na lógica funcional.
 
-files = [
-    "faturas_por_cliente_2025-11-22_14-40-49.csv",
-    "fretes_2025-11-22_14-40-49.csv",
-    "localizacao_cargas_2025-11-22_14-40-49.csv",
-    "manifestos_2025-11-22_14-40-49.csv",
-    "coletas_2025-11-22_14-40-49.csv",
-    "contas_a_pagar_2025-11-22_14-40-49.csv",
-    "cotacoes_2025-11-22_14-40-49.csv"
-]
+O modelo contém **7 Tabelas Fato principais** (a 8ª, Ocorrências, não consta neste arquivo JSON) e tabelas dimensão de suporte. A lógica está dividida entre Power Query (M) para limpeza e DAX para métricas.
 
-info = {}
-for f in files:
-    try:
-        df = pd.read_csv(f, sep=';', nrows=2)
-        info[f] = df.columns.tolist()
-    except Exception as e:
-        info[f] = str(e)
+---
 
-print(info)
+#Documentação Técnica de Migração: Power BI para Python##1. Visão Geral do Modelo* **Estrutura:** Star Schema (Esquema Estrela).
+* **Tabelas Fato:** `fFretes`, `fColetas`, `fManifestos`, `fContasAPagar`, `fCotacoes`, `fFaturasCliente`, `fLocalizacaoCargas`.
+* **Tabelas Dimensão:** `dCalendario`, `dFiliais`, `dClientes`, `dMotoristas`, `dVeiculos`, `dPlanoContas`.
+* **Tabela de Medidas:** `_Medidas` (Centraliza os cálculos KPI).
 
-```
+---
 
-```text?code_stdout&code_event_index=2
-{'faturas_por_cliente_2025-11-22_14-40-49.csv': ['ID', 'Filial', 'Pagador / Nome', 'Pagador / Documento', 'Nfse / Número NFS-e', 'CT-e / Número', 'CT-e / Data emissão', 'CT-e / Chave', 'CT-e / Status', 'Fatura / N° Doc', 'Fatura / Emissão', 'Fatura / Valor', 'Parcelas / Vencimento', 'Baixa / Data', 'Frete original / Total', 'Tipo', 'Estado / Nome', 'Classificação', 'Remetente / Nome', 'Destinatário / Nome', 'NF (Notas Fiscais)', 'Cache / N° Pedido', 'Data de extracao'], 'fretes_2025-11-22_14-40-49.csv': ['ID', 'Chave CT-e', 'Numero CT-e', 'Serie CT-e', 'Data frete', 'Valor Total do Servico', 'Valor NF', 'Valor Frete', 'Volumes', 'Kg Taxado', 'Kg Real', 'M3', 'Pagador', 'Remetente', 'Origem', 'UF Origem', 'Destinatario', 'Destino', 'UF Destino', 'Filial', 'Tabela de Preco', 'Classificacao', 'Centro de Custo', 'Usuario', 'NF', 'Status', 'Modal', 'Tipo Frete', 'Data de extracao'], 'localizacao_cargas_2025-11-22_14-40-49.csv': ['CT-e', 'Tipo', 'Data Emissão', 'Volumes', 'Peso Taxado', 'Valor NF', 'Valor Frete', 'Tipo Serviço', 'Filial Emissora', 'Previsão Entrega', 'Cidade Destino', 'Filial Destino', 'Serviço', 'Status Carga', 'Filial Atual', 'Cidade Origem', 'Filial Origem', 'Latitude', 'Longitude', 'Velocidade', 'Altitude', 'Dispositivo ID', 'Dispositivo Tipo', 'Endereço', 'Data de extracao'], 'manifestos_2025-11-22_14-40-49.csv': ['Número', 'Filial', 'Data criação', 'Classificação', 'Status', 'Data Saída', 'Data Fechamento', 'Volumes NF', 'Qtd NF', 'Valor NF', 'Receita', 'Peso NF', 'Proprietário/Nome', 'Motorista', 'Veículo/Placa', 'Veículo/Tipo', 'KM Saída', 'KM Fechamento', 'KM Rodado', 'Custo Total', 'Custo (Líquido)', 'Chave MDFe', 'Status MDFe', 'Usuário', 'Data de extracao'], 'coletas_2025-11-22_14-40-49.csv': ['ID', 'Coleta', 'Cliente', 'Solicitante', 'Local da Coleta', 'Cidade', 'UF', 'Solicitacao', 'Hora (Solicitacao)', 'Agendamento', 'Horario (Inicio)', 'Finalizacao', 'Hora (Fim)', 'Status', 'Volumes', 'Peso Real', 'Peso Taxado', 'Valor NF', 'Usuario', 'Agente', 'Numero Manifesto', 'Veiculo', 'Data de extracao'], 'contas_a_pagar_2025-11-22_14-40-49.csv': ['Lançamento a Pagar/N°', 'N° Documento', 'Emissão', 'Tipo', 'Valor', 'Valor a pagar', 'Pago', 'Valor pago', 'Fornecedor/Nome', 'Filial', 'Conta Contábil/Classif.', 'Conta Contábil/Desc.', 'Conta Contábil/Valor', 'Centro de custo/Nome', 'Centro de custo/Valor', 'Mês Competência', 'Ano Competência', 'Data criação', 'Observações', 'Baixa/Data liquidação', 'Usuário/Nome', 'Data de extracao'], 'cotacoes_2025-11-22_14-40-49.csv': ['Cotação', 'Data', 'Filial', 'Solicitante', 'Cliente', 'CNPJ Cliente', 'Origem', 'UF (Origem)', 'Destino', 'UF (Destino)', 'Volumes', 'Peso Real', 'Peso Taxado', 'Valor NF', 'Valor Frete', 'Tabela', 'Usuário', 'Status Conversão', 'Motivo Perda', 'CT-e / Data emissão', 'NFS-e / Data emissão', 'Data de extracao']}
+##2. Dimensões Globais (Tratamento Prévio)Antes de processar os fatos, você precisará replicar as dimensões para garantir filtros corretos.
 
-```
+###dCalendario* **Lógica Power BI:** Criada dinamicamente buscando a menor data entre `fFretes` e `fManifestos` até o final do ano atual.
+* **Python:** Crie um DataFrame de datas (`pd.date_range`) cobrindo `min(df_fretes['Data frete'])` até `today`.
+* **Colunas Necessárias:** Data, Ano, Mês (Número e Nome), Trimestre, Dia da Semana, Flag `IsFimDeSemana` (Sábado/Domingo).
 
-Com certeza. Se você quer precisão e não quer economizar informação, preparei o **"Guia Mestre de Implementação de BI"** para os seus 7 arquivos.
+###dFiliais* **Fonte:** Derivada da tabela `fColetas`.
+* **Lógica:** `SELECT DISTINCT Filial, [Filial ID] FROM fColetas`.
+* **Uso:** Usada para JOIN em todas as tabelas fato via `ID_Filial`.
 
-Aqui está detalhado arquivo por arquivo: quais colunas usar, quais ignorar, como relacionar as tabelas e, o mais importante, **as fórmulas DAX prontas** para copiar e colar.
+---
 
------
+##3. Entidades (Tabelas Fato) e KPIsAbaixo, a lógica detalhada por entidade.
 
-### 🏗️ Estrutura do Modelo de Dados (Relacionamentos)
+###3.1. Entidade: Fretes (`fFretes`)Focada na receita e volume de transporte.
 
-Para que tudo funcione junto, você precisará criar uma tabela calendário.
+**A. ETL e Transformações (Power Query -> Python)**
 
-1.  **Crie a tabela `dCalendario`:**
-      * Ela deve ter datas de 01/01/2024 até o fim de 2025.
-      * Relacionamentos:
-          * `dCalendario[Data]` -\> `Manifestos[Data criação]` (Ativo)
-          * `dCalendario[Data]` -\> `Fretes[Data frete]` (Ativo)
-          * `dCalendario[Data]` -\> `Faturas[Parcelas / Vencimento]` (Ativo)
-          * `dCalendario[Data]` -\> `Contas a Pagar[Baixa/Data liquidação]` (Inativo - Use `USERELATIONSHIP` na fórmula)
+1. **Fonte:** `vw_fretes_powerbi`.
+2. **Coluna Calculada `Status_Nome`:**
+* Mapear `Status` (inglês) para PT-BR:
+* `finished` -> "Concluído"
+* `pending` -> "Pendente"
+* `delivering` -> "Em Entrega"
+* `cancelled` -> "Cancelado"
+* `standby` -> "Espera"
+* `in_transit` -> "Em Trânsito"
+* `manifested` -> "Manifestado"
+* `occurrence_treatment` -> "Tratamento de ocorrência"
 
------
 
-### 1\. Arquivo: `manifestos_*.csv` (Lucratividade)
 
-**Foco:** Quanto custou rodar a frota e quanto sobrou.
 
-  * **Chave Única (ID):** Coluna `Número`.
-  * **Colunas de Dinheiro:**
-      * `Receita` -\> **O CORRETO** para faturamento.
-      * `Valor NF` -\> **IGNORAR** para soma financeira (é apenas valor de seguro/risco).
-      * `Custo Total` -\> O que você pagou ao motorista/posto.
-  * **Fórmulas DAX:**
+3. **Coluna Calculada `Rota`:** Concatenar: `[Origem] + " (" + [UF Origem] + ") → " + [Destino] + " (" + [UF Destino] + ")"`.
+4. **Coluna Calculada `Modal_PT`:** Traduzir `rodo` -> "Rodoviário", `aereo` -> "Aéreo", `maritimo` -> "Marítimo".
 
-<!-- end list -->
+**B. Métricas e KPIs (DAX -> Python)**
 
-```dax
-// 1. Receita Real do Manifesto (Evita duplicidade se o manifesto tiver múltiplas linhas)
-Receita Manifestos = 
-CALCULATE(
-    SUM(Manifestos[Receita]),
-    DISTINCT(Manifestos[Número])
-)
+* **`FRE_Fretes Qtde`:** Contagem simples de linhas (`count`) ou IDs únicos.
+* **`FRE_Valor Total`:** Soma da coluna `Valor Total do Serviço`.
+* **`FRE_Peso Taxado`:** Soma da coluna `Kg Taxado`.
+* **`FRE_Ticket Medio`:** `FRE_Valor Total` / `FRE_Fretes Qtde`.
+* **`FRE_Valor por Kg`:** `FRE_Valor Total` / `FRE_Peso Taxado`.
+* **`FRE_Var Valor YOY` (Year Over Year):**
+* *Python:* Calcular a soma de `Valor Total do Serviço` agrupado por ano. Calcular `(Valor Ano Atual - Valor Ano Anterior) / Valor Ano Anterior`.
+* *Nota:* O modelo trata divisões por zero retornando `BLANK` (no Python use `np.nan` ou trate com `fillna(0)`).
 
-// 2. Custo Total da Operação
-Custo Manifestos = 
-CALCULATE(
-    SUM(Manifestos[Custo Total]),
-    DISTINCT(Manifestos[Número])
-)
 
-// 3. Margem de Lucro (R$)
-Margem Bruta R$ = [Receita Manifestos] - [Custo Manifestos]
+* **`FRE_Top5 Rotas`:** Agrupar por `Rota`, somar `Valor Total do Serviço`, ordenar DESC e pegar top 5.
 
-// 4. Margem de Lucro (%) - O indicador mais importante
-Margem % = DIVIDE([Margem Bruta R$], [Receita Manifestos], 0)
+---
 
-// 5. Custo por KM Rodado
-Custo por KM = 
-VAR KmTotal = CALCULATE(SUM(Manifestos[KM Rodado]), DISTINCT(Manifestos[Número]))
-RETURN DIVIDE([Custo Manifestos], KmTotal, 0)
-```
+###3.2. Entidade: Coletas (`fColetas`)Focada na eficiência da primeira milha.
 
------
+**A. ETL e Transformações**
 
-### 2\. Arquivo: `fretes_*.csv` (Comercial / Volume)
+1. **Fonte:** `vw_coletas_powerbi`.
+2. **Coluna `Status_PT`:** Tradução similar a fretes (`finished` -> "Finalizada", etc).
+3. **Coluna `No_Prazo`:** Lógica condicional:
+* Se `Finalizacao` <= `Agendamento`: "Sim"
+* Senão: "Não" (Considerar nulos como "Não" ou tratar à parte).
 
-**Foco:** Vendas brutas e perfil de carga.
 
-  * **Chave Única (ID):** Coluna `ID`.
-  * **Colunas de Dinheiro:** `Valor Frete` (Receita).
-  * **Fórmulas DAX:**
 
-<!-- end list -->
+**B. Métricas e KPIs**
 
-```dax
-// 1. Faturamento Bruto de Fretes
-Total Fretes = SUM(Fretes[Valor Frete])
+* **`COL_Coletas Qtde`:** Contagem de linhas (`id`).
+* **`COL_Taxa Conclusao`:**
+* Numerador: Contagem onde `Status` == "finalizado".
+* Denominador: `COL_Coletas Qtde` Total.
 
-// 2. Ticket Médio (Preço médio por transporte)
-Ticket Médio = AVERAGE(Fretes[Valor Frete])
 
-// 3. Peso Total Transportado (Toneladas)
-Peso Total Tons = SUM(Fretes[Kg Taxado]) / 1000
-
-// 4. Contagem de Expedições
-Qtd Fretes = COUNTROWS(Fretes)
-```
+* **`COL_Tempo Medio Horas`:**
+* Cálculo: Média da diferença em horas entre `Finalizacao` e `Solicitacao`.
+* *Python:* `(df['Finalizacao'] - df['Solicitacao']).dt.total_seconds() / 3600`.
 
------
 
-### 3\. Arquivo: `faturas_por_cliente_*.csv` (Financeiro - Recebíveis)
+* **`COL_Cor Pontualidade` (Regra de Negócio para Dashboard):**
+* Verde: Taxa >= 95%
+* Amarelo: Taxa >= 85%
+* Vermelho: < 85%
 
-**Foco:** Fluxo de caixa futuro (o que vai entrar).
 
-  * **Chave Única:** Combinação de `Fatura / N° Doc` + `Parcelas / Vencimento` (uma fatura pode ter parcelas).
-  * **Data Crítica:** `Parcelas / Vencimento` (Use esta para o Eixo X).
-  * **Fórmulas DAX:**
 
-<!-- end list -->
+---
 
-```dax
-// 1. Total a Receber (Carteira Aberta)
-// Filtra apenas o que não foi baixado (pago) ainda
-Saldo a Receber = 
-CALCULATE(
-    SUM('Faturas por Cliente'[Fatura / Valor]),
-    'Faturas por Cliente'[Baixa / Data] = BLANK()
-)
+###3.3. Entidade: Manifestos (`fManifestos`)Focada em custos e viagens (MDF-e).
 
-// 2. Total Recebido (Caixa Realizado)
-Caixa Entrada = 
-CALCULATE(
-    SUM('Faturas por Cliente'[Fatura / Valor]),
-    NOT(ISBLANK('Faturas por Cliente'[Baixa / Data]))
-)
-
-// 3. Inadimplência (Atrasados)
-Valor Inadimplente = 
-CALCULATE(
-    [Saldo a Receber],
-    'Faturas por Cliente'[Parcelas / Vencimento] < TODAY()
-)
-```
+**A. ETL e Transformações**
 
------
+1. **Fonte:** `vw_manifestos_powerbi`.
+2. **Tratamento Booleano:** Converter colunas `Km manual`, `Gerar MDF-e`, `Solicitou Monitoramento` de texto ("Sim"/"Não" ou "1"/"0") para Booleano (`True`/`False`).
 
-### 4\. Arquivo: `contas_a_pagar_*.csv` (Financeiro - Pagáveis)
+**B. Métricas e KPIs**
 
-**Foco:** Saída de caixa.
+* **`MAN_Manifestos Qtde`:** Contagem de linhas.
+* **`MAN_Custo Total`:** Soma da coluna `Custo total`.
+* **`MAN_Valor Fretes`:** Soma da coluna `Fretes/Total` (Receita atrelada ao manifesto).
+* **`MAN_Rentabilidade`:**
+* Formula: `( [MAN_Valor Fretes] - [MAN_Custo Total] ) / [MAN_Valor Fretes]`.
+* *Meta:* >= 20% (Verde), >= 10% (Amarelo), < 10% (Vermelho).
 
-  * **Chave Única:** `Lançamento a Pagar/N°`.
-  * **Colunas de Dinheiro:** `Valor a pagar` (Previsto) e `Valor pago` (Realizado).
-  * **Fórmulas DAX:**
 
-<!-- end list -->
+* **`MAN_Custo por KM`:** `[MAN_Custo Total]` / Soma de `KM viagem`.
+* **`KPI_Utilizacao Frota`:**
+* Numerador: Soma de `Total peso taxado`.
+* Denominador: Soma de `Carreta 1/Capacidade Peso`.
 
-```dax
-// 1. Contas a Pagar (Fluxo Futuro)
-// Use relacionamento ativo com a Data de Vencimento (se houver) ou Emissão + Prazo
-Saldo a Pagar = 
-CALCULATE(
-    SUM('Contas a Pagar'[Valor a pagar]),
-    'Contas a Pagar'[Baixa/Data liquidação] = BLANK()
-)
 
-// 2. Pagamentos Realizados (Fluxo Passado)
-// Nota: Aqui usamos a data de LIQUIDAÇÃO, não a de emissão.
-Caixa Saída = 
-CALCULATE(
-    SUM('Contas a Pagar'[Valor pago]),
-    USERELATIONSHIP('dCalendario'[Data], 'Contas a Pagar'[Baixa/Data liquidação])
-)
-```
 
------
+---
 
-### 5\. Arquivo: `cotacoes_*.csv` (Comercial - Funil)
+###3.4. Entidade: Financeiro / Contas a Pagar (`fContasAPagar`)Focada em despesas e fluxo de caixa passivo.
 
-**Foco:** Eficiência de Vendas.
+**A. ETL e Transformações**
 
-  * **Chave Única:** `Cotação`.
-  * **Colunas Importantes:** `Status Conversão`, `Valor Frete`.
-  * **Fórmulas DAX:**
+1. **Fonte:** `vw_contas_a_pagar_powerbi`.
+2. **Coluna Crítica `Flag_Operacional`:**
+* Regra: Se `Centro de custo/Nome` for "ADMINISTRATIVO GERAL" **OU** `Fornecedor/Nome` for "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA", então `0`, senão `1`.
+* *Importante:* Isso define o que é Custo Operacional vs Despesa Administrativa.
 
-<!-- end list -->
 
-```dax
-// 1. Volume Total Cotado (R$)
-Total Oportunidades R$ = SUM(Cotacoes[Valor Frete])
+3. **Coluna `Vencimento Estimado`:** Se `Emissão` for nulo, usar `Data criação`. Somar 30 dias a essa data base.
 
-// 2. Taxa de Conversão (Hit Rate)
-// Assumindo que o status de sucesso é "Convertida" ou "Aprovada"
-Taxa de Conversão = 
-VAR Ganhas = CALCULATE(COUNTROWS(Cotacoes), Cotacoes[Status Conversão] = "Convertida")
-VAR Total = COUNTROWS(Cotacoes)
-RETURN DIVIDE(Ganhas, Total, 0)
+**B. Métricas e KPIs**
 
-// 3. Perda Financeira (Quanto deixamos de ganhar)
-Valor Perdido = 
-CALCULATE(
-    SUM(Cotacoes[Valor Frete]),
-    Cotacoes[Status Conversão] = "Perdida" // Ajuste conforme o texto exato do seu CSV
-)
-```
+* **`CAP_Valor A Pagar Operacional`:** Soma de `Valor a pagar` filtrando onde `Flag_Operacional == 1`.
+* **`CAP_Valor Pago`:** Soma de `Valor pago` (considerando a data de liquidação para filtro temporal, `USERELATIONSHIP` no Power BI).
+* **`CAP_Vencidas Qtde`:** Contagem onde `Status Pagamento` == "ABERTO" e `Vencimento Estimado` < Data de Hoje.
 
------
+---
 
-### 6\. Arquivo: `localizacao_cargas_*.csv` (Operacional - Rastreio)
+###3.5. Entidade: Comercial / Cotações (`fCotacoes`)Funil de vendas.
 
-**Foco:** Onde está a carga agora.
+**A. ETL e Transformações**
 
-  * **Chave Única:** `CT-e`.
-  * **Colunas Importantes:** `Status Carga`, `Filial Atual`, `Previsão Entrega`.
-  * **Fórmulas DAX:**
+1. **Fonte:** `vw_cotacoes_powerbi`.
+2. **Coluna `Status_Cotacao`:**
+* Lógica: Se a coluna `CT-e/Data de emissão` não for nula, então "CONVERTIDA", senão "PENDENTE".
 
-<!-- end list -->
 
-```dax
-// 1. Cargas em Atraso (Backlog Crítico)
-Qtd Atrasados = 
-CALCULATE(
-    COUNTROWS('Localizacao Cargas'),
-    'Localizacao Cargas'[Previsão Entrega] < TODAY(),
-    'Localizacao Cargas'[Status Carga] <> "Entregue" // ou "finished"
-)
 
-// 2. Cargas Paradas na Filial (Gargalo)
-Qtd em Armazem = 
-CALCULATE(
-    COUNTROWS('Localizacao Cargas'),
-    'Localizacao Cargas'[Status Carga] = "in_warehouse" // Ajuste conforme CSV
-)
-```
+**B. Métricas e KPIs**
 
------
+* **`COT_Realizadas Qtde`:** Contagem de `N° Cotação`.
+* **`COT_Convertidas Qtde`:** Contagem onde `Status Conversão` (ou a calculada `Status_Cotacao`) == "CONVERTIDA".
+* **`COT_Taxa Conversao`:** `Convertidas` / `Realizadas`.
+* **`COT_Rank Cliente Valor`:** Rankeamento denso dos clientes baseado na soma de `Valor frete`.
 
-### 7\. Arquivo: `coletas_*.csv` (Operacional - Primeira Milha)
+---
 
-**Foco:** SLA de Coleta.
+###3.6. Entidade: Faturas (`fFaturasCliente`)Contas a Receber.
 
-  * **Chave Única:** `ID` ou `Coleta`.
-  * **Colunas Importantes:** `Status`, `Hora (Solicitacao)`, `Horario (Inicio)`.
-  * **Fórmulas DAX:**
+**A. ETL e Transformações**
 
-<!-- end list -->
+1. **Fonte:** `vw_faturas_por_cliente_powerbi`.
+2. **Filtro:** Apenas linhas onde `CT-e/Data de emissão` não é nulo.
 
-```dax
-// 1. Eficiência de Coleta
-% Coletas Realizadas = 
-VAR Realizadas = CALCULATE(COUNTROWS(Coletas), Coletas[Status] = "finished")
-VAR Total = COUNTROWS(Coletas)
-RETURN DIVIDE(Realizadas, Total, 0)
+**B. Métricas e KPIs**
 
-// 2. Tempo Médio de Atendimento (Horas)
-// Precisa converter as colunas de hora para formato Time no Power Query antes
-Tempo Medio Coleta = 
-AVERAGEX(
-    FILTER(Coletas, Coletas[Status] = "finished"),
-    DATEDIFF(Coletas[Hora (Solicitacao)], Coletas[Horario (Inicio)], HOUR)
-)
-```
+* **`FAT_Valor Fatura`:** Soma de `Fatura/Valor`.
+* **`FAT_Valor Aberto`:** Soma de `Fatura/Valor` onde `Fatura/Baixa` (data de pagamento) é Nulo (BLANK).
+* **`FAT_CTes Cancelados`:** Contagem onde `CT-e/Status` == "Cancelado".
 
------
+---
 
-### 🚀 Dica de Implementação
+###3.7. Entidade: Localização (`fLocalizacaoCargas`)Rastreamento.
 
-1.  Importe os 7 arquivos no Power BI.
-2.  No Power Query, certifique-se de que colunas numéricas (`Receita`, `Valor Frete`, `Custo Total`) estejam como "Número Decimal" e não Texto.
-3.  Crie as Medidas DAX acima (não Colunas Calculadas, use **Medidas** para performance).
-4.  Monte as telas conforme o "Blueprints" que passei na resposta anterior.
+**A. ETL e Transformações**
 
-Se seguir essas fórmulas, o número de "42 Milhões" vai desaparecer e você terá o valor real do lucro da transportadora.
+1. **Fonte:** `vw_localizacao_cargas_powerbi`.
+
+**B. Métricas e KPIs**
+
+* **`LOC_Total Cargas`:** Contagem de linhas.
+* **`LOC_Em Transito`:** Contagem onde `Status Carga` == "in_transfer".
+* **`LOC_Principal Destino`:** A região (`Região Destino`) com maior volume de cargas (Top 1).
+
+---
+
+##4. KPIs Executivos (Cálculo Cruzado)Estes são os cálculos que cruzam tabelas e devem ser feitos com cuidado no Python (geralmente requerem `merge` ou agregação prévia por período).
+
+1. **`KPI_Receita Total`:**
+* `Soma(fFretes[Valor Total])` + `Soma(fFaturasCliente[Valor Fatura])`.
+
+
+2. **`KPI_Custo Total`:**
+* `Soma(fManifestos[Custo Total])` + `Soma(fContasAPagar[Valor a pagar])` (Apenas Operacional: Flag=1).
+
+
+3. **`KPI_Lucro Bruto`:**
+* `Receita Total` - `Custo Total`.
+
+
+4. **`KPI_Margem Bruta`:**
+* `Lucro Bruto` / `Receita Total`.
+
+
+5. **`RES_Resultado Liquido` (Visão de Caixa):**
+* `Receita (Faturas)` - (`Custos Viagem (Manifestos)` + `Despesas Fixas (ContasAPagar Original)`).
+
+
+
+---
+
+##5. Dicas para Implementação no Python1. **Datas (`USERELATIONSHIP`):**
+* No Power BI, medidas como `CAP_Valor Pago` usam a "Data de Liquidação" em vez da "Data de Emissão".
+* **No Python:** Ao calcular fluxo de caixa realizado, não use a coluna de data padrão do índice. Você deve fazer um `groupby` pela coluna `Baixa/Data liquidação` para somar os valores pagos naquele período.
+
+
+2. **Filtros de Contexto:**
+* Medidas como `COT_Var Qtde YOY` exigem que você desloque os dados (shift). Use `df.groupby('Ano')['Valor'].sum().pct_change()` para facilitar.
+
+
+3. **Relacionamentos:**
+* Como não há motor de relação automática no Pandas, faça *merges* (left join) das tabelas fato com a tabela `dFiliais` usando `ID_Filial` antes de agrupar, caso precise quebrar os KPIs por Filial.
+
+
+4. **Ocorrências:**
+* Como a tabela não existe no JSON, você precisará importar a view `vw_ocorrencias` do seu banco SQL e criar a lógica padrão: Contagem de Ocorrências, % de Resolução (se houver status) e Tempo Médio de Tratamento.
+
+
+
+Este guia cobre toda a lógica de negócio contida no arquivo `.bim`. Você pode agora traduzir cada item de "Métrica" para uma linha de código Pandas/Polars.

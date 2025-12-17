@@ -22,6 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import br.com.extrator.db.entity.PageAuditEntity;
+import br.com.extrator.db.repository.PageAuditRepository;
 import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.util.CarregadorConfig;
@@ -51,6 +53,8 @@ public class ClienteApiGraphQL {
     private final ObjectMapper mapeadorJson;
     private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
     private final Duration timeoutRequisicao;
+    private final PageAuditRepository pageAuditRepository;
+    private String executionUuid;
 
     /**
      * Executa uma query GraphQL com paginação automática e proteções contra loops infinitos
@@ -67,7 +71,8 @@ public class ClienteApiGraphQL {
         // CIRCUIT BREAKER - Verificar se a entidade está com circuit aberto
         if (entidadesComCircuitAberto.contains(chaveEntidade)) {
             logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Entidade {} temporariamente desabilitada devido a falhas consecutivas", nomeEntidade);
-            return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
+            final java.util.List<T> vazio = new java.util.ArrayList<>();
+            return ResultadoExtracao.completo(vazio, 0, 0);
         }
         
         logger.info("🔍 Executando query GraphQL paginada para entidade: {}", nomeEntidade);
@@ -79,8 +84,31 @@ public class ClienteApiGraphQL {
         int totalRegistrosProcessados = 0;
         boolean interrompido = false; // NOVO: Rastrear se foi interrompido
         
-        // ✅ LER A CONFIGURAÇÃO UMA VEZ ANTES DO LOOP
-        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiGraphQL();
+        final int limitePaginasGeral = CarregadorConfig.obterLimitePaginasApiGraphQL();
+        final int limitePaginas = "creditCustomerBilling".equals(nomeEntidade)
+                ? CarregadorConfig.obterLimitePaginasFaturasGraphQL()
+                : limitePaginasGeral;
+        final boolean auditar = "creditCustomerBilling".equals(nomeEntidade);
+        final String runUuid = auditar ? java.util.UUID.randomUUID().toString() : null;
+        final int perInt = 100;
+        java.time.LocalDate janelaInicio = null;
+        java.time.LocalDate janelaFim = null;
+        try {
+            final Object paramsObj = variaveis != null ? variaveis.get("params") : null;
+            if (paramsObj instanceof final java.util.Map<?, ?> m) {
+                final Object v1 = m.get("issueDate");
+                final Object v2 = m.get("dueDate");
+                final Object v3 = m.get("originalDueDate");
+                final String dataStr = v1 != null ? v1.toString() : (v2 != null ? v2.toString() : (v3 != null ? v3.toString() : null));
+                if (dataStr != null && !dataStr.isBlank()) {
+                    try {
+                        final java.time.LocalDate d = java.time.LocalDate.parse(dataStr);
+                        janelaInicio = d;
+                        janelaFim = d;
+                    } catch (final RuntimeException ignored) {}
+                }
+            }
+        } catch (final RuntimeException ignored) {}
 
         while (hasNextPage) {
             try {
@@ -108,10 +136,24 @@ public class ClienteApiGraphQL {
 
                 logger.debug("Executando página {} da query GraphQL para {}", paginaAtual, nomeEntidade);
                 
-                // Adicionar cursor às variáveis se não for a primeira página
                 final Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
                 if (cursor != null) {
                     variaveisComCursor.put("after", cursor);
+                }
+                String resumoParams = null;
+                try {
+                    final Object paramsObj = variaveisComCursor.get("params");
+                    if (paramsObj instanceof final java.util.Map<?, ?> m) {
+                        final Object v1 = ((java.util.Map<?, ?>) m).get("serviceAt");
+                        final Object v2 = ((java.util.Map<?, ?>) m).get("requestDate");
+                        final String intervalo = v1 != null ? v1.toString() : (v2 != null ? v2.toString() : "");
+                        final String cursorStr = cursor != null ? cursor : "<inicio>";
+                        resumoParams = "after=" + cursorStr + " | intervalo=" + intervalo;
+                    }
+                } catch (final RuntimeException ignored) {
+                }
+                if (resumoParams != null) {
+                    logger.info("Parâmetros da requisição: {}", resumoParams);
                 }
 
                 // Executar a query para esta página
@@ -120,6 +162,39 @@ public class ClienteApiGraphQL {
                 // Adicionar entidades desta página ao resultado total
                 todasEntidades.addAll(resposta.getEntidades());
                 totalRegistrosProcessados += resposta.getEntidades().size();
+                
+                if (auditar && this.executionUuid != null && runUuid != null) {
+                    final PageAuditEntity audit = new PageAuditEntity();
+                    audit.setExecutionUuid(this.executionUuid);
+                    audit.setRunUuid(runUuid);
+                    audit.setTemplateId(9901);
+                    audit.setPage(paginaAtual);
+                    audit.setPer(perInt);
+                    audit.setJanelaInicio(janelaInicio);
+                    audit.setJanelaFim(janelaFim);
+                    audit.setReqHash(resposta.getReqHash() != null ? resposta.getReqHash() : "");
+                    audit.setRespHash(resposta.getRespHash() != null ? resposta.getRespHash() : "");
+                    audit.setTotalItens(resposta.getTotalItens());
+                    audit.setIdKey("id");
+                    Long minNum = null;
+                    Long maxNum = null;
+                    if (tipoClasse != null && tipoClasse.getName().endsWith("CreditCustomerBillingNodeDTO")) {
+                        for (final T it : resposta.getEntidades()) {
+                            try {
+                                final Long idVal = ((br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO) it).getId();
+                                if (idVal != null) {
+                                    minNum = (minNum == null || idVal < minNum) ? idVal : minNum;
+                                    maxNum = (maxNum == null || idVal > maxNum) ? idVal : maxNum;
+                                }
+                            } catch (final RuntimeException ignored) {}
+                        }
+                    }
+                    audit.setIdMinNum(minNum);
+                    audit.setIdMaxNum(maxNum);
+                    audit.setStatusCode(resposta.getStatusCode());
+                    audit.setDuracaoMs(resposta.getDuracaoMs());
+                    this.pageAuditRepository.inserir(audit);
+                }
                 
                 // Reset do contador de falhas em caso de sucesso
                 contadorFalhasConsecutivas.put(chaveEntidade, 0);
@@ -135,7 +210,7 @@ public class ClienteApiGraphQL {
                 
                 // Não é mais necessário pausar entre requisições - o GerenciadorRequisicaoHttp já controla o throttling
                 
-            } catch (final Exception e) {
+            } catch (final RuntimeException e) {
                 logger.error("💥 Erro ao executar query GraphQL para entidade {} página {}: {}", 
                         nomeEntidade, paginaAtual, e.getMessage(), e);
                 incrementarContadorFalhas(chaveEntidade, nomeEntidade);
@@ -176,8 +251,14 @@ public class ClienteApiGraphQL {
                 .build();
         this.mapeadorJson = new ObjectMapper();
         this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
+        this.pageAuditRepository = new PageAuditRepository();
+        this.pageAuditRepository.criarTabelaSeNaoExistir();
+        this.executionUuid = java.util.UUID.randomUUID().toString();
     }
 
+    public void setExecutionUuid(final String uuid) {
+        this.executionUuid = uuid;
+    }
     /**
      * Busca coletas via GraphQL para as últimas 24h (ontem + hoje)
      * API GraphQL de coletas (PickInput) SÓ aceita 1 data específica em requestDate, não aceita intervalo.
@@ -212,6 +293,7 @@ public class ClienteApiGraphQL {
                         customer { id name cnpj }
                         pickAddress {
                           line1
+                          line2
                           number
                           neighborhood
                           postalCode
@@ -314,15 +396,17 @@ public class ClienteApiGraphQL {
      */
     public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataReferencia) {
         final String query = """
-                query BuscarFretes_Master_V6($params: FreightInput!, $after: String) {
+                query BuscarFretes_Master_V8($params: FreightInput!, $after: String) {
                   freight(params: $params, after: $after, first: 100) {
                     edges {
                       node {
                         id
+                        accountingCreditId
+                        accountingCreditInstallmentId
                         referenceNumber
                         serviceAt
                         createdAt
-                        cte { key number series issuedAt emissionType }
+                        cte { id key number series issuedAt createdAt emissionType }
                         total
                         subtotal
                         invoicesValue
@@ -343,10 +427,11 @@ public class ClienteApiGraphQL {
                         serviceDate
                         serviceType
                         deliveryPredictionDate
-                        corporation { name nickname cnpj }
+                        corporation { id nickname cnpj }
                         customerPriceTable { name }
                         freightClassification { name }
                         costCenter { name }
+                        
                         originCity { name state { code } }
                         destinationCity { name state { code } }
                         destinationCityId
@@ -376,7 +461,7 @@ public class ClienteApiGraphQL {
                         secCatSubtotal
                         suframaSubtotal
                         tdeSubtotal
-                        fiscalDetail { cstType cfopCode calculationBasis taxRate taxValue pisRate pisValue cofinsRate cofinsValue hasDifal }
+                        fiscalDetail { cstType cfopCode calculationBasis taxRate taxValue pisRate pisValue cofinsRate cofinsValue hasDifal difalTaxValueOrigin difalTaxValueDestination }
                         trtSubtotal
                       }
                     }
@@ -416,6 +501,179 @@ public class ClienteApiGraphQL {
     }
 
     /**
+     * Busca NFSe diretamente via GraphQL para enriquecer fretes com metadados.
+     * Utiliza paginação e traz campos diretos e o XML bruto.
+     */
+    public ResultadoExtracao<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> buscarNfseDireta(final LocalDate dataReferencia) {
+        final String query = """
+            query ExtracaoNfseDireta($params: NfseInput!, $after: String) {
+              nfse(params: $params, first: 100, after: $after) {
+                edges {
+                   node {
+                     id
+                    freightId
+                    freight { id }
+                     number
+                     status
+                     rpsSeries
+                     issuedAt
+                     cancelationReason
+                    pdfServiceUrl
+                    xmlDocument
+                    corporationId
+                    nfseService { id description }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+        """;
+        try {
+            final java.time.LocalDate dataInicio = dataReferencia.minusDays(1);
+            final java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            final String intervaloIssuedAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
+            final Map<String, Object> variaveis = java.util.Map.of(
+                "params", java.util.Map.of("issuedAt", intervaloIssuedAt)
+            );
+            logger.info("Buscando NFSe via GraphQL - Período: {}", intervaloIssuedAt);
+            return executarQueryPaginada(query, "nfse", variaveis, br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO.class);
+        } catch (final RuntimeException e) {
+            logger.warn("Falha ao buscar NFSe direta: {}", e.getMessage());
+            final java.util.List<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> vazio = new java.util.ArrayList<>();
+            return ResultadoExtracao.completo(vazio, 0, 0);
+        }
+    }
+
+    public ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataReferencia) {
+        final String query = """
+            query ExtrairFaturas_Billing_Final($params: CreditCustomerBillingInput!, $after: String) {
+              creditCustomerBilling(params: $params, first: 100, after: $after) {
+                pageInfo { hasNextPage endCursor }
+                edges {
+                  node {
+                    id
+                    document
+                    dueDate
+                    issueDate
+                    value
+                    customer {
+                      id
+                      nickname
+                      person { name cnpj }
+                    }
+                  }
+                }
+              }
+            }
+        """;
+        final java.util.List<String> campos = listarCamposInputCreditCustomerBilling();
+        String campoFiltro = "dueDate";
+        if (campos != null && !campos.isEmpty()) {
+            logger.info("Campos CreditCustomerBillingInput disponíveis: {}", campos);
+            if (campos.contains("dueDate")) {
+                campoFiltro = "dueDate";
+            } else if (campos.contains("originalDueDate")) {
+                campoFiltro = "originalDueDate";
+            } else if (campos.contains("issueDate")) {
+                campoFiltro = "issueDate";
+            }
+        }
+        final int diasJanela = br.com.extrator.util.CarregadorConfig.obterDiasJanelaFaturasGraphQL();
+        final LocalDate dataInicio = dataReferencia.minusDays(Math.max(0, diasJanela - 1));
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        final java.util.List<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> todas = new java.util.ArrayList<>();
+        int totalPaginas = 0;
+        boolean completo = true;
+        LocalDate dia = dataInicio;
+        while (!dia.isAfter(dataReferencia)) {
+            final String dataStr = dia.format(formatter);
+            final Map<String, Object> params = new java.util.HashMap<>();
+            params.put(campoFiltro, dataStr);
+            final String corpId = br.com.extrator.util.CarregadorConfig.obterCorporationId();
+            if (corpId != null && !corpId.isBlank()) {
+                if (campos != null && campos.contains("corporationId")) {
+                    params.put("corporationId", corpId);
+                } else if (campos != null && campos.contains("corporation")) {
+                    params.put("corporation", java.util.Map.of("id", corpId));
+                }
+            }
+            final Map<String, Object> variaveisDia = java.util.Map.of("params", params);
+            logger.info("Buscando Capa Faturas via GraphQL - {}: {}", campoFiltro, dataStr);
+            final ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> r = executarQueryPaginada(
+                query, "creditCustomerBilling", variaveisDia, br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO.class
+            );
+            todas.addAll(r.getDados());
+            totalPaginas += r.getPaginasProcessadas();
+            if (!r.isCompleto()) completo = false;
+            dia = dia.plusDays(1);
+        }
+        if (todas.isEmpty()) {
+            logger.info("ℹ️ Nenhum registro encontrado com filtro {} em janela de {} dias. Tentando busca sem filtros (últimos 100)...", campoFiltro, diasJanela);
+            final Map<String, Object> paramsFallback = new java.util.HashMap<>();
+            final String corpId2 = br.com.extrator.util.CarregadorConfig.obterCorporationId();
+            if (corpId2 != null && !corpId2.isBlank()) {
+                if (campos != null && campos.contains("corporationId")) {
+                    paramsFallback.put("corporationId", corpId2);
+                } else if (campos != null && campos.contains("corporation")) {
+                    paramsFallback.put("corporation", java.util.Map.of("id", corpId2));
+                }
+            }
+            final Map<String, Object> variaveisFallback = java.util.Map.of("params", paramsFallback);
+            final ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> fallback = executarQueryPaginada(
+                query, "creditCustomerBilling", variaveisFallback, br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO.class
+            );
+            todas.addAll(fallback.getDados());
+            totalPaginas += fallback.getPaginasProcessadas();
+            if (!fallback.isCompleto()) completo = false;
+        }
+        if (todas.isEmpty()) {
+            logger.info("❌ Query GraphQL concluída - Entidade creditCustomerBilling: Nenhum registro encontrado");
+        } else {
+            logger.info("✅ Encontrados {} registros de capa de faturas no período", todas.size());
+        }
+        if (completo) {
+            return ResultadoExtracao.completo(todas, totalPaginas, todas.size());
+        } else {
+            return ResultadoExtracao.incompleto(todas, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, totalPaginas, todas.size());
+        }
+    }
+
+    private java.util.List<String> listarCamposInputCreditCustomerBilling() {
+        try {
+            final String introspection = """
+                query CamposCreditCustomerBillingInput {
+                  __type(name: "CreditCustomerBillingInput") {
+                    inputFields { name }
+                  }
+                }
+            """;
+            final com.fasterxml.jackson.databind.node.ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            corpoJson.put("query", introspection);
+            final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
+            final java.net.http.HttpRequest requisicao = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(urlBase + endpointGraphQL))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + token)
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(corpoRequisicao))
+                    .timeout(this.timeoutRequisicao)
+                    .build();
+            final java.net.http.HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-Introspection");
+            final com.fasterxml.jackson.databind.JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+            final java.util.List<String> campos = new java.util.ArrayList<>();
+            final com.fasterxml.jackson.databind.JsonNode fields = respostaJson.path("data").path("__type").path("inputFields");
+            if (fields.isArray()) {
+                for (final com.fasterxml.jackson.databind.JsonNode f : fields) {
+                    final String nome = f.path("name").asText();
+                    if (nome != null && !nome.isBlank()) campos.add(nome);
+                }
+            }
+            return campos;
+        } catch (final java.io.IOException e) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
      * Executa uma query GraphQL de forma genérica e robusta com desserialização tipada
      * 
      * @param query        A query GraphQL a ser executada
@@ -431,14 +689,19 @@ public class ClienteApiGraphQL {
         final List<T> entidades = new ArrayList<>();
         boolean hasNextPage = false;
         String endCursor = null;
+        int statusCode;
+        int duracaoMs;
+        String reqHash;
+        String respHash;
 
         // Validação básica de configuração
         if (urlBase == null || urlBase.isBlank() || token == null || token.isBlank()) {
             logger.error("Configurações inválidas para chamada GraphQL (urlBase/token)");
-            return new PaginatedGraphQLResponse<>(entidades, false, null);
+            return new PaginatedGraphQLResponse<>(entidades, false, null, 0, 0, "", "", entidades.size());
         }
 
         try {
+            final long tempoInicio = System.currentTimeMillis();
             // Construir o corpo da requisição GraphQL usando ObjectMapper
             final ObjectNode corpoJson = mapeadorJson.createObjectNode();
             corpoJson.put("query", query);
@@ -446,6 +709,14 @@ public class ClienteApiGraphQL {
                 corpoJson.set("variables", mapeadorJson.valueToTree(variaveis));
             }
             final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
+            try {
+                final byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(corpoRequisicao.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                final StringBuilder sb = new StringBuilder(d.length * 2);
+                for (final byte b : d) sb.append(String.format("%02x", b));
+                reqHash = sb.toString();
+            } catch (final java.security.NoSuchAlgorithmException ex) {
+                reqHash = "";
+            }
 
             // Construir a requisição HTTP
             final HttpRequest requisicao = HttpRequest.newBuilder()
@@ -458,28 +729,42 @@ public class ClienteApiGraphQL {
 
             // Executar a requisição usando o gerenciador central
             final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-" + nomeEntidade);
+            statusCode = resposta != null ? resposta.statusCode() : 0;
+            duracaoMs = (int) (System.currentTimeMillis() - tempoInicio);
+            try {
+                final byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest((resposta != null ? resposta.body() : "").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                final StringBuilder sb = new StringBuilder(d.length * 2);
+                for (final byte b : d) sb.append(String.format("%02x", b));
+                respHash = sb.toString();
+            } catch (final java.security.NoSuchAlgorithmException ex) {
+                respHash = "";
+            }
 
             // Parsear a resposta JSON
+            if (resposta == null || resposta.body() == null) {
+                logger.warn("Resposta GraphQL nula para {}", nomeEntidade);
+                return new PaginatedGraphQLResponse<>(entidades, false, null, statusCode, duracaoMs, reqHash, respHash, entidades.size());
+            }
             final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
 
             // Verificar se há erros na resposta GraphQL
             if (respostaJson.has("errors")) {
                 final JsonNode erros = respostaJson.get("errors");
                 logger.error("Erros na query GraphQL para {}: {}", nomeEntidade, erros.toString());
-                return new PaginatedGraphQLResponse<>(entidades, false, null);
+                return new PaginatedGraphQLResponse<>(entidades, false, null, statusCode, duracaoMs, reqHash, respHash, entidades.size());
             }
 
             // Extrair os dados da resposta
             if (!respostaJson.has("data")) {
                 logger.warn("Resposta GraphQL sem campo 'data' para {}", nomeEntidade);
-                return new PaginatedGraphQLResponse<>(entidades, false, null);
+                return new PaginatedGraphQLResponse<>(entidades, false, null, statusCode, duracaoMs, reqHash, respHash, entidades.size());
             }
 
             final JsonNode dados = respostaJson.get("data");
             if (!dados.has(nomeEntidade)) {
                 logger.warn("Campo '{}' não encontrado na resposta GraphQL. Campos disponíveis: {}",
                         nomeEntidade, dados.fieldNames());
-                return new PaginatedGraphQLResponse<>(entidades, false, null);
+                return new PaginatedGraphQLResponse<>(entidades, false, null, statusCode, duracaoMs, reqHash, respHash, entidades.size());
             }
 
             final JsonNode dadosEntidade = dados.get(nomeEntidade);
@@ -538,11 +823,13 @@ public class ClienteApiGraphQL {
 
         } catch (final JsonProcessingException e) {
             logger.error("Erro de processamento JSON durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
+            return new PaginatedGraphQLResponse<>(entidades, false, null, 0, 0, "", "", entidades.size());
         } catch (final RuntimeException e) {
             logger.error("Erro durante execução da query GraphQL para {}: {}", nomeEntidade, e.getMessage(), e);
+            return new PaginatedGraphQLResponse<>(entidades, false, null, 0, 0, "", "", entidades.size());
         }
 
-        return new PaginatedGraphQLResponse<>(entidades, hasNextPage, endCursor);
+        return new PaginatedGraphQLResponse<>(entidades, hasNextPage, endCursor, statusCode, duracaoMs, reqHash, respHash, entidades.size());
     }
 
     /**

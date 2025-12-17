@@ -24,9 +24,11 @@ public class ExportadorCSV {
         "coletas",
         "contas_a_pagar",
         "faturas_por_cliente",
+        "faturas_graphql",
         "fretes",
         "manifestos",
-        "localizacao_cargas"
+        "localizacao_cargas",
+        "page_audit"
     };
     
     private static final String PASTA_DESTINO = "exports";
@@ -38,6 +40,9 @@ public class ExportadorCSV {
         System.out.println("===============================================================");
         System.out.println();
         
+        final String tabelaEspecifica = (args != null && args.length > 0) ? args[0].trim() : null;
+        final boolean somenteUmaTabela = tabelaEspecifica != null && !tabelaEspecifica.isEmpty();
+
         // Criar pasta de destino
         final Path pastaExports = Paths.get(PASTA_DESTINO);
         try {
@@ -66,13 +71,10 @@ public class ExportadorCSV {
         } catch (final Exception e) {
         }
         
-        // Exportar cada entidade
-        for (int i = 0; i < ENTIDADES.length; i++) {
-            final String entidade = ENTIDADES[i];
-            System.out.printf("[%d/%d] 📊 Exportando: %s%n", i + 1, ENTIDADES.length, entidade);
-            
+        if (somenteUmaTabela) {
+            System.out.println("📌 Exportando tabela específica: " + tabelaEspecifica);
             try {
-                final int registros = exportarEntidade(entidade, timestamp);
+                final int registros = exportarEntidade(tabelaEspecifica, timestamp);
                 System.out.println("    ✅ Sucesso: " + registros + " registros");
                 totalRegistros += registros;
                 entidadesExportadas++;
@@ -80,6 +82,20 @@ public class ExportadorCSV {
                 System.err.println("    ❌ Erro: " + e.getMessage());
             }
             System.out.println();
+        } else {
+            for (int i = 0; i < ENTIDADES.length; i++) {
+                final String entidade = ENTIDADES[i];
+                System.out.printf("[%d/%d] 📊 Exportando: %s%n", i + 1, ENTIDADES.length, entidade);
+                try {
+                    final int registros = exportarEntidade(entidade, timestamp);
+                    System.out.println("    ✅ Sucesso: " + registros + " registros");
+                    totalRegistros += registros;
+                    entidadesExportadas++;
+                } catch (final Exception e) {
+                    System.err.println("    ❌ Erro: " + e.getMessage());
+                }
+                System.out.println();
+            }
         }
         
         // Resumo final
@@ -107,7 +123,13 @@ public class ExportadorCSV {
                 SELECT
                     unique_id AS [ID Único],
                     filial AS [Filial],
+                    estado AS [Estado],
                     numero_cte AS [CT-e/Número],
+                    CASE 
+                      WHEN numero_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_cte)
+                      WHEN numero_nfse IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_nfse)
+                      ELSE NULL
+                    END AS [Número do Documento],
                     chave_cte AS [CT-e/Chave],
                     data_emissao_cte AS [CT-e/Data de emissão],
                     valor_frete AS [Frete/Valor dos CT-es],
@@ -118,8 +140,12 @@ public class ExportadorCSV {
                     pagador_nome AS [Pagador do frete/Nome],
                     pagador_documento AS [Pagador do frete/Documento],
                     remetente_nome AS [Remetente/Nome],
+                    remetente_documento AS [Remetente/Documento],
                     destinatario_nome AS [Destinatário/Nome],
+                    destinatario_documento AS [Destinatário/Documento],
                     vendedor_nome AS [Vendedor/Nome],
+                    numero_nfse AS [NFS-e/Número],
+                    numero_nfse AS [fit_nse_number],
                     CASE WHEN fit_ant_document IS NOT NULL THEN 'Faturado' ELSE 'Aguardando Faturamento' END AS [Status do Processo],
                     fit_ant_document AS [Fatura/N° Documento],
                     fit_ant_issue_date AS [Fatura/Emissão],
@@ -130,6 +156,8 @@ public class ExportadorCSV {
                     data_vencimento_fatura AS [Parcelas/Vencimento],
                     data_baixa_fatura AS [Fatura/Baixa],
                     fit_ant_ils_original_due_date AS [Fatura/Data Vencimento Original],
+                    notas_fiscais AS [Notas Fiscais],
+                    pedidos_cliente AS [Pedidos/Cliente],
                     metadata AS [Metadata],
                     data_extracao AS [Data da Última Atualização]
                 FROM dbo.faturas_por_cliente;
@@ -144,6 +172,30 @@ public class ExportadorCSV {
                     numero_cte AS [Nº CT-e],
                     serie_cte AS [Série],
                     cte_issued_at AS [CT-e Emissão],
+                    cte_emission_type AS [CT-e Tipo Emissão],
+                    cte_id AS [CT-e ID],
+                    cte_created_at AS [CT-e Criado em],
+                    CASE 
+                      WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL OR numero_cte IS NOT NULL OR serie_cte IS NOT NULL THEN 'CT-e'
+                      WHEN nfse_number IS NOT NULL OR nfse_series IS NOT NULL OR nfse_xml_document IS NOT NULL OR nfse_integration_id IS NOT NULL THEN 'NFS-e'
+                      ELSE 'Pendente/Não Emitido'
+                    END AS [Documento Oficial/Tipo],
+                    CASE 
+                      WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN chave_cte
+                      ELSE NULL
+                    END AS [Documento Oficial/Chave],
+                    CASE 
+                      WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_cte)
+                      ELSE CONVERT(NVARCHAR(50), nfse_number)
+                    END AS [Documento Oficial/Número],
+                    CASE 
+                      WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), serie_cte)
+                      ELSE nfse_series
+                    END AS [Documento Oficial/Série],
+                    CASE 
+                      WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN NULL
+                      ELSE nfse_xml_document
+                    END AS [Documento Oficial/XML],
                     servico_em AS [Data frete],
                     criado_em AS [Criado em],
                     valor_total AS [Valor Total do Serviço],
@@ -169,6 +221,7 @@ public class ExportadorCSV {
                     destino_cidade AS [Destino],
                     destino_uf AS [UF Destino],
                     filial_nome AS [Filial],
+                    filial_apelido AS [Filial Apelido],
                     filial_cnpj AS [Filial CNPJ],
                     tabela_preco_nome AS [Tabela de Preço],
                     classificacao_nome AS [Classificação],
@@ -202,8 +255,23 @@ public class ExportadorCSV {
                     fiscal_tax_value AS [Valor ICMS],
                     fiscal_pis_value AS [Valor PIS],
                     fiscal_cofins_value AS [Valor COFINS],
+                    fiscal_calculation_basis AS [Base de Cálculo ICMS],
+                    fiscal_tax_rate AS [Alíquota ICMS %],
+                    fiscal_pis_rate AS [Alíquota PIS %],
+                    fiscal_cofins_rate AS [Alíquota COFINS %],
+                    fiscal_has_difal AS [Possui DIFAL],
+                    fiscal_difal_origin AS [DIFAL Origem],
+                    fiscal_difal_destination AS [DIFAL Destino],
                     nfse_series AS [Série NFS-e],
                     nfse_number AS [Nº NFS-e],
+                    nfse_integration_id AS [NFS-e/ID Integração],
+                    nfse_status AS [NFS-e/Status],
+                    nfse_issued_at AS [NFS-e/Emissão],
+                    nfse_cancelation_reason AS [NFS-e/Cancelamento/Motivo],
+                    nfse_pdf_service_url AS [NFS-e/PDF],
+                    nfse_corporation_id AS [NFS-e/Filial ID],
+                    nfse_service_description AS [NFS-e/Serviço/Descrição],
+                    nfse_xml_document AS [NFS-e/XML],
                     insurance_id AS [Seguro ID],
                     other_fees AS [Outras Tarifas],
                     km AS [KM],
@@ -306,6 +374,23 @@ public class ExportadorCSV {
                 FROM dbo.contas_a_pagar;
             """;
             stmt.execute(sqlContas);
+
+            final String sqlFaturasGraphQL = """
+                CREATE OR ALTER VIEW dbo.vw_faturas_graphql_powerbi AS
+                SELECT
+                    id               AS [ID],
+                    document         AS [Fatura/N° Documento],
+                    issue_date       AS [Emissão],
+                    due_date         AS [Vencimento],
+                    value            AS [Valor],
+                    customer_id      AS [Cliente/ID],
+                    customer_name    AS [Cliente/Nome],
+                    customer_cnpj    AS [Cliente/CNPJ],
+                    metadata         AS [Metadata],
+                    data_extracao    AS [Data de extracao]
+                FROM dbo.faturas_graphql;
+            """;
+            stmt.execute(sqlFaturasGraphQL);
 
             final String sqlLocalizacao = """
                 CREATE OR ALTER VIEW dbo.vw_localizacao_cargas_powerbi AS
@@ -447,7 +532,8 @@ public class ExportadorCSV {
      * Exporta uma entidade para CSV
      */
     private static int exportarEntidade(final String entidade, final String timestamp) throws Exception {
-        final String nomeArquivo = String.format("%s/%s_%s.csv", PASTA_DESTINO, entidade, timestamp);
+        final String entidadeArquivo = entidade.replaceAll("[^A-Za-z0-9_]+", "_");
+        final String nomeArquivo = String.format("%s/%s_%s.csv", PASTA_DESTINO, entidadeArquivo, timestamp);
         
         System.out.println("    🔍 Contando registros no banco...");
         
@@ -488,6 +574,7 @@ public class ExportadorCSV {
                 case "cotacoes" -> origem = "dbo.vw_cotacoes_powerbi";
                 case "contas_a_pagar" -> origem = "dbo.vw_contas_a_pagar_powerbi";
                 case "faturas_por_cliente" -> origem = "dbo.vw_faturas_por_cliente_powerbi";
+                case "faturas_graphql" -> origem = "dbo.vw_faturas_graphql_powerbi";
                 case "manifestos" -> origem = "dbo.vw_manifestos_powerbi";
                 case "localizacao_cargas" -> origem = "dbo.vw_localizacao_cargas_powerbi";
                 default -> origem = entidade;

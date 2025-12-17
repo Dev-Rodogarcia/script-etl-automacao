@@ -205,6 +205,19 @@ public class CompletudeValidator {
                                 contagemBanco = rsDb.getInt(1);
                             }
                         }
+                        if ("contas_a_pagar".equals(nomeEntidade) && contagemBanco == 0) {
+                            final String sqlDbFallbackDia = String.format(
+                                "SELECT COUNT(*) FROM %s WHERE CAST(data_extracao AS DATE) = CAST(? AS DATE)",
+                                nomeTabela
+                            );
+                            try (PreparedStatement stmtDb2 = conexao.prepareStatement(sqlDbFallbackDia)) {
+                                stmtDb2.setTimestamp(1, tsFim);
+                                try (ResultSet rsDb2 = stmtDb2.executeQuery()) {
+                                    rsDb2.next();
+                                    contagemBanco = rsDb2.getInt(1);
+                                }
+                            }
+                        }
                     } else {
                         final String sqlDb = String.format(
                             "SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())",

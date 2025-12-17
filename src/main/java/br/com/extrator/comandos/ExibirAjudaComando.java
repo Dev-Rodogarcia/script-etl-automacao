@@ -23,6 +23,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("                         rest      - Testa API REST");
         System.out.println("                         graphql   - Testa API GraphQL");
         System.out.println("                         dataexport- Testa API DataExport");
+        System.out.println("  --loop               Console de loop de extração (start/pause/resume/stop)");
         System.out.println("  --ajuda, --help      Exibe esta mensagem de ajuda");
         System.out.println();
         System.out.println("EXEMPLOS:");
@@ -31,6 +32,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  java -jar extrator.jar --auditoria");
         System.out.println("  java -jar extrator.jar --auditoria --periodo 2024-01-01 2024-01-31");
         System.out.println("  java -jar extrator.jar --testar-api rest");
+        System.out.println("  java -jar extrator.jar --loop");
         System.out.println();
         System.out.println("=".repeat(80));
     }

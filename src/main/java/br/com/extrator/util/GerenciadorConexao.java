@@ -30,6 +30,21 @@ public class GerenciadorConexao {
             
             throw new SQLException("Variáveis de ambiente do banco (DB_URL, DB_USER, DB_PASSWORD) não estão configuradas ou estão vazias.");
         }
-        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+        String url = DB_URL.trim();
+        if (url.startsWith("jdbc:sqlserver://")) {
+            final boolean temDatabaseName = url.toLowerCase().contains("databasename=");
+            final boolean temDatabase = url.toLowerCase().contains("database=");
+            if (!temDatabaseName && !temDatabase) {
+                final String nomeBanco = CarregadorConfig.obterNomeBancoDados();
+                if (nomeBanco != null && !nomeBanco.trim().isEmpty()) {
+                    if (url.endsWith(";")) {
+                        url = url + "databaseName=" + nomeBanco.trim();
+                    } else {
+                        url = url + ";databaseName=" + nomeBanco.trim();
+                    }
+                }
+            }
+        }
+        return DriverManager.getConnection(url, DB_USER, DB_PASSWORD);
     }
 }

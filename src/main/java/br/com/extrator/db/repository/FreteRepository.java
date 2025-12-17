@@ -48,6 +48,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     status NVARCHAR(50),
                     modal NVARCHAR(50),
                     tipo_frete NVARCHAR(100),
+                    accounting_credit_id BIGINT,
+                    accounting_credit_installment_id BIGINT,
                     valor_total DECIMAL(18, 2),
                     valor_notas DECIMAL(18, 2),
                     peso_notas DECIMAL(18, 3),
@@ -67,6 +69,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     destino_cidade NVARCHAR(255),
                     destino_uf NVARCHAR(10),
                     filial_nome NVARCHAR(255),
+                    filial_apelido NVARCHAR(255),
                     numero_nota_fiscal NVARCHAR(MAX),
                     tabela_preco_nome NVARCHAR(255),
                     classificacao_nome NVARCHAR(255),
@@ -83,6 +86,9 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     chave_cte NVARCHAR(100),
                     numero_cte INT,
                     serie_cte INT,
+                    cte_id BIGINT,
+                    cte_emission_type NVARCHAR(50),
+                    cte_created_at DATETIMEOFFSET,
 
                     service_type INT,
                     insurance_enabled BIT,
@@ -107,6 +113,14 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     globalized_type NVARCHAR(50),
                     price_table_accountable_type INT,
                     insurance_accountable_type INT,
+
+                    fiscal_calculation_basis DECIMAL(18, 2),
+                    fiscal_tax_rate DECIMAL(18, 6),
+                    fiscal_pis_rate DECIMAL(18, 6),
+                    fiscal_cofins_rate DECIMAL(18, 6),
+                    fiscal_has_difal BIT,
+                    fiscal_difal_origin DECIMAL(18, 2),
+                    fiscal_difal_destination DECIMAL(18, 2),
 
                     -- Coluna de Metadados para Resiliência e Completude
                     metadata NVARCHAR(MAX),
@@ -151,14 +165,38 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
         final String sqlView = """
             CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
-            SELECT
-                id AS [ID],
-                chave_cte AS [Chave CT-e],
-                numero_cte AS [Nº CT-e],
-                serie_cte AS [Série],
-                cte_issued_at AS [CT-e Emissão],
-                servico_em AS [Data frete],
-                criado_em AS [Criado em],
+                SELECT
+                    id AS [ID],
+                    chave_cte AS [Chave CT-e],
+                    numero_cte AS [Nº CT-e],
+                    serie_cte AS [Série],
+                    cte_issued_at AS [CT-e Emissão],
+                    cte_emission_type AS [CT-e Tipo Emissão],
+                    cte_id AS [CT-e ID],
+                    cte_created_at AS [CT-e Criado em],
+                CASE 
+                    WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL OR numero_cte IS NOT NULL OR serie_cte IS NOT NULL THEN 'CT-e'
+                    WHEN nfse_number IS NOT NULL OR nfse_series IS NOT NULL OR nfse_xml_document IS NOT NULL OR nfse_integration_id IS NOT NULL THEN 'NFS-e'
+                    ELSE 'Pendente/Não Emitido'
+                END AS [Documento Oficial/Tipo],
+                CASE 
+                    WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN chave_cte
+                    ELSE NULL
+                END AS [Documento Oficial/Chave],
+                CASE 
+                    WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_cte)
+                    ELSE CONVERT(NVARCHAR(50), nfse_number)
+                END AS [Documento Oficial/Número],
+                CASE 
+                    WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), serie_cte)
+                    ELSE nfse_series
+                END AS [Documento Oficial/Série],
+                CASE 
+                    WHEN cte_id IS NOT NULL OR chave_cte IS NOT NULL THEN NULL
+                    ELSE nfse_xml_document
+                END AS [Documento Oficial/XML],
+                    servico_em AS [Data frete],
+                    criado_em AS [Criado em],
                 valor_total AS [Valor Total do Serviço],
                 valor_notas AS [Valor NF],
                 peso_notas AS [Kg NF],
@@ -180,9 +218,10 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 destinatario_documento AS [Destinatario Doc],
                 destinatario_id AS [Destinatario ID],
                 destino_cidade AS [Destino],
-                destino_uf AS [UF Destino],
-                filial_nome AS [Filial],
-                filial_cnpj AS [Filial CNPJ],
+                    destino_uf AS [UF Destino],
+                    filial_nome AS [Filial],
+                    filial_apelido AS [Filial Apelido],
+                    filial_cnpj AS [Filial CNPJ],
                 tabela_preco_nome AS [Tabela de Preço],
                 classificacao_nome AS [Classificação],
                 centro_custo_nome AS [Centro de Custo],
@@ -193,10 +232,21 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 id_cidade_destino AS [Cidade Destino ID],
                 data_previsao_entrega AS [Previsão de Entrega],
                 modal AS [Modal],
-                status AS [Status],
-                tipo_frete AS [Tipo Frete],
+                CASE status
+                    WHEN 'pending' THEN 'pendente'
+                    WHEN 'finished' THEN 'finalizado'
+                    WHEN 'in_transit' THEN 'em trânsito'
+                    WHEN 'standby' THEN 'aguardando'
+                    WHEN 'manifested' THEN 'registrado'
+                    WHEN 'occurrence_treatment' THEN 'tratamento de ocorrência'
+                    ELSE status
+                END AS [Status],
+                REPLACE(tipo_frete, 'Freight::', '') AS [Tipo Frete],
                 service_type AS [Service Type],
-                insurance_enabled AS [Seguro Habilitado],
+                CASE WHEN insurance_enabled = 1 THEN 'Com seguro'
+                     WHEN insurance_enabled = 0 THEN 'Sem seguro'
+                     ELSE NULL
+                END AS [Seguro Habilitado],
                 gris_subtotal AS [GRIS],
                 tde_subtotal AS [TDE],
                 freight_weight_subtotal AS [Frete Peso],
@@ -206,25 +256,56 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 modal_cte AS [Modal CT-e],
                 redispatch_subtotal AS [Redispatch],
                 suframa_subtotal AS [SUFRAMA],
-                payment_type AS [Tipo Pagamento],
-                previous_document_type AS [Doc Anterior],
+                CASE payment_type
+                    WHEN 'bill' THEN 'cobrança'
+                    WHEN 'cash' THEN 'dinheiro'
+                    ELSE payment_type
+                END AS [Tipo Pagamento],
+                CASE previous_document_type
+                    WHEN 'electronic' THEN 'eletrônico'
+                    ELSE previous_document_type
+                END AS [Doc Anterior],
                 products_value AS [Valor Produtos],
                 trt_subtotal AS [TRT],
                 fiscal_cst_type AS [ICMS CST],
-                fiscal_cfop_code AS [CFOP],
-                fiscal_tax_value AS [Valor ICMS],
-                fiscal_pis_value AS [Valor PIS],
-                fiscal_cofins_value AS [Valor COFINS],
+                    fiscal_cfop_code AS [CFOP],
+                    fiscal_tax_value AS [Valor ICMS],
+                    fiscal_pis_value AS [Valor PIS],
+                    fiscal_cofins_value AS [Valor COFINS],
+                    fiscal_calculation_basis AS [Base de Cálculo ICMS],
+                    fiscal_tax_rate AS [Alíquota ICMS %],
+                    fiscal_pis_rate AS [Alíquota PIS %],
+                    fiscal_cofins_rate AS [Alíquota COFINS %],
+                    CASE WHEN fiscal_has_difal = 1 THEN 'possui'
+                         WHEN fiscal_has_difal = 0 THEN 'não possui'
+                         ELSE NULL
+                    END AS [Possui DIFAL],
+                    fiscal_difal_origin AS [DIFAL Origem],
+                    fiscal_difal_destination AS [DIFAL Destino],
                 nfse_series AS [Série NFS-e],
                 nfse_number AS [Nº NFS-e],
+                nfse_integration_id AS [NFS-e/ID Integração],
+                nfse_status AS [NFS-e/Status],
+                nfse_issued_at AS [NFS-e/Emissão],
+                nfse_cancelation_reason AS [NFS-e/Cancelamento/Motivo],
+                nfse_pdf_service_url AS [NFS-e/PDF],
+                nfse_corporation_id AS [NFS-e/Filial ID],
+                nfse_service_description AS [NFS-e/Serviço/Descrição],
+                nfse_xml_document AS [NFS-e/XML],
                 insurance_id AS [Seguro ID],
                 other_fees AS [Outras Tarifas],
                 km AS [KM],
                 payment_accountable_type AS [Tipo Contábil Pagamento],
                 insured_value AS [Valor Segurado],
-                globalized AS [Globalizado],
+                CASE WHEN globalized = 1 THEN 'verdadeiro'
+                     WHEN globalized = 0 THEN 'falso'
+                     ELSE NULL
+                END AS [Globalizado],
                 sec_cat_subtotal AS [SEC/CAT],
-                globalized_type AS [Tipo Globalizado],
+                CASE globalized_type
+                    WHEN 'none' THEN 'nenhum'
+                    ELSE globalized_type
+                END AS [Tipo Globalizado],
                 price_table_accountable_type AS [Tipo Contábil Tabela],
                 insurance_accountable_type AS [Tipo Contábil Seguro],
                 metadata AS [Metadata],
@@ -246,6 +327,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     }
 
     private void adicionarColunasNovasSeNecessario(final Connection conexao) throws SQLException {
+        adicionarColunaSeNaoExistir(conexao, "accounting_credit_id", "BIGINT");
+        adicionarColunaSeNaoExistir(conexao, "accounting_credit_installment_id", "BIGINT");
         adicionarColunaSeNaoExistir(conexao, "service_type", "INT");
         adicionarColunaSeNaoExistir(conexao, "insurance_enabled", "BIT");
         adicionarColunaSeNaoExistir(conexao, "gris_subtotal", "DECIMAL(18, 2)");
@@ -270,10 +353,14 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         adicionarColunaSeNaoExistir(conexao, "price_table_accountable_type", "INT");
         adicionarColunaSeNaoExistir(conexao, "insurance_accountable_type", "INT");
         adicionarColunaSeNaoExistir(conexao, "filial_cnpj", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "filial_apelido", "NVARCHAR(255)");
         adicionarColunaSeNaoExistir(conexao, "pagador_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, "remetente_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, "destinatario_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, "cte_issued_at", "DATETIMEOFFSET");
+        adicionarColunaSeNaoExistir(conexao, "cte_id", "BIGINT");
+        adicionarColunaSeNaoExistir(conexao, "cte_emission_type", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "cte_created_at", "DATETIMEOFFSET");
         adicionarColunaSeNaoExistir(conexao, "cubages_cubed_weight", "DECIMAL(18, 3)");
         adicionarColunaSeNaoExistir(conexao, "freight_weight_subtotal", "DECIMAL(18, 2)");
         adicionarColunaSeNaoExistir(conexao, "ad_valorem_subtotal", "DECIMAL(18, 2)");
@@ -284,6 +371,153 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         adicionarColunaSeNaoExistir(conexao, "fiscal_tax_value", "DECIMAL(18, 2)");
         adicionarColunaSeNaoExistir(conexao, "fiscal_pis_value", "DECIMAL(18, 2)");
         adicionarColunaSeNaoExistir(conexao, "fiscal_cofins_value", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_calculation_basis", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_tax_rate", "DECIMAL(18, 6)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_pis_rate", "DECIMAL(18, 6)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_cofins_rate", "DECIMAL(18, 6)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_has_difal", "BIT");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_difal_origin", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "fiscal_difal_destination", "DECIMAL(18, 2)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_integration_id", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_status", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_issued_at", "DATE");
+        adicionarColunaSeNaoExistir(conexao, "nfse_cancelation_reason", "NVARCHAR(255)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_pdf_service_url", "NVARCHAR(1000)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_corporation_id", "BIGINT");
+        adicionarColunaSeNaoExistir(conexao, "nfse_service_description", "NVARCHAR(500)");
+        adicionarColunaSeNaoExistir(conexao, "nfse_xml_document", "NVARCHAR(MAX)");
+    }
+
+    /**
+     * Atualiza colunas de NFSe em fretes, vinculando pelo número da NFSe.
+     * Retorna o total de linhas afetadas.
+     */
+    public int atualizarCamposNfse(final java.util.List<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> nfseList) throws SQLException {
+        if (nfseList == null || nfseList.isEmpty()) return 0;
+        try (Connection conexao = obterConexao()) {
+            criarTabelaSeNaoExistir(conexao);
+            int totalAtualizados = 0;
+            int totalIgnoradosSemId = 0;
+            int totalNaoEncontradosNoBanco = 0;
+                final String sqlById = """
+                    UPDATE dbo.fretes
+                    SET
+                        nfse_integration_id = ?,
+                        nfse_status = ?,
+                        nfse_issued_at = ?,
+                        nfse_cancelation_reason = ?,
+                        nfse_pdf_service_url = ?,
+                        nfse_corporation_id = ?,
+                        nfse_service_description = ?,
+                        nfse_xml_document = ?,
+                        nfse_series = ?,
+                        nfse_number = ?
+                    WHERE id = ?
+                """;
+                final String sqlByNumber = """
+                    UPDATE dbo.fretes
+                    SET
+                        nfse_integration_id = ?,
+                        nfse_status = ?,
+                        nfse_issued_at = ?,
+                        nfse_cancelation_reason = ?,
+                        nfse_pdf_service_url = ?,
+                        nfse_corporation_id = ?,
+                        nfse_service_description = ?,
+                        nfse_xml_document = ?,
+                        nfse_series = ?,
+                        nfse_number = ?
+                    WHERE nfse_number = ?
+                """;
+                try (PreparedStatement psId = conexao.prepareStatement(sqlById);
+                     PreparedStatement psNumber = conexao.prepareStatement(sqlByNumber)) {
+                    for (final br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO nfse : nfseList) {
+                        final java.time.LocalDate dt = parseIssuedAt(nfse.getIssuedAt());
+                        final String serviceDesc = (nfse.getServiceDescription() != null && !nfse.getServiceDescription().isBlank())
+                            ? nfse.getServiceDescription()
+                            : extrairDiscriminacaoDoXml(nfse.getXmlDocument());
+                        int linhasAfetadas;
+                        if (nfse.getFreightId() != null) {
+                            psId.setString(1, nfse.getId());
+                            psId.setString(2, nfse.getStatus());
+                            if (dt != null) { psId.setObject(3, dt, java.sql.Types.DATE); } else { psId.setNull(3, java.sql.Types.DATE); }
+                            psId.setString(4, nfse.getCancelationReason());
+                            psId.setString(5, nfse.getPdfServiceUrl());
+                            if (nfse.getCorporationId() != null) { psId.setObject(6, nfse.getCorporationId(), java.sql.Types.BIGINT); } else { psId.setNull(6, java.sql.Types.BIGINT); }
+                            psId.setString(7, serviceDesc);
+                            psId.setString(8, nfse.getXmlDocument());
+                            psId.setString(9, nfse.getRpsSeries());
+                            if (nfse.getNumber() != null) { psId.setObject(10, nfse.getNumber(), java.sql.Types.INTEGER); } else { psId.setNull(10, java.sql.Types.INTEGER); }
+                            psId.setObject(11, nfse.getFreightId(), java.sql.Types.BIGINT);
+                            linhasAfetadas = psId.executeUpdate();
+                            if (linhasAfetadas == 0 && nfse.getNumber() != null) {
+                                psNumber.setString(1, nfse.getId());
+                                psNumber.setString(2, nfse.getStatus());
+                                if (dt != null) { psNumber.setObject(3, dt, java.sql.Types.DATE); } else { psNumber.setNull(3, java.sql.Types.DATE); }
+                                psNumber.setString(4, nfse.getCancelationReason());
+                                psNumber.setString(5, nfse.getPdfServiceUrl());
+                                if (nfse.getCorporationId() != null) { psNumber.setObject(6, nfse.getCorporationId(), java.sql.Types.BIGINT); } else { psNumber.setNull(6, java.sql.Types.BIGINT); }
+                                psNumber.setString(7, serviceDesc);
+                                psNumber.setString(8, nfse.getXmlDocument());
+                                psNumber.setString(9, nfse.getRpsSeries());
+                                psNumber.setObject(10, nfse.getNumber(), java.sql.Types.INTEGER);
+                                psNumber.setObject(11, nfse.getNumber(), java.sql.Types.INTEGER);
+                                linhasAfetadas = psNumber.executeUpdate();
+                            }
+                        } else if (nfse.getNumber() != null) {
+                            psNumber.setString(1, nfse.getId());
+                            psNumber.setString(2, nfse.getStatus());
+                            if (dt != null) { psNumber.setObject(3, dt, java.sql.Types.DATE); } else { psNumber.setNull(3, java.sql.Types.DATE); }
+                            psNumber.setString(4, nfse.getCancelationReason());
+                            psNumber.setString(5, nfse.getPdfServiceUrl());
+                            if (nfse.getCorporationId() != null) { psNumber.setObject(6, nfse.getCorporationId(), java.sql.Types.BIGINT); } else { psNumber.setNull(6, java.sql.Types.BIGINT); }
+                            psNumber.setString(7, serviceDesc);
+                            psNumber.setString(8, nfse.getXmlDocument());
+                            psNumber.setString(9, nfse.getRpsSeries());
+                            psNumber.setObject(10, nfse.getNumber(), java.sql.Types.INTEGER);
+                            psNumber.setObject(11, nfse.getNumber(), java.sql.Types.INTEGER);
+                            linhasAfetadas = psNumber.executeUpdate();
+                        } else {
+                            totalIgnoradosSemId++;
+                            continue;
+                        }
+                        if (linhasAfetadas > 0) { totalAtualizados++; } else { totalNaoEncontradosNoBanco++; }
+                    }
+                    if (totalIgnoradosSemId > 0) { logger.warn("{} NFSe ignoradas por ausência de vínculo de frete (freightId null)", totalIgnoradosSemId); }
+                    logger.info("Resumo Enriquecimento NFSe: Processados={}, Atualizados={}, Sem Frete Pai no Banco={}, Sem ID={}", nfseList.size(), totalAtualizados, totalNaoEncontradosNoBanco, totalIgnoradosSemId);
+                }
+                return totalAtualizados;
+            }
+    }
+
+    private static java.time.LocalDate parseIssuedAt(final String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return java.time.LocalDate.parse(value); } catch (final Exception ignored1) {}
+        try { return java.time.OffsetDateTime.parse(value).toLocalDate(); } catch (final Exception ignored2) {}
+        try { return java.time.LocalDateTime.parse(value).toLocalDate(); } catch (final Exception ignored3) {}
+        try { return java.time.LocalDate.parse(value.substring(0, Math.min(10, value.length()))); } catch (final Exception ignored4) {}
+        return null;
+    }
+
+    private static String extrairDiscriminacaoDoXml(final String xml) {
+        if (xml == null || xml.isBlank()) return null;
+        try {
+            final String lower = xml.toLowerCase();
+            final String tag = "discriminacao";
+            final int start = lower.indexOf("<" + tag + ">");
+            final int end = lower.indexOf("</" + tag + ">");
+            if (start >= 0 && end > start) {
+                final String inner = xml.substring(start + tag.length() + 2, end);
+                final String cdataStart = "<![CDATA[";
+                final String cdataEnd = "]]>";
+                String text = inner.trim();
+                if (text.startsWith(cdataStart) && text.endsWith(cdataEnd)) {
+                    text = text.substring(cdataStart.length(), text.length() - cdataEnd.length()).trim();
+                }
+                return text.isBlank() ? null : text;
+            }
+        } catch (final Exception ignored) {}
+        return null;
     }
 
     /**
@@ -304,18 +538,26 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
+                ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?
             ))
                 AS source (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                            pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
                            filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
                            taxed_weight, real_weight, total_cubic_volume, subtotal,
+                           accounting_credit_id, accounting_credit_installment_id,
                            service_type, insurance_enabled, gris_subtotal, tde_subtotal, modal_cte, redispatch_subtotal, suframa_subtotal, payment_type, previous_document_type,
                            products_value, trt_subtotal, nfse_series, nfse_number, insurance_id, other_fees, km, payment_accountable_type, insured_value, globalized, sec_cat_subtotal, globalized_type, price_table_accountable_type, insurance_accountable_type,
                            pagador_documento, remetente_documento, destinatario_documento, filial_cnpj, cte_issued_at, cubages_cubed_weight, freight_weight_subtotal, ad_valorem_subtotal, toll_subtotal, itr_subtotal,
                            fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
+                           filial_apelido, cte_id, cte_emission_type, cte_created_at,
+                           fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
                            metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
@@ -356,6 +598,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     real_weight = source.real_weight,
                     total_cubic_volume = source.total_cubic_volume,
                     subtotal = source.subtotal,
+                    accounting_credit_id = source.accounting_credit_id,
+                    accounting_credit_installment_id = source.accounting_credit_installment_id,
                     service_type = source.service_type,
                     insurance_enabled = source.insurance_enabled,
                     gris_subtotal = source.gris_subtotal,
@@ -394,26 +638,43 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     fiscal_tax_value = source.fiscal_tax_value,
                     fiscal_pis_value = source.fiscal_pis_value,
                     fiscal_cofins_value = source.fiscal_cofins_value,
+                    filial_apelido = source.filial_apelido,
+                    cte_id = source.cte_id,
+                    cte_emission_type = source.cte_emission_type,
+                    cte_created_at = source.cte_created_at,
+                    fiscal_calculation_basis = source.fiscal_calculation_basis,
+                    fiscal_tax_rate = source.fiscal_tax_rate,
+                    fiscal_pis_rate = source.fiscal_pis_rate,
+                    fiscal_cofins_rate = source.fiscal_cofins_rate,
+                    fiscal_has_difal = source.fiscal_has_difal,
+                    fiscal_difal_origin = source.fiscal_difal_origin,
+                    fiscal_difal_destination = source.fiscal_difal_destination,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega,
                         pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
-                        filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
-                        taxed_weight, real_weight, total_cubic_volume, subtotal,
+                           filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
+                           taxed_weight, real_weight, total_cubic_volume, subtotal,
+                        accounting_credit_id, accounting_credit_installment_id,
                         service_type, insurance_enabled, gris_subtotal, tde_subtotal, modal_cte, redispatch_subtotal, suframa_subtotal, payment_type, previous_document_type,
                         products_value, trt_subtotal, nfse_series, nfse_number, insurance_id, other_fees, km, payment_accountable_type, insured_value, globalized, sec_cat_subtotal, globalized_type, price_table_accountable_type, insurance_accountable_type,
                         pagador_documento, remetente_documento, destinatario_documento, filial_cnpj, cte_issued_at, cubages_cubed_weight, freight_weight_subtotal, ad_valorem_subtotal, toll_subtotal, itr_subtotal,
                         fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
+                        filial_apelido, cte_id, cte_emission_type, cte_created_at,
+                        fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
                         metadata, data_extracao)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
                         source.filial_nome, source.numero_nota_fiscal, source.tabela_preco_nome, source.classificacao_nome, source.centro_custo_nome, source.usuario_nome, source.reference_number, source.chave_cte, source.numero_cte, source.serie_cte, source.invoices_total_volumes,
                         source.taxed_weight, source.real_weight, source.total_cubic_volume, source.subtotal,
+                        source.accounting_credit_id, source.accounting_credit_installment_id,
                         source.service_type, source.insurance_enabled, source.gris_subtotal, source.tde_subtotal, source.modal_cte, source.redispatch_subtotal, source.suframa_subtotal, source.payment_type, source.previous_document_type,
                         source.products_value, source.trt_subtotal, source.nfse_series, source.nfse_number, source.insurance_id, source.other_fees, source.km, source.payment_accountable_type, source.insured_value, source.globalized, source.sec_cat_subtotal, source.globalized_type, source.price_table_accountable_type, source.insurance_accountable_type,
                         source.pagador_documento, source.remetente_documento, source.destinatario_documento, source.filial_cnpj, source.cte_issued_at, source.cubages_cubed_weight, source.freight_weight_subtotal, source.ad_valorem_subtotal, source.toll_subtotal, source.itr_subtotal,
                         source.fiscal_cst_type, source.fiscal_cfop_code, source.fiscal_tax_value, source.fiscal_pis_value, source.fiscal_cofins_value,
+                        source.filial_apelido, source.cte_id, source.cte_emission_type, source.cte_created_at,
+                        source.fiscal_calculation_basis, source.fiscal_tax_rate, source.fiscal_pis_rate, source.fiscal_cofins_rate, source.fiscal_has_difal, source.fiscal_difal_origin, source.fiscal_difal_destination,
                         source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
@@ -466,6 +727,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setBigDecimal(paramIndex++, frete.getRealWeight());
             statement.setBigDecimal(paramIndex++, frete.getTotalCubicVolume());
             statement.setBigDecimal(paramIndex++, frete.getSubtotal());
+            if (frete.getAccountingCreditId() != null) { statement.setObject(paramIndex++, frete.getAccountingCreditId(), Types.BIGINT); } else { statement.setNull(paramIndex++, Types.BIGINT); }
+            if (frete.getAccountingCreditInstallmentId() != null) { statement.setObject(paramIndex++, frete.getAccountingCreditInstallmentId(), Types.BIGINT); } else { statement.setNull(paramIndex++, Types.BIGINT); }
             if (frete.getServiceType() != null) {
                 statement.setObject(paramIndex++, frete.getServiceType(), Types.INTEGER);
             } else { statement.setNull(paramIndex++, Types.INTEGER); }
@@ -508,6 +771,17 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setBigDecimal(paramIndex++, frete.getFiscalTaxValue());
             statement.setBigDecimal(paramIndex++, frete.getFiscalPisValue());
             statement.setBigDecimal(paramIndex++, frete.getFiscalCofinsValue());
+            statement.setString(paramIndex++, frete.getFilialApelido());
+            if (frete.getCteId() != null) { statement.setObject(paramIndex++, frete.getCteId(), Types.BIGINT); } else { statement.setNull(paramIndex++, Types.BIGINT); }
+            statement.setString(paramIndex++, frete.getCteEmissionType());
+            statement.setObject(paramIndex++, frete.getCteCreatedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
+            statement.setBigDecimal(paramIndex++, frete.getFiscalCalculationBasis());
+            statement.setBigDecimal(paramIndex++, frete.getFiscalTaxRate());
+            statement.setBigDecimal(paramIndex++, frete.getFiscalPisRate());
+            statement.setBigDecimal(paramIndex++, frete.getFiscalCofinsRate());
+            if (frete.getFiscalHasDifal() != null) { statement.setObject(paramIndex++, frete.getFiscalHasDifal(), Types.BOOLEAN); } else { statement.setNull(paramIndex++, Types.BOOLEAN); }
+            statement.setBigDecimal(paramIndex++, frete.getFiscalDifalOrigin());
+            statement.setBigDecimal(paramIndex++, frete.getFiscalDifalDestination());
             statement.setString(paramIndex++, frete.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now());
             final int expected = statement.getParameterMetaData().getParameterCount();

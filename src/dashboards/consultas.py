@@ -1,24 +1,12 @@
 CONTAS_PAGAR_TOP = """
-SELECT
-  [Lançamento a Pagar/N°] AS sequence_code,
-  [N° Documento] AS document_number,
-  [Emissão] AS issue_date,
-  [Pago] AS pago,
-  [Fornecedor/Nome] AS fornecedor,
-  [Filial] AS filial,
-  [Valor a pagar] AS valor_a_pagar
+SELECT *
 FROM dbo.vw_contas_a_pagar_powerbi
-ORDER BY [Emissão] DESC
+ORDER BY 1 DESC
 OFFSET 0 ROWS FETCH NEXT :n ROWS ONLY
 """
 
 FATURAS_CLIENTE_TOP = """
-SELECT
-  [ID] AS unique_id,
-  [Filial] AS filial,
-  [Pagador / Nome] AS pagador_nome,
-  [Fatura / Valor] AS valor_fatura,
-  [Parcelas / Vencimento] AS data_vencimento_fatura
+SELECT *
 FROM dbo.vw_faturas_por_cliente_powerbi
 ORDER BY [Parcelas / Vencimento] DESC
 OFFSET 0 ROWS FETCH NEXT :n ROWS ONLY

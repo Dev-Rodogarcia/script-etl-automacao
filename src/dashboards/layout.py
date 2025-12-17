@@ -18,7 +18,7 @@ def criar_cabecalho():
         dbc.Container([
             dbc.NavbarBrand(html.Img(src=img, className="logo-rodo") if img else html.Span("RODOGARCIA", className="marca-rodo")),
             dbc.Button("Atualizar", id="botao-atualizar", className="botao-personalizado", size="sm"),
-        ]), color="light", light=True, className="navbar-rodo"
+        ]), color="light", className="navbar-rodo"
     )
 
 def criar_controles():
@@ -111,6 +111,8 @@ def criar_controles():
 def criar_layout():
     return dbc.Container([
         criar_cabecalho(),
+        dbc.Alert(id="alerta-banco", is_open=False, dismissable=True, className="mb-2"),
+        html.Div(id="alertas", className="mb-2"),
         html.Br(),
         dbc.Row([
             dbc.Col(dbc.Button("Mostrar/Esconder filtros", id="toggle-filtros", color="secondary", className="btn-filtros"), md=3)
@@ -120,44 +122,98 @@ def criar_layout():
             dbc.Card(dbc.CardBody([
                 html.H6("Registros", className="texto-kpi"),
                 html.H3(id="kpi-total", className="valor-kpi"),
-            ]), className="card-kpi card-registros"),
+            ]), id="card-basic-registros", className="card-kpi card-registros"),
             dbc.Card(dbc.CardBody([
                 html.H6("Soma (valor)", className="texto-kpi"),
                 html.H3(id="kpi-soma", className="valor-kpi"),
-            ]), className="card-kpi card-soma"),
+            ]), id="card-basic-soma", className="card-kpi card-soma"),
             dbc.Card(dbc.CardBody([
                 html.H6("Média (valor)", className="texto-kpi"),
                 html.H3(id="kpi-media", className="valor-kpi"),
-            ]), className="card-kpi card-media"),
+            ]), id="card-basic-media", className="card-kpi card-media"),
             dbc.Card(dbc.CardBody([
                 html.H6("Máximo (valor)", className="texto-kpi"),
                 html.H3(id="kpi-max", className="valor-kpi"),
-            ]), className="card-kpi card-max"),
+            ]), id="card-basic-max", className="card-kpi card-max"),
             dbc.Card(dbc.CardBody([
                 html.H6("Mínimo (valor)", className="texto-kpi"),
                 html.H3(id="kpi-min", className="valor-kpi"),
-            ]), className="card-kpi card-min"),
+            ]), id="card-basic-min", className="card-kpi card-min"),
             dbc.Card(dbc.CardBody([
                 html.H6("Mediana (valor)", className="texto-kpi"),
                 html.H3(id="kpi-mediana", className="valor-kpi"),
-            ]), className="card-kpi card-mediana"),
+            ]), id="card-basic-mediana", className="card-kpi card-mediana"),
             dbc.Card(dbc.CardBody([
                 html.H6("Desvio (valor)", className="texto-kpi"),
                 html.H3(id="kpi-desvio", className="valor-kpi"),
-            ]), className="card-kpi card-desvio"),
+            ]), id="card-basic-desvio", className="card-kpi card-desvio"),
             dbc.Card(dbc.CardBody([
                 html.H6("Última data", className="texto-kpi"),
                 html.H3(id="kpi-ultima-data", className="valor-kpi"),
-            ]), className="card-kpi card-data"),
+            ]), id="card-basic-data", className="card-kpi card-data"),
             dbc.Card(dbc.CardBody([
                 html.H6("Top filial", className="texto-kpi"),
                 html.H3(id="kpi-top-filial", className="valor-kpi"),
-            ]), className="card-kpi card-top"),
+            ]), id="card-basic-top", className="card-kpi card-top"),
             dbc.Card(dbc.CardBody([
                 html.H6("Menor filial", className="texto-kpi"),
                 html.H3(id="kpi-menor-filial", className="valor-kpi"),
-            ]), className="card-kpi card-menor"),
+            ]), id="card-basic-menor", className="card-kpi card-menor"),
         ], className="kpi-grid mb-3"),
+        html.Div([
+            dbc.Card(dbc.CardBody([
+                html.H6("Receita Total (executivo)", className="texto-kpi"),
+                html.H3(id="kpi-exec-receita", className="valor-kpi"),
+            ]), id="card-exec-receita", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Custo Total (executivo)", className="texto-kpi"),
+                html.H3(id="kpi-exec-custo", className="valor-kpi"),
+            ]), id="card-exec-custo", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Lucro Bruto (executivo)", className="texto-kpi"),
+                html.H3(id="kpi-exec-lucro", className="valor-kpi"),
+            ]), id="card-exec-lucro", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Margem Bruta", className="texto-kpi"),
+                html.H3(id="kpi-exec-margem", className="valor-kpi"),
+            ]), id="card-exec-margem", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Resultado Líquido", className="texto-kpi"),
+                html.H3(id="kpi-exec-resultado", className="valor-kpi"),
+            ]), id="card-exec-resultado", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Var. YOY (%)", className="texto-kpi"),
+                html.H3(id="kpi-yoy", className="valor-kpi"),
+            ]), id="card-yoy", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Taxa Conversão", className="texto-kpi"),
+                html.H3(id="kpi-conversao", className="valor-kpi"),
+            ]), id="card-conversao", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Pontualidade (%)", className="texto-kpi"),
+                html.H3(id="kpi-pontualidade", className="valor-kpi"),
+            ]), id="card-pontualidade", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Tempo Médio (h)", className="texto-kpi"),
+                html.H3(id="kpi-tempo-medio", className="valor-kpi"),
+            ]), id="card-tempo-medio", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Rentabilidade (%)", className="texto-kpi"),
+                html.H3(id="kpi-rentabilidade", className="valor-kpi"),
+            ]), id="card-rentabilidade", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Aberto (R$)", className="texto-kpi"),
+                html.H3(id="kpi-aberto", className="valor-kpi"),
+            ]), id="card-aberto", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Em Trânsito", className="texto-kpi"),
+                html.H3(id="kpi-em-transito", className="valor-kpi"),
+            ]), id="card-em-transito", className="card-kpi"),
+            dbc.Card(dbc.CardBody([
+                html.H6("Principal Destino", className="texto-kpi"),
+                html.H3(id="kpi-principal-destino", className="valor-kpi"),
+            ]), id="card-principal-destino", className="card-kpi"),
+        ], id="grid-exec", className="kpi-grid mb-3"),
         dbc.Row([
             dbc.Col(dcc.Graph(id="grafico", className="bloco-grafico"), md=6),
             dbc.Col(dcc.Graph(id="grafico-secundario", className="bloco-grafico"), md=6),

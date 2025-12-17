@@ -4,19 +4,17 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 try:
-    from .banco import consultar_tabela
+    from .banco import consultar_tabela, banco_ping, banco_erro, banco_driver
     from .consultas import (
-        CONTAS_PAGAR_TOP, FATURAS_CLIENTE_TOP, MANIFESTOS_RESUMO,
-        COLETAS_TOP, FRETES_TOP, COTACOES_TOP, LOCALIZACAO_TOP, MANIFESTOS_VIEW_TOP,
-        FATURAS_CLIENTE_BASE, FRETES_BASE, LOCALIZACAO_BASE
+        CONTAS_PAGAR_TOP, FATURAS_CLIENTE_TOP,
+        COLETAS_TOP, FRETES_TOP, COTACOES_TOP, LOCALIZACAO_TOP, MANIFESTOS_VIEW_TOP
     )
     from .layout import criar_layout
 except ImportError:
-    from banco import consultar_tabela
+    from banco import consultar_tabela, banco_ping, banco_erro, banco_driver
     from consultas import (
-        CONTAS_PAGAR_TOP, FATURAS_CLIENTE_TOP, MANIFESTOS_RESUMO,
-        COLETAS_TOP, FRETES_TOP, COTACOES_TOP, LOCALIZACAO_TOP, MANIFESTOS_VIEW_TOP,
-        FATURAS_CLIENTE_BASE, FRETES_BASE, LOCALIZACAO_BASE
+        CONTAS_PAGAR_TOP, FATURAS_CLIENTE_TOP,
+        COLETAS_TOP, FRETES_TOP, COTACOES_TOP, LOCALIZACAO_TOP, MANIFESTOS_VIEW_TOP
     )
     from layout import criar_layout
 
@@ -43,6 +41,126 @@ def alternar_mais_filtros(n, aberto):
     return not aberto
 
 @aplicacao.callback(
+    dash.Output("alerta-banco", "children"),
+    dash.Output("alerta-banco", "color"),
+    dash.Output("alerta-banco", "is_open"),
+    dash.Input("seletor-entidade", "value"),
+    dash.Input("botao-carregar", "n_clicks"),
+    dash.Input("botao-atualizar", "n_clicks"),
+    dash.State("alerta-banco", "is_open"),
+    prevent_initial_call=False
+)
+def status_banco(_entidade, _c, _u, aberto_atual):
+    ok = False
+    try:
+        ok = bool(banco_ping())
+    except Exception:
+        ok = False
+    if ok:
+        return "Conectado ao banco de dados", "success", bool(aberto_atual) if aberto_atual is not None else True
+    return "Banco de dados indisponível. Verifique as variáveis .env e o driver ODBC.", "warning", bool(aberto_atual) if aberto_atual is not None else True
+
+@aplicacao.callback(
+    dash.Output("alertas", "children"),
+    dash.Input("seletor-entidade", "value"),
+    dash.Input("botao-carregar", "n_clicks"),
+    dash.Input("botao-atualizar", "n_clicks"),
+    prevent_initial_call=False
+)
+def diagnosticos(entidade, _c, _u):
+    import os
+    msgs = []
+    def add(msg, cor):
+        msgs.append(dbc.Alert(msg, color=cor, dismissable=True, className="mb-1"))
+    url = os.getenv("DB_URL") or ""
+    user = os.getenv("DB_USER") or ""
+    pwd = os.getenv("DB_PASSWORD") or ""
+    drv = os.getenv("ODBC_DRIVER") or ""
+    if str(url).strip() == "":
+        add("Variável DB_URL ausente", "danger")
+    if str(user).strip() == "" or str(pwd).strip() == "":
+        add("Credenciais DB_USER/DB_PASSWORD ausentes", "danger")
+    if str(drv).strip() == "":
+        add("Variável ODBC_DRIVER não definida; usando fallback de driver", "warning")
+    try:
+        import re as _re
+        m = _re.match(r"jdbc:sqlserver://([^:;]+)(?::(\d+))?;databaseName=([^;]+)", str(url))
+        if m:
+            h, p, dbn = m.group(1), m.group(2) or "1433", m.group(3)
+            enc = "encrypt=false" not in str(url).lower()
+            add("DB_URL detectado: servidor="+h+" porta="+p+" banco="+dbn+" encrypt="+("on" if enc else "off"), "info")
+        else:
+            add("DB_URL com formato inválido para JDBC SQL Server", "danger")
+    except Exception:
+        add("Falha ao analisar DB_URL", "warning")
+    try:
+        import pyodbc
+        det = [d for d in pyodbc.drivers() if "SQL Server" in d]
+        if len(det) == 0:
+            add("Nenhum driver ODBC de SQL Server instalado", "danger")
+        else:
+            add("Drivers ODBC detectados: " + ", ".join(det), "info")
+    except Exception:
+        add("pyodbc indisponível para listar drivers", "warning")
+    ok = False
+    try:
+        ok = bool(banco_ping())
+    except Exception:
+        ok = False
+    if not ok:
+        err = banco_erro()
+        if str(err).strip() != "":
+            add("Conexão ao banco falhou: " + str(err), "danger")
+        else:
+            add("Conexão ao banco falhou", "danger")
+    else:
+        add("Conectado ao banco de dados", "success")
+        try:
+            drv_usado = banco_driver()
+            if str(drv_usado).strip() != "":
+                add("Driver ODBC em uso: " + str(drv_usado), "info")
+        except Exception:
+            pass
+    try:
+        import socket
+        s = socket.socket()
+        s.settimeout(2)
+        s.connect(("localhost", 1433))
+        s.close()
+        add("Porta 1433 aberta em localhost", "info")
+    except Exception:
+        add("Porta 1433 não está acessível em localhost", "warning")
+    if ok and entidade:
+        nomes = {
+            "contas": "vw_contas_a_pagar_powerbi",
+            "faturas": "vw_faturas_por_cliente_powerbi",
+            "coletas": "vw_coletas_powerbi",
+            "fretes": "vw_fretes_powerbi",
+            "cotacoes": "vw_cotacoes_powerbi",
+            "localizacao": "vw_localizacao_cargas_powerbi",
+            "manifestos_view": "vw_manifestos_powerbi",
+            "manifestos": "vw_manifestos_powerbi",
+        }
+        alvo = nomes.get(entidade)
+        if alvo:
+            try:
+                df_obj = consultar_tabela("SELECT COUNT(*) AS cnt FROM sys.objects WHERE name=:n", {"n": alvo})
+                existe = int(df_obj["cnt"].iloc[0]) > 0 if len(df_obj) > 0 else False
+                if existe:
+                    add("Objeto " + alvo + " disponível no banco", "success")
+                else:
+                    add("Objeto " + alvo + " não encontrado no banco", "warning")
+            except Exception:
+                add("Falha ao verificar objeto " + str(alvo), "warning")
+        try:
+            df_amostra, _ = _carregar_inicial(entidade, 5)
+            if len(df_amostra) == 0:
+                add("Sem dados para a entidade selecionada", "warning")
+        except Exception:
+            add("Falha ao consultar a entidade selecionada", "danger")
+    return msgs
+
+@aplicacao.callback(
     Output("tabela", "data"), Output("tabela", "columns"),
     Output("grafico", "figure"), Output("grafico-secundario", "figure"), Output("grafico-terciario", "figure"),
     Output("kpi-total", "children"), Output("kpi-soma", "children"), Output("kpi-media", "children"),
@@ -50,6 +168,9 @@ def alternar_mais_filtros(n, aberto):
     Output("kpi-ultima-data", "children"), Output("kpi-top-filial", "children"), Output("kpi-menor-filial", "children"),
     Output("seletor-filiais", "options"), Output("seletor-status", "options"), Output("seletor-pessoa", "options"), Output("seletor-uf", "options"),
     Output("seletor-cidade", "options"), Output("seletor-origem", "options"), Output("seletor-destino", "options"), Output("seletor-modal", "options"),
+    Output("kpi-exec-receita", "children"), Output("kpi-exec-custo", "children"), Output("kpi-exec-lucro", "children"), Output("kpi-exec-margem", "children"), Output("kpi-exec-resultado", "children"),
+    Output("kpi-yoy", "children"), Output("kpi-conversao", "children"), Output("kpi-pontualidade", "children"), Output("kpi-tempo-medio", "children"), Output("kpi-rentabilidade", "children"),
+    Output("kpi-aberto", "children"), Output("kpi-em-transito", "children"), Output("kpi-principal-destino", "children"),
     Input("seletor-entidade", "value"),
     Input("filtro-periodo", "start_date"), Input("filtro-periodo", "end_date"),
     Input("seletor-filiais", "value"), Input("seletor-status", "value"), Input("seletor-pessoa", "value"), Input("seletor-uf", "value"),
@@ -58,9 +179,10 @@ def alternar_mais_filtros(n, aberto):
     Input("botao-carregar", "n_clicks"), Input("botao-atualizar", "n_clicks")
 )
 def carregar_dados(entidade, inicio, fim, filiais, status_sel, pessoa_sel, uf_sel, cidade_sel, origem_sel, destino_sel, modal_sel, vmin, vmax, pmin, pmax, busca, _, __):
-    limite = 12000
+    limite = 6000
     try:
         dados, figura = _carregar_inicial(entidade, limite)
+        dados = _transformar_entidade(dados, entidade)
         dados = _aplicar_filtros(
             dados, entidade, inicio, fim, filiais,
             status_sel, pessoa_sel, uf_sel,
@@ -69,15 +191,13 @@ def carregar_dados(entidade, inicio, fim, filiais, status_sel, pessoa_sel, uf_se
         )
         dados = _sanitizar_df(dados)
         colunas = [{"name": c, "id": c} for c in list(dados.columns)]
-        total = len(dados)
-        soma = _soma_valor(dados)
-        media = (soma / total) if total > 0 and soma is not None else None
+        total, soma, media, maximo_raw, minimo_raw, mediana_raw, desvio_raw = _kpi_por_entidade(dados, entidade)
         col_filial = _col(dados, ["filial","Filial","branch_nickname","filial_nome","filial_atual","status_branch_nickname","destination_branch_nickname"]) 
         opcoes_filiais = []
         if col_filial in dados.columns:
             unicas = sorted([str(v) for v in dados[col_filial].dropna().unique()])
             opcoes_filiais = [{"label": _sigla_filial(v), "value": v} for v in unicas]
-        opcoes_status = _opcoes_unicas(dados, ["status","Status","pago","Pago"]) 
+        opcoes_status = _opcoes_unicas(dados, ["status","Status","pago","Pago","Status_Nome","Status_PT","Status_Cotacao","status_carga","Status Carga"]) 
         opcoes_pessoa = _opcoes_unicas(dados, ["pagador_nome","Pagador / Nome","fornecedor","Fornecedor/Nome","cliente_nome"]) 
         opcoes_uf = _opcoes_unicas(dados, ["estado","uf","UF","Estado"]) 
         opcoes_cidade = _opcoes_unicas(dados, ["cidade","Cidade","city","City"]) 
@@ -126,14 +246,16 @@ def carregar_dados(entidade, inicio, fim, filiais, status_sel, pessoa_sel, uf_se
             fig_tempo = _estilizar_fig(_grafico_tempo(dados, entidade), "Evolução diária")
         soma_fmt = _fmt_brl(soma)
         media_fmt = _fmt_brl(media)
-        maximo = _fmt_brl(_max_valor(dados))
-        minimo = _fmt_brl(_min_valor(dados))
-        mediana = _fmt_brl(_median_valor(dados))
-        desvio = _fmt_brl(_std_valor(dados))
+        maximo = _fmt_brl(maximo_raw)
+        minimo = _fmt_brl(minimo_raw)
+        mediana = _fmt_brl(mediana_raw)
+        desvio = _fmt_brl(desvio_raw)
         ultima_data = _fmt_data(_ultima_data(dados, entidade))
         top_filial = _top_filial_str(dados)
         menor_filial = _menor_filial_str(dados)
-        return dados.to_dict("records"), colunas, figura, fig_filial, fig_tempo, f"{total}", soma_fmt, media_fmt, maximo, minimo, mediana, desvio, ultima_data, top_filial, menor_filial, opcoes_filiais, opcoes_status, opcoes_pessoa, opcoes_uf, opcoes_cidade, opcoes_origem, opcoes_destino, opcoes_modal
+        exec_rec, exec_cus, exec_luc, exec_mar, exec_res = _executivo_kpis(inicio, fim, filiais)
+        yoy, conv, pont, tmedio, rentab, aberto, emtrans, pdest = _kpis_entidade_extras(dados, entidade)
+        return dados.to_dict("records"), colunas, figura, fig_filial, fig_tempo, f"{total}", soma_fmt, media_fmt, maximo, minimo, mediana, desvio, ultima_data, top_filial, menor_filial, opcoes_filiais, opcoes_status, opcoes_pessoa, opcoes_uf, opcoes_cidade, opcoes_origem, opcoes_destino, opcoes_modal, exec_rec, exec_cus, exec_luc, exec_mar, exec_res, yoy, conv, pont, tmedio, rentab, aberto, emtrans, pdest
     except Exception:
         import pandas as pd
         cols = _colunas_padrao(entidade)
@@ -142,7 +264,7 @@ def carregar_dados(entidade, inicio, fim, filiais, status_sel, pessoa_sel, uf_se
         fig = _fig_sem_dados(_titulo_entidade(entidade))
         fig = _estilizar_fig(fig, _titulo_entidade(entidade))
         vazio = _fmt_brl(None)
-        return df.to_dict("records"), colunas, fig, fig, fig, "0", vazio, vazio, vazio, vazio, vazio, vazio, "—", "—", "—", [], [], [], [], [], [], [], []
+        return df.to_dict("records"), colunas, fig, fig, fig, "0", vazio, vazio, vazio, vazio, vazio, vazio, "—", "—", "—", [], [], [], [], [], [], [], [], vazio, vazio, vazio, "—", "—", "—", "—", "—", "—", "—", "—", "—", "—"
 
 def _carregar_inicial(entidade, limite):
     try:
@@ -150,41 +272,26 @@ def _carregar_inicial(entidade, limite):
             df = consultar_tabela(CONTAS_PAGAR_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Contas a Pagar")
         elif entidade == "faturas":
-            try:
-                df = consultar_tabela(FATURAS_CLIENTE_TOP, {"n": int(limite)})
-            except Exception:
-                df = consultar_tabela(FATURAS_CLIENTE_BASE, {"n": int(limite)})
-            if len(df) == 0:
-                df = consultar_tabela(FATURAS_CLIENTE_BASE, {"n": int(limite)})
+            df = consultar_tabela(FATURAS_CLIENTE_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Faturas por Cliente")
         elif entidade == "coletas":
             df = consultar_tabela(COLETAS_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Coletas")
         elif entidade == "fretes":
-            try:
-                df = consultar_tabela(FRETES_TOP, {"n": int(limite)})
-            except Exception:
-                df = consultar_tabela(FRETES_BASE, {"n": int(limite)})
-            if len(df) == 0:
-                df = consultar_tabela(FRETES_BASE, {"n": int(limite)})
+            df = consultar_tabela(FRETES_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Fretes")
         elif entidade == "cotacoes":
             df = consultar_tabela(COTACOES_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Cotações")
         elif entidade == "localizacao":
-            try:
-                df = consultar_tabela(LOCALIZACAO_TOP, {"n": int(limite)})
-            except Exception:
-                df = consultar_tabela(LOCALIZACAO_BASE, {"n": int(limite)})
-            if len(df) == 0:
-                df = consultar_tabela(LOCALIZACAO_BASE, {"n": int(limite)})
+            df = consultar_tabela(LOCALIZACAO_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Localização de Carga")
         elif entidade == "manifestos_view":
             df = consultar_tabela(MANIFESTOS_VIEW_TOP, {"n": int(limite)})
             fig = _estilizar_fig(_grafico_generico(df), "Manifestos (view)")
         else:
-            df = consultar_tabela(MANIFESTOS_RESUMO, {"n": int(limite)})
-            fig = _estilizar_fig(_grafico_generico(df), "Manifestos (tabela)")
+            df = consultar_tabela(MANIFESTOS_VIEW_TOP, {"n": int(limite)})
+            fig = _estilizar_fig(_grafico_generico(df), "Manifestos")
         return df, fig
     except Exception:
         import pandas as pd
@@ -198,7 +305,7 @@ def _carregar_inicial(entidade, limite):
             "cotacoes": "Cotações",
             "localizacao": "Localização de Carga",
             "manifestos_view": "Manifestos (view)",
-            "manifestos": "Manifestos (tabela)",
+            "manifestos": "Manifestos",
         }
         return df, _fig_sem_dados(titulos.get(entidade, "Dados"))
 
@@ -272,7 +379,7 @@ def _colunas_padrao(entidade):
             "ID","Filial","CT-e","Valor notas","Peso Taxado","Peso Real","Data Emissão"
         ]
     return [
-        "sequence_code","branch_nickname","invoices_value","total_cost","paying_total","created_at"
+        "ID","Filial","CT-e","Valor notas","Peso Taxado","Peso Real","Data Emissão"
     ]
 
 def _titulo_entidade(entidade):
@@ -294,6 +401,11 @@ def _col(df, candidatos):
             return c
     # fallback: primeira coluna
     return df.columns[0]
+def _col_strict(df, candidatos):
+    for c in candidatos:
+        if c in df.columns:
+            return c
+    return None
 
 def _abreviar_texto(s):
     s = str(s or "").strip()
@@ -415,6 +527,13 @@ def _fmt_brl(v):
         return "R$ —"
     return f"R$ { _fmt_num(v) }"
 
+def _fmt_pct(v):
+    if v is None:
+        return "—"
+    try:
+        return f"{(float(v)*100):,.2f}%".replace(",","X").replace(".",",").replace("X",".")
+    except Exception:
+        return "—"
 def _col_valor_generico(df):
     preferidas = [
         "valor_total","valor_fatura","valor_a_pagar","invoices_value","total_cost","paying_total",
@@ -587,7 +706,12 @@ def _opcoes_unicas(df, candidatos):
     return []
 
 def iniciar():
-    aplicacao.run_server(debug=True, dev_tools_ui=False)
+    import os
+    try:
+        port = int(os.getenv("PORT", "8050"))
+    except Exception:
+        port = 8050
+    aplicacao.run(debug=True, port=port)
 def _max_valor(df):
     c = _col_valor_generico(df)
     if c and c in df.columns:
@@ -848,16 +972,432 @@ def _grafico_faturas_linha(df):
     return px.line(agrupado, x=data_col, y=val_col)
 
 def _grafico_contas_linha(df):
-    data_col = _col(df, ["Emissão","issue_date","data_criacao","data_liquidacao","vencimento"]) 
-    val_col = _col(df, ["valor_a_pagar","Valor a pagar","valor_total"]) 
     import pandas as pd
-    tmp = df[[data_col, val_col]].copy()
-    tmp[val_col] = pd.to_numeric(tmp[val_col], errors="coerce").fillna(0)
-    tmp[data_col] = pd.to_datetime(tmp[data_col], errors="coerce", dayfirst=True, format="mixed")
-    agrupado = tmp.groupby(pd.Grouper(key=data_col, freq="D"))[val_col].sum().reset_index()
-    if len(agrupado) == 0:
+    df2 = df.copy()
+    flag = _col(df2, ["Flag_Operacional","flag_operacional"])
+    if flag in df2.columns:
+        df2 = df2[df2[flag] == 1]
+    v_ap = _col(df2, ["Valor a pagar","valor_a_pagar"])
+    v_pg = _col(df2, ["Valor pago","valor_pago"])
+    dt_venc = _col(df2, ["Vencimento Estimado","vencimento"])
+    dt_emis = _col(df2, ["Emissão","issue_date","data_criacao"])
+    dt_liq = _col(df2, ["Data liquidação","Baixa","data_liquidacao","Fatura/Baixa"])
+    linhas = []
+    if v_ap:
+        col_data = dt_venc or dt_emis
+        tmp = df2[[col_data, v_ap]].copy()
+        tmp[v_ap] = pd.to_numeric(tmp[v_ap], errors="coerce").fillna(0)
+        tmp[col_data] = pd.to_datetime(tmp[col_data], errors="coerce", dayfirst=True, format="mixed")
+        a_pagar = tmp.groupby(pd.Grouper(key=col_data, freq="D"))[v_ap].sum().reset_index()
+        a_pagar["tipo"] = "a pagar"
+        a_pagar.rename(columns={col_data: "data", v_ap: "valor"}, inplace=True)
+        linhas.append(a_pagar)
+    if v_pg and dt_liq:
+        tmp = df2[[dt_liq, v_pg]].copy()
+        tmp[v_pg] = pd.to_numeric(tmp[v_pg], errors="coerce").fillna(0)
+        tmp[dt_liq] = pd.to_datetime(tmp[dt_liq], errors="coerce", dayfirst=True, format="mixed")
+        pago = tmp.groupby(pd.Grouper(key=dt_liq, freq="D"))[v_pg].sum().reset_index()
+        pago["tipo"] = "pago"
+        pago.rename(columns={dt_liq: "data", v_pg: "valor"}, inplace=True)
+        linhas.append(pago)
+    if len(linhas) == 0:
         return _fig_sem_dados("Contas a Pagar")
-    return px.line(agrupado, x=data_col, y=val_col)
+    base = pd.concat(linhas, ignore_index=True)
+    fig = px.line(base, x="data", y="valor", color="tipo")
+    return fig
  
 if __name__ == "__main__":
     iniciar()
+
+def _transformar_entidade(df, entidade):
+    if entidade == "fretes":
+        return _etl_fretes(df)
+    if entidade == "coletas":
+        return _etl_coletas(df)
+    if entidade == "manifestos" or entidade == "manifestos_view":
+        return _etl_manifestos(df)
+    if entidade == "contas":
+        return _etl_contas(df)
+    if entidade == "cotacoes":
+        return _etl_cotacoes(df)
+    if entidade == "faturas":
+        return _etl_faturas(df)
+    if entidade == "localizacao":
+        return _etl_localizacao(df)
+    return df
+
+def _etl_fretes(df):
+    import pandas as pd
+    d = df.copy()
+    status_col = _col(d, ["status","Status"])
+    if status_col in d.columns:
+        s = d[status_col].astype(str).str.lower().str.strip()
+        mapa = {
+            "finished": "Concluído",
+            "pending": "Pendente",
+            "delivering": "Em Entrega",
+            "cancelled": "Cancelado",
+            "standby": "Espera",
+            "in_transit": "Em Trânsito",
+            "manifested": "Manifestado",
+            "occurrence_treatment": "Tratamento de ocorrência",
+        }
+        d["Status_Nome"] = s.map(lambda x: mapa.get(x, d.get(status_col, s)))
+    origem = _col(d, ["Origem","Cidade Origem","origin_city","cidade_origem","Origin"])
+    uf_origem = _col(d, ["UF Origem","origem_uf","origin_state","estado_origem"])
+    destino = _col(d, ["Destino","Cidade Destino","destination_city","cidade_destino","Destination"])
+    uf_destino = _col(d, ["UF Destino","destino_uf","destination_state","estado_destino"])
+    if origem and uf_origem and destino and uf_destino:
+        d["Rota"] = d[origem].astype(str) + " (" + d[uf_origem].astype(str) + ") → " + d[destino].astype(str) + " (" + d[uf_destino].astype(str) + ")"
+    modal = _col(d, ["modal","Modal","modality","service_mode"])
+    if modal in d.columns:
+        m = d[modal].astype(str).str.lower()
+        d["Modal_PT"] = m.map(lambda x: "Rodoviário" if "rodo" in x else ("Aéreo" if "aere" in x else ("Marítimo" if "mari" in x else x)))
+    return d
+
+def _etl_coletas(df):
+    import pandas as pd
+    d = df.copy()
+    status_col = _col(d, ["status","Status"])
+    if status_col in d.columns:
+        s = d[status_col].astype(str).str.lower().str.strip()
+        d["Status_PT"] = s.map(lambda x: "Finalizada" if "finish" in x or "finaliz" in x else ("Pendente" if "pend" in x else ("Cancelada" if "cancel" in x else x)))
+    fim = _col(d, ["Finalizacao","finish_date","service_end"])
+    ag = _col(d, ["Agendamento","service_start"])
+    if fim and ag:
+        f = pd.to_datetime(d[fim], errors="coerce", dayfirst=True, format="mixed")
+        a = pd.to_datetime(d[ag], errors="coerce", dayfirst=True, format="mixed")
+        d["No_Prazo"] = pd.Series(["Sim" if (not pd.isna(fi) and not pd.isna(ai) and fi <= ai) else "Não" for fi, ai in zip(f, a)], index=d.index)
+    return d
+
+def _etl_manifestos(df):
+    import pandas as pd
+    d = df.copy()
+    km = _col(d, ["Km manual","manual_km"])
+    mdf = _col(d, ["Gerar MDF-e","mdf_e"])
+    mon = _col(d, ["Solicitou Monitoramento","monitoring_requested"])
+    for c in [km, mdf, mon]:
+        if c:
+            s = d[c].astype(str).str.strip().str.lower()
+            d[c] = s.map(lambda x: True if x in ["1","true","sim","yes"] else (False if x in ["0","false","nao","não","no"] else None))
+    receita = _col(d, ["invoices_value","freight_subtotal","Valor notas"])
+    custo = _col(d, ["total_cost","operational_expenses_total","Custo Total"])
+    if receita and custo:
+        try:
+            r = pd.to_numeric(d[receita], errors="coerce").fillna(0)
+            c = pd.to_numeric(d[custo], errors="coerce").fillna(0)
+            d["Rentabilidade"] = (r - c) / r.replace(0, pd.NA)
+            kmviagem = _col(d, ["KM viagem","km_viagem"])
+            if kmviagem:
+                kv = pd.to_numeric(d[kmviagem], errors="coerce").fillna(0)
+                d["Custo por KM"] = c / kv.replace(0, pd.NA)
+            cap = _col(d, ["Carreta 1/Capacidade Peso","capacidade_peso"])
+            peso = _col(d, ["Total peso taxado","taxed_weight","peso_notas"])
+            if cap and peso:
+                cp = pd.to_numeric(d[cap], errors="coerce").fillna(0)
+                ps = pd.to_numeric(d[peso], errors="coerce").fillna(0)
+                d["Utilizacao Frota"] = ps / cp.replace(0, pd.NA)
+        except Exception:
+            pass
+    return d
+
+def _etl_contas(df):
+    import pandas as pd
+    d = df.copy()
+    cc = _col(d, ["Centro de Custo","Centro de custo/Nome"])
+    forn = _col(d, ["Fornecedor/Nome","fornecedor"])
+    if cc or forn:
+        ccserie = d[cc] if cc else pd.Series([None]*len(d))
+        fserie = d[forn] if forn else pd.Series([None]*len(d))
+        d["Flag_Operacional"] = pd.Series([0 if (str(ccserie.iloc[i] or "").strip().upper() == "ADMINISTRATIVO GERAL" or str(fserie.iloc[i] or "").strip().upper() == "RODOGARCIA TRANSPORTES RODOVIARIOS LTDA") else 1 for i in range(len(d))], index=d.index)
+    emis = _col(d, ["Emissão","issue_date"])
+    cri = _col(d, ["Data criação","data_criacao"])
+    base = emis or cri
+    if base:
+        b = pd.to_datetime(d[base], errors="coerce", dayfirst=True, format="mixed")
+        d["Vencimento Estimado"] = b.fillna(pd.to_datetime(d[cri], errors="coerce", dayfirst=True, format="mixed")) + pd.to_timedelta(30, unit="D")
+    return d
+
+def _etl_cotacoes(df):
+    import pandas as pd
+    d = df.copy()
+    cte = _col(d, ["CT-e / Data emissão","CT-e/Data de emissão"])
+    if cte:
+        dt = pd.to_datetime(d[cte], errors="coerce", dayfirst=True, format="mixed")
+        d["Status_Cotacao"] = dt.notna().map(lambda x: "CONVERTIDA" if x else "PENDENTE")
+    return d
+
+def _etl_faturas(df):
+    import pandas as pd
+    d = df.copy()
+    cte = _col(d, ["CT-e / Data emissão","CT-e/Data de emissão"])
+    if cte in d.columns:
+        dt = pd.to_datetime(d[cte], errors="coerce", dayfirst=True, format="mixed")
+        d = d[dt.notna()]
+    return d
+
+def _etl_localizacao(df):
+    return df
+
+def _kpi_por_entidade(df, entidade):
+    import pandas as pd
+    total = len(df)
+    if entidade == "fretes":
+        vcol = _col(df, ["Valor Total do Servico","Valor Total do Serviço","Valor frete","valor_total","subtotal","valor_frete"])
+        pcol = _col(df, ["Kg Taxado","taxed_weight","peso_notas","real_weight","Peso Taxado"])
+        soma = float(pd.to_numeric(df[vcol], errors="coerce").fillna(0).sum()) if vcol else None
+        media = (soma / total) if total > 0 and soma is not None else None
+        return total, soma, media, _max_valor(df), _min_valor(df), _median_valor(df), _std_valor(df)
+    if entidade == "contas":
+        flag = _col(df, ["Flag_Operacional","flag_operacional"])
+        base = df[df[flag] == 1] if flag in df.columns else df
+        vcol = _col(base, ["Valor a pagar","valor_a_pagar"])
+        soma = float(pd.to_numeric(base[vcol], errors="coerce").fillna(0).sum()) if vcol else None
+        media = (soma / total) if total > 0 and soma is not None else None
+        return total, soma, media, _max_valor(base), _min_valor(base), _median_valor(base), _std_valor(base)
+    if entidade == "faturas":
+        vcol = _col(df, ["Fatura / Valor","valor_fatura","Valor"])
+        soma = float(pd.to_numeric(df[vcol], errors="coerce").fillna(0).sum()) if vcol else None
+        media = (soma / total) if total > 0 and soma is not None else None
+        return total, soma, media, _max_valor(df), _min_valor(df), _median_valor(df), _std_valor(df)
+    if entidade == "manifestos" or entidade == "manifestos_view":
+        vcol = _col(df, ["invoices_value","freight_subtotal","Valor notas"])
+        soma = float(pd.to_numeric(df[vcol], errors="coerce").fillna(0).sum()) if vcol else None
+        media = (soma / total) if total > 0 and soma is not None else None
+        return total, soma, media, _max_valor(df), _min_valor(df), _median_valor(df), _std_valor(df)
+    vcol = _col(df, ["valor_total","valor_fatura","valor_a_pagar","invoices_value","total_cost","paying_total","Valor","Valor NF","Valor notas"])
+    soma = float(pd.to_numeric(df[vcol], errors="coerce").fillna(0).sum()) if vcol else None
+    media = (soma / total) if total > 0 and soma is not None else None
+    return total, soma, media, _max_valor(df), _min_valor(df), _median_valor(df), _std_valor(df)
+
+def _executivo_kpis(inicio, fim, filiais):
+    try:
+        n_exec = 10000
+        import pandas as pd
+        try:
+            df_fre = consultar_tabela(FRETES_TOP, {"n": n_exec})
+        except Exception:
+            df_fre = pd.DataFrame()
+        try:
+            df_fat = consultar_tabela(FATURAS_CLIENTE_TOP, {"n": n_exec})
+        except Exception:
+            df_fat = pd.DataFrame()
+        try:
+            df_man = consultar_tabela(MANIFESTOS_VIEW_TOP, {"n": n_exec})
+        except Exception:
+            df_man = pd.DataFrame()
+        df_cap = consultar_tabela(CONTAS_PAGAR_TOP, {"n": n_exec})
+        # filtros
+        if filiais and isinstance(filiais, list) and len(filiais) > 0:
+            for df_, ent in [(df_fre,"fretes"), (df_fat,"faturas"), (df_man,"manifestos"), (df_cap,"contas")]:
+                col_filial = _col_strict(df_, ["filial","Filial","branch_nickname"])
+                if col_filial:
+                    df_[:] = df_[df_[col_filial].astype(str).isin([str(x) for x in filiais])]
+        if inicio or fim:
+            for df_, ent in [(df_fre,"fretes"), (df_fat,"faturas"), (df_man,"manifestos"), (df_cap,"contas")]:
+                col_data = _col_date(df_, ent)
+                if col_data and (col_data in df_.columns):
+                    serie = _parse_datetime(df_[col_data])
+                    if inicio:
+                        df_[:] = df_[serie >= _parse_datetime_val(inicio)]
+                    if fim:
+                        df_[:] = df_[serie <= _parse_datetime_val(fim)]
+        # Receita Total
+        v_fre = _col_strict(df_fre, ["Valor Total do Servico","Valor Total do Serviço","valor_total","subtotal","Valor frete","valor_frete"])
+        receita_fre = float(pd.to_numeric(df_fre[v_fre], errors="coerce").fillna(0).sum()) if v_fre else 0.0
+        v_fat = _col_strict(df_fat, ["Fatura / Valor","valor_fatura","Valor"])
+        receita_fat = float(pd.to_numeric(df_fat[v_fat], errors="coerce").fillna(0).sum()) if v_fat else 0.0
+        receita_total = receita_fre + receita_fat
+        # Custo Total
+        c_man = _col_strict(df_man, ["total_cost","Custo Total"])
+        custo_manifesto = float(pd.to_numeric(df_man[c_man], errors="coerce").fillna(0).sum()) if c_man else 0.0
+        df_cap_op = _etl_contas(df_cap)
+        flag = _col_strict(df_cap_op, ["Flag_Operacional","flag_operacional"])
+        df_op = df_cap_op[df_cap_op[flag] == 1] if flag else df_cap_op
+        v_cap_op = _col_strict(df_op, ["Valor a pagar","valor_a_pagar"])
+        custo_cap = float(pd.to_numeric(df_op[v_cap_op], errors="coerce").fillna(0).sum()) if v_cap_op else 0.0
+        custo_total = custo_manifesto + custo_cap
+        lucro_bruto = receita_total - custo_total
+        margem_bruta = (lucro_bruto / receita_total) if receita_total != 0 else None
+        # Resultado Líquido (Visão de Caixa)
+        df_cap_full = _etl_contas(df_cap.copy())
+        flag2 = _col_strict(df_cap_full, ["Flag_Operacional","flag_operacional"])
+        df_fixas = df_cap_full[df_cap_full[flag2] == 0] if flag2 else df_cap_full
+        v_cap_fix = _col_strict(df_fixas, ["Valor a pagar","valor_a_pagar"])
+        despesas_fixas = float(pd.to_numeric(df_fixas[v_cap_fix], errors="coerce").fillna(0).sum()) if v_cap_fix else 0.0
+        resultado_liquido = receita_fat - (custo_manifesto + despesas_fixas)
+        return _fmt_brl(receita_total), _fmt_brl(custo_total), _fmt_brl(lucro_bruto), _fmt_pct(margem_bruta), _fmt_brl(resultado_liquido)
+    except Exception:
+        vazio = _fmt_brl(None)
+        return vazio, vazio, vazio, "—", vazio
+
+@aplicacao.callback(
+    dash.Output("card-basic-registros", "style"),
+    dash.Output("card-basic-soma", "style"),
+    dash.Output("card-basic-media", "style"),
+    dash.Output("card-basic-max", "style"),
+    dash.Output("card-basic-min", "style"),
+    dash.Output("card-basic-mediana", "style"),
+    dash.Output("card-basic-desvio", "style"),
+    dash.Output("card-basic-data", "style"),
+    dash.Output("card-basic-top", "style"),
+    dash.Output("card-basic-menor", "style"),
+    dash.Output("grid-exec", "style"),
+    dash.Output("card-exec-receita", "style"),
+    dash.Output("card-exec-custo", "style"),
+    dash.Output("card-exec-lucro", "style"),
+    dash.Output("card-exec-margem", "style"),
+    dash.Output("card-exec-resultado", "style"),
+    dash.Output("card-yoy", "style"),
+    dash.Output("card-conversao", "style"),
+    dash.Output("card-pontualidade", "style"),
+    dash.Output("card-tempo-medio", "style"),
+    dash.Output("card-rentabilidade", "style"),
+    dash.Output("card-aberto", "style"),
+    dash.Output("card-em-transito", "style"),
+    dash.Output("card-principal-destino", "style"),
+    dash.Input("seletor-entidade", "value")
+)
+def visibilidade_kpis(entidade):
+    show = {}
+    hide = {"display": "none"}
+    visible_basic = set()
+    visible_exec = set()
+    if entidade == "contas":
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data","card-basic-top","card-basic-menor"}
+        visible_exec = set()
+    elif entidade == "faturas":
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data","card-basic-top","card-basic-menor"}
+        visible_exec = {"card-aberto"}
+    elif entidade == "coletas":
+        visible_basic = {"card-basic-registros","card-basic-data"}
+        visible_exec = {"card-pontualidade","card-tempo-medio"}
+    elif entidade == "fretes":
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data","card-basic-top"}
+        visible_exec = {"card-yoy"}
+    elif entidade == "cotacoes":
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data"}
+        visible_exec = {"card-conversao"}
+    elif entidade == "localizacao":
+        visible_basic = {"card-basic-registros","card-basic-data"}
+        visible_exec = {"card-em-transito","card-principal-destino"}
+    elif entidade == "manifestos_view":
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data","card-basic-top","card-basic-menor"}
+        visible_exec = {"card-rentabilidade"}
+    else:  # manifestos (tabela)
+        visible_basic = {"card-basic-registros","card-basic-soma","card-basic-media","card-basic-data","card-basic-top","card-basic-menor"}
+        visible_exec = {"card-exec-receita","card-exec-custo","card-exec-lucro","card-exec-margem","card-exec-resultado"}
+    def st(id_):
+        return {} if id_ in visible_basic or id_ in visible_exec else hide
+    grid_exec_style = {} if len(visible_exec) > 0 else hide
+    return (
+        st("card-basic-registros"),
+        st("card-basic-soma"),
+        st("card-basic-media"),
+        st("card-basic-max"),
+        st("card-basic-min"),
+        st("card-basic-mediana"),
+        st("card-basic-desvio"),
+        st("card-basic-data"),
+        st("card-basic-top"),
+        st("card-basic-menor"),
+        grid_exec_style,
+        st("card-exec-receita"),
+        st("card-exec-custo"),
+        st("card-exec-lucro"),
+        st("card-exec-margem"),
+        st("card-exec-resultado"),
+        st("card-yoy"),
+        st("card-conversao"),
+        st("card-pontualidade"),
+        st("card-tempo-medio"),
+        st("card-rentabilidade"),
+        st("card-aberto"),
+        st("card-em-transito"),
+        st("card-principal-destino"),
+    )
+
+def _kpis_entidade_extras(df, entidade):
+    import pandas as pd
+    try:
+        if entidade == "fretes":
+            v = _col_strict(df, ["Valor Total do Servico","Valor Total do Serviço","valor_total","subtotal","Valor frete","valor_frete"])
+            dcol = _col_date(df, "fretes")
+            if v and dcol and (dcol in df.columns):
+                tmp = df[[dcol, v]].copy()
+                tmp[v] = pd.to_numeric(tmp[v], errors="coerce").fillna(0)
+                tmp[dcol] = pd.to_datetime(tmp[dcol], errors="coerce", dayfirst=True, format="mixed")
+                por_ano = tmp.groupby(tmp[dcol].dt.year)[v].sum().sort_index()
+                yoy = None
+                if len(por_ano) >= 2:
+                    atual = por_ano.iloc[-1]
+                    anterior = por_ano.iloc[-2]
+                    yoy = ((atual - anterior) / anterior) if anterior != 0 else None
+                return _fmt_pct(yoy), "—", "—", "—", "—", "—", "—", "—"
+        if entidade == "cotacoes":
+            s = _col_strict(df, ["Status_Cotacao","status_conversao","conversion_status","status","Status"])
+            if s and (s in df.columns):
+                serie = df[s].astype(str).str.upper()
+                tot = len(serie)
+                conv = int((serie == "CONVERTIDA").sum())
+                taxa = (conv / tot) if tot > 0 else None
+                return "—", _fmt_pct(taxa), "—", "—", "—", "—", "—", "—"
+        if entidade == "coletas":
+            st = _col_strict(df, ["Status_PT","status","Status"])
+            fim = _col_strict(df, ["Finalizacao","finish_date","service_end"])
+            ini = _col_strict(df, ["Solicitacao","request_date","service_date"])
+            noprazo = _col_strict(df, ["No_Prazo"])
+            taxa = None
+            if st and (st in df.columns):
+                s = df[st].astype(str).str.lower()
+                tot = len(s)
+                concl = int(s.str.contains("finaliz|finish").sum())
+                taxa = (concl / tot) if tot > 0 else None
+            tempo_medio = None
+            if fim and ini and (fim in df.columns) and (ini in df.columns):
+                f = pd.to_datetime(df[fim], errors="coerce", dayfirst=True, format="mixed")
+                i = pd.to_datetime(df[ini], errors="coerce", dayfirst=True, format="mixed")
+                delta = (f - i).dt.total_seconds() / 3600
+                tempo_medio = float(delta.dropna().mean()) if delta.notna().any() else None
+            pont = None
+            if noprazo and (noprazo in df.columns):
+                s = df[noprazo].astype(str).str.strip().str.lower()
+                tot = len(s)
+                sim = int((s == "sim").sum())
+                pont = (sim / tot) if tot > 0 else None
+            return "—", "—", _fmt_pct(pont), f"{_fmt_num(tempo_medio) if tempo_medio is not None else '—'}", "—", "—", "—", "—"
+        if entidade in ["manifestos","manifestos_view"]:
+            rent = _col_strict(df, ["Rentabilidade"])
+            if rent and (rent in df.columns):
+                media = pd.to_numeric(df[rent], errors="coerce").mean()
+                return "—", "—", "—", "—", _fmt_pct(media), "—", "—", "—"
+        if entidade == "faturas":
+            val = _col_strict(df, ["Fatura / Valor","valor_fatura","Valor"])
+            baixa = _col_strict(df, ["Fatura/Baixa","Baixa","data_liquidacao"])
+            aberto = None
+            if val and (val in df.columns):
+                v = pd.to_numeric(df[val], errors="coerce").fillna(0)
+                if baixa and (baixa in df.columns):
+                    b = df[baixa]
+                    aberto = float(v[b.isna()].sum())
+                else:
+                    aberto = None
+            return "—", "—", "—", "—", "—", _fmt_brl(aberto), "—", "—"
+        if entidade == "localizacao":
+            st = _col_strict(df, ["Status Carga","status_carga","status","Status"])
+            emt = None
+            if st and (st in df.columns):
+                s = df[st].astype(str).str.lower()
+                emt = int(s.str.contains("in_transfer|transfer|transit").sum())
+            reg = _col_strict(df, ["Região Destino","regiao_destino","destination_region","region_destino"])
+            if not reg:
+                reg = _col_strict(df, ["Cidade Destino","cidade_destino","destination_city","Destination"])
+            pdest = "—"
+            if reg:
+                grp = df[reg].dropna().astype(str).value_counts()
+                if len(grp) > 0:
+                    pdest = str(grp.index[0])
+            return "—", "—", "—", "—", "—", "—", f"{emt or 0}", pdest
+        return "—", "—", "—", "—", "—", "—", "0", "—"
+    except Exception:
+        return "—", "—", "—", "—", "—", "—", "0", "—"

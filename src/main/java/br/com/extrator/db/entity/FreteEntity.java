@@ -21,6 +21,8 @@ public class FreteEntity {
     private String status;
     private String modal;
     private String tipoFrete;
+    private Long accountingCreditId;
+    private Long accountingCreditInstallmentId;
     private BigDecimal valorTotal;
     private BigDecimal valorNotas;
     private BigDecimal pesoNotas;
@@ -75,6 +77,14 @@ public class FreteEntity {
     private BigDecimal itrSubtotal;
     private String nfseSeries;
     private Integer nfseNumber;
+    private String nfseIntegrationId;
+    private String nfseStatus;
+    private java.time.LocalDate nfseIssuedAt;
+    private String nfseCancelationReason;
+    private String nfsePdfServiceUrl;
+    private Long nfseCorporationId;
+    private String nfseServiceDescription;
+    private String nfseXmlDocument;
     private Long insuranceId;
     private BigDecimal otherFees;
     private BigDecimal km;
@@ -96,6 +106,20 @@ public class FreteEntity {
     private BigDecimal fiscalTaxValue;
     private BigDecimal fiscalPisValue;
     private BigDecimal fiscalCofinsValue;
+
+    private BigDecimal fiscalCalculationBasis;
+    private BigDecimal fiscalTaxRate;
+    private BigDecimal fiscalPisRate;
+    private BigDecimal fiscalCofinsRate;
+    private Boolean fiscalHasDifal;
+    private BigDecimal fiscalDifalOrigin;
+    private BigDecimal fiscalDifalDestination;
+
+    private Long cteId;
+    private String cteEmissionType;
+    private OffsetDateTime cteCreatedAt;
+
+    private String filialApelido;
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -148,6 +172,19 @@ public class FreteEntity {
 
     public void setTipoFrete(final String tipoFrete) {
         this.tipoFrete = tipoFrete;
+    }
+
+    public Long getAccountingCreditId() {
+        return accountingCreditId;
+    }
+    public void setAccountingCreditId(final Long accountingCreditId) {
+        this.accountingCreditId = accountingCreditId;
+    }
+    public Long getAccountingCreditInstallmentId() {
+        return accountingCreditInstallmentId;
+    }
+    public void setAccountingCreditInstallmentId(final Long accountingCreditInstallmentId) {
+        this.accountingCreditInstallmentId = accountingCreditInstallmentId;
     }
 
     public BigDecimal getValorTotal() {
@@ -446,6 +483,22 @@ public class FreteEntity {
     public void setNfseSeries(final String nfseSeries) { this.nfseSeries = nfseSeries; }
     public Integer getNfseNumber() { return nfseNumber; }
     public void setNfseNumber(final Integer nfseNumber) { this.nfseNumber = nfseNumber; }
+    public String getNfseIntegrationId() { return nfseIntegrationId; }
+    public void setNfseIntegrationId(final String nfseIntegrationId) { this.nfseIntegrationId = nfseIntegrationId; }
+    public String getNfseStatus() { return nfseStatus; }
+    public void setNfseStatus(final String nfseStatus) { this.nfseStatus = nfseStatus; }
+    public java.time.LocalDate getNfseIssuedAt() { return nfseIssuedAt; }
+    public void setNfseIssuedAt(final java.time.LocalDate nfseIssuedAt) { this.nfseIssuedAt = nfseIssuedAt; }
+    public String getNfseCancelationReason() { return nfseCancelationReason; }
+    public void setNfseCancelationReason(final String nfseCancelationReason) { this.nfseCancelationReason = nfseCancelationReason; }
+    public String getNfsePdfServiceUrl() { return nfsePdfServiceUrl; }
+    public void setNfsePdfServiceUrl(final String nfsePdfServiceUrl) { this.nfsePdfServiceUrl = nfsePdfServiceUrl; }
+    public Long getNfseCorporationId() { return nfseCorporationId; }
+    public void setNfseCorporationId(final Long nfseCorporationId) { this.nfseCorporationId = nfseCorporationId; }
+    public String getNfseServiceDescription() { return nfseServiceDescription; }
+    public void setNfseServiceDescription(final String nfseServiceDescription) { this.nfseServiceDescription = nfseServiceDescription; }
+    public String getNfseXmlDocument() { return nfseXmlDocument; }
+    public void setNfseXmlDocument(final String nfseXmlDocument) { this.nfseXmlDocument = nfseXmlDocument; }
     public Long getInsuranceId() { return insuranceId; }
     public void setInsuranceId(final Long insuranceId) { this.insuranceId = insuranceId; }
     public BigDecimal getOtherFees() { return otherFees; }
@@ -486,6 +539,31 @@ public class FreteEntity {
     public void setFiscalPisValue(final BigDecimal fiscalPisValue) { this.fiscalPisValue = fiscalPisValue; }
     public BigDecimal getFiscalCofinsValue() { return fiscalCofinsValue; }
     public void setFiscalCofinsValue(final BigDecimal fiscalCofinsValue) { this.fiscalCofinsValue = fiscalCofinsValue; }
+
+    public BigDecimal getFiscalCalculationBasis() { return fiscalCalculationBasis; }
+    public void setFiscalCalculationBasis(final BigDecimal fiscalCalculationBasis) { this.fiscalCalculationBasis = fiscalCalculationBasis; }
+    public BigDecimal getFiscalTaxRate() { return fiscalTaxRate; }
+    public void setFiscalTaxRate(final BigDecimal fiscalTaxRate) { this.fiscalTaxRate = fiscalTaxRate; }
+    public BigDecimal getFiscalPisRate() { return fiscalPisRate; }
+    public void setFiscalPisRate(final BigDecimal fiscalPisRate) { this.fiscalPisRate = fiscalPisRate; }
+    public BigDecimal getFiscalCofinsRate() { return fiscalCofinsRate; }
+    public void setFiscalCofinsRate(final BigDecimal fiscalCofinsRate) { this.fiscalCofinsRate = fiscalCofinsRate; }
+    public Boolean getFiscalHasDifal() { return fiscalHasDifal; }
+    public void setFiscalHasDifal(final Boolean fiscalHasDifal) { this.fiscalHasDifal = fiscalHasDifal; }
+    public BigDecimal getFiscalDifalOrigin() { return fiscalDifalOrigin; }
+    public void setFiscalDifalOrigin(final BigDecimal fiscalDifalOrigin) { this.fiscalDifalOrigin = fiscalDifalOrigin; }
+    public BigDecimal getFiscalDifalDestination() { return fiscalDifalDestination; }
+    public void setFiscalDifalDestination(final BigDecimal fiscalDifalDestination) { this.fiscalDifalDestination = fiscalDifalDestination; }
+
+    public Long getCteId() { return cteId; }
+    public void setCteId(final Long cteId) { this.cteId = cteId; }
+    public String getCteEmissionType() { return cteEmissionType; }
+    public void setCteEmissionType(final String cteEmissionType) { this.cteEmissionType = cteEmissionType; }
+    public OffsetDateTime getCteCreatedAt() { return cteCreatedAt; }
+    public void setCteCreatedAt(final OffsetDateTime cteCreatedAt) { this.cteCreatedAt = cteCreatedAt; }
+
+    public String getFilialApelido() { return filialApelido; }
+    public void setFilialApelido(final String filialApelido) { this.filialApelido = filialApelido; }
 
     public String getMetadata() {
         return metadata;

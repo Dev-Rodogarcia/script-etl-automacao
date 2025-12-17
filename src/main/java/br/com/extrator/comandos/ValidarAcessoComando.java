@@ -16,6 +16,11 @@ public class ValidarAcessoComando implements Comando {
             br.com.extrator.util.CarregadorConfig.validarConexaoBancoDados();
             System.out.println("✅ Conexão com banco de dados: OK");
             
+            final br.com.extrator.db.repository.LogExtracaoRepository repo = new br.com.extrator.db.repository.LogExtracaoRepository();
+            repo.criarTabelaSeNaoExistir();
+            final boolean existe = repo.tabelaExiste();
+            System.out.println(existe ? "✅ Tabela dbo.log_extracoes disponível" : "❌ Tabela dbo.log_extracoes indisponível");
+            
             // Valida configurações das APIs
             System.out.println("🌐 Validando configurações das APIs...");
             // As validações específicas são feitas pelos próprios clientes quando instanciados
