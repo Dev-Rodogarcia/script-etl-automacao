@@ -19,7 +19,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import br.com.extrator.util.CarregadorConfig;
+import br.com.extrator.util.configuracao.CarregadorConfig;
 
 /**
  * Classe base abstrata para repositórios com operações comuns de banco de dados.
@@ -33,11 +33,21 @@ import br.com.extrator.util.CarregadorConfig;
 public abstract class AbstractRepository<T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractRepository.class);
     
-    // Configuração de batch - commit a cada N registros
-    private static final int BATCH_SIZE = 100;
+    /**
+     * Obtém o tamanho do batch para commits (configurável via config.properties).
+     * @return Tamanho do batch
+     */
+    protected static int getBatchSize() {
+        return CarregadorConfig.obterBatchSize();
+    }
     
-    // Flag para controlar se deve parar na primeira falha ou continuar
-    private static final boolean CONTINUAR_APOS_ERRO = true;
+    /**
+     * Verifica se deve continuar após erro (configurável via config.properties).
+     * @return true para continuar após erros
+     */
+    protected static boolean isContinuarAposErro() {
+        return CarregadorConfig.isContinuarAposErro();
+    }
 
     private final String urlConexao;
     private final String usuario;
@@ -86,8 +96,9 @@ public abstract class AbstractRepository<T> {
         int registroAtual = 0;
         final int totalRegistros = entidades.size();
 
+        final int batchSize = getBatchSize();
         logger.info("🔄 Iniciando salvamento de {} registros de {} (batch size: {})", 
-            totalRegistros, getClass().getSimpleName(), BATCH_SIZE);
+            totalRegistros, getClass().getSimpleName(), batchSize);
 
         try (Connection conexao = obterConexao()) {
             conexao.setAutoCommit(false);
@@ -119,7 +130,7 @@ public abstract class AbstractRepository<T> {
                         }
                         
                         // Commit em batches para evitar transações muito grandes
-                        if (registroAtual % BATCH_SIZE == 0) {
+                        if (registroAtual % batchSize == 0) {
                             conexao.commit();
                             logger.debug("✅ Batch commit: {}/{} registros processados", registroAtual, totalRegistros);
                         }
@@ -138,7 +149,7 @@ public abstract class AbstractRepository<T> {
                         // Log da stack trace completa em nível DEBUG
                         logger.debug("Stack trace completo do erro:", e);
                         
-                        if (!CONTINUAR_APOS_ERRO) {
+                        if (!isContinuarAposErro()) {
                             // Se configurado para parar na primeira falha
                             logger.error("🚨 Abortando salvamento devido a erro crítico");
                             conexao.rollback();
@@ -171,9 +182,10 @@ public abstract class AbstractRepository<T> {
                 } else {
                     logger.info("✅ Salvamento 100% concluído: {} operações bem-sucedidas (INSERTs + UPDATEs) de {} processados", 
                         totalSucesso, totalRegistros);
-                    logger.info("💡 Nota: 'Operações bem-sucedidas' inclui INSERTs (novos registros) e UPDATEs (registros atualizados). " +
-                               "Se houver UPDATEs, o número de registros no banco pode ser menor que o número de operações. " +
-                               "Isso é esperado quando o script roda periodicamente (execuções a cada 1h buscando últimas 24h).");
+                    logger.info("""
+                        💡 Nota: 'Operações bem-sucedidas' inclui INSERTs (novos registros) e UPDATEs (registros atualizados). \
+                        Se houver UPDATEs, o número de registros no banco pode ser menor que o número de operações. \
+                        Isso é esperado quando o script roda periodicamente (execuções a cada 1h buscando últimas 24h).""");
                 }
 
             } catch (final SQLException e) {
@@ -311,7 +323,7 @@ public abstract class AbstractRepository<T> {
      * @param conexao Conexão com o banco de dados
      * @throws SQLException Se ocorrer um erro durante a criação da tabela
      */
-    public void criarTabelaSeNaoExistirPublico(Connection conexao) throws SQLException {
+    public void criarTabelaSeNaoExistirPublico(final Connection conexao) throws SQLException {
         criarTabelaSeNaoExistir(conexao);
     }
 
@@ -476,6 +488,21 @@ public abstract class AbstractRepository<T> {
             statement.setNull(index, Types.TIMESTAMP);
         } else {
             statement.setTimestamp(index, Timestamp.from(value));
+        }
+    }
+
+    /**
+     * Define um parâmetro OffsetDateTime no PreparedStatement
+     * @param statement PreparedStatement
+     * @param index Índice do parâmetro (1-based)
+     * @param value Valor OffsetDateTime a ser definido
+     * @throws SQLException Se ocorrer um erro ao definir o parâmetro
+     */
+    protected void setOffsetDateTimeParameter(final PreparedStatement statement, final int index, final java.time.OffsetDateTime value) throws SQLException {
+        if (value == null) {
+            statement.setNull(index, Types.TIMESTAMP);
+        } else {
+            statement.setTimestamp(index, Timestamp.from(value.toInstant()));
         }
     }
 

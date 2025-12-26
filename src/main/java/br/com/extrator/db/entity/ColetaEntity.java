@@ -44,7 +44,6 @@ public class ColetaEntity {
     private LocalDate finishDate;
     private String serviceEndHour;
     private String requester;
-    private BigDecimal taxedWeight;
     private String comments;
     private Long agentId;
     private Long manifestItemPickId;
@@ -296,14 +295,6 @@ public class ColetaEntity {
 
     public void setRequester(final String requester) {
         this.requester = requester;
-    }
-
-    public BigDecimal getTaxedWeight() {
-        return taxedWeight;
-    }
-
-    public void setTaxedWeight(final BigDecimal taxedWeight) {
-        this.taxedWeight = taxedWeight;
     }
 
     public String getComments() {

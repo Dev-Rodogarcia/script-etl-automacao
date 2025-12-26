@@ -31,6 +31,22 @@ public class FreteMapper {
     }
 
     /**
+     * Converte String para Integer de forma segura.
+     * Retorna null se a string for null, vazia ou não puder ser convertida.
+     */
+    private Integer parseIntegerOrNull(final String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (final NumberFormatException e) {
+            logger.warn("Erro ao converter '{}' para Integer: {}", value, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Converte o DTO de Frete em uma Entidade.
      * @param dto O objeto DTO com os dados do frete.
      * @return Um objeto FreteEntity pronto para ser salvo.
@@ -167,7 +183,7 @@ public class FreteMapper {
         entity.setTotalCubicVolume(dto.getTotalCubicVolume());
         entity.setSubtotal(dto.getSubtotal());
 
-        entity.setServiceType(dto.getServiceType());
+        entity.setServiceType(parseIntegerOrNull(dto.getServiceType()));
         entity.setInsuranceEnabled(dto.getInsuranceEnabled());
         entity.setGrisSubtotal(dto.getGrisSubtotal());
         entity.setTdeSubtotal(dto.getTdeSubtotal());
@@ -183,17 +199,17 @@ public class FreteMapper {
         entity.setTollSubtotal(dto.getTollSubtotal());
         entity.setItrSubtotal(dto.getItrSubtotal());
         entity.setNfseSeries(dto.getNfseSeries());
-        entity.setNfseNumber(dto.getNfseNumber());
+        entity.setNfseNumber(parseIntegerOrNull(dto.getNfseNumber()));
         entity.setInsuranceId(dto.getInsuranceId());
         entity.setOtherFees(dto.getOtherFees());
         entity.setKm(dto.getKm());
-        entity.setPaymentAccountableType(dto.getPaymentAccountableType());
+        entity.setPaymentAccountableType(parseIntegerOrNull(dto.getPaymentAccountableType()));
         entity.setInsuredValue(dto.getInsuredValue());
         entity.setGlobalized(dto.getGlobalized());
         entity.setSecCatSubtotal(dto.getSecCatSubtotal());
         entity.setGlobalizedType(dto.getGlobalizedType());
-        entity.setPriceTableAccountableType(dto.getPriceTableAccountableType());
-        entity.setInsuranceAccountableType(dto.getInsuranceAccountableType());
+        entity.setPriceTableAccountableType(parseIntegerOrNull(dto.getPriceTableAccountableType()));
+        entity.setInsuranceAccountableType(parseIntegerOrNull(dto.getInsuranceAccountableType()));
 
         if (dto.getFiscalDetail() != null) {
             entity.setFiscalCstType(dto.getFiscalDetail().getCstType());
@@ -235,9 +251,12 @@ public class FreteMapper {
             if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
                 entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));
             }
+            if (dto.getServiceDate() != null && !dto.getServiceDate().trim().isEmpty()) {
+                entity.setServiceDate(LocalDate.parse(dto.getServiceDate()));
+            }
         } catch (final DateTimeParseException e) {
-            logger.error("❌ Erro ao converter data para frete ID {}: serviceAt='{}', createdAt='{}', deliveryPredictionDate='{}' - {}", 
-                dto.getId(), dto.getServiceAt(), dto.getCreatedAt(), dto.getDeliveryPredictionDate(), e.getMessage());
+            logger.error("❌ Erro ao converter data para frete ID {}: serviceAt='{}', createdAt='{}', deliveryPredictionDate='{}', serviceDate='{}' - {}", 
+                dto.getId(), dto.getServiceAt(), dto.getCreatedAt(), dto.getDeliveryPredictionDate(), dto.getServiceDate(), e.getMessage());
             logger.debug("Stack trace completo:", e);
         }
 

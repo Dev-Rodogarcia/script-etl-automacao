@@ -8,7 +8,9 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.api.constantes.ConstantesViewsPowerBI;
 import br.com.extrator.db.entity.FaturaPorClienteEntity;
+import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Repository para persistência de Faturas por Cliente no banco de dados.
@@ -20,7 +22,7 @@ import br.com.extrator.db.entity.FaturaPorClienteEntity;
 public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClienteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FaturaPorClienteRepository.class);
 
-    private static final String NOME_TABELA = "faturas_por_cliente";
+    private static final String NOME_TABELA = ConstantesEntidades.FATURAS_POR_CLIENTE;
     private static boolean viewVerificada = false;
 
     /**
@@ -39,6 +41,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 numero_nfse BIGINT,
                 serie_nfse NVARCHAR(50),
                 status_cte NVARCHAR(255),
+                status_cte_result NVARCHAR(MAX),
                 data_emissao_cte DATETIMEOFFSET,
                 numero_fatura NVARCHAR(50),
                 data_emissao_fatura DATE,
@@ -86,6 +89,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 ? AS chave_cte,
                 ? AS numero_nfse,
                 ? AS status_cte,
+                ? AS status_cte_result,
                 ? AS data_emissao_cte,
                 ? AS numero_fatura,
                 ? AS data_emissao_fatura,
@@ -121,6 +125,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 chave_cte = source.chave_cte,
                 numero_nfse = source.numero_nfse,
                 status_cte = source.status_cte,
+                status_cte_result = source.status_cte_result,
                 data_emissao_cte = source.data_emissao_cte,
                 numero_fatura = source.numero_fatura,
                 data_emissao_fatura = source.data_emissao_fatura,
@@ -146,8 +151,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 metadata = source.metadata,
                 data_extracao = source.data_extracao
         WHEN NOT MATCHED THEN
-            INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao)
-            VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao);
+            INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao)
+            VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao);
         """;
 
     @Override
@@ -164,6 +169,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "remetente_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "destinatario_documento", "NVARCHAR(50)");
         adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "serie_nfse", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, NOME_TABELA, "status_cte_result", "NVARCHAR(MAX)");
         if (!viewVerificada) {
             criarViewPowerBISeNaoExistir(conexao);
             viewVerificada = true;
@@ -188,52 +194,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
-        final String sqlView = """
-            CREATE OR ALTER VIEW dbo.vw_faturas_por_cliente_powerbi AS
-            SELECT
-                unique_id AS [ID Único],
-                filial AS [Filial],
-                estado AS [Estado],
-                numero_cte AS [CT-e/Número],
-                CASE 
-                    WHEN numero_cte IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_cte)
-                    WHEN numero_nfse IS NOT NULL THEN CONVERT(NVARCHAR(50), numero_nfse)
-                    ELSE NULL
-                END AS [Número do Documento],
-                chave_cte AS [CT-e/Chave],
-                data_emissao_cte AS [CT-e/Data de emissão],
-                valor_frete AS [Frete/Valor dos CT-es],
-                third_party_ctes_value AS [Terceiros/Valor CT-es],
-                status_cte AS [CT-e/Status],
-                tipo_frete AS [Tipo],
-                classificacao AS [Classificação],
-                pagador_nome AS [Pagador do frete/Nome],
-                pagador_documento AS [Pagador do frete/Documento],
-                remetente_nome AS [Remetente/Nome],
-                remetente_documento AS [Remetente/Documento],
-                destinatario_nome AS [Destinatário/Nome],
-                destinatario_documento AS [Destinatário/Documento],
-                vendedor_nome AS [Vendedor/Nome],
-                numero_nfse AS [NFS-e/Número],
-                serie_nfse AS [NFS-e/Série],
-                numero_nfse AS [fit_nse_number],
-                CASE WHEN fit_ant_document IS NOT NULL THEN 'Faturado' ELSE 'Aguardando Faturamento' END AS [Status do Processo],
-                fit_ant_document AS [Fatura/N° Documento],
-                fit_ant_issue_date AS [Fatura/Emissão],
-                fit_ant_value AS [Fatura/Valor],
-                valor_fatura AS [Fatura/Valor Total],
-                numero_fatura AS [Fatura/Número],
-                data_emissao_fatura AS [Fatura/Emissão Fatura],
-                data_vencimento_fatura AS [Parcelas/Vencimento],
-                data_baixa_fatura AS [Fatura/Baixa],
-                fit_ant_ils_original_due_date AS [Fatura/Data Vencimento Original],
-                notas_fiscais AS [Notas Fiscais],
-                pedidos_cliente AS [Pedidos/Cliente],
-                metadata AS [Metadata],
-                data_extracao AS [Data da Última Atualização]
-            FROM dbo.faturas_por_cliente;
-        """;
-        executarDDL(conexao, sqlView);
+        executarDDL(conexao, ConstantesViewsPowerBI.obterSqlView(NOME_TABELA));
     }
 
     @Override
@@ -251,6 +212,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             pstmt.setString(idx++, entity.getChaveCte());
             setLongParameter(pstmt, idx++, entity.getNumeroNfse());
             pstmt.setString(idx++, entity.getStatusCte());
+            pstmt.setString(idx++, entity.getStatusCteResult());
             if (entity.getDataEmissaoCte() != null) {
                 pstmt.setObject(idx++, entity.getDataEmissaoCte(), java.sql.Types.TIMESTAMP_WITH_TIMEZONE);
             } else {

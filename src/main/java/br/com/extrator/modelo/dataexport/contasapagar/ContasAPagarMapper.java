@@ -4,14 +4,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.extrator.db.entity.ContasAPagarDataExportEntity;
+import br.com.extrator.util.formatacao.FormatadorData;
+import br.com.extrator.util.validacao.ValidadorDTO;
+import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
 
 /**
  * Mapper para conversão de FaturaAPagarDataExportDTO em FaturaAPagarDataExportEntity.
@@ -20,15 +21,24 @@ public class ContasAPagarMapper {
     private static final Logger logger = LoggerFactory.getLogger(ContasAPagarMapper.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    // Formatadores de data
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    
     /**
      * Converte DTO em Entity com tratamento de erros robusto.
+     * PROBLEMA #6 CORRIGIDO: Adicionada validação de campos críticos.
+     * 
+     * @throws IllegalArgumentException se campos críticos forem inválidos
      */
     public ContasAPagarDataExportEntity toEntity(final ContasAPagarDTO dto) {
         if (dto == null) {
             return null;
+        }
+        
+        // PROBLEMA #6: Validação de campos críticos
+        final ResultadoValidacao validacao = ValidadorDTO.criarValidacao("ContasAPagar");
+        ValidadorDTO.validarIdString(validacao, "sequence_code", dto.getSequenceCode());
+        
+        if (!validacao.isValido()) {
+            validacao.logErros();
+            throw new IllegalArgumentException("Conta a Pagar inválida: sequence_code é obrigatório. Erros: " + validacao.getErros());
         }
         
         final ContasAPagarDataExportEntity entity = new ContasAPagarDataExportEntity();
@@ -162,23 +172,11 @@ public class ContasAPagarMapper {
     }
     
     private LocalDate parseLocalDate(final String dateStr) {
-        if (dateStr == null || dateStr.trim().isEmpty()) return null;
-        try {
-            return LocalDate.parse(dateStr, DATE_FORMATTER);
-        } catch (final java.time.format.DateTimeParseException e) {
-            logger.warn("Erro ao parsear LocalDate: {}", dateStr);
-            return null;
-        }
+        return FormatadorData.parseLocalDate(dateStr);
     }
     
     private OffsetDateTime parseOffsetDateTime(final String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) return null;
-        try {
-            return OffsetDateTime.parse(dateTimeStr);
-        } catch (final java.time.format.DateTimeParseException e) {
-            logger.warn("Erro ao parsear OffsetDateTime: {}", dateTimeStr);
-            return null;
-        }
+        return FormatadorData.parseOffsetDateTime(dateTimeStr);
     }
     
     private String limparETraduzirTipoLancamento(final String tipo) {

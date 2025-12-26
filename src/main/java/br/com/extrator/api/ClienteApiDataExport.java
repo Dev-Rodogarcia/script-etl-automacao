@@ -29,12 +29,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import br.com.extrator.api.constantes.ConstantesApiDataExport;
+import br.com.extrator.api.constantes.ConstantesApiDataExport.ConfiguracaoEntidade;
 import br.com.extrator.modelo.dataexport.cotacao.CotacaoDTO;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoDTO;
-import br.com.extrator.util.CarregadorConfig;
-import br.com.extrator.util.GerenciadorRequisicaoHttp;
+import br.com.extrator.util.configuracao.CarregadorConfig;
+import br.com.extrator.util.validacao.ConstantesEntidades;
+import br.com.extrator.util.formatacao.FormatadorData;
+import br.com.extrator.util.http.GerenciadorRequisicaoHttp;
 import br.com.extrator.db.entity.PageAuditEntity;
 import br.com.extrator.db.repository.PageAuditRepository;
 
@@ -52,16 +56,13 @@ public class ClienteApiDataExport {
     private final ObjectMapper objectMapper;
     private final String urlBase;
     private final String token;
-    private final int templateIdManifestos;
-    private final int templateIdLocalizacaoCarga;
-    private final int templateIdCotacoes;
     private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
     private final Duration timeoutRequisicao;
     private final PageAuditRepository pageAuditRepository;
     private String executionUuid;
 
     // PROTEÇÕES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
-    private static final int MAX_REGISTROS_POR_EXECUCAO = 10000;
+    // PROBLEMA #7 CORRIGIDO: Valor agora obtido de CarregadorConfig
     private static final int INTERVALO_LOG_PROGRESSO = 10; // A cada 10 páginas
 
     // CIRCUIT BREAKER
@@ -69,26 +70,8 @@ public class ClienteApiDataExport {
     private final Set<String> templatesComCircuitAberto = new HashSet<>();
     private static final int MAX_FALHAS_CONSECUTIVAS = 5;
 
-    // Template IDs padrão para cada tipo de dados
-    private static final int TEMPLATE_ID_MANIFESTOS = 6399;
-    private static final int TEMPLATE_ID_LOCALIZACAO_CARGA = 8656;
-    private static final int TEMPLATE_ID_COTACOES = 6906;
-    private static final int TEMPLATE_ID_CONTAS_APAGAR = 8636;
-    private static final int TEMPLATE_ID_FATURAS_POR_CLIENTE = 4924;
-
-    // Campos de data corretos para cada template (descobertos via Postman)
-    private static final String CAMPO_MANIFESTOS = "service_date";
-    private static final String CAMPO_COTACOES = "requested_at";
-    private static final String CAMPO_LOCALIZACAO_CARGA = "service_at";
-    private static final String CAMPO_CONTAS_APAGAR = "issue_date";
-    private static final String CAMPO_FATURAS_POR_CLIENTE = "service_at";
-    
-    // Constantes para nomes de// Nomes das tabelas conforme API DataExport
-    private static final String TABELA_MANIFESTOS = "manifests";
-    private static final String TABELA_COTACOES = "quotes";
-    private static final String TABELA_LOCALIZACAO_CARGA = "freights";
-    private static final String TABELA_CONTAS_APAGAR = "accounting_debits";
-    private static final String TABELA_FATURAS_POR_CLIENTE = "freights";
+    // NOTA: Constantes de Template IDs, campos de data e tabelas foram movidas para:
+    // ConstantesApiDataExport.java - usar ConstantesApiDataExport.obterConfiguracao(entidade)
 
     /**
      * Construtor que inicializa o cliente da API Data Export.
@@ -116,22 +99,8 @@ public class ClienteApiDataExport {
             throw new IllegalStateException("Token da API Data Export não configurado");
         }
 
-        // Inicializa IDs de template permitindo sobrescrita via env/properties
-        this.templateIdManifestos = carregarTemplateId(
-                "API_DATAEXPORT_TEMPLATE_MANIFESTOS",
-                "api.dataexport.template.manifestos",
-                TEMPLATE_ID_MANIFESTOS);
-        this.templateIdLocalizacaoCarga = carregarTemplateId(
-                "API_DATAEXPORT_TEMPLATE_LOCALIZACAO",
-                "api.dataexport.template.localizacao",
-                TEMPLATE_ID_LOCALIZACAO_CARGA);
-        this.templateIdCotacoes = carregarTemplateId(
-                "API_DATAEXPORT_TEMPLATE_COTACOES",
-                "api.dataexport.template.cotacoes",
-                TEMPLATE_ID_COTACOES);
-        logger.debug(
-                "Template IDs configurados: manifestos={}, localizacao={}, cotacoes={}",
-                templateIdManifestos, templateIdLocalizacaoCarga, templateIdCotacoes);
+        // Template IDs agora são obtidos de ConstantesApiDataExport.obterConfiguracao(entidade)
+        logger.debug("Template IDs configurados via ConstantesApiDataExport");
 
         // Inicializa o gerenciador de requisições HTTP
         this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
@@ -147,78 +116,152 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de manifestos da API Data Export usando fluxo síncrono (resposta
-     * JSON).
+     * Busca dados de manifestos da API Data Export (últimas 24h).
+     * Método de conveniência que delega para buscarManifestos(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ManifestoDTO> buscarManifestos() {
-        logger.info("Buscando manifestos da API DataExport (últimas 24h)");
-        final Instant agora = Instant.now();
-        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
-        return buscarDadosGenericos(templateIdManifestos, TABELA_MANIFESTOS, CAMPO_MANIFESTOS,
-                new TypeReference<List<ManifestoDTO>>() {}, ontem, agora);
+        final LocalDate hoje = LocalDate.now();
+        final LocalDate ontem = hoje.minusDays(1);
+        return buscarManifestos(ontem, hoje);
     }
 
     /**
-     * Busca dados de cotações da API Data Export usando fluxo síncrono (resposta
-     * JSON).
+     * Busca dados de cotações da API Data Export (últimas 24h).
+     * Método de conveniência que delega para buscarCotacoes(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<CotacaoDTO> buscarCotacoes() {
-        logger.info("Buscando cotações da API DataExport (últimas 24h)");
-        final Instant agora = Instant.now();
-        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
-        return buscarDadosGenericos(templateIdCotacoes, TABELA_COTACOES, CAMPO_COTACOES,
-                new TypeReference<List<CotacaoDTO>>() {}, ontem, agora);
+        final LocalDate hoje = LocalDate.now();
+        final LocalDate ontem = hoje.minusDays(1);
+        return buscarCotacoes(ontem, hoje);
     }
 
     /**
-     * Busca dados de localização de carga da API Data Export usando fluxo síncrono
-     * (resposta JSON).
+     * Busca dados de localização de carga da API Data Export (últimas 24h).
+     * Método de conveniência que delega para buscarLocalizacaoCarga(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga() {
-        logger.info("Buscando localização de carga da API DataExport (últimas 24h)");
-        final Instant agora = Instant.now();
-        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
-        return buscarDadosGenericos(templateIdLocalizacaoCarga, TABELA_LOCALIZACAO_CARGA, CAMPO_LOCALIZACAO_CARGA,
-                new TypeReference<List<LocalizacaoCargaDTO>>() {}, ontem, agora);
+        final LocalDate hoje = LocalDate.now();
+        final LocalDate ontem = hoje.minusDays(1);
+        return buscarLocalizacaoCarga(ontem, hoje);
     }
 
     /**
      * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export (últimas 24h).
+     * Método de conveniência que delega para buscarContasAPagar(dataInicio, dataFim).
      */
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar() {
-        logger.info("Buscando Faturas a Pagar da API DataExport (últimas 24h)");
-        final Instant agora = Instant.now();
-        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
-        return buscarDadosGenericos(
-            TEMPLATE_ID_CONTAS_APAGAR,
-            TABELA_CONTAS_APAGAR,
-            CAMPO_CONTAS_APAGAR,
-            new TypeReference<List<ContasAPagarDTO>>() {},
-            ontem,
-            agora
-        );
+        final LocalDate hoje = LocalDate.now();
+        final LocalDate ontem = hoje.minusDays(1);
+        return buscarContasAPagar(ontem, hoje);
     }
 
     /**
      * Busca dados de Faturas por Cliente da API Data Export (últimas 24h).
+     * Método de conveniência que delega para buscarFaturasPorCliente(dataInicio, dataFim).
      */
     public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente() {
-        logger.info("Buscando Faturas por Cliente da API DataExport (últimas 24h)");
-        final Instant agora = Instant.now();
-        final Instant ontem = agora.minusSeconds(24 * 60 * 60);
+        final LocalDate hoje = LocalDate.now();
+        final LocalDate ontem = hoje.minusDays(1);
+        return buscarFaturasPorCliente(ontem, hoje);
+    }
+
+    /**
+     * Busca dados de manifestos da API Data Export para um intervalo de datas.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<ManifestoDTO> buscarManifestos(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
+        logger.info("Buscando manifestos da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
+        final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+        final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+        return buscarDadosGenericos(config.templateId(), config.tabelaApi(), config.campoData(),
+                new TypeReference<List<ManifestoDTO>>() {}, inicio, fim, config);
+    }
+
+    /**
+     * Busca dados de cotações da API Data Export para um intervalo de datas.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<CotacaoDTO> buscarCotacoes(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
+        logger.info("Buscando cotações da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.COTACOES);
+        final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+        final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+        return buscarDadosGenericos(config.templateId(), config.tabelaApi(), config.campoData(),
+                new TypeReference<List<CotacaoDTO>>() {}, inicio, fim, config);
+    }
+
+    /**
+     * Busca dados de localização de carga da API Data Export para um intervalo de datas.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
+        logger.info("Buscando localização de carga da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.LOCALIZACAO_CARGAS);
+        final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+        final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+        return buscarDadosGenericos(config.templateId(), config.tabelaApi(), config.campoData(),
+                new TypeReference<List<LocalizacaoCargaDTO>>() {}, inicio, fim, config);
+    }
+
+    /**
+     * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export para um intervalo de datas.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
+        logger.info("Buscando Faturas a Pagar da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
+        final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+        final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
         return buscarDadosGenericos(
-            TEMPLATE_ID_FATURAS_POR_CLIENTE,
-            TABELA_FATURAS_POR_CLIENTE,
-            CAMPO_FATURAS_POR_CLIENTE,
+            config.templateId(),
+            config.tabelaApi(),
+            config.campoData(),
+            new TypeReference<List<ContasAPagarDTO>>() {},
+            inicio,
+            fim,
+            config
+        );
+    }
+
+    /**
+     * Busca dados de Faturas por Cliente da API Data Export para um intervalo de datas.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
+        logger.info("Buscando Faturas por Cliente da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.FATURAS_POR_CLIENTE);
+        final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+        final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+        return buscarDadosGenericos(
+            config.templateId(),
+            config.tabelaApi(),
+            config.campoData(),
             new com.fasterxml.jackson.core.type.TypeReference<java.util.List<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO>>() {},
-            ontem,
-            agora
+            inicio,
+            fim,
+            config
         );
     }
 
@@ -232,10 +275,12 @@ public class ClienteApiDataExport {
      * @param typeReference Referência de tipo para desserialização
      * @param dataInicio   Data de início do período
      * @param dataFim      Data de fim do período
+     * @param config       Configuração da entidade (de ConstantesApiDataExport)
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     private <T> ResultadoExtracao<T> buscarDadosGenericos(final int templateId, final String nomeTabela, final String campoData,
-            final TypeReference<List<T>> typeReference, final Instant dataInicio, final Instant dataFim) {
+            final TypeReference<List<T>> typeReference, final Instant dataInicio, final Instant dataFim, 
+            final ConfiguracaoEntidade config) {
         
         // Determina o nome amigável do tipo de dados baseado na tabela
         final String tipoAmigavel = obterNomeAmigavelTipo(nomeTabela);
@@ -252,9 +297,9 @@ public class ClienteApiDataExport {
             return ResultadoExtracao.completo(new ArrayList<>(), 0, 0);
         }
         
-        // Obter valor de 'per' e timeout adequado
-        final String valorPer = obterValorPerPorTemplate(templateId);
-        final Duration timeout = obterTimeoutPorTemplate(templateId);
+        // Obter valor de 'per' e timeout da configuração
+        final String valorPer = config.valorPer();
+        final Duration timeout = config.timeout();
         int perInt;
         try {
             perInt = Integer.parseInt(valorPer);
@@ -278,7 +323,18 @@ public class ClienteApiDataExport {
         int totalPaginas = 0;
         int totalRegistrosProcessados = 0;
         boolean interrompido = false;
-        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExport();
+        ResultadoExtracao.MotivoInterrupcao motivoInterrupcao = null;
+        
+        // Limites específicos por template (para templates com muitos dados)
+        final int limitePaginasBase = CarregadorConfig.obterLimitePaginasApiDataExport();
+        final int maxRegistrosBase = CarregadorConfig.obterMaxRegistrosDataExport();
+        
+        // Aumentar limites para templates que têm muitos dados em períodos longos
+        // Template 4924 = FATURAS_POR_CLIENTE, Template 8656 = LOCALIZACAO_CARGAS
+        final boolean templateComMuitosDados = templateId == 4924 || templateId == 8656;
+        
+        final int limitePaginas = templateComMuitosDados ? limitePaginasBase * 2 : limitePaginasBase; // Dobrar limite de páginas (1000)
+        final int maxRegistros = templateComMuitosDados ? maxRegistrosBase * 10 : maxRegistrosBase; // 10x mais registros (100.000)
 
         try {
             while (true) {
@@ -287,14 +343,17 @@ public class ClienteApiDataExport {
                     logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
                             templateId, tipoAmigavel, limitePaginas);
                     interrompido = true;
+                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
                     break;
                 }
 
                 // PROTEÇÃO 2: Limite máximo de registros
-                if (totalRegistrosProcessados >= MAX_REGISTROS_POR_EXECUCAO) {
+                // PROBLEMA #7 CORRIGIDO: Usar valor de CarregadorConfig em vez de constante hardcoded
+                if (totalRegistrosProcessados >= maxRegistros) {
                     logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
-                            templateId, tipoAmigavel, MAX_REGISTROS_POR_EXECUCAO);
+                            templateId, tipoAmigavel, maxRegistros);
                     interrompido = true;
+                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_REGISTROS;
                     break;
                 }
 
@@ -302,10 +361,10 @@ public class ClienteApiDataExport {
                 logger.info("→ Requisitando página {}...", paginaAtual);
 
                 // URL base limpa sem parâmetros de query (filtros e paginação vão no corpo JSON)
-                final String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+                final String url = urlBase + ConstantesApiDataExport.formatarEndpoint(templateId);
 
                 // Constrói o corpo JSON com search, page, per conforme formato do Postman
-                final String corpoJson = construirCorpoRequisicao(templateId, nomeTabela, campoData, dataInicio, dataFim, paginaAtual, valorPer);
+                final String corpoJson = construirCorpoRequisicao(nomeTabela, campoData, dataInicio, dataFim, paginaAtual, config);
 
                 logger.debug("URL: {} | Corpo: {}", url, corpoJson);
                 String reqHash;
@@ -362,12 +421,8 @@ public class ClienteApiDataExport {
                 try {
                     final JsonNode raizJson = objectMapper.readTree(resposta.body());
                     final JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
-                    final String idKey = switch (templateId) {
-                        case 6399, 6906, 8636 -> "sequence_code";
-                        case 8656 -> "sequence_number";
-                        case 4924 -> "unique_id";
-                        default -> null;
-                    };
+                    // Obtém o campo de ID primário do orderBy da configuração
+                    final String idKey = ConstantesApiDataExport.obterCampoIdPrimario(config);
 
                     if (dadosNode != null && dadosNode.isArray()) {
                         if (dadosNode.size() == 0) {
@@ -487,7 +542,11 @@ public class ClienteApiDataExport {
 
             // Retornar ResultadoExtracao
             if (interrompido) {
-                return ResultadoExtracao.incompleto(resultadosFinais, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, 
+                // Usar o motivo correto da interrupção (LIMITE_PAGINAS ou LIMITE_REGISTROS)
+                final ResultadoExtracao.MotivoInterrupcao motivo = motivoInterrupcao != null 
+                        ? motivoInterrupcao 
+                        : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS; // Fallback
+                return ResultadoExtracao.incompleto(resultadosFinais, motivo, 
                         totalPaginas > 0 ? totalPaginas : (paginaAtual - 1), totalRegistrosProcessados);
             } else {
                 return ResultadoExtracao.completo(resultadosFinais, 
@@ -521,84 +580,49 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Determina o nome amigável do tipo de dados baseado no nome da tabela.
+     * Determina o nome amigável do tipo de dados baseado no nome da tabela da API.
      * 
      * @param nomeTabela Nome da tabela da API
      * @return Nome amigável para logs
      */
     private String obterNomeAmigavelTipo(final String nomeTabela) {
         return switch (nomeTabela) {
-            case TABELA_MANIFESTOS -> "Manifestos";
-            case TABELA_COTACOES -> "Cotações";
-            case TABELA_LOCALIZACAO_CARGA -> "Localizações de Carga";
+            case "manifests" -> "Manifestos";
+            case "quotes" -> "Cotações";
+            case "freights" -> "Localizações de Carga / Fretes";
+            case "accounting_debits" -> "Contas a Pagar";
             default -> "Dados";
         };
-    }
-
-    /**
-     * Carrega o ID do template a partir de variáveis de ambiente ou propriedades do sistema.
-     * 
-     * @param envName Nome da variável de ambiente
-     * @param propKey Chave da propriedade do sistema
-     * @param padrao  Valor padrão caso não seja encontrado
-     * @return ID do template configurado ou valor padrão
-     */
-    private int carregarTemplateId(final String envName, final String propKey, final int padrao) {
-        // Tenta primeiro obter da variável de ambiente
-        final String valorEnv = System.getenv(envName);
-        if (valorEnv != null && !valorEnv.trim().isEmpty()) {
-            try {
-                return Integer.parseInt(valorEnv.trim());
-            } catch (final NumberFormatException e) {
-                logger.warn("Valor inválido na variável de ambiente {}: '{}'. Tentando arquivo de configuração.",
-                        envName, valorEnv);
-            }
-        }
-
-        // Fallback para o arquivo config.properties usando CarregadorConfig
-        final String valorProp = CarregadorConfig.obterPropriedade(propKey);
-        if (valorProp != null && !valorProp.trim().isEmpty()) {
-            try {
-                return Integer.parseInt(valorProp.trim());
-            } catch (final NumberFormatException e) {
-                logger.warn("Valor inválido na propriedade {}: '{}'. Usando valor padrão {}.",
-                        propKey, valorProp, padrao);
-            }
-        }
-
-        logger.info("Template ID não configurado (env: {}, prop: {}). Usando valor padrão: {}",
-                envName, propKey, padrao);
-        return padrao;
     }
 
     /**
      * Constrói o corpo JSON da requisição conforme formato esperado pela API DataExport.
      * Formato: {"search": {"nomeTabela": {"campoData": "yyyy-MM-dd - yyyy-MM-dd"}}, "page": "1", "per": "1000|10000"}
      * 
-     * @param templateId ID do template para determinar o valor de 'per'
      * @param nomeTabela Nome da tabela para o campo search
      * @param campoData Nome do campo de data específico do template
      * @param dataInicio Data de início do filtro
      * @param dataFim Data de fim do filtro
      * @param pagina Número da página atual
-     * @param valorPer Valor de 'per' (registros por página)
+     * @param config Configuração da entidade (de ConstantesApiDataExport)
      * @return String JSON formatada para o corpo da requisição
      */
-    private String construirCorpoRequisicao(final int templateId, final String nomeTabela, final String campoData, 
-            final Instant dataInicio, final Instant dataFim, final int pagina, final String valorPer) {
+    private String construirCorpoRequisicao(final String nomeTabela, final String campoData, 
+            final Instant dataInicio, final Instant dataFim, final int pagina, final ConfiguracaoEntidade config) {
         try {
             final ObjectNode corpo = objectMapper.createObjectNode();
             final ObjectNode search = objectMapper.createObjectNode();
             final ObjectNode table = objectMapper.createObjectNode();
 
+            // PROBLEMA 13 CORRIGIDO: Usar FormatadorData em vez de criar formatter inline
             // Formata as datas no formato yyyy-MM-dd - yyyy-MM-dd
-            final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            final String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
-            final String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(fmt);
+            final String dataInicioStr = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(FormatadorData.ISO_DATE);
+            final String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(FormatadorData.ISO_DATE);
             final String range = dataInicioStr + " - " + dataFimStr;
 
             // Constrói a estrutura JSON conforme formato do Postman
-            if (templateId == TEMPLATE_ID_CONTAS_APAGAR) {
+            // Usa config.usaSearchNested() para determinar estrutura
+            if (config.usaSearchNested()) {
                 final ObjectNode searchNested = objectMapper.createObjectNode();
                 searchNested.put(campoData, range);
                 searchNested.put("created_at", "");
@@ -610,13 +634,8 @@ public class ClienteApiDataExport {
 
             corpo.set("search", search);
             corpo.put("page", String.valueOf(pagina));
-            corpo.put("per", valorPer);
-            final String orderBy = switch (templateId) {
-                case TEMPLATE_ID_LOCALIZACAO_CARGA -> "sequence_number asc";
-                case TEMPLATE_ID_FATURAS_POR_CLIENTE -> "unique_id asc";
-                default -> "sequence_code asc";
-            };
-            corpo.put("order_by", orderBy);
+            corpo.put("per", config.valorPer());
+            corpo.put("order_by", config.orderBy());
 
             final String corpoJson = objectMapper.writeValueAsString(corpo);
             logger.debug("Corpo JSON construído: {}", corpoJson);
@@ -637,10 +656,11 @@ public class ClienteApiDataExport {
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemManifestos(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
         return obterContagemGenericaCsv(
-            templateIdManifestos, 
-            TABELA_MANIFESTOS, 
-            CAMPO_MANIFESTOS, 
+            config.templateId(), 
+            config.tabelaApi(), 
+            config.campoData(), 
             dataReferencia, 
             "manifestos"
         );
@@ -655,10 +675,11 @@ public class ClienteApiDataExport {
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemCotacoes(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.COTACOES);
         return obterContagemGenericaCsv(
-            templateIdCotacoes, 
-            TABELA_COTACOES, 
-            CAMPO_COTACOES, 
+            config.templateId(), 
+            config.tabelaApi(), 
+            config.campoData(), 
             dataReferencia, 
             "cotações"
         );
@@ -673,10 +694,11 @@ public class ClienteApiDataExport {
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemLocalizacoesCarga(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.LOCALIZACAO_CARGAS);
         return obterContagemGenericaCsv(
-            templateIdLocalizacaoCarga, 
-            TABELA_LOCALIZACAO_CARGA, 
-            CAMPO_LOCALIZACAO_CARGA, 
+            config.templateId(), 
+            config.tabelaApi(), 
+            config.campoData(), 
             dataReferencia, 
             "localizações de carga"
         );
@@ -686,10 +708,11 @@ public class ClienteApiDataExport {
      * Obtém contagem via CSV para Faturas a Pagar.
      */
     public int obterContagemContasAPagar(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
         return obterContagemGenericaCsv(
-            TEMPLATE_ID_CONTAS_APAGAR,
-            TABELA_CONTAS_APAGAR,
-            CAMPO_CONTAS_APAGAR,
+            config.templateId(),
+            config.tabelaApi(),
+            config.campoData(),
             dataReferencia,
             "faturas a pagar"
         );
@@ -729,7 +752,7 @@ public class ClienteApiDataExport {
             final Instant dataFim = dataReferencia.plusDays(1).atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
 
             // URL para download do CSV
-            final String url = String.format("%s/api/analytics/reports/%d/data", urlBase, templateId);
+            final String url = urlBase + ConstantesApiDataExport.formatarEndpoint(templateId);
 
             // Construir corpo da requisição com per=1 para otimização (apenas primeira página)
             final String corpoJson = construirCorpoRequisicaoCsv(nomeTabela, campoData, dataInicio, dataFim);
@@ -802,46 +825,8 @@ public class ClienteApiDataExport {
         }
     }
 
-    /**
-     * Obtém o valor de 'per' (registros por página) baseado no template ID.
-     * Conforme documentação em docs/descobertas-endpoints/:
-     * - Template 6906 (Cotações): per: "1000"
-     * - Template 6399 (Manifestos): per: "10000"
-     * - Template 8656 (Localização de Carga): per: "10000"
-     * 
-     * @param templateId ID do template
-     * @return String com o valor de 'per' apropriado
-     */
-    private String obterValorPerPorTemplate(final int templateId) {
-        return switch (templateId) {
-            case 6906 -> "1000";   // Cotações
-            case 6399 -> "10000";  // Manifestos
-            case 8656 -> "10000";  // Localização de Carga
-            case 8636 -> "100";    // Faturas a Pagar
-            default -> "100";      // Valor padrão para templates desconhecidos
-        };
-    }
-
-    /**
-     * Obtém o timeout adequado baseado no template ID.
-     * Manifestos podem retornar páginas grandes, então precisam de timeout maior.
-     * 
-     * @param templateId ID do template
-     * @return Duration com o timeout apropriado
-     */
-    private Duration obterTimeoutPorTemplate(final int templateId) {
-        // Timeout padrão da configuração
-        final Duration timeoutPadrao = this.timeoutRequisicao;
-        
-        // Timeout aumentado para manifestos (podem ter páginas muito grandes)
-        return switch (templateId) {
-            case 6399 -> Duration.ofSeconds(120);  // Manifestos: 120 segundos
-            case 8656 -> Duration.ofSeconds(90);   // Localização: 90 segundos
-            case 6906 -> Duration.ofSeconds(60);   // Cotações: 60 segundos
-            case 8636 -> Duration.ofSeconds(60);   // Faturas a Pagar: 60 segundos
-            default -> timeoutPadrao;              // Usar timeout padrão
-        };
-    }
+    // NOTA: Métodos obterValorPerPorTemplate() e obterTimeoutPorTemplate() foram removidos.
+    // Agora usar config.valorPer() e config.timeout() de ConstantesApiDataExport.
 
     /**
      * Constrói o corpo da requisição JSON para contagem via CSV

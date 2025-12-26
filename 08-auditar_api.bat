@@ -14,7 +14,7 @@ if errorlevel 1 (
 
 echo Executando auditor...
 set CP=target\extrator.jar
-java -cp "%CP%" br.com.extrator.auditoria.AuditorEstruturaApi
+java -cp "%CP%" br.com.extrator.auditoria.validacao.AuditorEstruturaApi
 set EXITCODE=%ERRORLEVEL%
 
 if %EXITCODE% NEQ 0 (

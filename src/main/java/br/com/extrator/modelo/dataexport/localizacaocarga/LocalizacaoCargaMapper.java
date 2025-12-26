@@ -1,6 +1,8 @@
 package br.com.extrator.modelo.dataexport.localizacaocarga;
 
 import br.com.extrator.db.entity.LocalizacaoCargaEntity;
+import br.com.extrator.util.validacao.ValidadorDTO;
+import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -29,15 +31,27 @@ public class LocalizacaoCargaMapper {
 
     /**
      * Converte o DTO de Localização de Carga em uma Entidade.
+     * PROBLEMA #6 CORRIGIDO: Adicionada validação de campos críticos.
+     * 
      * @param dto O objeto DTO com os dados do registro.
      * @return Um objeto LocalizacaoCargaEntity pronto para ser salvo.
+     * @throws IllegalArgumentException se campos críticos forem inválidos
      */
-    public LocalizacaoCargaEntity toEntity(LocalizacaoCargaDTO dto) {
+    public LocalizacaoCargaEntity toEntity(final LocalizacaoCargaDTO dto) {
         if (dto == null) {
             return null;
         }
 
-        LocalizacaoCargaEntity entity = new LocalizacaoCargaEntity();
+        // PROBLEMA #6: Validação de campos críticos
+        final ResultadoValidacao validacao = ValidadorDTO.criarValidacao("LocalizacaoCarga");
+        ValidadorDTO.validarId(validacao, "sequence_number", dto.getSequenceNumber());
+        
+        if (!validacao.isValido()) {
+            validacao.logErros();
+            throw new IllegalArgumentException("Localização de Carga inválida: sequence_number é obrigatório. Erros: " + validacao.getErros());
+        }
+
+        final LocalizacaoCargaEntity entity = new LocalizacaoCargaEntity();
 
         // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/localizacaocarga.md
         entity.setSequenceNumber(dto.getSequenceNumber());

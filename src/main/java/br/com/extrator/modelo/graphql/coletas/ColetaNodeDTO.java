@@ -102,9 +102,6 @@ public class ColetaNodeDTO {
     @JsonProperty("statusUpdatedAt")
     private String statusUpdatedAt;
 
-    @JsonProperty("taxedWeight")
-    private BigDecimal taxedWeight;
-
     @JsonProperty("vehicleTypeId")
     private Long vehicleTypeId;
 
@@ -360,14 +357,6 @@ public class ColetaNodeDTO {
 
     public void setStatusUpdatedAt(final String statusUpdatedAt) {
         this.statusUpdatedAt = statusUpdatedAt;
-    }
-
-    public BigDecimal getTaxedWeight() {
-        return taxedWeight;
-    }
-
-    public void setTaxedWeight(final BigDecimal taxedWeight) {
-        this.taxedWeight = taxedWeight;
     }
 
     public Long getVehicleTypeId() {

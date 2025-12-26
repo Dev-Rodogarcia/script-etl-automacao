@@ -110,7 +110,6 @@ public class ColetaMapper {
         }
         entity.setServiceEndHour(validarCampoHora(dto.getServiceEndHour()));
         entity.setRequester(dto.getRequester());
-        entity.setTaxedWeight(dto.getTaxedWeight());
         entity.setComments(dto.getComments());
         entity.setAgentId(dto.getAgentId());
         entity.setManifestItemPickId(dto.getManifestItemPickId());

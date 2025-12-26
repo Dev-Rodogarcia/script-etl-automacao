@@ -6,7 +6,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,10 +23,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import br.com.extrator.db.entity.PageAuditEntity;
 import br.com.extrator.db.repository.PageAuditRepository;
+import br.com.extrator.api.constantes.ConstantesApiGraphQL;
+import br.com.extrator.api.graphql.GraphQLIntervaloHelper;
+import br.com.extrator.api.graphql.GraphQLQueries;
+import br.com.extrator.util.validacao.ConstantesEntidades;
 import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
-import br.com.extrator.util.CarregadorConfig;
-import br.com.extrator.util.GerenciadorRequisicaoHttp;
+import br.com.extrator.util.configuracao.CarregadorConfig;
+import br.com.extrator.util.http.GerenciadorRequisicaoHttp;
+import br.com.extrator.util.formatacao.FormatadorData;
 
 /**
  * Cliente especializado para comunicação com a API GraphQL do ESL Cloud
@@ -38,7 +42,7 @@ public class ClienteApiGraphQL {
     private static final Logger logger = LoggerFactory.getLogger(ClienteApiGraphQL.class);
     
     // PROTEÇÕES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
-    private static final int MAX_REGISTROS_POR_EXECUCAO = 50000;
+    // PROBLEMA #7 CORRIGIDO: Valor agora obtido de CarregadorConfig
     private static final int INTERVALO_LOG_PROGRESSO = 50;
     
     // CIRCUIT BREAKER - Controle de falhas consecutivas
@@ -85,10 +89,11 @@ public class ClienteApiGraphQL {
         boolean interrompido = false; // NOVO: Rastrear se foi interrompido
         
         final int limitePaginasGeral = CarregadorConfig.obterLimitePaginasApiGraphQL();
-        final int limitePaginas = "creditCustomerBilling".equals(nomeEntidade)
+        final String nomeEntidadeFaturasGraphQL = ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FATURAS_GRAPHQL);
+        final int limitePaginas = nomeEntidadeFaturasGraphQL.equals(nomeEntidade)
                 ? CarregadorConfig.obterLimitePaginasFaturasGraphQL()
                 : limitePaginasGeral;
-        final boolean auditar = "creditCustomerBilling".equals(nomeEntidade);
+        final boolean auditar = nomeEntidadeFaturasGraphQL.equals(nomeEntidade);
         final String runUuid = auditar ? java.util.UUID.randomUUID().toString() : null;
         final int perInt = 100;
         java.time.LocalDate janelaInicio = null;
@@ -121,9 +126,11 @@ public class ClienteApiGraphQL {
                 }
 
                 // PROTEÇÃO 2: Limite máximo de registros
-                if (totalRegistrosProcessados >= MAX_REGISTROS_POR_EXECUCAO) {
+                // PROBLEMA #7 CORRIGIDO: Usar valor de CarregadorConfig em vez de constante hardcoded
+                final int maxRegistros = CarregadorConfig.obterMaxRegistrosGraphQL();
+                if (totalRegistrosProcessados >= maxRegistros) {
                     logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
-                            nomeEntidade, MAX_REGISTROS_POR_EXECUCAO);
+                            nomeEntidade, maxRegistros);
                     interrompido = true; // NOVO: Marcar como interrompido
                     break;
                 }
@@ -167,7 +174,7 @@ public class ClienteApiGraphQL {
                     final PageAuditEntity audit = new PageAuditEntity();
                     audit.setExecutionUuid(this.executionUuid);
                     audit.setRunUuid(runUuid);
-                    audit.setTemplateId(9901);
+                    audit.setTemplateId(ConstantesApiGraphQL.TEMPLATE_ID_AUDIT);
                     audit.setPage(paginaAtual);
                     audit.setPer(perInt);
                     audit.setJanelaInicio(janelaInicio);
@@ -260,128 +267,15 @@ public class ClienteApiGraphQL {
         this.executionUuid = uuid;
     }
     /**
-     * Busca coletas via GraphQL para as últimas 24h (ontem + hoje)
-     * API GraphQL de coletas (PickInput) SÓ aceita 1 data específica em requestDate, não aceita intervalo.
-     * Para obter coletas das últimas 24h, precisa buscar 2 dias separadamente.
+     * Busca coletas via GraphQL para as últimas 24h (ontem + hoje).
+     * Método de conveniência que delega para buscarColetas(dataInicio, dataFim).
      * 
      * @param dataReferencia Data de referência para buscar as coletas (LocalDate)
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ColetaNodeDTO> buscarColetas(final LocalDate dataReferencia) {
-        // Query GraphQL expandida conforme documentação em docs/descobertas-endpoints/coletas.md
-        // Query: BuscarColetasExpandidaV2, Tipo: Pick
-        final String query = """
-                query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
-                  pick(params: $params, after: $after, first: 100) {
-                    edges {
-                      cursor
-                      node {
-                        id
-                        status
-                        requestDate
-                        serviceDate
-                        sequenceCode
-                        requestHour
-                        serviceStartHour
-                        finishDate
-                        serviceEndHour
-                        requester
-                        corporation {
-                          id
-                          person { nickname cnpj }
-                        }
-                        customer { id name cnpj }
-                        pickAddress {
-                          line1
-                          line2
-                          number
-                          neighborhood
-                          postalCode
-                          city { name state { code } }
-                        }
-                        invoicesValue
-                        invoicesWeight
-                        invoicesVolumes
-                        user { id name }
-                        comments
-                        agentId
-                        manifestItemPickId
-                        vehicleTypeId
-                        invoicesCubedWeight
-                        cancellationReason
-                        cancellationUserId
-                        cargoClassificationId
-                        costCenterId
-                        destroyReason
-                        destroyUserId
-                        lunchBreakEndHour
-                        lunchBreakStartHour
-                        notificationEmail
-                        notificationPhone
-                        pickTypeId
-                        pickupLocationId
-                        statusUpdatedAt
-                      }
-                    }
-                    pageInfo { hasNextPage endCursor }
-                  }
-                }""";
-
-        // Calcular dia anterior (ontem)
         final LocalDate diaAnterior = dataReferencia.minusDays(1);
-        
-        // Lista consolidada para armazenar todas as coletas
-        final List<ColetaNodeDTO> todasColetas = new ArrayList<>();
-        int totalPaginas = 0;
-        boolean ambasCompletas = true;
-
-        // 1. Buscar coletas do dia anterior (ontem)
-        logger.info("🔍 Coletas - Dia 1/2: {}", diaAnterior);
-        final String dataAnteriorFormatada = formatarDataParaApiGraphQL(diaAnterior);
-        final Map<String, Object> variaveisDiaAnterior = Map.of(
-            "params", Map.of("requestDate", dataAnteriorFormatada)
-        );
-        
-        final ResultadoExtracao<ColetaNodeDTO> resultadoDiaAnterior = executarQueryPaginada(query, "pick", variaveisDiaAnterior, ColetaNodeDTO.class);
-        todasColetas.addAll(resultadoDiaAnterior.getDados());
-        totalPaginas += resultadoDiaAnterior.getPaginasProcessadas();
-        
-        if (resultadoDiaAnterior.isCompleto()) {
-            logger.info("✅ Dia 1/2: {} coletas", resultadoDiaAnterior.getDados().size());
-        } else {
-            logger.warn("⚠️ Dia 1/2: {} coletas (INCOMPLETO)", resultadoDiaAnterior.getDados().size());
-            ambasCompletas = false;
-        }
-
-        // 2. Buscar coletas do dia atual (hoje)
-        logger.info("🔍 Coletas - Dia 2/2: {}", dataReferencia);
-        final String dataAtualFormatada = formatarDataParaApiGraphQL(dataReferencia);
-        final Map<String, Object> variaveisDataAtual = Map.of(
-            "params", Map.of("requestDate", dataAtualFormatada)
-        );
-        
-        final ResultadoExtracao<ColetaNodeDTO> resultadoDataAtual = executarQueryPaginada(query, "pick", variaveisDataAtual, ColetaNodeDTO.class);
-        todasColetas.addAll(resultadoDataAtual.getDados());
-        totalPaginas += resultadoDataAtual.getPaginasProcessadas();
-        
-        if (resultadoDataAtual.isCompleto()) {
-            logger.info("✅ Dia 2/2: {} coletas", resultadoDataAtual.getDados().size());
-        } else {
-            logger.warn("⚠️ Dia 2/2: {} coletas (INCOMPLETO)", resultadoDataAtual.getDados().size());
-            ambasCompletas = false;
-        }
-
-        // 3. Consolidar resultados
-        logger.info("✅ Total: {} coletas", todasColetas.size());
-
-        // 4. Retornar resultado consolidado
-        if (ambasCompletas) {
-            return ResultadoExtracao.completo(todasColetas, totalPaginas, todasColetas.size());
-        } else {
-            // Se qualquer uma das buscas foi incompleta, marcar o resultado como incompleto
-            final ResultadoExtracao.MotivoInterrupcao motivo = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
-            return ResultadoExtracao.incompleto(todasColetas, motivo, totalPaginas, todasColetas.size());
-        }
+        return buscarColetas(diaAnterior, dataReferencia);
     }
 
 
@@ -390,114 +284,69 @@ public class ClienteApiGraphQL {
 
     /**
      * Busca fretes via GraphQL para as últimas 24 horas a partir de uma data de referência.
+     * Método de conveniência que delega para buscarFretes(dataInicio, dataFim).
      * 
      * @param dataReferencia Data de referência que representa o FIM do intervalo de busca.
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataReferencia) {
-        final String query = """
-                query BuscarFretes_Master_V8($params: FreightInput!, $after: String) {
-                  freight(params: $params, after: $after, first: 100) {
-                    edges {
-                      node {
-                        id
-                        accountingCreditId
-                        accountingCreditInstallmentId
-                        referenceNumber
-                        serviceAt
-                        createdAt
-                        cte { id key number series issuedAt createdAt emissionType }
-                        total
-                        subtotal
-                        invoicesValue
-                        invoicesWeight
-                        taxedWeight
-                        realWeight
-                        cubagesCubedWeight
-                        totalCubicVolume
-                        invoicesTotalVolumes
-                        freightInvoices { invoice { number series key value weight } }
-                        sender { id name cnpj cpf inscricaoEstadual mainAddress { city { name state { code } } } }
-                        receiver { id name cnpj cpf inscricaoEstadual mainAddress { city { name state { code } } } }
-                        payer { id name cnpj cpf }
-                        modal
-                        modalCte
-                        status
-                        type
-                        serviceDate
-                        serviceType
-                        deliveryPredictionDate
-                        corporation { id nickname cnpj }
-                        customerPriceTable { name }
-                        freightClassification { name }
-                        costCenter { name }
-                        
-                        originCity { name state { code } }
-                        destinationCity { name state { code } }
-                        destinationCityId
-                        corporationId
-                        freightWeightSubtotal
-                        freightWeightSubtotal
-                        globalized
-                        globalizedType
-                        grisSubtotal
-                        adValoremSubtotal
-                        insuranceAccountableType
-                        insuranceEnabled
-                        insuranceId
-                        insuredValue
-                        itrSubtotal
-                        tollSubtotal
-                        km
-                        nfseNumber
-                        nfseSeries
-                        otherFees
-                        paymentAccountableType
-                        paymentType
-                        previousDocumentType
-                        priceTableAccountableType
-                        productsValue
-                        redispatchSubtotal
-                        secCatSubtotal
-                        suframaSubtotal
-                        tdeSubtotal
-                        fiscalDetail { cstType cfopCode calculationBasis taxRate taxValue pisRate pisValue cofinsRate cofinsValue hasDifal difalTaxValueOrigin difalTaxValueDestination }
-                        trtSubtotal
-                      }
-                    }
-                    pageInfo { hasNextPage endCursor }
-                  }
-                }""";
-
-        // --- INÍCIO DAS MUDANÇAS ---
-
-        // 1. Calcular o intervalo de 24 horas
         final LocalDate dataInicio = dataReferencia.minusDays(1);
-        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        final String intervaloServiceAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
+        return buscarFretes(dataInicio, dataReferencia);
+    }
 
-        // 2. Construir variáveis SEM o corporationId, usando o intervalo de datas
+    /**
+     * Busca coletas via GraphQL para um intervalo de datas.
+     * Utiliza GraphQLIntervaloHelper para iterar dia a dia (API não suporta intervalo).
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(final LocalDate dataInicio, final LocalDate dataFim) {
+        return GraphQLIntervaloHelper.executarPorDia(
+            dataInicio,
+            dataFim,
+            this::buscarColetasDia,
+            "Coletas"
+        );
+    }
+    
+    /**
+     * Busca coletas para um único dia específico.
+     * Método auxiliar usado pelo GraphQLIntervaloHelper.
+     * 
+     * @param data Data específica para buscar coletas
+     * @return ResultadoExtracao das coletas do dia
+     */
+    private ResultadoExtracao<ColetaNodeDTO> buscarColetasDia(final LocalDate data) {
+        final String dataFormatada = formatarDataParaApiGraphQL(data);
+        final Map<String, Object> variaveis = Map.of(
+            "params", Map.of("requestDate", dataFormatada)
+        );
+        return executarQueryPaginada(GraphQLQueries.QUERY_COLETAS, 
+            ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.COLETAS), variaveis, ColetaNodeDTO.class);
+    }
+
+    /**
+     * Busca fretes via GraphQL para um intervalo de datas.
+     * API de fretes suporta intervalo diretamente via serviceAt.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataInicio, final LocalDate dataFim) {
+        logger.info("🔍 Buscando fretes via GraphQL - Período: {} a {}", dataInicio, dataFim);
+        
+        // Usar formato "dataInicio - dataFim" no filtro serviceAt (já suportado pela API)
+        final String intervaloServiceAt = formatarDataParaApiGraphQL(dataInicio) + " - " + formatarDataParaApiGraphQL(dataFim);
+        
         final Map<String, Object> variaveis = Map.of(
             "params", Map.of("serviceAt", intervaloServiceAt)
         );
 
-        // 3. Atualizar os logs para refletir a nova busca
-        logger.info("🔍 Buscando fretes via GraphQL - Período: {}", intervaloServiceAt);
-        logger.debug("Executando query GraphQL para fretes - URL: {}{}, Variáveis: {}", 
-                    urlBase, endpointGraphQL, variaveis);
-
-        final ResultadoExtracao<FreteNodeDTO> resultado = executarQueryPaginada(query, "freight", variaveis, FreteNodeDTO.class);
-        
-        // 4. Atualizar o log de resultado
-        if (resultado.getDados().isEmpty()) {
-            logger.warn("❌ Sem fretes encontrados para o período {}", intervaloServiceAt);
-        } else {
-            logger.info("✅ Encontrados {} fretes para o período {}", resultado.getDados().size(), intervaloServiceAt);
-        }
-        
-        // --- FIM DAS MUDANÇAS ---
-        
-        return resultado;
+        return executarQueryPaginada(GraphQLQueries.QUERY_FRETES, 
+            ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FRETES), variaveis, FreteNodeDTO.class);
     }
 
     /**
@@ -505,71 +354,63 @@ public class ClienteApiGraphQL {
      * Utiliza paginação e traz campos diretos e o XML bruto.
      */
     public ResultadoExtracao<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> buscarNfseDireta(final LocalDate dataReferencia) {
-        final String query = """
-            query ExtracaoNfseDireta($params: NfseInput!, $after: String) {
-              nfse(params: $params, first: 100, after: $after) {
-                edges {
-                   node {
-                     id
-                    freightId
-                    freight { id }
-                     number
-                     status
-                     rpsSeries
-                     issuedAt
-                     cancelationReason
-                    pdfServiceUrl
-                    xmlDocument
-                    corporationId
-                    nfseService { id description }
-                  }
-                }
-                pageInfo { hasNextPage endCursor }
-              }
-            }
-        """;
         try {
-            final java.time.LocalDate dataInicio = dataReferencia.minusDays(1);
-            final java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            final String intervaloIssuedAt = dataInicio.format(formatter) + " - " + dataReferencia.format(formatter);
-            final Map<String, Object> variaveis = java.util.Map.of(
-                "params", java.util.Map.of("issuedAt", intervaloIssuedAt)
+            final LocalDate dataInicio = dataReferencia.minusDays(1);
+            final String intervaloIssuedAt = dataInicio.format(FormatadorData.ISO_DATE) + " - " + dataReferencia.format(FormatadorData.ISO_DATE);
+            final Map<String, Object> variaveis = Map.of(
+                "params", Map.of("issuedAt", intervaloIssuedAt)
             );
             logger.info("Buscando NFSe via GraphQL - Período: {}", intervaloIssuedAt);
-            return executarQueryPaginada(query, "nfse", variaveis, br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO.class);
+            return executarQueryPaginada(GraphQLQueries.QUERY_NFSE, 
+                ConstantesApiGraphQL.obterNomeEntidadeApi("nfse"), variaveis, br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO.class);
         } catch (final RuntimeException e) {
             logger.warn("Falha ao buscar NFSe direta: {}", e.getMessage());
-            final java.util.List<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> vazio = new java.util.ArrayList<>();
+            final List<br.com.extrator.modelo.graphql.fretes.nfse.NfseNodeDTO> vazio = new ArrayList<>();
             return ResultadoExtracao.completo(vazio, 0, 0);
         }
     }
 
+    /**
+     * Busca capa de faturas via GraphQL para a data de referência.
+     * Utiliza janela configurável para buscar dias anteriores.
+     * 
+     * @param dataReferencia Data de referência (normalmente hoje)
+     * @return ResultadoExtracao das faturas encontradas
+     */
     public ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataReferencia) {
-        final String query = """
-            query ExtrairFaturas_Billing_Final($params: CreditCustomerBillingInput!, $after: String) {
-              creditCustomerBilling(params: $params, first: 100, after: $after) {
-                pageInfo { hasNextPage endCursor }
-                edges {
-                  node {
-                    id
-                    document
-                    dueDate
-                    issueDate
-                    value
-                    customer {
-                      id
-                      nickname
-                      person { name cnpj }
-                    }
-                  }
-                }
-              }
-            }
-        """;
-        final java.util.List<String> campos = listarCamposInputCreditCustomerBilling();
+        final int diasJanela = CarregadorConfig.obterDiasJanelaFaturasGraphQL();
+        final LocalDate dataInicio = dataReferencia.minusDays(Math.max(0, diasJanela - 1));
+        return buscarCapaFaturas(dataInicio, dataReferencia);
+    }
+
+    /**
+     * Busca capa de faturas via GraphQL para um intervalo de datas específico.
+     * Utiliza GraphQLIntervaloHelper para iterar dia a dia (API não suporta intervalo).
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataInicio, final LocalDate dataFim) {
+        return GraphQLIntervaloHelper.executarPorDia(
+            dataInicio,
+            dataFim,
+            this::buscarCapaFaturasDia,
+            "Capa Faturas"
+        );
+    }
+    
+    /**
+     * Busca capa de faturas para um único dia específico.
+     * Método auxiliar usado pelo GraphQLIntervaloHelper.
+     * 
+     * @param data Data específica para buscar faturas
+     * @return ResultadoExtracao das faturas do dia
+     */
+    private ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> buscarCapaFaturasDia(final LocalDate data) {
+        final List<String> campos = listarCamposInputCreditCustomerBilling();
         String campoFiltro = "dueDate";
         if (campos != null && !campos.isEmpty()) {
-            logger.info("Campos CreditCustomerBillingInput disponíveis: {}", campos);
             if (campos.contains("dueDate")) {
                 campoFiltro = "dueDate";
             } else if (campos.contains("originalDueDate")) {
@@ -578,93 +419,54 @@ public class ClienteApiGraphQL {
                 campoFiltro = "issueDate";
             }
         }
-        final int diasJanela = br.com.extrator.util.CarregadorConfig.obterDiasJanelaFaturasGraphQL();
-        final LocalDate dataInicio = dataReferencia.minusDays(Math.max(0, diasJanela - 1));
-        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        final java.util.List<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> todas = new java.util.ArrayList<>();
-        int totalPaginas = 0;
-        boolean completo = true;
-        LocalDate dia = dataInicio;
-        while (!dia.isAfter(dataReferencia)) {
-            final String dataStr = dia.format(formatter);
-            final Map<String, Object> params = new java.util.HashMap<>();
-            params.put(campoFiltro, dataStr);
-            final String corpId = br.com.extrator.util.CarregadorConfig.obterCorporationId();
-            if (corpId != null && !corpId.isBlank()) {
-                if (campos != null && campos.contains("corporationId")) {
-                    params.put("corporationId", corpId);
-                } else if (campos != null && campos.contains("corporation")) {
-                    params.put("corporation", java.util.Map.of("id", corpId));
-                }
+        
+        final String dataStr = data.format(FormatadorData.ISO_DATE);
+        final Map<String, Object> params = new HashMap<>();
+        params.put(campoFiltro, dataStr);
+        
+        final String corpId = CarregadorConfig.obterCorporationId();
+        if (corpId != null && !corpId.isBlank()) {
+            if (campos != null && campos.contains("corporationId")) {
+                params.put("corporationId", corpId);
+            } else if (campos != null && campos.contains("corporation")) {
+                params.put("corporation", Map.of("id", corpId));
             }
-            final Map<String, Object> variaveisDia = java.util.Map.of("params", params);
-            logger.info("Buscando Capa Faturas via GraphQL - {}: {}", campoFiltro, dataStr);
-            final ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> r = executarQueryPaginada(
-                query, "creditCustomerBilling", variaveisDia, br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO.class
-            );
-            todas.addAll(r.getDados());
-            totalPaginas += r.getPaginasProcessadas();
-            if (!r.isCompleto()) completo = false;
-            dia = dia.plusDays(1);
         }
-        if (todas.isEmpty()) {
-            logger.info("ℹ️ Nenhum registro encontrado com filtro {} em janela de {} dias. Tentando busca sem filtros (últimos 100)...", campoFiltro, diasJanela);
-            final Map<String, Object> paramsFallback = new java.util.HashMap<>();
-            final String corpId2 = br.com.extrator.util.CarregadorConfig.obterCorporationId();
-            if (corpId2 != null && !corpId2.isBlank()) {
-                if (campos != null && campos.contains("corporationId")) {
-                    paramsFallback.put("corporationId", corpId2);
-                } else if (campos != null && campos.contains("corporation")) {
-                    paramsFallback.put("corporation", java.util.Map.of("id", corpId2));
-                }
-            }
-            final Map<String, Object> variaveisFallback = java.util.Map.of("params", paramsFallback);
-            final ResultadoExtracao<br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO> fallback = executarQueryPaginada(
-                query, "creditCustomerBilling", variaveisFallback, br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO.class
-            );
-            todas.addAll(fallback.getDados());
-            totalPaginas += fallback.getPaginasProcessadas();
-            if (!fallback.isCompleto()) completo = false;
-        }
-        if (todas.isEmpty()) {
-            logger.info("❌ Query GraphQL concluída - Entidade creditCustomerBilling: Nenhum registro encontrado");
-        } else {
-            logger.info("✅ Encontrados {} registros de capa de faturas no período", todas.size());
-        }
-        if (completo) {
-            return ResultadoExtracao.completo(todas, totalPaginas, todas.size());
-        } else {
-            return ResultadoExtracao.incompleto(todas, ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS, totalPaginas, todas.size());
-        }
+        
+        final Map<String, Object> variaveis = Map.of("params", params);
+        return executarQueryPaginada(GraphQLQueries.QUERY_FATURAS, 
+            ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FATURAS_GRAPHQL), variaveis, 
+            br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO.class);
     }
 
-    private java.util.List<String> listarCamposInputCreditCustomerBilling() {
+    /**
+     * Lista os campos disponíveis no tipo CreditCustomerBillingInput via introspection.
+     * Usado para determinar qual campo de filtro usar (dueDate, issueDate, etc).
+     * 
+     * @return Lista de nomes de campos disponíveis
+     */
+    private List<String> listarCamposInputCreditCustomerBilling() {
         try {
-            final String introspection = """
-                query CamposCreditCustomerBillingInput {
-                  __type(name: "CreditCustomerBillingInput") {
-                    inputFields { name }
-                  }
-                }
-            """;
-            final com.fasterxml.jackson.databind.node.ObjectNode corpoJson = mapeadorJson.createObjectNode();
-            corpoJson.put("query", introspection);
+            final ObjectNode corpoJson = mapeadorJson.createObjectNode();
+            corpoJson.put("query", GraphQLQueries.INTROSPECTION_CREDIT_CUSTOMER_BILLING);
             final String corpoRequisicao = mapeadorJson.writeValueAsString(corpoJson);
-            final java.net.http.HttpRequest requisicao = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(urlBase + endpointGraphQL))
+            final HttpRequest requisicao = HttpRequest.newBuilder()
+                    .uri(URI.create(urlBase + endpointGraphQL))
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + token)
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(corpoRequisicao))
+                    .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
                     .timeout(this.timeoutRequisicao)
                     .build();
-            final java.net.http.HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-Introspection");
-            final com.fasterxml.jackson.databind.JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
-            final java.util.List<String> campos = new java.util.ArrayList<>();
-            final com.fasterxml.jackson.databind.JsonNode fields = respostaJson.path("data").path("__type").path("inputFields");
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-Introspection");
+            final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
+            final List<String> campos = new ArrayList<>();
+            final JsonNode fields = respostaJson.path("data").path("__type").path("inputFields");
             if (fields.isArray()) {
-                for (final com.fasterxml.jackson.databind.JsonNode f : fields) {
+                for (final JsonNode f : fields) {
                     final String nome = f.path("name").asText();
-                    if (nome != null && !nome.isBlank()) campos.add(nome);
+                    if (nome != null && !nome.isBlank()) {
+                        campos.add(nome);
+                    }
                 }
             }
             return campos;
@@ -888,7 +690,7 @@ public class ClienteApiGraphQL {
      * @return String no formato YYYY-MM-DD
      */
     private String formatarDataParaApiGraphQL(final LocalDate data) {
-        return data.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        return data.format(FormatadorData.ISO_DATE);
     }
 
     /**

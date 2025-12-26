@@ -1,0 +1,46 @@
+================================================================================
+RELATÓRIO COMPLETO DE AUDITORIA - ESL CLOUD DATA EXTRACTOR
+================================================================================
+Data/Hora da Auditoria: 24/12/2025 11:19:24
+Sistema: ESL Cloud Data Extraction
+Versão: 1.0-SNAPSHOT
+
+RESUMO GERAL
+----------------------------------------
+Data/Hora da Auditoria: 24/12/2025 11:19:24
+Total de Resultados: 8
+Sucessos: 7
+Alertas: 1
+Erros: 0
+
+DETALHES DOS RESULTADOS
+----------------------------------------
+
+Resultado 1:
+cotacoes: ResultadoValidacaoEntidade{entidade='cotacoes', status=? OK, registros=68, erro='null'}
+
+Resultado 2:
+coletas: ResultadoValidacaoEntidade{entidade='coletas', status=? OK, esperado=104, extraido=104, diferenca=0, completude=100,0%}
+
+Resultado 3:
+contas_a_pagar: ResultadoValidacaoEntidade{entidade='contas_a_pagar', status=?? Alerta, esperado=76, extraido=30, diferenca=-46, completude=39,5%}
+
+Resultado 4:
+faturas_por_cliente: ResultadoValidacaoEntidade{entidade='faturas_por_cliente', status=? OK, registros=505, erro='null'}
+
+Resultado 5:
+fretes: ResultadoValidacaoEntidade{entidade='fretes', status=? OK, registros=505, erro='null'}
+
+Resultado 6:
+faturas_graphql: ResultadoValidacaoEntidade{entidade='faturas_graphql', status=? OK, esperado=150, extraido=150, diferenca=0, completude=100,0%}
+
+Resultado 7:
+manifestos: ResultadoValidacaoEntidade{entidade='manifestos', status=? OK, esperado=218, extraido=218, diferenca=0, completude=100,0%}
+
+Resultado 8:
+localizacao_cargas: ResultadoValidacaoEntidade{entidade='localizacao_cargas', status=? OK, registros=505, erro='null'}
+
+================================================================================
+FIM DO RELATÓRIO DE AUDITORIA
+Gerado em: 24/12/2025 11:19:24
+================================================================================

@@ -9,7 +9,9 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.api.constantes.ConstantesViewsPowerBI;
 import br.com.extrator.db.entity.CotacaoEntity;
+import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Repositório para operações de persistência da entidade CotacaoEntity.
@@ -20,7 +22,7 @@ import br.com.extrator.db.entity.CotacaoEntity;
  */
 public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
     private static final Logger logger = LoggerFactory.getLogger(CotacaoRepository.class);
-    private static final String NOME_TABELA = "cotacoes";
+    private static final String NOME_TABELA = ConstantesEntidades.COTACOES;
     private static boolean viewVerificada = false;
 
     @Override
@@ -131,59 +133,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
-        final String sqlView = """
-                    CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
-                    SELECT
-                        sequence_code                                   AS [N° Cotação],
-                        requested_at                                    AS [Data Cotação],
-                        branch_nickname                                 AS [Filial],
-                        requester_name                                  AS [Solicitante],
-                        customer_name                                   AS [Cliente Pagador],
-                        customer_doc                                    AS [CNPJ/CPF Cliente],
-                        origin_city                                     AS [Cidade Origem],
-                        origin_state                                    AS [UF Origem],
-                        destination_city                                AS [Cidade Destino],
-                        destination_state                               AS [UF Destino],
-                        volumes                                         AS [Volume],
-                        real_weight                                     AS [Peso real],
-                        taxed_weight                                    AS [Peso taxado],
-                        invoices_value                                  AS [Valor NF],
-                        total_value                                     AS [Valor frete],
-                        price_table                                     AS [Tabela],
-                        user_name                                       AS [Usuário],
-                        company_name                                    AS [Empresa],
-                        operation_type                                  AS [Tipo de operação],
-                        origin_postal_code                              AS [CEP Origem],
-                        destination_postal_code                         AS [CEP Destino],
-                        metadata                                        AS [Metadata],
-                        data_extracao                                   AS [Data de extracao],
-                        CASE
-                            WHEN cte_issued_at IS NOT NULL
-                                OR nfse_issued_at IS NOT NULL
-                            THEN 'Convertida'
-                            WHEN disapprove_comments IS NOT NULL
-                                AND LEN(disapprove_comments) > 0
-                            THEN 'Reprovada'
-                            ELSE 'Pendente'
-                        END                                             AS [Status Conversão],
-                        disapprove_comments                             AS [Motivo Perda],
-                        freight_comments                                AS [Observações para o frete],
-                        cte_issued_at                                   AS [CT-e/Data de emissão],
-                        nfse_issued_at                                  AS [Nfse/Data de emissão],
-                        customer_nickname                               AS [Pagador/Nome fantasia],
-                        sender_document                                 AS [Remetente/CNPJ],
-                        sender_nickname                                 AS [Remetente/Nome fantasia],
-                        receiver_document                               AS [Destinatário/CNPJ],
-                        receiver_nickname                               AS [Destinatário/Nome fantasia],
-                        discount_subtotal                               AS [Descontos/Subtotal parcelas],
-                        itr_subtotal                                    AS [Trechos/ITR],
-                        tde_subtotal                                    AS [Trechos/TDE],
-                        collect_subtotal                                AS [Trechos/Coleta],
-                        delivery_subtotal                               AS [Trechos/Entrega],
-                        other_fees                                      AS [Trechos/Outros valores]
-                    FROM dbo.cotacoes;
-                """;
-        executarDDL(conexao, sqlView);
+        executarDDL(conexao, ConstantesViewsPowerBI.obterSqlView(NOME_TABELA));
         try (PreparedStatement ps = conexao.prepareStatement("SELECT TOP 0 * FROM dbo.vw_cotacoes_powerbi");
              java.sql.ResultSet rs = ps.executeQuery()) {
             final java.sql.ResultSetMetaData md = rs.getMetaData();
@@ -195,46 +145,6 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             logger.info("vw_cotacoes_powerbi colunas: {}", cols.toString());
         }
     }
-
-    //     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
-    //     final String sqlView = """
-    //         CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
-    //         SELECT
-    //             sequence_code AS [Cotação],
-    //             requested_at AS [Data],
-    //             branch_nickname AS [Filial],
-    //             requester_name AS [Solicitante],
-    //             customer_name AS [Cliente],
-    //             customer_doc AS [CNPJ Cliente],
-    //             origin_city AS [Origem],
-    //             origin_state AS [UF (Origem)],
-    //             destination_city AS [Destino],
-    //             destination_state AS [UF (Destino)],
-    //             volumes AS [Volumes],
-    //             real_weight AS [Peso Real],
-    //             taxed_weight AS [Peso Taxado],
-    //             invoices_value AS [Valor NF],
-    //             total_value AS [Valor Frete],
-    //             price_table AS [Tabela],
-    //             user_name AS [Usuário],
-    //             -- Campos derivados do metadata para status e evidências de conversão
-    //             CASE
-    //               WHEN JSON_VALUE(metadata, '$.qoe_qes_fit_fhe_cte_issued_at') IS NOT NULL
-    //                    OR JSON_VALUE(metadata, '$.qoe_qes_fit_nse_issued_at') IS NOT NULL
-    //                 THEN 'Convertida'
-    //               WHEN JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments') IS NOT NULL
-    //                    AND LEN(JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments')) > 0
-    //                 THEN 'Reprovada'
-    //               ELSE 'Pendente'
-    //             END AS [Status Conversão],
-    //             JSON_VALUE(metadata, '$.qoe_qes_disapprove_comments') AS [Motivo Perda],
-    //             JSON_VALUE(metadata, '$.qoe_qes_fit_fhe_cte_issued_at') AS [CT-e/Data de emissão],
-    //             JSON_VALUE(metadata, '$.qoe_qes_fit_nse_issued_at') AS [Nfse/Data de emissão],
-    //             data_extracao AS [Data de extracao]
-    //         FROM dbo.cotacoes;
-    //     """;
-    //     executarDDL(conexao, sqlView);
-    // }
 
     /**
      * Executa a operação MERGE (UPSERT) para inserir ou atualizar uma cotação no

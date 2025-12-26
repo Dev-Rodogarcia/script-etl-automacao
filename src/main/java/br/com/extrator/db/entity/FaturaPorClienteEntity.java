@@ -26,6 +26,7 @@ public class FaturaPorClienteEntity {
     private String chaveCte;
     private Long numeroNfse;
     private String statusCte;
+    private String statusCteResult;
     private OffsetDateTime dataEmissaoCte;
 
     // Dados da Fatura (Cobrança)
@@ -124,6 +125,14 @@ public class FaturaPorClienteEntity {
 
     public void setStatusCte(final String statusCte) {
         this.statusCte = statusCte;
+    }
+
+    public String getStatusCteResult() {
+        return statusCteResult;
+    }
+
+    public void setStatusCteResult(final String statusCteResult) {
+        this.statusCteResult = statusCteResult;
     }
 
     public OffsetDateTime getDataEmissaoCte() {

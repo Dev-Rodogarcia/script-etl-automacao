@@ -60,6 +60,9 @@ public class FreteNodeDTO {
     @JsonProperty("deliveryPredictionDate")
     private String deliveryPredictionDate; // Recebe como String para ser convertido para LocalDate
 
+    @JsonProperty("serviceDate")
+    private String serviceDate; // Recebe como String para ser convertido para LocalDate
+
     // --- Campos Expandidos (Objetos Aninhados) ---
     @JsonProperty("payer")
     private PayerDTO payer;
@@ -173,7 +176,7 @@ public class FreteNodeDTO {
     private BigDecimal itrSubtotal;
 
     @JsonProperty("serviceType")
-    private Integer serviceType;
+    private String serviceType; // API retorna como String (ex: "0")
 
     @JsonProperty("insuranceEnabled")
     private Boolean insuranceEnabled;
@@ -209,7 +212,7 @@ public class FreteNodeDTO {
     private String nfseSeries;
 
     @JsonProperty("nfseNumber")
-    private Integer nfseNumber;
+    private String nfseNumber; // API retorna como String (pode ser "" ou número como String)
 
     @JsonProperty("insuranceId")
     private Long insuranceId;
@@ -221,7 +224,7 @@ public class FreteNodeDTO {
     private BigDecimal km;
 
     @JsonProperty("paymentAccountableType")
-    private Integer paymentAccountableType;
+    private String paymentAccountableType; // API retorna como String (ex: "0", "1", "3", "4")
 
     @JsonProperty("insuredValue")
     private BigDecimal insuredValue;
@@ -236,10 +239,10 @@ public class FreteNodeDTO {
     private String globalizedType;
 
     @JsonProperty("priceTableAccountableType")
-    private Integer priceTableAccountableType;
+    private String priceTableAccountableType; // API retorna como String (ex: "4")
 
     @JsonProperty("insuranceAccountableType")
-    private Integer insuranceAccountableType;
+    private String insuranceAccountableType; // API retorna como String (ex: "4", "5")
 
     // --- Contêiner Dinâmico ("Resto") ---
     private final Map<String, Object> otherProperties = new HashMap<>();
@@ -358,6 +361,14 @@ public class FreteNodeDTO {
 
     public void setDeliveryPredictionDate(final String deliveryPredictionDate) {
         this.deliveryPredictionDate = deliveryPredictionDate;
+    }
+
+    public String getServiceDate() {
+        return serviceDate;
+    }
+
+    public void setServiceDate(final String serviceDate) {
+        this.serviceDate = serviceDate;
     }
 
     // --- Getters e Setters para Campos Expandidos ---
@@ -506,8 +517,8 @@ public class FreteNodeDTO {
     public BigDecimal getItrSubtotal() { return itrSubtotal; }
     public void setItrSubtotal(final BigDecimal itrSubtotal) { this.itrSubtotal = itrSubtotal; }
 
-    public Integer getServiceType() { return serviceType; }
-    public void setServiceType(final Integer serviceType) { this.serviceType = serviceType; }
+    public String getServiceType() { return serviceType; }
+    public void setServiceType(final String serviceType) { this.serviceType = serviceType; }
     public Boolean getInsuranceEnabled() { return insuranceEnabled; }
     public void setInsuranceEnabled(final Boolean insuranceEnabled) { this.insuranceEnabled = insuranceEnabled; }
     public BigDecimal getGrisSubtotal() { return grisSubtotal; }
@@ -530,16 +541,16 @@ public class FreteNodeDTO {
     public void setTrtSubtotal(final BigDecimal trtSubtotal) { this.trtSubtotal = trtSubtotal; }
     public String getNfseSeries() { return nfseSeries; }
     public void setNfseSeries(final String nfseSeries) { this.nfseSeries = nfseSeries; }
-    public Integer getNfseNumber() { return nfseNumber; }
-    public void setNfseNumber(final Integer nfseNumber) { this.nfseNumber = nfseNumber; }
+    public String getNfseNumber() { return nfseNumber; }
+    public void setNfseNumber(final String nfseNumber) { this.nfseNumber = nfseNumber; }
     public Long getInsuranceId() { return insuranceId; }
     public void setInsuranceId(final Long insuranceId) { this.insuranceId = insuranceId; }
     public BigDecimal getOtherFees() { return otherFees; }
     public void setOtherFees(final BigDecimal otherFees) { this.otherFees = otherFees; }
     public BigDecimal getKm() { return km; }
     public void setKm(final BigDecimal km) { this.km = km; }
-    public Integer getPaymentAccountableType() { return paymentAccountableType; }
-    public void setPaymentAccountableType(final Integer paymentAccountableType) { this.paymentAccountableType = paymentAccountableType; }
+    public String getPaymentAccountableType() { return paymentAccountableType; }
+    public void setPaymentAccountableType(final String paymentAccountableType) { this.paymentAccountableType = paymentAccountableType; }
     public BigDecimal getInsuredValue() { return insuredValue; }
     public void setInsuredValue(final BigDecimal insuredValue) { this.insuredValue = insuredValue; }
     public Boolean getGlobalized() { return globalized; }
@@ -548,10 +559,10 @@ public class FreteNodeDTO {
     public void setSecCatSubtotal(final BigDecimal secCatSubtotal) { this.secCatSubtotal = secCatSubtotal; }
     public String getGlobalizedType() { return globalizedType; }
     public void setGlobalizedType(final String globalizedType) { this.globalizedType = globalizedType; }
-    public Integer getPriceTableAccountableType() { return priceTableAccountableType; }
-    public void setPriceTableAccountableType(final Integer priceTableAccountableType) { this.priceTableAccountableType = priceTableAccountableType; }
-    public Integer getInsuranceAccountableType() { return insuranceAccountableType; }
-    public void setInsuranceAccountableType(final Integer insuranceAccountableType) { this.insuranceAccountableType = insuranceAccountableType; }
+    public String getPriceTableAccountableType() { return priceTableAccountableType; }
+    public void setPriceTableAccountableType(final String priceTableAccountableType) { this.priceTableAccountableType = priceTableAccountableType; }
+    public String getInsuranceAccountableType() { return insuranceAccountableType; }
+    public void setInsuranceAccountableType(final String insuranceAccountableType) { this.insuranceAccountableType = insuranceAccountableType; }
 
     @JsonAnyGetter
     public Map<String, Object> getOtherProperties() {

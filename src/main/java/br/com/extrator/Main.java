@@ -6,17 +6,18 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import br.com.extrator.comandos.Comando;
-import br.com.extrator.comandos.ExibirAjudaComando;
-import br.com.extrator.comandos.ExecutarAuditoriaComando;
-import br.com.extrator.comandos.ExecutarFluxoCompletoComando;
-import br.com.extrator.comandos.LimparTabelasComando;
-import br.com.extrator.comandos.RealizarIntrospeccaoGraphQLComando;
-import br.com.extrator.comandos.TestarApiComando;
-import br.com.extrator.comandos.ValidarAcessoComando;
-import br.com.extrator.comandos.ValidarManifestosComando;
-import br.com.extrator.comandos.VerificarTimestampsComando;
-import br.com.extrator.comandos.VerificarTimezoneComando;
+import br.com.extrator.comandos.console.ExibirAjudaComando;
+import br.com.extrator.comandos.auditoria.ExecutarAuditoriaComando;
+import br.com.extrator.comandos.base.Comando;
+import br.com.extrator.comandos.extracao.ExecutarFluxoCompletoComando;
+import br.com.extrator.comandos.utilitarios.ExportarCsvComando;
+import br.com.extrator.comandos.utilitarios.LimparTabelasComando;
+import br.com.extrator.comandos.utilitarios.RealizarIntrospeccaoGraphQLComando;
+import br.com.extrator.comandos.utilitarios.TestarApiComando;
+import br.com.extrator.comandos.validacao.ValidarAcessoComando;
+import br.com.extrator.comandos.validacao.ValidarManifestosComando;
+import br.com.extrator.comandos.validacao.VerificarTimestampsComando;
+import br.com.extrator.comandos.validacao.VerificarTimezoneComando;
 import br.com.extrator.servicos.LoggingService;
 
 /**
@@ -24,9 +25,9 @@ import br.com.extrator.servicos.LoggingService;
  *
  * Esta classe atua como um orquestrador de alto nível que delega a execução
  * do processo de ETL para as classes Runner especializadas:
- * - RestRunner: Faturas a Receber, Faturas a Pagar e Ocorrências
- * - GraphQLRunner: Coletas e Fretes
- * - DataExportRunner: Manifestos, Cotações e Localização de Carga
+ * - GraphQLRunner: Coletas, Fretes e Faturas (via GraphQL)
+ * - DataExportRunner: Manifestos, Cotações, Localização de Carga, 
+ *                     Contas a Pagar e Faturas por Cliente (via Data Export API)
  *
  * Responsabilidades da Main:
  * - Interpretar argumentos da linha de comando
@@ -35,7 +36,7 @@ import br.com.extrator.servicos.LoggingService;
  * - Tratamento de erros de alto nível
  *
  * @author Sistema de Extração ESL Cloud
- * @version 3.0 - Refatorado para padrão Orquestrador
+ * @version 3.1 - Arquitetura com 2 Runners (GraphQL + DataExport)
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -46,7 +47,8 @@ public class Main {
     private static Map<String, Comando> criarMapaComandos() {
         Map<String, Comando> comandos = new HashMap<>();
         comandos.put("--fluxo-completo", new ExecutarFluxoCompletoComando());
-        comandos.put("--loop", new br.com.extrator.comandos.LoopExtracaoComando());
+        comandos.put("--extracao-intervalo", new br.com.extrator.comandos.extracao.ExecutarExtracaoPorIntervaloComando());
+        comandos.put("--loop", new br.com.extrator.comandos.extracao.LoopExtracaoComando());
         comandos.put("--validar", new ValidarAcessoComando());
         comandos.put("--ajuda", new ExibirAjudaComando());
         comandos.put("--help", new ExibirAjudaComando());
@@ -57,6 +59,7 @@ public class Main {
         comandos.put("--verificar-timestamps", new VerificarTimestampsComando());
         comandos.put("--verificar-timezone", new VerificarTimezoneComando());
         comandos.put("--validar-manifestos", new ValidarManifestosComando());
+        comandos.put("--exportar-csv", new ExportarCsvComando());
         return comandos;
     }
 

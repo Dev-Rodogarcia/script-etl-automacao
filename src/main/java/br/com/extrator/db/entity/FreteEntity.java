@@ -29,6 +29,7 @@ public class FreteEntity {
     private Long idCorporacao;
     private Long idCidadeDestino;
     private LocalDate dataPrevisaoEntrega;
+    private LocalDate serviceDate;
 
     // --- Campos Expandidos (22 campos do CSV) ---
     private Long pagadorId;
@@ -233,6 +234,14 @@ public class FreteEntity {
 
     public void setDataPrevisaoEntrega(final LocalDate dataPrevisaoEntrega) {
         this.dataPrevisaoEntrega = dataPrevisaoEntrega;
+    }
+
+    public LocalDate getServiceDate() {
+        return serviceDate;
+    }
+
+    public void setServiceDate(final LocalDate serviceDate) {
+        this.serviceDate = serviceDate;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

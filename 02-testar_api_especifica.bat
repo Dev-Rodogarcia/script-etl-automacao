@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 REM Ajusta code page para evitar erros de parsing com acentos e parenteses
 chcp 1252 >nul
@@ -7,35 +7,138 @@ chcp 1252 >nul
 REM ================================================================
 REM Script: 02-testar_api_especifica.bat
 REM Finalidade:
-REM   Executa testes da API especifica informada como parametro.
+REM   Executa testes da API especifica informada como parametro ou via menu interativo.
 REM   Valores aceitos: 'graphql' ou 'dataexport'.
 REM
 REM Uso:
-REM   02-testar_api_especifica.bat <api> [entidade]
+REM   02-testar_api_especifica.bat [api] [entidade]
 REM
-REM Parametros:
+REM Parametros (opcionais):
 REM   %1  Nome da API a testar: graphql | dataexport
 REM   %2  Entidade (opcional):
 REM       GraphQL -> coletas | fretes | faturas_graphql
 REM       DataExport -> manifestos | cotacoes | localizacao_carga | contas_a_pagar | faturas_por_cliente
 REM
-REM Exemplos:
-REM   02-testar_api_especifica.bat graphql
-REM   02-testar_api_especifica.bat graphql fretes
-REM   02-testar_api_especifica.bat graphql coletas
-REM   02-testar_api_especifica.bat dataexport
-REM   02-testar_api_especifica.bat dataexport manifestos
-REM   02-testar_api_especifica.bat dataexport cotacoes
-REM   02-testar_api_especifica.bat dataexport localizacao_carga
-REM   02-testar_api_especifica.bat dataexport contas_a_pagar
-REM   02-testar_api_especifica.bat dataexport faturas_por_cliente
+REM Se nenhum parametro for informado, exibe menu interativo.
 REM ================================================================
 
-if "%~1"=="" goto :USAGE
+REM Se parametros foram fornecidos, usar diretamente
+if not "%~1"=="" (
+    set "API=%~1"
+    set "ENTIDADE=%~2"
+    goto :VALIDATE_ARGS
+)
 
-set "API=%~1"
-set "ENTIDADE=%~2"
+REM ================================================================
+REM MENU INTERATIVO
+REM ================================================================
+:INTERACTIVE_MENU
+cls
+echo ================================================================
+echo TESTE DE API ESPECIFICA
+echo ================================================================
+echo.
+echo Escolha a API:
+echo   1. GraphQL
+echo   2. DataExport
+echo.
+set /p "OPCAO_API=Digite sua opcao (1 ou 2): "
 
+if "%OPCAO_API%"=="1" (
+    set "API=graphql"
+    goto :CHOOSE_ENTITY
+)
+if "%OPCAO_API%"=="2" (
+    set "API=dataexport"
+    goto :CHOOSE_ENTITY
+)
+
+echo.
+echo ERRO: Opcao invalida!
+timeout /t 2 >nul
+goto :INTERACTIVE_MENU
+
+:CHOOSE_ENTITY
+cls
+echo ================================================================
+echo TESTE DE API: %API%
+echo ================================================================
+echo.
+echo Escolha o escopo:
+echo   1. Todas as entidades
+echo   2. Entidade especifica
+echo.
+set /p "OPCAO_ESCOPO=Digite sua opcao (1 ou 2): "
+
+if "%OPCAO_ESCOPO%"=="1" (
+    set "ENTIDADE="
+    goto :RUN
+)
+if "%OPCAO_ESCOPO%"=="2" (
+    goto :CHOOSE_SPECIFIC_ENTITY
+)
+
+echo.
+echo ERRO: Opcao invalida!
+timeout /t 2 >nul
+goto :CHOOSE_ENTITY
+
+:CHOOSE_SPECIFIC_ENTITY
+cls
+echo ================================================================
+echo TESTE DE API: %API% - ENTIDADE ESPECIFICA
+echo ================================================================
+echo.
+
+if /i "%API%"=="graphql" (
+    echo Entidades disponiveis:
+    echo   1. Coletas
+    echo   2. Fretes
+    echo   3. Faturas GraphQL
+    echo.
+    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2 ou 3): "
+    
+    if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
+    if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
+    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=faturas_graphql"
+    
+    if "!ENTIDADE!"=="" (
+        echo.
+        echo ERRO: Opcao invalida!
+        timeout /t 2 >nul
+        goto :CHOOSE_SPECIFIC_ENTITY
+    )
+    goto :RUN
+)
+
+if /i "%API%"=="dataexport" (
+    echo Entidades disponiveis:
+    echo   1. Manifestos
+    echo   2. Cotacoes
+    echo   3. Localizacao de Carga
+    echo   4. Contas a Pagar
+    echo   5. Faturas por Cliente
+    echo.
+    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2, 3, 4 ou 5): "
+    
+    if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=manifestos"
+    if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=cotacoes"
+    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=localizacao_carga"
+    if "!OPCAO_ENTIDADE!"=="4" set "ENTIDADE=contas_a_pagar"
+    if "!OPCAO_ENTIDADE!"=="5" set "ENTIDADE=faturas_por_cliente"
+    
+    if "!ENTIDADE!"=="" (
+        echo.
+        echo ERRO: Opcao invalida!
+        timeout /t 2 >nul
+        goto :CHOOSE_SPECIFIC_ENTITY
+    )
+    goto :RUN
+)
+
+goto :RUN
+
+:VALIDATE_ARGS
 REM Valida API e entidade usando ramos sem parenteses
 if /i "%API%"=="graphql" goto :CHECK_GRAPHQL
 if /i "%API%"=="dataexport" goto :CHECK_DATAEXPORT
@@ -76,30 +179,13 @@ echo.
 pause
 exit /b 1
 
-:USAGE
-echo ERRO: Parametro obrigatorio nao informado!
-echo.
-echo Uso: %~nx0 ^<api^> [entidade]
-echo   api: graphql ^| dataexport
-echo   entidade (opcional):
-echo     graphql: coletas ^| fretes ^| faturas_graphql ^| faturas
-echo     dataexport: manifestos ^| cotacoes ^| localizacao_carga ^| contas_a_pagar ^| faturas_por_cliente
-echo.
-echo Exemplos:
-echo   %~nx0 graphql
-echo   %~nx0 graphql fretes
-echo   %~nx0 graphql faturas_graphql
-echo   %~nx0 graphql faturas
-echo   %~nx0 dataexport
-echo   %~nx0 dataexport manifestos
-echo.
-pause
-exit /b 1
-
 :RUN
+cls
 echo ================================================================
 echo TESTANDO API: %API%
+if not "%ENTIDADE%"=="" echo ENTIDADE: %ENTIDADE%
 echo ================================================================
+echo.
 
 if /i "%API%"=="graphql" (
   if /i "%ENTIDADE%"=="faturas" set "API_GRAPHQL_FATURAS_DIAS_JANELA=1"

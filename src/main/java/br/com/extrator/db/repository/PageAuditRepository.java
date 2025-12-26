@@ -5,7 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 
 import br.com.extrator.db.entity.PageAuditEntity;
-import br.com.extrator.util.GerenciadorConexao;
+import br.com.extrator.util.banco.GerenciadorConexao;
 
 public class PageAuditRepository {
     private static final String SQL =

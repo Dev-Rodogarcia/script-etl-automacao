@@ -1,6 +1,8 @@
 package br.com.extrator.modelo.dataexport.manifestos;
 
 import br.com.extrator.db.entity.ManifestoEntity;
+import br.com.extrator.util.validacao.ValidadorDTO;
+import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -29,12 +31,24 @@ public class ManifestoMapper {
 
     /**
      * Converte o DTO de Manifesto em uma Entidade.
+     * PROBLEMA #6 CORRIGIDO: Adicionada validação de campos críticos.
+     * 
      * @param dto O objeto DTO com os dados do manifesto.
      * @return Um objeto ManifestoEntity pronto para ser salvo.
+     * @throws IllegalArgumentException se campos críticos forem inválidos
      */
     public ManifestoEntity toEntity(final ManifestoDTO dto) {
         if (dto == null) {
             return null;
+        }
+
+        // PROBLEMA #6: Validação de campos críticos
+        final ResultadoValidacao validacao = ValidadorDTO.criarValidacao("Manifesto");
+        ValidadorDTO.validarId(validacao, "sequence_code", dto.getSequenceCode());
+        
+        if (!validacao.isValido()) {
+            validacao.logErros();
+            throw new IllegalArgumentException("Manifesto inválido: sequence_code é obrigatório. Erros: " + validacao.getErros());
         }
 
         final ManifestoEntity entity = new ManifestoEntity();

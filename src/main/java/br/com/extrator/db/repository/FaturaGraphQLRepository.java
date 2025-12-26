@@ -5,10 +5,12 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
 
+import br.com.extrator.api.constantes.ConstantesViewsPowerBI;
 import br.com.extrator.db.entity.FaturaGraphQLEntity;
+import br.com.extrator.util.validacao.ConstantesEntidades;
 
 public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEntity> {
-    private static final String NOME_TABELA = "faturas_graphql";
+    private static final String NOME_TABELA = ConstantesEntidades.FATURAS_GRAPHQL;
     private static boolean viewVerificada = false;
 
     @Override
@@ -26,17 +28,37 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
                     document NVARCHAR(50),
                     issue_date DATE,
                     due_date DATE,
+                    original_due_date DATE,
                     value DECIMAL(18,2),
-                    customer_id BIGINT,
-                    customer_name NVARCHAR(255),
-                    customer_cnpj NVARCHAR(50),
+                    paid_value DECIMAL(18,2),
+                    value_to_pay DECIMAL(18,2),
+                    discount_value DECIMAL(18,2),
+                    interest_value DECIMAL(18,2),
+                    paid BIT,
+                    status NVARCHAR(50),
+                    type NVARCHAR(50),
+                    comments NVARCHAR(MAX),
+                    sequence_code INT,
+                    competence_month INT,
+                    competence_year INT,
+                    created_at DATETIME2,
+                    updated_at DATETIME2,
+                    corporation_id BIGINT,
+                    corporation_name NVARCHAR(255),
+                    corporation_cnpj NVARCHAR(50),
                     metadata NVARCHAR(MAX),
                     data_extracao DATETIME2 DEFAULT GETDATE()
                 );
                 CREATE INDEX IX_fg_document ON dbo.faturas_graphql(document);
+                CREATE INDEX IX_fg_due_date ON dbo.faturas_graphql(due_date);
+                CREATE INDEX IX_fg_corporation_id ON dbo.faturas_graphql(corporation_id);
             END
         """;
         executarDDL(conexao, sql);
+        
+        // Adicionar novas colunas se a tabela já existir
+        adicionarColunasNovasSeNecessario(conexao);
+        
         if (!viewVerificada) {
             criarViewPowerBISeNaoExistir(conexao);
             viewVerificada = true;
@@ -47,23 +69,37 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
     protected int executarMerge(final Connection conexao, final FaturaGraphQLEntity e) throws SQLException {
         final String sql = """
             MERGE dbo.faturas_graphql AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source
-                  (id, document, issue_date, due_date, value, customer_id, customer_name, customer_cnpj, metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source
+                  (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
                     document = source.document,
                     issue_date = source.issue_date,
                     due_date = source.due_date,
+                    original_due_date = source.original_due_date,
                     value = source.value,
-                    customer_id = source.customer_id,
-                    customer_name = source.customer_name,
-                    customer_cnpj = source.customer_cnpj,
+                    paid_value = source.paid_value,
+                    value_to_pay = source.value_to_pay,
+                    discount_value = source.discount_value,
+                    interest_value = source.interest_value,
+                    paid = source.paid,
+                    status = source.status,
+                    type = source.type,
+                    comments = source.comments,
+                    sequence_code = source.sequence_code,
+                    competence_month = source.competence_month,
+                    competence_year = source.competence_year,
+                    created_at = source.created_at,
+                    updated_at = source.updated_at,
+                    corporation_id = source.corporation_id,
+                    corporation_name = source.corporation_name,
+                    corporation_cnpj = source.corporation_cnpj,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, document, issue_date, due_date, value, customer_id, customer_name, customer_cnpj, metadata, data_extracao)
-                VALUES (source.id, source.document, source.issue_date, source.due_date, source.value, source.customer_id, source.customer_name, source.customer_cnpj, source.metadata, source.data_extracao);
+                INSERT (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, metadata, data_extracao)
+                VALUES (source.id, source.document, source.issue_date, source.due_date, source.original_due_date, source.value, source.paid_value, source.value_to_pay, source.discount_value, source.interest_value, source.paid, source.status, source.type, source.comments, source.sequence_code, source.competence_month, source.competence_year, source.created_at, source.updated_at, source.corporation_id, source.corporation_name, source.corporation_cnpj, source.metadata, source.data_extracao);
         """;
         try (PreparedStatement ps = conexao.prepareStatement(sql)) {
             int idx = 1;
@@ -71,10 +107,24 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
             setStringParameter(ps, idx++, e.getDocument());
             setDateParameter(ps, idx++, e.getIssueDate());
             setDateParameter(ps, idx++, e.getDueDate());
+            setDateParameter(ps, idx++, e.getOriginalDueDate());
             setBigDecimalParameter(ps, idx++, e.getValue());
-            setLongParameter(ps, idx++, e.getCustomerId());
-            setStringParameter(ps, idx++, e.getCustomerName());
-            setStringParameter(ps, idx++, e.getCustomerCnpj());
+            setBigDecimalParameter(ps, idx++, e.getPaidValue());
+            setBigDecimalParameter(ps, idx++, e.getValueToPay());
+            setBigDecimalParameter(ps, idx++, e.getDiscountValue());
+            setBigDecimalParameter(ps, idx++, e.getInterestValue());
+            setBooleanParameter(ps, idx++, e.getPaid());
+            setStringParameter(ps, idx++, e.getStatus());
+            setStringParameter(ps, idx++, e.getType());
+            setStringParameter(ps, idx++, e.getComments());
+            setIntegerParameter(ps, idx++, e.getSequenceCode());
+            setIntegerParameter(ps, idx++, e.getCompetenceMonth());
+            setIntegerParameter(ps, idx++, e.getCompetenceYear());
+            setOffsetDateTimeParameter(ps, idx++, e.getCreatedAt());
+            setOffsetDateTimeParameter(ps, idx++, e.getUpdatedAt());
+            setLongParameter(ps, idx++, e.getCorporationId());
+            setStringParameter(ps, idx++, e.getCorporationName());
+            setStringParameter(ps, idx++, e.getCorporationCnpj());
             setStringParameter(ps, idx++, e.getMetadata());
             setInstantParameter(ps, idx++, Instant.now());
             return ps.executeUpdate();
@@ -82,51 +132,37 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
     }
 
     private void criarViewPowerBISeNaoExistir(final Connection conexao) throws SQLException {
-        final String sqlView = """
-            CREATE OR ALTER VIEW dbo.vw_faturas_graphql_powerbi AS
-            SELECT
-                id             AS [ID],
-                document       AS [Fatura/N° Documento],
-                issue_date     AS [Emissão],
-                due_date       AS [Vencimento],
-                value          AS [Valor],
-                customer_id    AS [Cliente/ID],
-                customer_name  AS [Cliente/Nome],
-                customer_cnpj  AS [Cliente/CNPJ],
-                metadata       AS [Metadata],
-                data_extracao  AS [Data de extracao]
-            FROM dbo.faturas_graphql
-        """;
-        executarDDL(conexao, sqlView);
+        executarDDL(conexao, ConstantesViewsPowerBI.obterSqlView(NOME_TABELA));
     }
 
-    public int enriquecerClientesViaJoins() throws SQLException {
-        int total = 0;
-        try (Connection conn = obterConexao();
-             PreparedStatement ps1 = conn.prepareStatement("""
-                UPDATE fg
-                SET 
-                    fg.customer_id   = COALESCE(fg.customer_id, f.pagador_id),
-                    fg.customer_name = COALESCE(fg.customer_name, f.pagador_nome),
-                    fg.customer_cnpj = COALESCE(fg.customer_cnpj, f.pagador_documento)
-                FROM dbo.faturas_graphql fg
-                INNER JOIN dbo.fretes f ON f.accounting_credit_id = fg.id
-                WHERE fg.customer_name IS NULL OR fg.customer_cnpj IS NULL
-            """);
-             PreparedStatement ps2 = conn.prepareStatement("""
-                UPDATE fg
-                SET 
-                    fg.customer_name = COALESCE(fg.customer_name, fpc.pagador_nome),
-                    fg.customer_cnpj = COALESCE(fg.customer_cnpj, fpc.pagador_documento)
-                FROM dbo.faturas_graphql fg
-                INNER JOIN dbo.faturas_por_cliente fpc ON fpc.fit_ant_document = fg.document
-                WHERE fg.customer_name IS NULL OR fg.customer_cnpj IS NULL
-            """)) {
-            total += ps1.executeUpdate();
-            if (verificarTabelaExiste(conn, "faturas_por_cliente")) {
-                total += ps2.executeUpdate();
+    private void adicionarColunaSeNaoExistir(final Connection conexao, final String nomeColuna, final String tipoDef) throws SQLException {
+        final String verifica = "SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA='dbo' AND TABLE_NAME='faturas_graphql' AND COLUMN_NAME='" + nomeColuna + "'";
+        try (PreparedStatement stmt = conexao.prepareStatement(verifica); java.sql.ResultSet rs = stmt.executeQuery()) {
+            if (!rs.next()) {
+                final String alterar = "ALTER TABLE dbo.faturas_graphql ADD " + nomeColuna + " " + tipoDef;
+                executarDDL(conexao, alterar);
             }
         }
-        return total;
     }
+
+    private void adicionarColunasNovasSeNecessario(final Connection conexao) throws SQLException {
+        adicionarColunaSeNaoExistir(conexao, "original_due_date", "DATE");
+        adicionarColunaSeNaoExistir(conexao, "paid_value", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, "value_to_pay", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, "discount_value", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, "interest_value", "DECIMAL(18,2)");
+        adicionarColunaSeNaoExistir(conexao, "paid", "BIT");
+        adicionarColunaSeNaoExistir(conexao, "status", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "type", "NVARCHAR(50)");
+        adicionarColunaSeNaoExistir(conexao, "comments", "NVARCHAR(MAX)");
+        adicionarColunaSeNaoExistir(conexao, "sequence_code", "INT");
+        adicionarColunaSeNaoExistir(conexao, "competence_month", "INT");
+        adicionarColunaSeNaoExistir(conexao, "competence_year", "INT");
+        adicionarColunaSeNaoExistir(conexao, "created_at", "DATETIME2");
+        adicionarColunaSeNaoExistir(conexao, "updated_at", "DATETIME2");
+        adicionarColunaSeNaoExistir(conexao, "corporation_id", "BIGINT");
+        adicionarColunaSeNaoExistir(conexao, "corporation_name", "NVARCHAR(255)");
+        adicionarColunaSeNaoExistir(conexao, "corporation_cnpj", "NVARCHAR(50)");
+    }
+
 }

@@ -1,6 +1,8 @@
 package br.com.extrator.modelo.dataexport.cotacao;
 
 import br.com.extrator.db.entity.CotacaoEntity;
+import br.com.extrator.util.validacao.ValidadorDTO;
+import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -31,15 +33,27 @@ public class CotacaoMapper {
 
     /**
      * Converte o DTO de Cotação em uma Entidade.
+     * PROBLEMA #6 CORRIGIDO: Adicionada validação de campos críticos.
+     * 
      * @param dto O objeto DTO com os dados da cotação.
      * @return Um objeto CotacaoEntity pronto para ser salvo.
+     * @throws IllegalArgumentException se campos críticos forem inválidos
      */
-    public CotacaoEntity toEntity(CotacaoDTO dto) {
+    public CotacaoEntity toEntity(final CotacaoDTO dto) {
         if (dto == null) {
             return null;
         }
 
-        CotacaoEntity entity = new CotacaoEntity();
+        // PROBLEMA #6: Validação de campos críticos
+        final ResultadoValidacao validacao = ValidadorDTO.criarValidacao("Cotacao");
+        ValidadorDTO.validarId(validacao, "sequence_code", dto.getSequenceCode());
+        
+        if (!validacao.isValido()) {
+            validacao.logErros();
+            throw new IllegalArgumentException("Cotação inválida: sequence_code é obrigatório. Erros: " + validacao.getErros());
+        }
+
+        final CotacaoEntity entity = new CotacaoEntity();
 
         // 1. Mapeamento dos campos essenciais conforme docs/descobertas-endpoints/cotacoes.md
         entity.setSequenceCode(dto.getSequenceCode());

@@ -57,6 +57,7 @@ public class FaturaPorClienteMapper {
                 entity.setNumeroCte(null);
                 entity.setChaveCte(null);
                 entity.setStatusCte(null);
+                entity.setStatusCteResult(null);
                 entity.setDataEmissaoCte(null);
             } else {
                 final boolean isCte = (dto.getCteKey() != null && !dto.getCteKey().trim().isEmpty()) || dto.getCteNumber() != null;
@@ -65,12 +66,14 @@ public class FaturaPorClienteMapper {
                     entity.setChaveCte(dto.getCteKey());
                     entity.setNumeroNfse(null);
                     entity.setStatusCte(traduzirStatus(dto.getCteStatus()));
+                    entity.setStatusCteResult(dto.getCteStatusResult());
                     entity.setDataEmissaoCte(converterParaOffsetDateTime(dto.getCteIssuedAt()));
                 } else {
                     entity.setNumeroCte(null);
                     entity.setChaveCte(null);
                     entity.setNumeroNfse(null);
                     entity.setStatusCte(null);
+                    entity.setStatusCteResult(null);
                     entity.setDataEmissaoCte(null);
                 }
             }
