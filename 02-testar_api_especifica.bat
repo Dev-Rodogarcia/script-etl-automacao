@@ -1,0 +1,240 @@
+@echo off
+setlocal EnableDelayedExpansion
+
+REM Ajusta code page para evitar erros de parsing com acentos e parenteses
+chcp 1252 >nul
+
+REM ================================================================
+REM Script: 02-testar_api_especifica.bat
+REM Finalidade:
+REM   Executa testes da API especifica informada como parametro ou via menu interativo.
+REM   Valores aceitos: 'graphql' ou 'dataexport'.
+REM
+REM Uso:
+REM   02-testar_api_especifica.bat [api] [entidade]
+REM
+REM Parametros (opcionais):
+REM   %1  Nome da API a testar: graphql | dataexport
+REM   %2  Entidade (opcional):
+REM       GraphQL -> coletas | fretes | faturas_graphql
+REM       DataExport -> manifestos | cotacoes | localizacao_carga | contas_a_pagar | faturas_por_cliente
+REM
+REM Se nenhum parametro for informado, exibe menu interativo.
+REM ================================================================
+
+REM Se parametros foram fornecidos, usar diretamente
+if not "%~1"=="" (
+    set "API=%~1"
+    set "ENTIDADE=%~2"
+    goto :VALIDATE_ARGS
+)
+
+REM ================================================================
+REM MENU INTERATIVO
+REM ================================================================
+:INTERACTIVE_MENU
+cls
+echo ================================================================
+echo TESTE DE API ESPECIFICA
+echo ================================================================
+echo.
+echo Escolha a API:
+echo   1. GraphQL
+echo   2. DataExport
+echo.
+set /p "OPCAO_API=Digite sua opcao (1 ou 2): "
+
+if "%OPCAO_API%"=="1" (
+    set "API=graphql"
+    goto :CHOOSE_ENTITY
+)
+if "%OPCAO_API%"=="2" (
+    set "API=dataexport"
+    goto :CHOOSE_ENTITY
+)
+
+echo.
+echo ERRO: Opcao invalida!
+timeout /t 2 >nul
+goto :INTERACTIVE_MENU
+
+:CHOOSE_ENTITY
+cls
+echo ================================================================
+echo TESTE DE API: %API%
+echo ================================================================
+echo.
+echo Escolha o escopo:
+echo   1. Todas as entidades
+echo   2. Entidade especifica
+echo.
+set /p "OPCAO_ESCOPO=Digite sua opcao (1 ou 2): "
+
+if "%OPCAO_ESCOPO%"=="1" (
+    set "ENTIDADE="
+    goto :RUN
+)
+if "%OPCAO_ESCOPO%"=="2" (
+    goto :CHOOSE_SPECIFIC_ENTITY
+)
+
+echo.
+echo ERRO: Opcao invalida!
+timeout /t 2 >nul
+goto :CHOOSE_ENTITY
+
+:CHOOSE_SPECIFIC_ENTITY
+cls
+echo ================================================================
+echo TESTE DE API: %API% - ENTIDADE ESPECIFICA
+echo ================================================================
+echo.
+
+if /i "%API%"=="graphql" (
+    echo Entidades disponiveis:
+    echo   1. Coletas
+    echo   2. Fretes
+    echo   3. Faturas GraphQL
+    echo.
+    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2 ou 3): "
+    
+    if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
+    if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
+    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=faturas_graphql"
+    
+    if "!ENTIDADE!"=="" (
+        echo.
+        echo ERRO: Opcao invalida!
+        timeout /t 2 >nul
+        goto :CHOOSE_SPECIFIC_ENTITY
+    )
+    goto :RUN
+)
+
+if /i "%API%"=="dataexport" (
+    echo Entidades disponiveis:
+    echo   1. Manifestos
+    echo   2. Cotacoes
+    echo   3. Localizacao de Carga
+    echo   4. Contas a Pagar
+    echo   5. Faturas por Cliente
+    echo.
+    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2, 3, 4 ou 5): "
+    
+    if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=manifestos"
+    if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=cotacoes"
+    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=localizacao_carga"
+    if "!OPCAO_ENTIDADE!"=="4" set "ENTIDADE=contas_a_pagar"
+    if "!OPCAO_ENTIDADE!"=="5" set "ENTIDADE=faturas_por_cliente"
+    
+    if "!ENTIDADE!"=="" (
+        echo.
+        echo ERRO: Opcao invalida!
+        timeout /t 2 >nul
+        goto :CHOOSE_SPECIFIC_ENTITY
+    )
+    goto :RUN
+)
+
+goto :RUN
+
+:VALIDATE_ARGS
+REM Valida API e entidade usando ramos sem parenteses
+if /i "%API%"=="graphql" goto :CHECK_GRAPHQL
+if /i "%API%"=="dataexport" goto :CHECK_DATAEXPORT
+echo ERRO: API '%API%' nao reconhecida!
+echo.
+echo APIs suportadas: graphql, dataexport
+echo.
+pause
+exit /b 1
+
+:CHECK_GRAPHQL
+if "%ENTIDADE%"=="" goto :RUN
+if /i "%ENTIDADE%"=="coletas" goto :RUN
+if /i "%ENTIDADE%"=="fretes" goto :RUN
+if /i "%ENTIDADE%"=="faturas_graphql" goto :RUN
+if /i "%ENTIDADE%"=="faturas" goto :RUN
+echo ERRO: Entidade '%ENTIDADE%' invalida para API GraphQL!
+echo.
+echo Entidades suportadas: coletas, fretes, faturas_graphql, faturas
+echo.
+pause
+exit /b 1
+
+:CHECK_DATAEXPORT
+if "%ENTIDADE%"=="" goto :RUN
+if /i "%ENTIDADE%"=="manifestos" goto :RUN
+if /i "%ENTIDADE%"=="cotacoes" goto :RUN
+if /i "%ENTIDADE%"=="localizacao_carga" goto :RUN
+if /i "%ENTIDADE%"=="localizacao_de_carga" goto :RUN
+if /i "%ENTIDADE%"=="contas_a_pagar" goto :RUN
+if /i "%ENTIDADE%"=="contasapagar" goto :RUN
+if /i "%ENTIDADE%"=="faturas_por_cliente" goto :RUN
+if /i "%ENTIDADE%"=="faturasporcliente" goto :RUN
+echo ERRO: Entidade '%ENTIDADE%' invalida para API DataExport!
+echo.
+echo Entidades suportadas: manifestos, cotacoes, localizacao_carga, contas_a_pagar, faturas_por_cliente
+echo.
+pause
+exit /b 1
+
+:RUN
+cls
+echo ================================================================
+echo TESTANDO API: %API%
+if not "%ENTIDADE%"=="" echo ENTIDADE: %ENTIDADE%
+echo ================================================================
+echo.
+
+if /i "%API%"=="graphql" (
+  if /i "%ENTIDADE%"=="faturas" set "API_GRAPHQL_FATURAS_DIAS_JANELA=1"
+  if /i "%ENTIDADE%"=="faturas" set "API_GRAPHQL_FATURAS_MAX_PAGINAS=20"
+  if /i "%ENTIDADE%"=="faturas_graphql" set "API_GRAPHQL_FATURAS_DIAS_JANELA=1"
+  if /i "%ENTIDADE%"=="faturas_graphql" set "API_GRAPHQL_FATURAS_MAX_PAGINAS=20"
+)
+
+call "%~dp0mvn.bat" -q -DskipTests clean compile
+if errorlevel 1 goto :COMPILE_FAIL
+
+if not exist "target\classes" goto :NOJAR
+
+set "CMD_ARGS=--testar-api %API%"
+if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
+echo Executando: mvn exec:java -Dexec.mainClass=br.com.extrator.Main -Dexec.args="%CMD_ARGS%" 
+echo.
+
+call "%~dp0mvn.bat" -q -DskipTests exec:java -Dexec.mainClass=br.com.extrator.Main -Dexec.args="%CMD_ARGS%"
+if errorlevel 1 goto :FAIL
+goto :SUCCESS
+
+:NOJAR
+echo ERRO: Arquivo target\extrator.jar nao encontrado!
+echo Execute primeiro: mvn package -DskipTests -q
+echo.
+pause
+exit /b 1
+
+:SUCCESS
+echo.
+echo ================================================================
+echo TESTE CONCLUIDO COM SUCESSO!
+echo ================================================================
+goto :END
+
+:FAIL
+echo.
+echo ================================================================
+echo TESTE FALHOU (Exit Code: %ERRORLEVEL%)
+echo ================================================================
+goto :END
+
+:COMPILE_FAIL
+echo ERRO: Compilacao falhou
+echo.
+pause
+exit /b 1
+
+:END
+echo.
+pause

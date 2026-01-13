@@ -1,0 +1,337 @@
+# ========================================
+# ARQUIVOS DE CONFIGURAÇÃO E CREDENCIAIS
+# ========================================
+# Arquivos de configuração com informações sensíveis
+src/main/resources/config.properties
+src/main/resources/application.properties
+src/main/resources/application-*.properties
+*.properties
+*.env
+.env
+.env.*
+config/
+configuration/
+
+# Arquivos de credenciais e tokens
+credentials/
+secrets/
+keys/
+certs/
+certificates/
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+
+# Arquivos de configuração de banco de dados
+database/config.bat
+database.properties
+db.properties
+datasource.properties
+hibernate.cfg.xml
+
+# Arquivos específicos do projeto
+last_run.properties
+last_successful_run.properties
+
+# Pastas temporárias criadas automaticamente
+test/
+mkdir/
+
+# ========================================
+# ARQUIVOS DE LOG E DADOS TEMPORÁRIOS
+# ========================================
+# Arquivos de log
+logs/
+log/
+*.log
+*.log.*
+*.out
+*.err
+
+# Arquivos de backup e dados temporários
+backups/
+backup/
+dumps/
+exports/
+data/
+*.bak
+*.backup
+*.dump# Arquivos de banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos de relatórios e monitoramento específicos do projeto
+relatorios-execucao/
+historico-execucoes/
+
+# Cache e arquivos temporários
+temp/
+tmp/
+cache/
+*.tmp
+*.temp
+*.cache
+*~.nib
+local.properties
+exports/
+
+# Arquivos específicos do sistema
+
+# ========================================
+# ARQUIVOS COMPILADOS E BUILD
+# ========================================
+# Maven
+target/
+.mvn/
+mvnw
+mvnw.cmd
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Arquivos compilados Java
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Arquivos de build específicos
+*-script.jar
+*-dashboard.jar
+
+# ========================================
+# ARQUIVOS DE IDE E EDITORES
+# ========================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+.metadata/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.recommenders
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ========================================
+# ARQUIVOS DO SISTEMA OPERACIONAL
+# ========================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# ARQUIVOS DE DESENVOLVIMENTO E TESTES
+# ========================================
+# Arquivos de teste e desenvolvimento
+test-output/
+test-results/
+coverage/
+*.coverage
+.nyc_output/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Arquivos de profiling
+*.prof
+*.hprof
+*.heap
+
+# Arquivos de teste específicos do projeto
+testes-unitarios/
+testes-integracao/
+
+# ========================================
+# DASHBOARD REACT (Frontend)
+# ========================================
+# Dependências do npm/node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Build do React
+/dashboard-monitoramento/build/
+/dashboard-monitoramento/dist/
+
+# Ambiente do React
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Arquivos de configuração do React/Vite
+vite.config.js.timestamp-*
+*.local
+
+# ========================================
+# ARQUIVOS DE DEPLOYMENT E PRODUÇÃO
+# ========================================
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Kubernetes
+*.kubeconfig
+kube-config
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# ========================================
+# OUTROS ARQUIVOS SENSÍVEIS
+# ========================================
+# Arquivos de configuração de serviços
+.aws/
+.azure/
+.gcp/
+.heroku/
+
+# Arquivos de monitoramento
+newrelic.yml
+elastic-apm-agent.properties
+
+# Arquivos de análise de código
+.sonar/
+sonar-project.properties
+
+# Arquivos de documentação gerados
+docs/generated/
+javadoc/
+apidoc/
+
+# Arquivos de versionamento local
+.git/
+.svn/
+.hg/
+.bzr/
+
+# Arquivos de configuração de ferramentas
+.editorconfig
+.gitattributes
+
+# ========================================
+# ARQUIVOS ESPECÍFICOS DO PROJETO
+# ========================================
+# Arquivos de execução e scripts específicos
+01_iniciar_dashboard_completo.bat
+02_extrair_dados_24h.bat
+03_extrair_dados_por_data.bat
+04_testar_api_24h.bat
+05_testar_api_por_data.bat
+
+# Arquivos de configuração específicos
+application-local.properties
+application-dev.properties
+application-prod.properties
+
+# Pastas específicas
+docs/arquivos-secretos-gitignore/
+docs/08-arquivos-secretos/

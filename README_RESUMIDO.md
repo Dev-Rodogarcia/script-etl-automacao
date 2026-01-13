@@ -1,0 +1,181 @@
+# 📦 Extrator de Dados ESL Cloud - Versão Resumida
+
+**Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server.
+
+**Versão:** 2.2 | **Última Atualização:** 12/01/2026 | **Status:** ✅ Estável e em Produção
+
+---
+
+## 🎯 O Que Faz?
+
+1. **Extrai dados** de 2 APIs do ESL Cloud (GraphQL, Data Export) em **execução paralela**
+2. **Transforma** dados JSON em entidades estruturadas
+3. **Carrega** dados no SQL Server usando MERGE (UPSERT)
+4. **Valida completude** comparando contagens entre API e banco
+5. **Exporta dados** para CSV
+
+---
+
+## 🚀 Início Rápido
+
+### Pré-requisitos
+- Java 17+
+- Maven
+- SQL Server com banco configurado
+- Variáveis de ambiente configuradas (`DB_URL`, `DB_USER`, `DB_PASSWORD`, `API_GRAPHQL_TOKEN`, `API_DATAEXPORT_TOKEN`)
+
+### Executar Extração Completa
+
+```bash
+01-executar_extracao_completa.bat
+```
+
+### Configuração do Banco
+
+**⚠️ IMPORTANTE**: As tabelas devem ser criadas via scripts SQL antes de executar:
+
+```bash
+cd database
+# Execute os scripts SQL na ordem:
+# 1. Tabelas (tabelas/*.sql)
+# 2. Views (views/*.sql)
+# 3. Views Dimensão (views-dimensao/*.sql)
+```
+
+Ver documentação completa em `database/README.md`.
+
+---
+
+## 📊 Entidades Extraídas
+
+- **GraphQL**: Coletas, Fretes, Faturas GraphQL
+- **Data Export**: Manifestos, Cotações, Localização de Carga, Contas a Pagar, Faturas por Cliente
+
+**Total**: 8 entidades
+
+---
+
+## 🏗️ Arquitetura Simplificada
+
+```
+Main.java (CLI)
+    ├── ExecutarFluxoCompletoComando
+    │   ├── GraphQLRunner (Thread 1)
+    │   │   ├── Coletas
+    │   │   └── Fretes
+    │   └── DataExportRunner (Thread 2)
+    │       ├── Manifestos
+    │       ├── Cotações
+    │       ├── Localização de Carga
+    │       ├── Contas a Pagar
+    │       └── Faturas por Cliente
+    └── Validações (Completude, Gaps, Temporal)
+```
+
+---
+
+## 📁 Estrutura Principal
+
+```
+script-automacao/
+├── src/main/java/          # Código fonte Java
+│   ├── br/com/extrator/
+│   │   ├── Main.java                  # Ponto de entrada
+│   │   ├── api/                       # Clientes de API
+│   │   ├── db/
+│   │   │   ├── entity/                # Entidades JPA
+│   │   │   └── repository/            # Repositórios (MERGE/INSERT)
+│   │   ├── runners/                   # Orquestradores de extração
+│   │   └── comandos/                  # Comandos CLI
+├── database/              # Scripts SQL (DDL)
+│   ├── tabelas/          # Criação de tabelas
+│   ├── views/            # Views para Power BI
+│   └── views-dimensao/   # Views de dimensão
+├── 01-executar_extracao_completa.bat  # Script principal
+└── README.md             # Documentação completa
+```
+
+---
+
+## 🔑 Características Principais
+
+- ✅ **2 APIs**: GraphQL e Data Export
+- ✅ **8 Entidades** extraídas
+- ✅ **Execução Paralela** (2 threads)
+- ✅ **Sistema MERGE Robusto** (previne duplicados)
+- ✅ **Validação Automática** (completude, gaps, temporal)
+- ✅ **Schema Versionado** (scripts SQL, não código Java)
+- ✅ **Logs Estruturados** (SLF4J/Logback)
+- ✅ **Exportação CSV** automática
+
+---
+
+## ⚙️ Configuração Mínima
+
+### Variáveis de Ambiente Obrigatórias
+
+```bash
+# Banco de Dados
+DB_URL=jdbc:sqlserver://servidor:1433;databaseName=SeuBanco
+DB_USER=usuario
+DB_PASSWORD=senha
+
+# APIs
+API_GRAPHQL_TOKEN=seu_token_graphql
+API_DATAEXPORT_TOKEN=seu_token_dataexport
+API_GRAPHQL_URL=https://api.eslcloud.com/graphql
+API_DATAEXPORT_URL=https://api.eslcloud.com/data-export
+```
+
+---
+
+## 📝 Scripts Principais
+
+| Script | Descrição |
+|--------|-----------|
+| `01-executar_extracao_completa.bat` | Extração completa de todas as entidades |
+| `03-validar_config.bat` | Valida configuração e variáveis de ambiente |
+| `05-compilar_projeto.bat` | Compila o projeto Maven |
+| `06-exportar_csv.bat` | Exporta dados para CSV |
+| `04-executar_auditoria.bat` | Executa auditoria de dados |
+
+---
+
+## 🔧 Tecnologias
+
+- **Java 17**
+- **Maven**
+- **SQL Server** (mssql-jdbc)
+- **Jackson** (JSON)
+- **SLF4J/Logback** (Logging)
+- **HikariCP** (Pool de conexões)
+
+---
+
+## 📚 Documentação Completa
+
+Para documentação detalhada, consulte:
+- **README.md** - Documentação completa
+- **docs/README.md** - Índice da documentação
+- **database/README.md** - Guia de scripts SQL
+
+---
+
+## 🆕 Novidades 2.2 (12/01/2026)
+
+- ✅ **Refatoração de Repositórios**: Separação completa DDL/DML
+- ✅ **Schema Versionado**: Estrutura gerenciada via scripts SQL
+- ✅ **Padronização**: Todos os repositórios seguem padrão consistente
+- ✅ **Melhorias de Código**: Logging, validações e tratamento de erros
+
+---
+
+## ⚠️ Importante
+
+- **Schema do Banco**: Deve ser criado via scripts SQL (`database/`) ANTES de executar
+- **Tokens e Credenciais**: Nunca commitar no Git - use variáveis de ambiente
+- **Java 17+**: Requerido para compilação e execução
+
+---
+
+**Para mais detalhes, consulte [README.md](README.md) - Documentação Completa**

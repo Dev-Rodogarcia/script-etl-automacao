@@ -1,0 +1,105 @@
+package br.com.extrator.db.entity;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+
+public class FaturaGraphQLEntity {
+    private Long id;
+    private String document;
+    private LocalDate issueDate;
+    private LocalDate dueDate;
+    private LocalDate originalDueDate;
+    private BigDecimal value;
+    private BigDecimal paidValue;
+    private BigDecimal valueToPay;
+    private BigDecimal discountValue;
+    private BigDecimal interestValue;
+    private Boolean paid;
+    private String status;
+    private String type;
+    private String comments;
+    private Integer sequenceCode;
+    private Integer competenceMonth;
+    private Integer competenceYear;
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
+    
+    // Relacionamentos
+    private Long corporationId;
+    private String corporationName;
+    private String corporationCnpj;
+    
+    // Metadata (JSON completo)
+    private String metadata;
+
+    // Getters e Setters
+    public Long getId() { return id; }
+    public void setId(final Long id) { this.id = id; }
+    
+    public String getDocument() { return document; }
+    public void setDocument(final String document) { this.document = document; }
+    
+    public LocalDate getIssueDate() { return issueDate; }
+    public void setIssueDate(final LocalDate issueDate) { this.issueDate = issueDate; }
+    
+    public LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(final LocalDate dueDate) { this.dueDate = dueDate; }
+    
+    public LocalDate getOriginalDueDate() { return originalDueDate; }
+    public void setOriginalDueDate(final LocalDate originalDueDate) { this.originalDueDate = originalDueDate; }
+    
+    public BigDecimal getValue() { return value; }
+    public void setValue(final BigDecimal value) { this.value = value; }
+    
+    public BigDecimal getPaidValue() { return paidValue; }
+    public void setPaidValue(final BigDecimal paidValue) { this.paidValue = paidValue; }
+    
+    public BigDecimal getValueToPay() { return valueToPay; }
+    public void setValueToPay(final BigDecimal valueToPay) { this.valueToPay = valueToPay; }
+    
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(final BigDecimal discountValue) { this.discountValue = discountValue; }
+    
+    public BigDecimal getInterestValue() { return interestValue; }
+    public void setInterestValue(final BigDecimal interestValue) { this.interestValue = interestValue; }
+    
+    public Boolean getPaid() { return paid; }
+    public void setPaid(final Boolean paid) { this.paid = paid; }
+    
+    public String getStatus() { return status; }
+    public void setStatus(final String status) { this.status = status; }
+    
+    public String getType() { return type; }
+    public void setType(final String type) { this.type = type; }
+    
+    public String getComments() { return comments; }
+    public void setComments(final String comments) { this.comments = comments; }
+    
+    public Integer getSequenceCode() { return sequenceCode; }
+    public void setSequenceCode(final Integer sequenceCode) { this.sequenceCode = sequenceCode; }
+    
+    public Integer getCompetenceMonth() { return competenceMonth; }
+    public void setCompetenceMonth(final Integer competenceMonth) { this.competenceMonth = competenceMonth; }
+    
+    public Integer getCompetenceYear() { return competenceYear; }
+    public void setCompetenceYear(final Integer competenceYear) { this.competenceYear = competenceYear; }
+    
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(final OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(final OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    
+    public Long getCorporationId() { return corporationId; }
+    public void setCorporationId(final Long corporationId) { this.corporationId = corporationId; }
+    
+    public String getCorporationName() { return corporationName; }
+    public void setCorporationName(final String corporationName) { this.corporationName = corporationName; }
+    
+    public String getCorporationCnpj() { return corporationCnpj; }
+    public void setCorporationCnpj(final String corporationCnpj) { this.corporationCnpj = corporationCnpj; }
+    
+    public String getMetadata() { return metadata; }
+    public void setMetadata(final String metadata) { this.metadata = metadata; }
+}
