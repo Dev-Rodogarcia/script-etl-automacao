@@ -15,6 +15,7 @@ public final class ConstantesEntidades {
     public static final String COLETAS = "coletas";
     public static final String FRETES = "fretes";
     public static final String FATURAS_GRAPHQL = "faturas_graphql";
+    public static final String USUARIOS_SISTEMA = "usuarios_sistema";
     
     // ========== ENTIDADES DATA EXPORT ==========
     public static final String MANIFESTOS = "manifestos";

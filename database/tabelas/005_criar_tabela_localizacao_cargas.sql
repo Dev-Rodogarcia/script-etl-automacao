@@ -7,31 +7,32 @@ IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.local
 BEGIN
     CREATE TABLE dbo.localizacao_cargas (
         -- Coluna de Chave Primária (Chave de Negócio)
-        sequence_number BIGINT PRIMARY KEY,
+        sequence_number BIGINT PRIMARY KEY, -- N° Minuta
 
         -- Colunas Essenciais para Indexação e Relatórios
-        type NVARCHAR(100),
-        service_at DATETIMEOFFSET,
-        invoices_volumes INT,
-        taxed_weight NVARCHAR(50),
-        invoices_value NVARCHAR(50),
-        total_value DECIMAL(18, 2),
-        service_type NVARCHAR(50),
-        branch_nickname NVARCHAR(255),
-        predicted_delivery_at DATETIMEOFFSET,
-        destination_location_name NVARCHAR(255),
-        destination_branch_nickname NVARCHAR(255),
-        classification NVARCHAR(255),
-        status NVARCHAR(50),
-        status_branch_nickname NVARCHAR(255),
-        origin_location_name NVARCHAR(255),
-        origin_branch_nickname NVARCHAR(255),
+        type NVARCHAR(100), -- Tipo
+        service_at DATETIMEOFFSET, -- Data do frete
+        invoices_volumes INT, -- Volumes
+        taxed_weight NVARCHAR(50), -- Peso Taxado
+        invoices_value NVARCHAR(50), -- Valor NF
+        total_value DECIMAL(18, 2), -- Valor Frete
+        service_type NVARCHAR(50), -- Tipo Serviço
+        branch_nickname NVARCHAR(255), -- Filial Emissora
+        predicted_delivery_at DATETIMEOFFSET, -- Previsão Entrega/Previsão de entrega
+        destination_location_name NVARCHAR(255), -- Região Destino
+        destination_branch_nickname NVARCHAR(255), -- Filial Destino
+        classification NVARCHAR(255), -- Classificação
+        status NVARCHAR(50), -- Status Carga
+        status_branch_nickname NVARCHAR(255), -- Filial Atual (Nao encontrado no excel)...
+        origin_location_name NVARCHAR(255), -- Região Origem
+        origin_branch_nickname NVARCHAR(255), -- Filial Origem
+        fit_fln_cln_nickname NVARCHAR(255), -- Localização Atual
 
         -- Coluna de Metadados para Resiliência e Completude
-        metadata NVARCHAR(MAX),
+        metadata NVARCHAR(MAX), -- Dados brutos do JSON...
 
         -- Coluna de Auditoria
-        data_extracao DATETIME2 DEFAULT GETDATE()
+        data_extracao DATETIME2 DEFAULT GETDATE() -- Dados da extracao...
     );
     
     PRINT 'Tabela localizacao_cargas criada com sucesso!';

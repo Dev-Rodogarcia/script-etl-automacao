@@ -117,6 +117,78 @@ public final class CarregadorConfig {
             throw new RuntimeException(mensagemErro, e);
         }
     }
+    
+    /**
+     * Valida se as tabelas essenciais existem no banco de dados.
+     * Verifica: log_extracoes, page_audit, dim_usuarios
+     * 
+     * @throws IllegalStateException Se alguma tabela essencial não existir
+     */
+    public static void validarTabelasEssenciais() {
+        logger.info("🔍 Validando existência de tabelas essenciais no banco de dados...");
+        
+        final String[] tabelasEssenciais = {
+            "log_extracoes",
+            "page_audit",
+            "dim_usuarios"
+        };
+        
+        final StringBuilder tabelasFaltando = new StringBuilder();
+        
+        try (Connection conexao = GerenciadorConexao.obterConexao()) {
+            for (final String tabela : tabelasEssenciais) {
+                if (!tabelaExiste(conexao, tabela)) {
+                    if (tabelasFaltando.length() > 0) {
+                        tabelasFaltando.append(", ");
+                    }
+                    tabelasFaltando.append(tabela);
+                }
+            }
+            
+            if (tabelasFaltando.length() > 0) {
+                final String mensagem = String.format(
+                    "❌ ERRO CRÍTICO: As seguintes tabelas não existem no banco de dados: %s. " +
+                    "Execute 'database/executar_database.bat' antes de rodar a aplicação. " +
+                    "Veja database/README.md para instruções.",
+                    tabelasFaltando.toString()
+                );
+                logger.error(mensagem);
+                throw new IllegalStateException(mensagem);
+            }
+            
+            logger.info("✅ Todas as tabelas essenciais existem no banco de dados");
+            
+        } catch (final SQLException e) {
+            logger.error("Erro ao validar tabelas essenciais: {}", e.getMessage());
+            throw new RuntimeException("Falha ao validar tabelas essenciais", e);
+        }
+    }
+    
+    /**
+     * Verifica se uma tabela existe no banco de dados.
+     * 
+     * @param conexao Conexão com o banco de dados
+     * @param nomeTabela Nome da tabela a verificar
+     * @return true se a tabela existe, false caso contrário
+     * @throws SQLException Se houver erro ao consultar o banco
+     */
+    private static boolean tabelaExiste(final Connection conexao, final String nomeTabela) throws SQLException {
+        final String sql = """
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = ?
+            """;
+        
+        try (java.sql.PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, nomeTabela);
+            try (java.sql.ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        }
+        return false;
+    }
 
     /**
      * Obtém uma configuração obrigatória exclusivamente de variáveis de ambiente.

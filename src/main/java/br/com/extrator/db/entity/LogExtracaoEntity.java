@@ -23,7 +23,7 @@ public class LogExtracaoEntity {
         
         private final String valor;
         
-        StatusExtracao(String valor) {
+        StatusExtracao(final String valor) {
             this.valor = valor;
         }
         
@@ -31,8 +31,13 @@ public class LogExtracaoEntity {
             return valor;
         }
         
-        public static StatusExtracao fromString(String valor) {
-            for (StatusExtracao status : StatusExtracao.values()) {
+        public static StatusExtracao fromString(final String valor) {
+            // Mapear "INCOMPLETO" para "INCOMPLETO_LIMITE" para compatibilidade
+            if ("INCOMPLETO".equals(valor)) {
+                return INCOMPLETO_LIMITE;
+            }
+            
+            for (final StatusExtracao status : StatusExtracao.values()) {
                 if (status.valor.equals(valor)) {
                     return status;
                 }
@@ -44,9 +49,9 @@ public class LogExtracaoEntity {
     // Construtores
     public LogExtracaoEntity() {}
     
-    public LogExtracaoEntity(String entidade, LocalDateTime timestampInicio, LocalDateTime timestampFim,
-                           StatusExtracao statusFinal, Integer registrosExtraidos, Integer paginasProcessadas,
-                           String mensagem) {
+    public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
+                           final StatusExtracao statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
+                           final String mensagem) {
         this.entidade = entidade;
         this.timestampInicio = timestampInicio;
         this.timestampFim = timestampFim;
@@ -59,9 +64,9 @@ public class LogExtracaoEntity {
     /**
      * Construtor que aceita String para status (converte automaticamente para enum)
      */
-    public LogExtracaoEntity(String entidade, LocalDateTime timestampInicio, LocalDateTime timestampFim,
-                           String statusFinal, Integer registrosExtraidos, Integer paginasProcessadas,
-                           String mensagem) {
+    public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
+                           final String statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
+                           final String mensagem) {
         this.entidade = entidade;
         this.timestampInicio = timestampInicio;
         this.timestampFim = timestampFim;
@@ -76,7 +81,7 @@ public class LogExtracaoEntity {
         return id;
     }
     
-    public void setId(Long id) {
+    public void setId(final Long id) {
         this.id = id;
     }
     
@@ -84,7 +89,7 @@ public class LogExtracaoEntity {
         return entidade;
     }
     
-    public void setEntidade(String entidade) {
+    public void setEntidade(final String entidade) {
         this.entidade = entidade;
     }
     
@@ -92,7 +97,7 @@ public class LogExtracaoEntity {
         return timestampInicio;
     }
     
-    public void setTimestampInicio(LocalDateTime timestampInicio) {
+    public void setTimestampInicio(final LocalDateTime timestampInicio) {
         this.timestampInicio = timestampInicio;
     }
     
@@ -100,7 +105,7 @@ public class LogExtracaoEntity {
         return timestampFim;
     }
     
-    public void setTimestampFim(LocalDateTime timestampFim) {
+    public void setTimestampFim(final LocalDateTime timestampFim) {
         this.timestampFim = timestampFim;
     }
     
@@ -108,7 +113,7 @@ public class LogExtracaoEntity {
         return statusFinal;
     }
     
-    public void setStatusFinal(StatusExtracao statusFinal) {
+    public void setStatusFinal(final StatusExtracao statusFinal) {
         this.statusFinal = statusFinal;
     }
     
@@ -116,7 +121,7 @@ public class LogExtracaoEntity {
         return registrosExtraidos;
     }
     
-    public void setRegistrosExtraidos(Integer registrosExtraidos) {
+    public void setRegistrosExtraidos(final Integer registrosExtraidos) {
         this.registrosExtraidos = registrosExtraidos;
     }
     
@@ -124,7 +129,7 @@ public class LogExtracaoEntity {
         return paginasProcessadas;
     }
     
-    public void setPaginasProcessadas(Integer paginasProcessadas) {
+    public void setPaginasProcessadas(final Integer paginasProcessadas) {
         this.paginasProcessadas = paginasProcessadas;
     }
     
@@ -132,7 +137,7 @@ public class LogExtracaoEntity {
         return mensagem;
     }
     
-    public void setMensagem(String mensagem) {
+    public void setMensagem(final String mensagem) {
         this.mensagem = mensagem;
     }
     

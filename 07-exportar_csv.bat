@@ -13,8 +13,9 @@ echo   EXPORTADOR CSV - TODOS OS DADOS
 echo ================================================================
 echo.
 
-echo Compilando projeto...
-call "%~dp0mvn.bat" -q -DskipTests package
+REM Compilar e gerar JAR antes de executar
+echo Compilando projeto (se necessario)...
+call "%~dp0mvn.bat" -q -DskipTests clean package
 if errorlevel 1 (
     echo ERRO: Compilacao falhou
     echo.
@@ -24,15 +25,31 @@ if errorlevel 1 (
 
 REM Verificar se o JAR existe
 if not exist "target\extrator.jar" (
-    echo ERRO: JAR nao encontrado!
+    echo ERRO: Arquivo target\extrator.jar nao encontrado apos compilacao!
     echo.
-    echo Compilando projeto automaticamente...
-    call "%~dp0mvn.bat" -q -DskipTests package
-    if errorlevel 1 (
-        echo ERRO: Compilacao falhou
-        echo.
-        pause
-        exit /b 1
+    pause
+    exit /b 1
+)
+
+REM Configurar JAVA_HOME automaticamente (Java 17+)
+if not defined JAVA_HOME (
+    REM Tenta encontrar JDK 17+ no Eclipse Adoptium
+    for /f "delims=" %%D in ('dir /b /ad "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul ^| sort /r') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :javahomefound
+    )
+    REM Se nao encontrar, tenta qualquer JDK 17+ no Adoptium
+    for /f "delims=" %%D in ('dir /b /ad "C:\Program Files\Eclipse Adoptium\jdk-*" 2^>nul ^| sort /r') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :javahomefound
+    )
+)
+:javahomefound
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        set "PATH=%JAVA_HOME%\bin;%PATH%"
+    ) else (
+        echo AVISO: JAVA_HOME configurado, mas java.exe nao encontrado
     )
 )
 
@@ -76,7 +93,8 @@ if "%OPCAO%"=="2" (
     echo   6. fretes                (Fretes)
     echo   7. manifestos            (Manifestos)
     echo   8. localizacao_cargas    (Localizacao de Cargas)
-    echo   9. page_audit            (Auditoria de Paginas)
+    echo   9. dim_usuarios          (Usuarios do Sistema - Dimensao)
+    echo  10. page_audit            (Auditoria de Paginas)
     echo   0. Voltar ao menu anterior
     echo.
     set /p TABELA_NUM="Digite o numero da tabela: "
@@ -96,7 +114,8 @@ if "%OPCAO%"=="2" (
     if "!TABELA_NUM!"=="6" set "TABELA=fretes"
     if "!TABELA_NUM!"=="7" set "TABELA=manifestos"
     if "!TABELA_NUM!"=="8" set "TABELA=localizacao_cargas"
-    if "!TABELA_NUM!"=="9" set "TABELA=page_audit"
+    if "!TABELA_NUM!"=="9" set "TABELA=dim_usuarios"
+    if "!TABELA_NUM!"=="10" set "TABELA=page_audit"
     
     if not defined TABELA (
         echo ERRO: Numero invalido!
@@ -169,6 +188,7 @@ echo   - coletas.csv                         (Coletas)
 echo   - manifestos.csv                      (Manifestos)
 echo   - cotacoes.csv                        (Cotacoes)
 echo   - localizacao_cargas.csv              (Localizacao da Carga)
+echo   - dim_usuarios.csv                    (Usuarios do Sistema - Dimensao)
 echo   - page_audit.csv                      (Auditoria de Paginas)
 echo.
 echo Verifique a pasta 'exports' para os arquivos gerados.

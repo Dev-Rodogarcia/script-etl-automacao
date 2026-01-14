@@ -40,8 +40,8 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
 
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
             ON target.sequence_number = source.sequence_number
             WHEN MATCHED THEN
                 UPDATE SET
@@ -61,11 +61,12 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     status_branch_nickname = source.status_branch_nickname,
                     origin_location_name = source.origin_location_name,
                     origin_branch_nickname = source.origin_branch_nickname,
+                    fit_fln_cln_nickname = source.fit_fln_cln_nickname,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, metadata, data_extracao)
-                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.metadata, source.data_extracao);
+                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
+                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.data_extracao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -97,12 +98,13 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             setStringParameter(statement, paramIndex++, carga.getStatusBranchNickname());
             setStringParameter(statement, paramIndex++, carga.getOriginLocationName());
             setStringParameter(statement, paramIndex++, carga.getOriginBranchNickname());
+            setStringParameter(statement, paramIndex++, carga.getFitFlnClnNickname());
             setStringParameter(statement, paramIndex++, carga.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             
-            // Verificar se todos os parâmetros foram definidos (19 parâmetros = paramIndex final = 20)
-            if (paramIndex != 20) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 19, definido %d", paramIndex - 1));
+            // Verificar se todos os parâmetros foram definidos (20 parâmetros = paramIndex final = 21)
+            if (paramIndex != 21) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 20, definido %d", paramIndex - 1));
             }
 
             final int rowsAffected = statement.executeUpdate();

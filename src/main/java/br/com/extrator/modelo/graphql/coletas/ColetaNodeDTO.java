@@ -57,6 +57,9 @@ public class ColetaNodeDTO {
     @JsonProperty("invoicesWeight")
     private BigDecimal invoicesWeight;
 
+    @JsonProperty("taxedWeight")
+    private BigDecimal taxedWeight;
+
     @JsonProperty("lunchBreakEndHour")
     private String lunchBreakEndHour;
 
@@ -239,6 +242,14 @@ public class ColetaNodeDTO {
         this.invoicesWeight = invoicesWeight;
     }
 
+    public BigDecimal getTaxedWeight() {
+        return taxedWeight;
+    }
+
+    public void setTaxedWeight(final BigDecimal taxedWeight) {
+        this.taxedWeight = taxedWeight;
+    }
+
     public String getLunchBreakEndHour() {
         return lunchBreakEndHour;
     }
@@ -371,7 +382,7 @@ public class ColetaNodeDTO {
         return manifestItemPickId;
     }
 
-    public void setManifestItemPickId(Long manifestItemPickId) {
+    public void setManifestItemPickId(final Long manifestItemPickId) {
         this.manifestItemPickId = manifestItemPickId;
     }
 
@@ -381,7 +392,7 @@ public class ColetaNodeDTO {
         return customer;
     }
 
-    public void setCustomer(CustomerDTO customer) {
+    public void setCustomer(final CustomerDTO customer) {
         this.customer = customer;
     }
 
@@ -389,7 +400,7 @@ public class ColetaNodeDTO {
         return pickAddress;
     }
 
-    public void setPickAddress(PickAddressDTO pickAddress) {
+    public void setPickAddress(final PickAddressDTO pickAddress) {
         this.pickAddress = pickAddress;
     }
 
@@ -397,7 +408,7 @@ public class ColetaNodeDTO {
         return user;
     }
 
-    public void setUser(UserDTO user) {
+    public void setUser(final UserDTO user) {
         this.user = user;
     }
 
@@ -405,7 +416,7 @@ public class ColetaNodeDTO {
         return corporation;
     }
 
-    public void setCorporation(Corporation corporation) {
+    public void setCorporation(final Corporation corporation) {
         this.corporation = corporation;
     }
 
@@ -415,7 +426,7 @@ public class ColetaNodeDTO {
         return finishDate;
     }
 
-    public void setFinishDate(String finishDate) {
+    public void setFinishDate(final String finishDate) {
         this.finishDate = finishDate;
     }
 
@@ -432,9 +443,9 @@ public class ColetaNodeDTO {
         private Person person;
 
         public Long getId() { return id; }
-        public void setId(Long id) { this.id = id; }
+        public void setId(final Long id) { this.id = id; }
         public Person getPerson() { return person; }
-        public void setPerson(Person person) { this.person = person; }
+        public void setPerson(final Person person) { this.person = person; }
     }
 
     public static class Person {
@@ -445,8 +456,8 @@ public class ColetaNodeDTO {
         private String cnpj;
 
         public String getNickname() { return nickname; }
-        public void setNickname(String nickname) { this.nickname = nickname; }
+        public void setNickname(final String nickname) { this.nickname = nickname; }
         public String getCnpj() { return cnpj; }
-        public void setCnpj(String cnpj) { this.cnpj = cnpj; }
+        public void setCnpj(final String cnpj) { this.cnpj = cnpj; }
     }
 }

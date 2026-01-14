@@ -7,8 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.comandos.base.Comando;
-import br.com.extrator.runners.DataExportRunner;
-import br.com.extrator.runners.GraphQLRunner;
+import br.com.extrator.runners.dataexport.DataExportRunner;
+import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.util.console.BannerUtil;
 
 /**

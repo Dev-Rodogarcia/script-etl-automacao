@@ -43,12 +43,11 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             USING (
                 SELECT
                     ? AS id, ? AS sequence_code, ? AS request_date, ? AS service_date, ? AS status, ? AS total_value, ? AS total_weight, ? AS total_volumes,
-                    ? AS cliente_id, ? AS cliente_nome, ? AS cliente_doc, ? AS local_coleta, ? AS numero_coleta, ? AS complemento_coleta, ? AS cidade_coleta, ? AS bairro_coleta, ? AS uf_coleta, ? AS cep_coleta, ? AS filial_id, ? AS filial_nome, ? AS filial_cnpj, ? AS usuario_id, ? AS usuario_nome,
-                    ? AS request_hour, ? AS service_start_hour, ? AS finish_date, ? AS service_end_hour, ? AS requester,
-                    ? AS comments, ? AS agent_id, ? AS manifest_item_pick_id, ? AS vehicle_type_id,
-                    ? AS cancellation_reason, ? AS cancellation_user_id, ? AS cargo_classification_id, ? AS cost_center_id,
-                    ? AS destroy_reason, ? AS destroy_user_id, ? AS invoices_cubed_weight, ? AS lunch_break_end_hour, ? AS lunch_break_start_hour,
-                    ? AS notification_email, ? AS notification_phone, ? AS pick_type_id, ? AS pickup_location_id, ? AS status_updated_at,
+                    ? AS cliente_nome, ? AS cliente_doc, ? AS local_coleta, ? AS numero_coleta, ? AS complemento_coleta, ? AS cidade_coleta, ? AS bairro_coleta, ? AS uf_coleta, ? AS cep_coleta, ? AS filial_id, ? AS filial_nome, ? AS usuario_nome,
+                    ? AS finish_date, ? AS manifest_item_pick_id, ? AS vehicle_type_id,
+                    ? AS cancellation_reason, ? AS cancellation_user_id,
+                    ? AS destroy_reason, ? AS destroy_user_id, ? AS status_updated_at,
+                    ? AS taxed_weight, ? AS pick_region, ? AS last_occurrence, ? AS acao_ocorrencia, ? AS numero_tentativas,
                     ? AS metadata, ? AS data_extracao
             ) AS source
             ON target.id = source.id
@@ -61,7 +60,6 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     total_value = source.total_value,
                     total_weight = source.total_weight,
                     total_volumes = source.total_volumes,
-                    cliente_id = source.cliente_id,
                     cliente_nome = source.cliente_nome,
                     cliente_doc = source.cliente_doc,
                     local_coleta = source.local_coleta,
@@ -73,53 +71,39 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     cep_coleta = source.cep_coleta,
                     filial_id = source.filial_id,
                     filial_nome = source.filial_nome,
-                    filial_cnpj = source.filial_cnpj,
-                    usuario_id = source.usuario_id,
                     usuario_nome = source.usuario_nome,
-                    request_hour = source.request_hour,
-                    service_start_hour = source.service_start_hour,
                     finish_date = source.finish_date,
-                    service_end_hour = source.service_end_hour,
-                    requester = source.requester,
-                    comments = source.comments,
-                    agent_id = source.agent_id,
                     manifest_item_pick_id = source.manifest_item_pick_id,
                     vehicle_type_id = source.vehicle_type_id,
                     cancellation_reason = source.cancellation_reason,
                     cancellation_user_id = source.cancellation_user_id,
-                    cargo_classification_id = source.cargo_classification_id,
-                    cost_center_id = source.cost_center_id,
                     destroy_reason = source.destroy_reason,
                     destroy_user_id = source.destroy_user_id,
-                    invoices_cubed_weight = source.invoices_cubed_weight,
-                    lunch_break_end_hour = source.lunch_break_end_hour,
-                    lunch_break_start_hour = source.lunch_break_start_hour,
-                    notification_email = source.notification_email,
-                    notification_phone = source.notification_phone,
-                    pick_type_id = source.pick_type_id,
-                    pickup_location_id = source.pickup_location_id,
                     status_updated_at = source.status_updated_at,
+                    taxed_weight = source.taxed_weight,
+                    pick_region = source.pick_region,
+                    last_occurrence = source.last_occurrence,
+                    acao_ocorrencia = source.acao_ocorrencia,
+                    numero_tentativas = source.numero_tentativas,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
                 INSERT (
                     id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes,
-                    cliente_id, cliente_nome, cliente_doc, local_coleta, numero_coleta, complemento_coleta, cidade_coleta, bairro_coleta, uf_coleta, cep_coleta, filial_id, filial_nome, filial_cnpj, usuario_id, usuario_nome,
-                    request_hour, service_start_hour, finish_date, service_end_hour, requester,
-                    comments, agent_id, manifest_item_pick_id, vehicle_type_id,
-                    cancellation_reason, cancellation_user_id, cargo_classification_id, cost_center_id,
-                    destroy_reason, destroy_user_id, invoices_cubed_weight, lunch_break_end_hour, lunch_break_start_hour,
-                    notification_email, notification_phone, pick_type_id, pickup_location_id, status_updated_at,
+                    cliente_nome, cliente_doc, local_coleta, numero_coleta, complemento_coleta, cidade_coleta, bairro_coleta, uf_coleta, cep_coleta, filial_id, filial_nome, usuario_nome,
+                    finish_date, manifest_item_pick_id, vehicle_type_id,
+                    cancellation_reason, cancellation_user_id,
+                    destroy_reason, destroy_user_id, status_updated_at,
+                    taxed_weight, pick_region, last_occurrence, acao_ocorrencia, numero_tentativas,
                     metadata, data_extracao
                 )
                 VALUES (
                     source.id, source.sequence_code, source.request_date, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
-                    source.cliente_id, source.cliente_nome, source.cliente_doc, source.local_coleta, source.numero_coleta, source.complemento_coleta, source.cidade_coleta, source.bairro_coleta, source.uf_coleta, source.cep_coleta, source.filial_id, source.filial_nome, source.filial_cnpj, source.usuario_id, source.usuario_nome,
-                    source.request_hour, source.service_start_hour, source.finish_date, source.service_end_hour, source.requester,
-                    source.comments, source.agent_id, source.manifest_item_pick_id, source.vehicle_type_id,
-                    source.cancellation_reason, source.cancellation_user_id, source.cargo_classification_id, source.cost_center_id,
-                    source.destroy_reason, source.destroy_user_id, source.invoices_cubed_weight, source.lunch_break_end_hour, source.lunch_break_start_hour,
-                    source.notification_email, source.notification_phone, source.pick_type_id, source.pickup_location_id, source.status_updated_at,
+                    source.cliente_nome, source.cliente_doc, source.local_coleta, source.numero_coleta, source.complemento_coleta, source.cidade_coleta, source.bairro_coleta, source.uf_coleta, source.cep_coleta, source.filial_id, source.filial_nome, source.usuario_nome,
+                    source.finish_date, source.manifest_item_pick_id, source.vehicle_type_id,
+                    source.cancellation_reason, source.cancellation_user_id,
+                    source.destroy_reason, source.destroy_user_id, source.status_updated_at,
+                    source.taxed_weight, source.pick_region, source.last_occurrence, source.acao_ocorrencia, source.numero_tentativas,
                     source.metadata, source.data_extracao
                 );
             """, NOME_TABELA);
@@ -136,11 +120,11 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             int expectedCount;
             try {
                 final int metaCount = statement.getParameterMetaData().getParameterCount();
-                expectedCount = (metaCount > 0 ? metaCount : 48);
+                expectedCount = (metaCount > 0 ? metaCount : 35);
                 logger.debug("MERGE de Coletas preparado: {} parâmetro(s) esperado(s)", expectedCount);
             } catch (final SQLException pmEx) {
                 logger.debug("Não foi possível obter ParameterMetaData: {}", pmEx.getMessage());
-                expectedCount = 47;
+                expectedCount = 35;
             }
             // Define os parâmetros de forma segura e na ordem correta.
             int paramIndex = 1;
@@ -152,8 +136,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             setBigDecimalParameter(statement, paramIndex++, coleta.getTotalValue());
             setBigDecimalParameter(statement, paramIndex++, coleta.getTotalWeight());
             statement.setObject(paramIndex++, coleta.getTotalVolumes(), Types.INTEGER);
-            // Campos expandidos (22 campos do CSV)
-            statement.setObject(paramIndex++, coleta.getClienteId(), Types.BIGINT);
+            // Campos expandidos (apenas os que existem na tabela)
             statement.setString(paramIndex++, coleta.getClienteNome());
             statement.setString(paramIndex++, coleta.getClienteDoc());
             statement.setString(paramIndex++, coleta.getLocalColeta());
@@ -165,32 +148,20 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             statement.setString(paramIndex++, coleta.getCepColeta());
             statement.setObject(paramIndex++, coleta.getFilialId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getFilialNome());
-            statement.setString(paramIndex++, coleta.getFilialCnpj());
-            statement.setObject(paramIndex++, coleta.getUsuarioId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getUsuarioNome());
-            statement.setString(paramIndex++, coleta.getRequestHour());
-            statement.setString(paramIndex++, coleta.getServiceStartHour());
             setDateParameter(statement, paramIndex++, coleta.getFinishDate());
-            statement.setString(paramIndex++, coleta.getServiceEndHour());
-            statement.setString(paramIndex++, coleta.getRequester());
-            statement.setString(paramIndex++, coleta.getComments());
-            statement.setObject(paramIndex++, coleta.getAgentId(), Types.BIGINT);
             statement.setObject(paramIndex++, coleta.getManifestItemPickId(), Types.BIGINT);
             statement.setObject(paramIndex++, coleta.getVehicleTypeId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getCancellationReason());
             statement.setObject(paramIndex++, coleta.getCancellationUserId(), Types.BIGINT);
-            statement.setObject(paramIndex++, coleta.getCargoClassificationId(), Types.BIGINT);
-            statement.setObject(paramIndex++, coleta.getCostCenterId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getDestroyReason());
             statement.setObject(paramIndex++, coleta.getDestroyUserId(), Types.BIGINT);
-            setBigDecimalParameter(statement, paramIndex++, coleta.getInvoicesCubedWeight());
-            statement.setString(paramIndex++, coleta.getLunchBreakEndHour());
-            statement.setString(paramIndex++, coleta.getLunchBreakStartHour());
-            statement.setString(paramIndex++, coleta.getNotificationEmail());
-            statement.setString(paramIndex++, coleta.getNotificationPhone());
-            statement.setObject(paramIndex++, coleta.getPickTypeId(), Types.BIGINT);
-            statement.setObject(paramIndex++, coleta.getPickupLocationId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getStatusUpdatedAt());
+            setBigDecimalParameter(statement, paramIndex++, coleta.getTaxedWeight());
+            statement.setString(paramIndex++, coleta.getPickRegion());
+            statement.setString(paramIndex++, coleta.getLastOccurrence());
+            statement.setString(paramIndex++, coleta.getAcaoOcorrencia());
+            statement.setObject(paramIndex++, coleta.getNumeroTentativas(), Types.INTEGER);
             statement.setString(paramIndex++, coleta.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             

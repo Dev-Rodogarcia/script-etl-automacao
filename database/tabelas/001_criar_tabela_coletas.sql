@@ -19,7 +19,6 @@ BEGIN
         total_volumes INT,
 
         -- Campos Expandidos (22 campos do CSV)
-        cliente_id BIGINT,
         cliente_nome NVARCHAR(255),
         cliente_doc NVARCHAR(50),
         local_coleta NVARCHAR(500),
@@ -31,33 +30,21 @@ BEGIN
         cep_coleta NVARCHAR(20),
         filial_id BIGINT,
         filial_nome NVARCHAR(255),
-        filial_cnpj NVARCHAR(50),
-        usuario_id BIGINT,
         usuario_nome NVARCHAR(255),
-        request_hour NVARCHAR(20),
-        service_start_hour NVARCHAR(20),
         finish_date DATE,
-        service_end_hour NVARCHAR(20),
-        requester NVARCHAR(255),
-        comments NVARCHAR(MAX),
-        agent_id BIGINT,
         manifest_item_pick_id BIGINT,
         vehicle_type_id BIGINT,
 
         cancellation_reason NVARCHAR(MAX),
         cancellation_user_id BIGINT,
-        cargo_classification_id BIGINT,
-        cost_center_id BIGINT,
         destroy_reason NVARCHAR(MAX),
         destroy_user_id BIGINT,
-        invoices_cubed_weight DECIMAL(18, 3),
-        lunch_break_end_hour NVARCHAR(20),
-        lunch_break_start_hour NVARCHAR(20),
-        notification_email NVARCHAR(255),
-        notification_phone NVARCHAR(255),
-        pick_type_id BIGINT,
-        pickup_location_id BIGINT,
         status_updated_at NVARCHAR(50),
+        taxed_weight DECIMAL(18, 3), -- Peso Taxado (node.taxedWeight)
+        pick_region NVARCHAR(255), -- Região da Coleta (node.pickAddress.city.name + state.code)
+        last_occurrence NVARCHAR(50), -- Última Ocorrência (tradução do status)
+        acao_ocorrencia NVARCHAR(255), -- Ação da Ocorrência (lógica De-Para)
+        numero_tentativas INT, -- Nº Tentativas (lógica De-Para)
 
         -- Coluna de Metadados para Resiliência e Completude
         metadata NVARCHAR(MAX),

@@ -2,7 +2,7 @@
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server.
 
-**Versão:** 2.2 | **Última Atualização:** 12/01/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.2.1 | **Última Atualização:** 12/01/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -160,6 +160,12 @@ Para documentação detalhada, consulte:
 - **database/README.md** - Guia de scripts SQL
 
 ---
+
+## 🆕 Novidades 2.2.1 (12/01/2026)
+
+- ✅ **Sistema de Auditoria Corrigido**: Comparação histórica usando dados do log_extracoes
+- ✅ **Correção CONTAS_A_PAGAR**: Contagem usando issue_date (mesma lógica da API)
+- ✅ **Relatórios Melhorados**: Relatórios de auditoria mais detalhados e organizados
 
 ## 🆕 Novidades 2.2 (12/01/2026)
 

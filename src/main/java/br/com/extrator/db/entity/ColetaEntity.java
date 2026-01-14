@@ -63,6 +63,11 @@ public class ColetaEntity {
     private Long pickTypeId;
     private Long pickupLocationId;
     private String statusUpdatedAt;
+    private BigDecimal taxedWeight; // Peso Taxado (node.taxedWeight)
+    private String pickRegion; // Região da Coleta (node.pickAddress.city.name + state.code)
+    private String lastOccurrence; // Última Ocorrência (tradução do status)
+    private String acaoOcorrencia; // Ação da Ocorrência (lógica De-Para)
+    private Integer numeroTentativas; // Nº Tentativas (lógica De-Para)
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -447,5 +452,45 @@ public class ColetaEntity {
 
     public void setStatusUpdatedAt(final String statusUpdatedAt) {
         this.statusUpdatedAt = statusUpdatedAt;
+    }
+
+    public BigDecimal getTaxedWeight() {
+        return taxedWeight;
+    }
+
+    public void setTaxedWeight(final BigDecimal taxedWeight) {
+        this.taxedWeight = taxedWeight;
+    }
+
+    public String getPickRegion() {
+        return pickRegion;
+    }
+
+    public void setPickRegion(final String pickRegion) {
+        this.pickRegion = pickRegion;
+    }
+
+    public String getLastOccurrence() {
+        return lastOccurrence;
+    }
+
+    public void setLastOccurrence(final String lastOccurrence) {
+        this.lastOccurrence = lastOccurrence;
+    }
+
+    public String getAcaoOcorrencia() {
+        return acaoOcorrencia;
+    }
+
+    public void setAcaoOcorrencia(final String acaoOcorrencia) {
+        this.acaoOcorrencia = acaoOcorrencia;
+    }
+
+    public Integer getNumeroTentativas() {
+        return numeroTentativas;
+    }
+
+    public void setNumeroTentativas(final Integer numeroTentativas) {
+        this.numeroTentativas = numeroTentativas;
     }
 }

@@ -47,6 +47,12 @@ public class ColetaMapper {
         entity.setTotalValue(dto.getInvoicesValue());
         entity.setTotalWeight(dto.getInvoicesWeight());
         entity.setTotalVolumes(dto.getInvoicesVolumes());
+        entity.setTaxedWeight(dto.getTaxedWeight()); // Peso Taxado
+
+        // 1.0. Lógica De-Para para campos calculados
+        entity.setLastOccurrence(traduzirStatus(dto.getStatus()));
+        entity.setAcaoOcorrencia(calcularAcaoOcorrencia(dto.getStatus(), dto.getCancellationReason()));
+        entity.setNumeroTentativas(calcularNumeroTentativas(dto.getStatus()));
 
         // 1.1. Mapeamento dos campos expandidos (22 campos do CSV)
         if (dto.getCustomer() != null) {
@@ -65,6 +71,18 @@ public class ColetaMapper {
                 entity.setCidadeColeta(dto.getPickAddress().getCity().getName());
                 if (dto.getPickAddress().getCity().getState() != null) {
                     entity.setUfColeta(dto.getPickAddress().getCity().getState().getCode());
+                    // Região da Coleta: cidade + estado
+                    final String cidade = dto.getPickAddress().getCity().getName();
+                    final String estado = dto.getPickAddress().getCity().getState().getCode();
+                    if (cidade != null && estado != null) {
+                        entity.setPickRegion(cidade + " - " + estado);
+                    } else if (cidade != null) {
+                        entity.setPickRegion(cidade);
+                    } else if (estado != null) {
+                        entity.setPickRegion(estado);
+                    }
+                } else if (dto.getPickAddress().getCity().getName() != null) {
+                    entity.setPickRegion(dto.getPickAddress().getCity().getName());
                 }
             }
         }
@@ -201,5 +219,83 @@ public class ColetaMapper {
 
         // Retorna o valor original (curto) quando não se enquadra nos casos acima
         return v;
+    }
+
+    /**
+     * Traduz o status da API para português (Última Ocorrência).
+     * @param status Status da coleta (ex: "finished", "canceled", "pending")
+     * @return Status traduzido ou o status original se não houver tradução
+     */
+    private String traduzirStatus(final String status) {
+        if (status == null) {
+            return null;
+        }
+        final String statusLower = status.toLowerCase();
+        return switch (statusLower) {
+            case "finished" -> "Finalizado";
+            case "canceled" -> "Cancelado";
+            case "draft" -> "Rascunho";
+            case "pending" -> "Pendente";
+            case "done" -> "Coletada";
+            case "treatment" -> "Em tratativa";
+            case "in_transit" -> "Em trânsito";
+            case "manifested" -> "Manifestada";
+            default -> status; // Retorna o status original se não houver tradução
+        };
+    }
+
+    /**
+     * Calcula a Ação da Ocorrência baseado nas regras de negócio.
+     * Regras:
+     * - Se status == 'finished' -> "Coleta Realizada"
+     * - Se cancellationReason != null -> usa o cancellationReason
+     * - Senão -> "Pendente"
+     * 
+     * @param status Status da coleta
+     * @param cancellationReason Motivo de cancelamento (pode ser null)
+     * @return Ação da ocorrência calculada
+     */
+    private String calcularAcaoOcorrencia(final String status, final String cancellationReason) {
+        if (status == null) {
+            return "Pendente";
+        }
+        final String statusLower = status.toLowerCase();
+        
+        // Se status == 'finished' -> "Coleta Realizada"
+        if ("finished".equals(statusLower) || "done".equals(statusLower)) {
+            return "Coleta Realizada";
+        }
+        
+        // Se cancellationReason != null -> usa o cancellationReason
+        if (cancellationReason != null && !cancellationReason.trim().isEmpty()) {
+            return cancellationReason;
+        }
+        
+        // Senão -> "Pendente"
+        return "Pendente";
+    }
+
+    /**
+     * Calcula o Nº de Tentativas baseado no status.
+     * Regras:
+     * - Se status == 'finished' OU status == 'canceled' -> 1
+     * - Senão -> 0
+     * 
+     * @param status Status da coleta
+     * @return Número de tentativas (0 ou 1)
+     */
+    private Integer calcularNumeroTentativas(final String status) {
+        if (status == null) {
+            return 0;
+        }
+        final String statusLower = status.toLowerCase();
+        
+        // Se status == 'finished' OU status == 'canceled' -> 1
+        if ("finished".equals(statusLower) || "done".equals(statusLower) || "canceled".equals(statusLower)) {
+            return 1;
+        }
+        
+        // Senão -> 0
+        return 0;
     }
 }

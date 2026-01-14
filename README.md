@@ -28,7 +28,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução, sistema robusto de deduplicação e validação completa de integridade dos dados.
 
-**Versão:** 2.2 | **Última Atualização:** 12/01/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.0 | **Última Atualização:** 14/01/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -94,6 +94,29 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 
 ---
 
+## 🆕 Novidades 2.3 (14/01/2026)
+
+- ✅ **Sistema de Logging Aprimorado**:
+  - **Logs Detalhados**: Sistema de logging completamente reformulado com métricas detalhadas, estatísticas consolidadas e formatação visual aprimorada
+  - **ExtractionLogger Melhorado**: Logs de extração agora incluem tempo de execução, taxa de registros/segundo, páginas processadas e estatísticas de deduplicação
+  - **Resumos Consolidados**: Resumos gerais no final das extrações GraphQL e DataExport com estatísticas totais e detalhamento por entidade
+  - **LoggingService Aprimorado**: Logs de arquivo agora incluem cabeçalhos formatados, estatísticas detalhadas (tamanho, linhas) e rodapés informativos
+- ✅ **Validação de Tabelas Essenciais**:
+  - **Validação Automática**: Sistema agora valida existência de tabelas essenciais (`log_extracoes`, `page_audit`, `dim_usuarios`) antes de iniciar extrações
+  - **Mensagens Claras**: Erros informativos indicando exatamente quais tabelas faltam e como resolver
+  - **Fail-Fast**: Sistema interrompe imediatamente se tabelas essenciais não existirem, evitando falhas em cascata
+- ✅ **Proteção de Paginação Melhorada**:
+  - **Detecção Inteligente de Última Página**: Proteção de cursor repetido agora detecta páginas incompletas e trata como última página válida
+  - **Prevenção de Loops Infinitos**: Melhorada lógica para evitar interrupção prematura quando API retorna cursor repetido na última página
+- ✅ **View PowerBI Atualizada**:
+  - **JOIN com cancellation_user_id**: View `vw_coletas_powerbi` agora faz JOIN com `dim_usuarios` para ambos `cancellation_user_id` e `destroy_user_id`
+  - **Campos de Nome de Usuário**: Adicionados campos `[Usuario Cancel. Nome]` e `[Usuario Exclusao Nome]` na view
+- ✅ **Scripts de Diagnóstico**:
+  - **Script SQL de Diagnóstico**: Criado script para diagnosticar campos NULL em coletas (`027_diagnosticar_campos_null_coletas.sql`)
+  - **Análise de Erros**: Documentação completa de análise de erros com soluções propostas
+- ✅ **Correções de cSpell**:
+  - Adicionadas palavras em português: `diretorio`, `resetar`, `conteudo`, `retencao`, `operacao`
+
 ## 🆕 Novidades 2.2 (12/01/2026)
 
 - ✅ **Refatoração Completa dos Repositórios**:
@@ -105,6 +128,11 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **ContasAPagarRepository Refatorado**:
   - Agora estende `AbstractRepository` para consistência
   - Beneficia-se de batch commits, tratamento de erros individual e logging detalhado
+- ✅ **Sistema de Auditoria Corrigido**:
+  - **Comparação Histórica**: Auditoria agora compara dados do banco com `registros_extraidos` do `log_extracoes` (ao invés de buscar dados atuais da API)
+  - **Correção CONTAS_A_PAGAR**: Contagem agora usa `issue_date` ao invés de `data_extracao` (mesma lógica da API)
+  - **Janela Temporal**: Usa últimas 24 horas para comparação, garantindo precisão mesmo com pequenas diferenças de timestamp
+  - **Relatórios Melhorados**: Relatórios de auditoria mais detalhados e organizados, com informações completas sobre registros esperados vs encontrados
 - ✅ **Qualidade de Código**:
   - Logging padronizado em todos os repositórios
   - Validações de null consistentes
@@ -1351,7 +1379,7 @@ mvn clean package -DskipTests
 06-exportar_csv.bat
 
 # Executar auditoria
-04-executar_auditoria.bat
+06-relatorio-completo-validacao.bat
 ```
 
 #### Opção 2: Linha de Comando
@@ -1368,6 +1396,8 @@ java -jar target/extrator.jar --validar-manifestos
 
 # Executar auditoria
 java -jar target/extrator.jar --auditoria
+# Ou usar o script batch que gera relatório completo:
+# 06-relatorio-completo-validacao.bat
 
 # Ver ajuda
 java -jar target/extrator.jar --ajuda
@@ -1618,7 +1648,7 @@ script-automacao/
 ├── 02-testar_api_especifica.bat
 ├── 03-loop_extracao_30min.bat
 ├── 03-validar_config.bat
-├── 04-executar_auditoria.bat
+├── 06-relatorio-completo-validacao.bat
 ├── 05-compilar_projeto.bat
 ├── 06-exportar_csv.bat
 ├── 07-validar-manifestos.bat
@@ -1707,6 +1737,27 @@ script-automacao/
 ---
 
 ## 📝 Changelog
+
+### v2.3.0 (14/01/2026)
+- Sistema de logging completamente reformulado com métricas detalhadas e resumos consolidados
+- Validação automática de tabelas essenciais antes de iniciar extrações
+- Proteção de paginação melhorada com detecção inteligente de última página
+- View PowerBI atualizada com JOIN para cancellation_user_id
+- Scripts de diagnóstico para campos NULL em coletas
+- Correções de cSpell (palavras em português)
+
+### v2.2.1 (12/01/2026)
+
+- ✅ **Sistema de Auditoria Corrigido**:
+  - Comparação histórica: Auditoria agora compara dados do banco com `registros_extraidos` do `log_extracoes` (ao invés de buscar dados atuais da API)
+  - Isso garante que a auditoria reflete o estado real no momento da extração, mesmo que novos dados sejam adicionados à API depois
+- ✅ **Correção CONTAS_A_PAGAR**:
+  - Contagem na auditoria agora usa `issue_date` ao invés de `data_extracao` (mesma lógica da API)
+  - Garante contagem precisa dos registros de contas a pagar
+- ✅ **Relatórios de Auditoria Melhorados**:
+  - Relatórios mais detalhados e organizados
+  - Informações completas sobre registros esperados vs encontrados
+  - Melhor formatação e apresentação dos dados
 
 ### v2.2 (12/01/2026)
 
@@ -1849,6 +1900,6 @@ Este projeto é interno e proprietário. Todos os direitos reservados.
 
 ---
 
-**Última Atualização:** 09/01/2026  
-**Versão:** 2.1  
+**Última Atualização:** 14/01/2026  
+**Versão:** 2.3.0  
 **Status:** ✅ Estável e em Produção

@@ -191,6 +191,7 @@ if "%OPCAO_API%"=="2" (
         echo   1. coletas
         echo   2. fretes
         echo   3. faturas_graphql
+        echo   4. usuarios_sistema
         echo.
         set /p ENTIDADE_NUM="Digite o numero da entidade (0 = todas): "
         
@@ -202,6 +203,8 @@ if "%OPCAO_API%"=="2" (
             set "ENTIDADE_ESCOLHIDA=fretes"
         ) else if "!ENTIDADE_NUM!"=="3" (
             set "ENTIDADE_ESCOLHIDA=faturas_graphql"
+        ) else if "!ENTIDADE_NUM!"=="4" (
+            set "ENTIDADE_ESCOLHIDA=usuarios_sistema"
         ) else (
             echo ERRO: Numero invalido!
             pause

@@ -32,6 +32,7 @@ public class LocalizacaoCargaEntity {
     private String statusBranchNickname; // Filial do Status
     private String originLocationName; // Polo de Origem
     private String originBranchNickname; // Filial de Origem
+    private String fitFlnClnNickname; // Localização Atual (fit_fln_cln_nickname)
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -174,6 +175,14 @@ public class LocalizacaoCargaEntity {
 
     public void setOriginBranchNickname(final String originBranchNickname) {
         this.originBranchNickname = originBranchNickname;
+    }
+
+    public String getFitFlnClnNickname() {
+        return fitFlnClnNickname;
+    }
+
+    public void setFitFlnClnNickname(final String fitFlnClnNickname) {
+        this.fitFlnClnNickname = fitFlnClnNickname;
     }
 
     public String getMetadata() {

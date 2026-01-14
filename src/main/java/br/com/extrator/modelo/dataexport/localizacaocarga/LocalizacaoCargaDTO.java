@@ -74,9 +74,13 @@ public class LocalizacaoCargaDTO {
     @JsonProperty("fit_fln_status")
     private String status;
     
-    // 15. Filial do Status
-    @JsonProperty("fit_fln_cln_nickname")
+    // 15. Filial do Status (status_branch_nickname no banco)
+    // Nota: Este campo pode vir de outro campo JSON ou ser null
     private String statusBranchNickname;
+    
+    // 15.5. Localização Atual (fit_fln_cln_nickname no banco)
+    @JsonProperty("fit_fln_cln_nickname")
+    private String fitFlnClnNickname;
     
     // 16. Polo de Origem
     @JsonProperty("fit_o_n_name")
@@ -117,7 +121,8 @@ public class LocalizacaoCargaDTO {
         allProps.put("fit_dyn_drt_nickname", destinationBranchNickname);
         allProps.put("fit_fsn_name", classification);
         allProps.put("fit_fln_status", status);
-        allProps.put("fit_fln_cln_nickname", statusBranchNickname);
+        allProps.put("status_branch_nickname", statusBranchNickname);
+        allProps.put("fit_fln_cln_nickname", fitFlnClnNickname);
         allProps.put("fit_o_n_name", originLocationName);
         allProps.put("fit_o_n_drt_nickname", originBranchNickname);
         // Adiciona todos os outros campos capturados dinamicamente
@@ -263,6 +268,14 @@ public class LocalizacaoCargaDTO {
 
     public void setOriginBranchNickname(final String originBranchNickname) {
         this.originBranchNickname = originBranchNickname;
+    }
+
+    public String getFitFlnClnNickname() {
+        return fitFlnClnNickname;
+    }
+
+    public void setFitFlnClnNickname(final String fitFlnClnNickname) {
+        this.fitFlnClnNickname = fitFlnClnNickname;
     }
 
     @JsonAnyGetter

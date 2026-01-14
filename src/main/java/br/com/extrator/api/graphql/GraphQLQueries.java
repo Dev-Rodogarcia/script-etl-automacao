@@ -46,6 +46,7 @@ public final class GraphQLQueries {
                     }
                     invoicesValue
                     invoicesWeight
+                    taxedWeight
                     invoicesVolumes
                     user { id name }
                     comments
@@ -239,6 +240,54 @@ public final class GraphQLQueries {
             query CamposCreditCustomerBillingInput {
               __type(name: "CreditCustomerBillingInput") {
                 inputFields { name }
+              }
+            }""";
+    
+    /**
+     * Query de introspection para descobrir o tipo de destroyUserId e cancellationUserId em Pick
+     * IMPORTANTE: Usar para validar se são do tipo Individual antes de fazer JOIN
+     */
+    public static final String INTROSPECTION_PICK_FIELDS = """
+            query IntrospectPickFields {
+              __type(name: "Pick") {
+                fields {
+                  name
+                  type {
+                    name
+                    kind
+                    ofType {
+                      name
+                      kind
+                    }
+                  }
+                }
+              }
+            }""";
+    
+    /**
+     * Query para buscar Usuários do Sistema (Individual)
+     * Tipo GraphQL: Individual
+     * Filtro: enabled: true (obrigatório)
+     * Paginação: cursor-based (first: 100, after: $cursor)
+     * 
+     * ⚠️ ATENÇÃO: Esta query busca todos os usuários do tipo Individual.
+     * Validar se destroyUserId e cancellationUserId em Pick são do mesmo tipo Individual
+     * antes de fazer JOIN na view de coletas. Se forem de outro tipo (ex: User, Driver),
+     * o cruzamento retornará dados incorretos.
+     */
+    public static final String QUERY_USUARIOS_SISTEMA = """
+            query ExtrairUsuariosSistema($params: IndividualInput!, $cursor: String) {
+              individual(params: $params, first: 100, after: $cursor) {
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+                edges {
+                  node {
+                    id
+                    name
+                  }
+                }
               }
             }""";
 }

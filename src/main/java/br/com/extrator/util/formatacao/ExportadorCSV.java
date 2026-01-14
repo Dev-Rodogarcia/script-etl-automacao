@@ -20,7 +20,9 @@ import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Exportador de dados para CSV
- * Exporta todas as 8 entidades do banco para arquivos CSV
+ * Exporta todas as entidades do banco para arquivos CSV
+ * Inclui: Cotacoes, Coletas, Contas a Pagar, Faturas por Cliente, Faturas GraphQL,
+ *         Fretes, Manifestos, Localizacao de Cargas, dim_usuarios, page_audit
  */
 public class ExportadorCSV {
     // PROBLEMA #9 CORRIGIDO: Usar LoggerConsole para log duplo (arquivo + console)
@@ -35,7 +37,8 @@ public class ExportadorCSV {
         ConstantesEntidades.FRETES,
         ConstantesEntidades.MANIFESTOS,
         ConstantesEntidades.LOCALIZACAO_CARGAS,
-        "page_audit"  // Entidade especial de auditoria, não precisa de constante
+        "dim_usuarios",  // Tabela dimensão de usuários do sistema
+        "page_audit"     // Entidade especial de auditoria, não precisa de constante
     };
     
     private static final String PASTA_DESTINO = "exports";
@@ -136,6 +139,9 @@ public class ExportadorCSV {
         String origem;
         if (ConstantesViewsPowerBI.possuiView(entidade)) {
             origem = "dbo." + ConstantesViewsPowerBI.obterNomeView(entidade);
+        } else if ("dim_usuarios".equals(entidade)) {
+            // Usar view vw_dim_usuarios se disponível, senão usar tabela diretamente
+            origem = "dbo.vw_dim_usuarios";
         } else {
             // Para tabelas sem view, garantir esquema dbo.
             origem = entidade.contains(".") ? entidade : "dbo." + entidade;
@@ -174,17 +180,24 @@ public class ExportadorCSV {
             log.info("    🔄 Executando query: SELECT * FROM {}...", origem);
             
             final boolean usarViewPowerBI = !origem.equals(entidade) && !("dbo." + entidade).equals(origem);
+            final boolean usarViewDimUsuarios = "dbo.vw_dim_usuarios".equals(origem);
             String query = "SELECT * FROM " + origem;
             // Ordenação consistente
-            if (usarViewPowerBI) {
-                // Evitar problemas com nomes com espaços usando posição
-                query += " ORDER BY 1"; // ID
+            if (usarViewPowerBI || usarViewDimUsuarios) {
+                // Para views PowerBI ou views de dimensão, usar primeira coluna (ID)
+                if (usarViewDimUsuarios) {
+                    query += " ORDER BY [User ID]"; // View vw_dim_usuarios tem [User ID] como primeira coluna
+                } else {
+                    // Evitar problemas com nomes com espaços usando posição
+                    query += " ORDER BY 1"; // ID
+                }
             } else {
                 switch (entidade) {
                     case ConstantesEntidades.MANIFESTOS, ConstantesEntidades.COTACOES, ConstantesEntidades.CONTAS_A_PAGAR -> query += " ORDER BY sequence_code";
                     case ConstantesEntidades.LOCALIZACAO_CARGAS -> query += " ORDER BY sequence_number";
                     case ConstantesEntidades.COLETAS, ConstantesEntidades.FRETES -> query += " ORDER BY id";
                     case ConstantesEntidades.FATURAS_POR_CLIENTE -> query += " ORDER BY unique_id";
+                    case "dim_usuarios" -> query += " ORDER BY user_id";
                     case "page_audit" -> query += " ORDER BY id";
                     default -> query += " ORDER BY 1"; // Ordenar pela primeira coluna por padrão
                 }

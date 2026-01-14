@@ -1,0 +1,52 @@
+package br.com.extrator.runners.common;
+
+import java.util.List;
+
+/**
+ * Interface especializada para extractors do DataExport que precisam
+ * retornar informações sobre deduplicação (totalUnicos).
+ * 
+ * @param <T> Tipo do DTO retornado pela API
+ */
+public interface DataExportEntityExtractor<T> extends EntityExtractor<T> {
+    
+    /**
+     * Salva entidades no banco de dados e retorna informações sobre a operação.
+     * 
+     * @param dtos Lista de DTOs a serem salvos
+     * @return Resultado do save com informações de deduplicação
+     * @throws java.sql.SQLException Se houver erro ao salvar
+     */
+    SaveResult saveWithDeduplication(List<T> dtos) throws java.sql.SQLException;
+    
+    /**
+     * Resultado do save com informações de deduplicação.
+     */
+    class SaveResult {
+        private final int registrosSalvos;
+        private final int totalUnicos;
+        
+        public SaveResult(final int registrosSalvos, final int totalUnicos) {
+            this.registrosSalvos = registrosSalvos;
+            this.totalUnicos = totalUnicos;
+        }
+        
+        public int getRegistrosSalvos() {
+            return registrosSalvos;
+        }
+        
+        public int getTotalUnicos() {
+            return totalUnicos;
+        }
+    }
+    
+    /**
+     * Implementação padrão que delega para saveWithDeduplication().
+     * Extractors podem sobrescrever para fornecer informações mais precisas.
+     */
+    @Override
+    default int save(final List<T> dtos) throws java.sql.SQLException {
+        final SaveResult result = saveWithDeduplication(dtos);
+        return result.getRegistrosSalvos();
+    }
+}

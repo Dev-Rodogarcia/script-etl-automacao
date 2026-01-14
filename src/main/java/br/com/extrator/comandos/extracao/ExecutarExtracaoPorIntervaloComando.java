@@ -11,8 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import br.com.extrator.comandos.base.Comando;
-import br.com.extrator.runners.DataExportRunner;
-import br.com.extrator.runners.GraphQLRunner;
+import br.com.extrator.runners.dataexport.DataExportRunner;
+import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.servicos.ValidadorLimiteExtracao;
 import br.com.extrator.util.console.BannerUtil;
 import br.com.extrator.util.console.LoggerConsole;

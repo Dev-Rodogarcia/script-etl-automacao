@@ -95,12 +95,14 @@ if /i "%API%"=="graphql" (
     echo   1. Coletas
     echo   2. Fretes
     echo   3. Faturas GraphQL
+    echo   4. Usuarios do Sistema
     echo.
-    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2 ou 3): "
+    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2, 3 ou 4): "
     
     if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
     if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
     if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=faturas_graphql"
+    if "!OPCAO_ENTIDADE!"=="4" set "ENTIDADE=usuarios_sistema"
     
     if "!ENTIDADE!"=="" (
         echo.
@@ -155,9 +157,11 @@ if /i "%ENTIDADE%"=="coletas" goto :RUN
 if /i "%ENTIDADE%"=="fretes" goto :RUN
 if /i "%ENTIDADE%"=="faturas_graphql" goto :RUN
 if /i "%ENTIDADE%"=="faturas" goto :RUN
+if /i "%ENTIDADE%"=="usuarios_sistema" goto :RUN
+if /i "%ENTIDADE%"=="usuarios" goto :RUN
 echo ERRO: Entidade '%ENTIDADE%' invalida para API GraphQL!
 echo.
-echo Entidades suportadas: coletas, fretes, faturas_graphql, faturas
+echo Entidades suportadas: coletas, fretes, faturas_graphql, faturas, usuarios_sistema, usuarios
 echo.
 pause
 exit /b 1
@@ -194,26 +198,48 @@ if /i "%API%"=="graphql" (
   if /i "%ENTIDADE%"=="faturas_graphql" set "API_GRAPHQL_FATURAS_MAX_PAGINAS=20"
 )
 
-call "%~dp0mvn.bat" -q -DskipTests clean compile
+REM Compilar e gerar JAR antes de executar
+echo Compilando projeto (se necessario)...
+call "%~dp0mvn.bat" -q -DskipTests clean package
 if errorlevel 1 goto :COMPILE_FAIL
 
-if not exist "target\classes" goto :NOJAR
+if not exist "target\extrator.jar" (
+    echo ERRO: Arquivo target\extrator.jar nao encontrado apos compilacao!
+    echo.
+    pause
+    exit /b 1
+)
+
+REM Configurar JAVA_HOME automaticamente (Java 17+)
+if not defined JAVA_HOME (
+    REM Tenta encontrar JDK 17+ no Eclipse Adoptium
+    for /f "delims=" %%D in ('dir /b /ad "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul ^| sort /r') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :javahomefound
+    )
+    REM Se nao encontrar, tenta qualquer JDK 17+ no Adoptium
+    for /f "delims=" %%D in ('dir /b /ad "C:\Program Files\Eclipse Adoptium\jdk-*" 2^>nul ^| sort /r') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :javahomefound
+    )
+)
+:javahomefound
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        set "PATH=%JAVA_HOME%\bin;%PATH%"
+    ) else (
+        echo AVISO: JAVA_HOME configurado, mas java.exe nao encontrado
+    )
+)
 
 set "CMD_ARGS=--testar-api %API%"
 if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
-echo Executando: mvn exec:java -Dexec.mainClass=br.com.extrator.Main -Dexec.args="%CMD_ARGS%" 
+echo Executando: java -jar "target\extrator.jar" %CMD_ARGS%
 echo.
 
-call "%~dp0mvn.bat" -q -DskipTests exec:java -Dexec.mainClass=br.com.extrator.Main -Dexec.args="%CMD_ARGS%"
+java -jar "target\extrator.jar" %CMD_ARGS%
 if errorlevel 1 goto :FAIL
 goto :SUCCESS
-
-:NOJAR
-echo ERRO: Arquivo target\extrator.jar nao encontrado!
-echo Execute primeiro: mvn package -DskipTests -q
-echo.
-pause
-exit /b 1
 
 :SUCCESS
 echo.

@@ -66,6 +66,7 @@ public class LocalizacaoCargaMapper {
         entity.setClassification(dto.getClassification());
         entity.setStatus(dto.getStatus());
         entity.setStatusBranchNickname(dto.getStatusBranchNickname());
+        entity.setFitFlnClnNickname(dto.getFitFlnClnNickname());
         entity.setOriginLocationName(dto.getOriginLocationName());
         entity.setOriginBranchNickname(dto.getOriginBranchNickname());
 

@@ -15,12 +15,8 @@ WITH ClientesUnificados AS (
     FROM dbo.vw_fretes_powerbi
     WHERE [Pagador ID] IS NOT NULL
     
-    UNION ALL
-    
-    -- Clientes vindos de Coletas
-    SELECT [Cliente ID] AS [ID], [Cliente] AS [Nome], 'Coletas' AS Fonte
-    FROM dbo.vw_coletas_powerbi
-    WHERE [Cliente ID] IS NOT NULL
+    -- NOTA: Clientes de Coletas removidos pois cliente_id foi removido da tabela coletas
+    -- Se necessário adicionar novamente, será preciso restaurar o campo cliente_id na tabela
 )
 SELECT 
     [ID],

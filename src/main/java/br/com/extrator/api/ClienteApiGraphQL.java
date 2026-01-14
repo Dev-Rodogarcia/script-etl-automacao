@@ -206,9 +206,49 @@ public class ClienteApiGraphQL {
                 // Reset do contador de falhas em caso de sucesso
                 contadorFalhasConsecutivas.put(chaveEntidade, 0);
                 
+                // PROTEÇÃO 3: Detectar cursor repetido (loop infinito)
+                // Comparar o novo cursor retornado com o cursor que foi usado na requisição atual
+                // Se forem iguais E hasNextPage=true, significa que a API não avançou na paginação (loop)
+                // Se hasNextPage=false, mesmo com cursor repetido, é válido (última página)
+                // MELHORIA: Se a página retornou menos registros que o esperado, pode ser a última página
+                final String novoCursor = resposta.getEndCursor();
+                if (novoCursor != null && cursor != null && novoCursor.equals(cursor)) {
+                    if (resposta.getHasNextPage()) {
+                        // Verificar se a página retornou menos registros que o esperado
+                        final int registrosEsperados = perInt; // first: 100 (ou outro valor configurado)
+                        final int registrosRecebidos = resposta.getEntidades().size();
+                        
+                        if (registrosRecebidos < registrosEsperados) {
+                            // Página incompleta + cursor repetido = provavelmente última página
+                            logger.warn("⚠️ Entidade {}: Cursor repetido ({}) mas página incompleta ({} < {}). Tratando como última página válida.", 
+                                nomeEntidade, novoCursor, registrosRecebidos, registrosEsperados);
+                            // Não interromper - tratar como última página válida
+                            break;
+                        } else {
+                            // Página completa + cursor repetido + hasNextPage=true = loop infinito
+                            logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Cursor repetido detectado ({}). A API retornou o mesmo cursor que foi enviado E indicou hasNextPage=true. Interrompendo busca para evitar loop infinito.", 
+                                nomeEntidade, novoCursor);
+                            interrompido = true;
+                            break;
+                        }
+                    } else {
+                        // Cursor repetido + hasNextPage=false = última página (comportamento válido da API)
+                        logger.debug("Entidade {}: Cursor repetido ({}) mas hasNextPage=false. Tratando como última página válida.", 
+                                nomeEntidade, novoCursor);
+                    }
+                }
+                
+                // PROTEÇÃO 4: Detectar página vazia com hasNextPage = true (possível bug da API)
+                if (resposta.getEntidades().isEmpty() && resposta.getHasNextPage()) {
+                    logger.warn("🚨 PROTEÇÃO ATIVADA - Entidade {}: Página vazia com hasNextPage=true detectada. Interrompendo busca para evitar loop infinito.", 
+                            nomeEntidade);
+                    interrompido = true;
+                    break;
+                }
+                
                 // Atualizar informações de paginação
                 hasNextPage = resposta.getHasNextPage();
-                cursor = resposta.getEndCursor();
+                cursor = novoCursor;
                 
                 logger.debug("✅ Página {} processada: {} entidades encontradas. Próxima página: {} (Total: {})", 
                             paginaAtual, resposta.getEntidades().size(), hasNextPage, totalRegistrosProcessados);
@@ -346,6 +386,32 @@ public class ClienteApiGraphQL {
 
         return executarQueryPaginada(GraphQLQueries.QUERY_FRETES, 
             ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FRETES), variaveis, FreteNodeDTO.class);
+    }
+
+    /**
+     * Busca usuários do sistema (Individual) via GraphQL.
+     * Não utiliza filtro de data, apenas filtra por enabled: true.
+     * Utiliza paginação cursor-based para extrair todos os usuários ativos.
+     * 
+     * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
+     */
+    public ResultadoExtracao<br.com.extrator.modelo.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema() {
+        try {
+            final Map<String, Object> variaveis = new HashMap<>();
+            variaveis.put("params", Map.of("enabled", true));
+            
+            logger.info("Buscando Usuários do Sistema via GraphQL (enabled: true)");
+            return executarQueryPaginada(
+                GraphQLQueries.QUERY_USUARIOS_SISTEMA, 
+                ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.USUARIOS_SISTEMA), 
+                variaveis, 
+                br.com.extrator.modelo.graphql.usuarios.IndividualNodeDTO.class
+            );
+        } catch (final RuntimeException e) {
+            logger.warn("Falha ao buscar Usuários do Sistema: {}", e.getMessage());
+            final List<br.com.extrator.modelo.graphql.usuarios.IndividualNodeDTO> vazio = new ArrayList<>();
+            return ResultadoExtracao.completo(vazio, 0, 0);
+        }
     }
 
     /**

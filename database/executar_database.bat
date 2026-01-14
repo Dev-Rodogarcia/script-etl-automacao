@@ -89,8 +89,8 @@ echo.
 echo Executando scripts de criacao de tabelas...
 echo.
 
-REM Executa scripts de tabelas (001-010) na pasta tabelas/
-for %%f in (tabelas\001_*.sql tabelas\002_*.sql tabelas\003_*.sql tabelas\004_*.sql tabelas\005_*.sql tabelas\006_*.sql tabelas\007_*.sql tabelas\008_*.sql tabelas\009_*.sql tabelas\010_*.sql) do (
+REM Executa scripts de tabelas (001-011) na pasta tabelas/
+for %%f in (tabelas\001_*.sql tabelas\002_*.sql tabelas\003_*.sql tabelas\004_*.sql tabelas\005_*.sql tabelas\006_*.sql tabelas\007_*.sql tabelas\008_*.sql tabelas\009_*.sql tabelas\010_*.sql tabelas\011_*.sql) do (
     echo Executando: %%f
     if %USE_WINDOWS_AUTH%==1 (
         sqlcmd -S %SERVER% -d %DATABASE% -E -i "%%f" -b
@@ -131,8 +131,8 @@ echo.
 echo Executando scripts de criacao de views de dimensoes...
 echo.
 
-REM Executa scripts de views de dimensões (019-023) na pasta views-dimensao/
-for %%f in (views-dimensao\019_*.sql views-dimensao\020_*.sql views-dimensao\021_*.sql views-dimensao\022_*.sql views-dimensao\023_*.sql) do (
+REM Executa scripts de views de dimensões (019-023, 027) na pasta views-dimensao/
+for %%f in (views-dimensao\019_*.sql views-dimensao\020_*.sql views-dimensao\021_*.sql views-dimensao\022_*.sql views-dimensao\023_*.sql views-dimensao\027_*.sql) do (
     echo Executando: %%f
     if %USE_WINDOWS_AUTH%==1 (
         sqlcmd -S %SERVER% -d %DATABASE% -E -i "%%f" -b
@@ -149,10 +149,10 @@ for %%f in (views-dimensao\019_*.sql views-dimensao\020_*.sql views-dimensao\021
 )
 
 echo.
-echo Executando script de validacao de views de dimensao...
+echo Executando scripts de validacao...
 echo.
 
-REM Executa script de validação (025)
+REM Executa script de validação de views de dimensão (025)
 set VALIDACAO_SCRIPT=validacao\025_validar_views_dimensao.sql
 if exist "%VALIDACAO_SCRIPT%" (
     echo Executando: %VALIDACAO_SCRIPT%
@@ -164,6 +164,25 @@ if exist "%VALIDACAO_SCRIPT%" (
     if errorlevel 1 (
         echo.
         echo AVISO: Erro ao executar %VALIDACAO_SCRIPT% (pode ser ignorado se views ainda estao vazias)
+        echo.
+    ) else (
+        echo OK: %VALIDACAO_SCRIPT%
+        echo.
+    )
+)
+
+REM Executa script de validação de tipo destroy_user_id (026)
+set VALIDACAO_SCRIPT=validacao\026_validar_tipo_destroy_user_id.sql
+if exist "%VALIDACAO_SCRIPT%" (
+    echo Executando: %VALIDACAO_SCRIPT%
+    if %USE_WINDOWS_AUTH%==1 (
+        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%VALIDACAO_SCRIPT%" -b
+    ) else (
+        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%VALIDACAO_SCRIPT%" -b
+    )
+    if errorlevel 1 (
+        echo.
+        echo AVISO: Erro ao executar %VALIDACAO_SCRIPT% (pode ser ignorado se tabelas ainda estao vazias)
         echo.
     ) else (
         echo OK: %VALIDACAO_SCRIPT%
@@ -200,10 +219,10 @@ echo Todas as scripts de database foram executados!
 echo ============================================
 echo.
 echo RESUMO:
-echo   - Tabelas: Criadas (001-010)
+echo   - Tabelas: Criadas (001-011)
 echo   - Views Power BI: Criadas (011-018)
-echo   - Views Dimensao: Criadas (019-023)
-echo   - Validacao: Executada (025)
+echo   - Views Dimensao: Criadas (019-023, 027)
+echo   - Validacao: Executada (025, 026)
 echo   - Seguranca: Executado (024)
 echo.
 echo NOTA: O script de seguranca (024) configura permissoes para o usuario do config.bat.

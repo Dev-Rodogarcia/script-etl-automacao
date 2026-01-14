@@ -81,6 +81,15 @@ public final class ConstantesApiGraphQL {
             GraphQLQueries.QUERY_FATURAS,   // query
             "creditCustomerBilling",        // nomeEntidadeApi
             false                           // suportaIntervalo (NÃO suporta)
+        ),
+
+        // USUARIOS_SISTEMA - Individual
+        ConstantesEntidades.USUARIOS_SISTEMA,
+        new ConfiguracaoGraphQL(
+            null,                           // campoFiltro (não usa filtro de data, usa enabled: true)
+            GraphQLQueries.QUERY_USUARIOS_SISTEMA, // query
+            "individual",                    // nomeEntidadeApi
+            false                           // suportaIntervalo (NÃO suporta)
         )
     );
 
