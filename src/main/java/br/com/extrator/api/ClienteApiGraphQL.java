@@ -29,6 +29,8 @@ import br.com.extrator.api.graphql.GraphQLQueries;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 import br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
+import br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO;
+import br.com.extrator.modelo.graphql.bancos.BankAccountNodeDTO;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.http.GerenciadorRequisicaoHttp;
 import br.com.extrator.util.formatacao.FormatadorData;
@@ -749,6 +751,76 @@ public class ClienteApiGraphQL {
     }
 
     /**
+     * Busca dados de enriquecimento de uma fatura específica via GraphQL.
+     * Executa a query EnriquecerFaturas para obter N° NFS-e, Carteira e Instrução Customizada.
+     * 
+     * @param billingId ID da cobrança (creditCustomerBilling)
+     * @return Optional com CreditCustomerBillingNodeDTO contendo os dados enriquecidos, ou empty se não encontrado
+     */
+    public java.util.Optional<CreditCustomerBillingNodeDTO> enriquecerFatura(final String billingId) {
+        if (billingId == null || billingId.isBlank()) {
+            logger.warn("⚠️ Tentativa de enriquecer fatura com ID nulo ou vazio");
+            return java.util.Optional.empty();
+        }
+        
+        try {
+            final Map<String, Object> variaveis = Map.of("id", billingId);
+            final PaginatedGraphQLResponse<CreditCustomerBillingNodeDTO> resposta = 
+                executarQueryGraphQLTipado(
+                    GraphQLQueries.QUERY_ENRIQUECER_FATURAS,
+                    "creditCustomerBilling",
+                    variaveis,
+                    CreditCustomerBillingNodeDTO.class
+                );
+            
+            if (resposta.getEntidades() != null && !resposta.getEntidades().isEmpty()) {
+                return java.util.Optional.of(resposta.getEntidades().get(0));
+            }
+            
+            return java.util.Optional.empty();
+        } catch (final Exception e) {
+            logger.error("❌ Erro ao enriquecer fatura com ID {}: {}", billingId, e.getMessage(), e);
+            return java.util.Optional.empty();
+        }
+    }
+    
+    /**
+     * Enriquece fatura usando o número do documento (fallback quando billingId não está disponível).
+     * Usa fit_ant_document do DataExport para buscar a cobrança no GraphQL.
+     * 
+     * @param document Número do documento da fatura (ex: "112025/1-3")
+     * @return Optional com os dados de enriquecimento ou empty se não encontrado
+     */
+    public java.util.Optional<CreditCustomerBillingNodeDTO> enriquecerFaturaPorDocumento(final String document) {
+        if (document == null || document.isBlank()) {
+            logger.warn("⚠️ Tentativa de enriquecer fatura com documento nulo ou vazio");
+            return java.util.Optional.empty();
+        }
+        
+        try {
+            final Map<String, Object> variaveis = Map.of("document", document);
+            final PaginatedGraphQLResponse<CreditCustomerBillingNodeDTO> resposta = 
+                executarQueryGraphQLTipado(
+                    GraphQLQueries.QUERY_ENRIQUECER_FATURAS_POR_DOCUMENTO,
+                    "creditCustomerBilling",
+                    variaveis,
+                    CreditCustomerBillingNodeDTO.class
+                );
+            
+            if (resposta.getEntidades() != null && !resposta.getEntidades().isEmpty()) {
+                logger.debug("✅ Fatura encontrada via documento: {}", document);
+                return java.util.Optional.of(resposta.getEntidades().get(0));
+            }
+            
+            logger.debug("⚠️ Fatura não encontrada via documento: {}", document);
+            return java.util.Optional.empty();
+        } catch (final Exception e) {
+            logger.error("❌ Erro ao enriquecer fatura por documento {}: {}", document, e.getMessage(), e);
+            return java.util.Optional.empty();
+        }
+    }
+    
+    /**
      * Formatar LocalDate para o formato esperado pela API GraphQL (YYYY-MM-DD).
      * 
      * @param data A data a ser formatada
@@ -774,6 +846,74 @@ public class ClienteApiGraphQL {
                     chaveEntidade, nomeEntidade, falhas);
         } else {
             logger.warn("⚠️ Falha {}/{} para entidade {} ({})", falhas, MAX_FALHAS_CONSECUTIVAS, chaveEntidade, nomeEntidade);
+        }
+    }
+    
+    /**
+     * Busca dados de enriquecimento de uma cobrança específica via GraphQL.
+     * Retorna ticketAccountId, NFS-e e método de pagamento da primeira parcela.
+     * 
+     * @param billingId ID da cobrança (creditCustomerBilling)
+     * @return Optional com CreditCustomerBillingNodeDTO contendo os dados enriquecidos, ou empty se não encontrado
+     */
+    public java.util.Optional<CreditCustomerBillingNodeDTO> buscarDadosCobranca(final Long billingId) {
+        if (billingId == null) {
+            logger.warn("⚠️ Tentativa de buscar dados de cobrança com ID nulo");
+            return java.util.Optional.empty();
+        }
+        
+        try {
+            final Map<String, Object> variaveis = Map.of("id", billingId.toString());
+            final PaginatedGraphQLResponse<CreditCustomerBillingNodeDTO> resposta = 
+                executarQueryGraphQLTipado(
+                    GraphQLQueries.QUERY_ENRIQUECER_COBRANCA_NFSE,
+                    "creditCustomerBilling",
+                    variaveis,
+                    CreditCustomerBillingNodeDTO.class
+                );
+            
+            if (resposta.getEntidades() != null && !resposta.getEntidades().isEmpty()) {
+                return java.util.Optional.of(resposta.getEntidades().get(0));
+            }
+            
+            return java.util.Optional.empty();
+        } catch (final Exception e) {
+            logger.error("❌ Erro ao buscar dados de cobrança com ID {}: {}", billingId, e.getMessage(), e);
+            return java.util.Optional.empty();
+        }
+    }
+    
+    /**
+     * Busca detalhes de uma conta bancária via GraphQL.
+     * Usado para resolver dados do banco via ticketAccountId (cache otimizado).
+     * 
+     * @param bankAccountId ID da conta bancária (ticketAccountId)
+     * @return Optional com BankAccountNodeDTO contendo os detalhes do banco, ou empty se não encontrado
+     */
+    public java.util.Optional<BankAccountNodeDTO> buscarDetalhesBanco(final Integer bankAccountId) {
+        if (bankAccountId == null) {
+            logger.warn("⚠️ Tentativa de buscar detalhes de banco com ID nulo");
+            return java.util.Optional.empty();
+        }
+        
+        try {
+            final Map<String, Object> variaveis = Map.of("id", bankAccountId);
+            final PaginatedGraphQLResponse<BankAccountNodeDTO> resposta = 
+                executarQueryGraphQLTipado(
+                    GraphQLQueries.QUERY_RESOLVER_CONTA_BANCARIA,
+                    "bankAccount",
+                    variaveis,
+                    BankAccountNodeDTO.class
+                );
+            
+            if (resposta.getEntidades() != null && !resposta.getEntidades().isEmpty()) {
+                return java.util.Optional.of(resposta.getEntidades().get(0));
+            }
+            
+            return java.util.Optional.empty();
+        } catch (final Exception e) {
+            logger.error("❌ Erro ao buscar detalhes de banco com ID {}: {}", bankAccountId, e.getMessage(), e);
+            return java.util.Optional.empty();
         }
     }
 }

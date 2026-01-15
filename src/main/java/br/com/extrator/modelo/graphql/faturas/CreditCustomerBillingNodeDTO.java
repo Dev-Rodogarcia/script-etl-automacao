@@ -50,6 +50,9 @@ public class CreditCustomerBillingNodeDTO {
 
     @JsonProperty("competenceYear")
     private Integer competenceYear;
+    
+    @JsonProperty("ticketAccountId")
+    private Integer ticketAccountId;
 
     public static class CustomerDTO {
         @JsonProperty("id")
@@ -143,6 +146,15 @@ public class CreditCustomerBillingNodeDTO {
         @JsonProperty("status")
         private String status;
         
+        @JsonProperty("paymentMethod")
+        private String paymentMethod;
+        
+        @JsonProperty("accountingCredit")
+        private AccountingCreditDTO accountingCredit;
+        
+        @JsonProperty("accountingBankAccount")
+        private AccountingBankAccountDTO accountingBankAccount;
+        
         public Long getId() { return id; }
         public void setId(final Long id) { this.id = id; }
         public Integer getPosition() { return position; }
@@ -159,6 +171,46 @@ public class CreditCustomerBillingNodeDTO {
         public void setOriginalDueDate(final String originalDueDate) { this.originalDueDate = originalDueDate; }
         public String getStatus() { return status; }
         public void setStatus(final String status) { this.status = status; }
+        public String getPaymentMethod() { return paymentMethod; }
+        public void setPaymentMethod(final String paymentMethod) { this.paymentMethod = paymentMethod; }
+        public AccountingCreditDTO getAccountingCredit() { return accountingCredit; }
+        public void setAccountingCredit(final AccountingCreditDTO accountingCredit) { this.accountingCredit = accountingCredit; }
+        public AccountingBankAccountDTO getAccountingBankAccount() { return accountingBankAccount; }
+        public void setAccountingBankAccount(final AccountingBankAccountDTO accountingBankAccount) { this.accountingBankAccount = accountingBankAccount; }
+    }
+    
+    /**
+     * DTO para AccountingCredit (dados fiscais da parcela).
+     * Contém o número da NFS-e (document).
+     */
+    public static class AccountingCreditDTO {
+        @JsonProperty("document")
+        private String document;
+        
+        public String getDocument() { return document; }
+        public void setDocument(final String document) { this.document = document; }
+    }
+    
+    /**
+     * DTO para AccountingBankAccount (dados bancários da parcela).
+     * Contém carteira (portfolioVariation) e instrução customizada (customInstruction).
+     */
+    public static class AccountingBankAccountDTO {
+        @JsonProperty("bankName")
+        private String bankName;
+        
+        @JsonProperty("portfolioVariation")
+        private String portfolioVariation;
+        
+        @JsonProperty("customInstruction")
+        private String customInstruction;
+        
+        public String getBankName() { return bankName; }
+        public void setBankName(final String bankName) { this.bankName = bankName; }
+        public String getPortfolioVariation() { return portfolioVariation; }
+        public void setPortfolioVariation(final String portfolioVariation) { this.portfolioVariation = portfolioVariation; }
+        public String getCustomInstruction() { return customInstruction; }
+        public void setCustomInstruction(final String customInstruction) { this.customInstruction = customInstruction; }
     }
 
     @JsonProperty("customer")
@@ -215,6 +267,9 @@ public class CreditCustomerBillingNodeDTO {
     
     public Integer getCompetenceYear() { return competenceYear; }
     public void setCompetenceYear(final Integer competenceYear) { this.competenceYear = competenceYear; }
+    
+    public Integer getTicketAccountId() { return ticketAccountId; }
+    public void setTicketAccountId(final Integer ticketAccountId) { this.ticketAccountId = ticketAccountId; }
     
     public CustomerDTO getCustomer() { return customer; }
     public void setCustomer(final CustomerDTO customer) { this.customer = customer; }

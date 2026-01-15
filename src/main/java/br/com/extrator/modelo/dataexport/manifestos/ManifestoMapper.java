@@ -169,6 +169,16 @@ public class ManifestoMapper {
         entity.setTrailer2WeightCapacity(converterParaBigDecimal(dto.getTrailer2WeightCapacity(), "mft_tl2_weight_capacity", dto.getSequenceCode()));
         entity.setVehicleWeightCapacity(converterParaBigDecimal(dto.getVehicleWeightCapacity(), "mft_vie_weight_capacity", dto.getSequenceCode()));
         entity.setVehicleCubicWeight(converterParaBigDecimal(dto.getVehicleCubicWeight(), "mft_vie_cubic_weight", dto.getSequenceCode()));
+        
+        // Novos campos de veículo e comentários
+        // capacidade_kg: usar vehicleWeightCapacity (mesmo campo JSON "mft_vie_weight_capacity")
+        entity.setCapacidadeKg(converterParaBigDecimal(dto.getVehicleWeightCapacity(), "capacidade_kg", dto.getSequenceCode()));
+        
+        // obs_operacional: comentários operacionais (liberação)
+        entity.setObsOperacional(dto.getObsOperacional());
+        
+        // obs_financeira: comentários financeiros (fechamento)
+        entity.setObsFinanceira(dto.getObsFinanceira());
 
         // 3. Empacotamento de todos os metadados
         try {

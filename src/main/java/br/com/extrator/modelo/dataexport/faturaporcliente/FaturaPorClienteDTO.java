@@ -108,6 +108,10 @@ public class FaturaPorClienteDTO {
     @JsonProperty("fit_fte_invoices_order_number")
     private List<String> pedidosCliente;
 
+    // Campo para armazenar ID da cobrança (creditCustomerBilling) - pode estar no metadata
+    // Usado para enriquecimento via GraphQL
+    private String billingId;
+
     private final Map<String, Object> otherProperties = new LinkedHashMap<>();
 
     // Getters e Setters
@@ -325,6 +329,14 @@ public class FaturaPorClienteDTO {
 
     public void setPedidosCliente(final List<String> pedidosCliente) {
         this.pedidosCliente = pedidosCliente;
+    }
+
+    public String getBillingId() {
+        return billingId;
+    }
+
+    public void setBillingId(final String billingId) {
+        this.billingId = billingId;
     }
 
     @JsonAnySetter

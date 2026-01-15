@@ -122,6 +122,11 @@ public class ManifestoEntity {
     private String deliveryRegionNames;
     private String programacaoCliente;
     private String programacaoTipoServico;
+    
+    // Novos campos de veículo e comentários (descobertos via CTE)
+    private BigDecimal capacidadeKg; // vehicle.weightCapacity (capacidade em kg)
+    private String obsOperacional; // operationalComments (comentários de liberação)
+    private String obsFinanceira; // closingComments (comentários financeiros)
 
     // --- Coluna de Metadados ---
     private String metadata;
@@ -859,6 +864,30 @@ public class ManifestoEntity {
 
     public void setProgramacaoTipoServico(final String programacaoTipoServico) {
         this.programacaoTipoServico = programacaoTipoServico;
+    }
+
+    public BigDecimal getCapacidadeKg() {
+        return capacidadeKg;
+    }
+
+    public void setCapacidadeKg(final BigDecimal capacidadeKg) {
+        this.capacidadeKg = capacidadeKg;
+    }
+
+    public String getObsOperacional() {
+        return obsOperacional;
+    }
+
+    public void setObsOperacional(final String obsOperacional) {
+        this.obsOperacional = obsOperacional;
+    }
+
+    public String getObsFinanceira() {
+        return obsFinanceira;
+    }
+
+    public void setObsFinanceira(final String obsFinanceira) {
+        this.obsFinanceira = obsFinanceira;
     }
 
     /**

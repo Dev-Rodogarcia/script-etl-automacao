@@ -262,6 +262,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                         pick_subtotal = ?, delivery_subtotal = ?, dispatch_subtotal = ?, consolidation_subtotal = ?, reverse_pick_subtotal = ?, advance_subtotal = ?, fleet_costs_subtotal = ?, additionals_subtotal = ?, discounts_subtotal = ?, discount_value = ?, \
                         adjustment_comments = ?, contract_status = ?, iks_id = ?, programacao_sequence_code = ?, programacao_starting_at = ?, programacao_ending_at = ?, \
                         trailer1_license_plate = ?, trailer1_weight_capacity = ?, trailer2_license_plate = ?, trailer2_weight_capacity = ?, vehicle_weight_capacity = ?, vehicle_cubic_weight = ?, \
+                        capacidade_kg = ?, obs_operacional = ?, obs_financeira = ?, \
                         unloading_recipient_names = ?, delivery_region_names = ?, programacao_cliente = ?, programacao_tipo_servico = ? \
                         WHERE sequence_code = ? AND COALESCE(pick_sequence_code, -1) = COALESCE(?, -1) AND COALESCE(mdfe_number, -1) = COALESCE(?, -1)""",
                     NOME_TABELA);
@@ -304,6 +305,9 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     setBigDecimalParameter(upd, i++, manifesto.getTrailer2WeightCapacity());
                     setBigDecimalParameter(upd, i++, manifesto.getVehicleWeightCapacity());
                     setBigDecimalParameter(upd, i++, manifesto.getVehicleCubicWeight());
+                    setBigDecimalParameter(upd, i++, manifesto.getCapacidadeKg());
+                    upd.setString(i++, truncate(manifesto.getObsOperacional(), 4000, "obs_operacional"));
+                    upd.setString(i++, truncate(manifesto.getObsFinanceira(), 4000, "obs_financeira"));
                     upd.setString(i++, manifesto.getUnloadingRecipientNames());
                     upd.setString(i++, manifesto.getDeliveryRegionNames());
                     upd.setString(i++, truncate(manifesto.getProgramacaoCliente(), 255, "programacao_cliente"));

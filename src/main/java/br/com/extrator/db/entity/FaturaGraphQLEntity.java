@@ -30,6 +30,13 @@ public class FaturaGraphQLEntity {
     private String corporationName;
     private String corporationCnpj;
     
+    // Campos enriquecidos da primeira parcela (installments[0])
+    private String nfseNumero;           // N° NFS-e (accountingCredit.document)
+    private String carteiraBanco;         // Carteira/Descrição (accountingBankAccount.portfolioVariation)
+    private String instrucaoBoleto;      // Instrução Customizada (accountingBankAccount.customInstruction)
+    private String bancoNome;            // Nome do Banco (via bankAccount.bankName)
+    private String metodoPagamento;      // Método de Pagamento (installments[0].paymentMethod)
+    
     // Metadata (JSON completo)
     private String metadata;
 
@@ -99,6 +106,21 @@ public class FaturaGraphQLEntity {
     
     public String getCorporationCnpj() { return corporationCnpj; }
     public void setCorporationCnpj(final String corporationCnpj) { this.corporationCnpj = corporationCnpj; }
+    
+    public String getNfseNumero() { return nfseNumero; }
+    public void setNfseNumero(final String nfseNumero) { this.nfseNumero = nfseNumero; }
+    
+    public String getCarteiraBanco() { return carteiraBanco; }
+    public void setCarteiraBanco(final String carteiraBanco) { this.carteiraBanco = carteiraBanco; }
+    
+    public String getInstrucaoBoleto() { return instrucaoBoleto; }
+    public void setInstrucaoBoleto(final String instrucaoBoleto) { this.instrucaoBoleto = instrucaoBoleto; }
+    
+    public String getBancoNome() { return bancoNome; }
+    public void setBancoNome(final String bancoNome) { this.bancoNome = bancoNome; }
+    
+    public String getMetodoPagamento() { return metodoPagamento; }
+    public void setMetodoPagamento(final String metodoPagamento) { this.metodoPagamento = metodoPagamento; }
     
     public String getMetadata() { return metadata; }
     public void setMetadata(final String metadata) { this.metadata = metadata; }

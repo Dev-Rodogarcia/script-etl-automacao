@@ -176,6 +176,7 @@ public final class GraphQLQueries {
                     sequenceCode
                     competenceMonth
                     competenceYear
+                    ticketAccountId
                     customer {
                       id
                       nickname
@@ -194,6 +195,15 @@ public final class GraphQLQueries {
                       dueDate
                       originalDueDate
                       status
+                      paymentMethod
+                      accountingCredit {
+                        document
+                      }
+                      accountingBankAccount {
+                        bankName
+                        portfolioVariation
+                        customInstruction
+                      }
                     }
                   }
                 }
@@ -286,6 +296,124 @@ public final class GraphQLQueries {
                   node {
                     id
                     name
+                  }
+                }
+              }
+            }""";
+    
+    /**
+     * Query para enriquecer Faturas por Cliente com dados financeiros.
+     * Busca N° NFS-e, Carteira e Instrução Customizada via creditCustomerBilling.
+     * 
+     * Tipo GraphQL: CreditCustomerBilling
+     * Parâmetro: id (ID da cobrança)
+     * 
+     * Campos extraídos:
+     * - nfse_numero: accountingCredit.document (da primeira parcela)
+     * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
+     * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
+     */
+    public static final String QUERY_ENRIQUECER_FATURAS = """
+            query EnriquecerFaturas($id: ID!) {
+              creditCustomerBilling(params: { id: $id }) {
+                edges {
+                  node {
+                    id
+                    installments {
+                      accountingCredit {
+                        document
+                      }
+                      accountingBankAccount {
+                        bankName
+                        portfolioVariation
+                        customInstruction
+                      }
+                    }
+                  }
+                }
+              }
+            }""";
+    
+    /**
+     * Query para enriquecer faturas por número do documento (fallback quando billingId não está disponível).
+     * Parâmetro: document (número do documento da fatura, ex: "112025/1-3")
+     * 
+     * Campos extraídos:
+     * - nfse_numero: accountingCredit.document (da primeira parcela)
+     * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
+     * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
+     */
+    public static final String QUERY_ENRIQUECER_FATURAS_POR_DOCUMENTO = """
+            query EnriquecerFaturasPorDocumento($document: String!) {
+              creditCustomerBilling(params: { document: $document }, first: 1) {
+                edges {
+                  node {
+                    id
+                    installments {
+                      accountingCredit {
+                        document
+                      }
+                      accountingBankAccount {
+                        bankName
+                        portfolioVariation
+                        customInstruction
+                      }
+                    }
+                  }
+                }
+              }
+            }""";
+    
+    /**
+     * Query para enriquecer cobrança individual com NFS-e e ID do banco.
+     * Usada dentro do loop de enriquecimento para cada fatura.
+     * 
+     * Parâmetro: id (ID da cobrança - creditCustomerBilling)
+     * 
+     * Campos extraídos:
+     * - ticketAccountId: ID para buscar detalhes do banco depois
+     * - nfse_numero: accountingCredit.document (da primeira parcela)
+     * - metodo_pagamento: installments[0].paymentMethod
+     */
+    public static final String QUERY_ENRIQUECER_COBRANCA_NFSE = """
+            query EnriquecerCobranca_Nfse($id: ID!) {
+              creditCustomerBilling(params: { id: $id }) {
+                edges {
+                  node {
+                    id
+                    ticketAccountId
+                    installments {
+                      id
+                      paymentMethod
+                      accountingCredit {
+                        document
+                      }
+                    }
+                  }
+                }
+              }
+            }""";
+    
+    /**
+     * Query para resolver detalhes de conta bancária via ID.
+     * Usada para buscar dados do banco de forma otimizada (cache).
+     * 
+     * Parâmetro: id (ID da conta bancária - ticketAccountId)
+     * 
+     * Campos extraídos:
+     * - bankName: Nome do banco
+     * - portfolioVariation: Carteira/Descrição (pode vir vazio se não cadastrado)
+     * - customInstruction: Instrução customizada (pode vir vazio se não cadastrado)
+     */
+    public static final String QUERY_RESOLVER_CONTA_BANCARIA = """
+            query ResolverContaBancaria($id: Int!) {
+              bankAccount(params: { id: $id }) {
+                edges {
+                  node {
+                    id
+                    bankName
+                    portfolioVariation
+                    customInstruction
                   }
                 }
               }

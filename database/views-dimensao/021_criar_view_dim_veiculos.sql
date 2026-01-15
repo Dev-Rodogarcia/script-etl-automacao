@@ -11,7 +11,7 @@
 CREATE OR ALTER VIEW dbo.vw_dim_veiculos AS
 SELECT 
     UPPER(LTRIM(RTRIM([Veículo/Placa]))) AS Placa,
-    MAX(UPPER(LTRIM(RTRIM([Tipo Veículo/Nome])))) AS TipoVeiculo,
+    MAX(UPPER(LTRIM(RTRIM([Tipo Veículo])))) AS TipoVeiculo,
     MAX(UPPER(LTRIM(RTRIM([Proprietário/Nome])))) AS Proprietario
 FROM dbo.vw_manifestos_powerbi
 WHERE [Veículo/Placa] IS NOT NULL AND LTRIM(RTRIM([Veículo/Placa])) <> ''

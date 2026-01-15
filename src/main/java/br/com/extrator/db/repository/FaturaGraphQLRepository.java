@@ -41,8 +41,8 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
         }
         final String sql = """
             MERGE dbo.faturas_graphql AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source
-                  (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, metadata, data_extracao)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source
+                  (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, nfse_numero, carteira_banco, instrucao_boleto, banco_nome, metodo_pagamento, metadata, data_extracao)
             ON target.id = source.id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -67,11 +67,16 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
                     corporation_id = source.corporation_id,
                     corporation_name = source.corporation_name,
                     corporation_cnpj = source.corporation_cnpj,
+                    nfse_numero = source.nfse_numero,
+                    carteira_banco = source.carteira_banco,
+                    instrucao_boleto = source.instrucao_boleto,
+                    banco_nome = source.banco_nome,
+                    metodo_pagamento = source.metodo_pagamento,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, metadata, data_extracao)
-                VALUES (source.id, source.document, source.issue_date, source.due_date, source.original_due_date, source.value, source.paid_value, source.value_to_pay, source.discount_value, source.interest_value, source.paid, source.status, source.type, source.comments, source.sequence_code, source.competence_month, source.competence_year, source.created_at, source.updated_at, source.corporation_id, source.corporation_name, source.corporation_cnpj, source.metadata, source.data_extracao);
+                INSERT (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, nfse_numero, carteira_banco, instrucao_boleto, banco_nome, metodo_pagamento, metadata, data_extracao)
+                VALUES (source.id, source.document, source.issue_date, source.due_date, source.original_due_date, source.value, source.paid_value, source.value_to_pay, source.discount_value, source.interest_value, source.paid, source.status, source.type, source.comments, source.sequence_code, source.competence_month, source.competence_year, source.created_at, source.updated_at, source.corporation_id, source.corporation_name, source.corporation_cnpj, source.nfse_numero, source.carteira_banco, source.instrucao_boleto, source.banco_nome, source.metodo_pagamento, source.metadata, source.data_extracao);
         """;
         try (PreparedStatement ps = conexao.prepareStatement(sql)) {
             int idx = 1;
@@ -97,6 +102,11 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
             setLongParameter(ps, idx++, e.getCorporationId());
             setStringParameter(ps, idx++, e.getCorporationName());
             setStringParameter(ps, idx++, e.getCorporationCnpj());
+            setStringParameter(ps, idx++, e.getNfseNumero());
+            setStringParameter(ps, idx++, e.getCarteiraBanco());
+            setStringParameter(ps, idx++, e.getInstrucaoBoleto());
+            setStringParameter(ps, idx++, e.getBancoNome());
+            setStringParameter(ps, idx++, e.getMetodoPagamento());
             setStringParameter(ps, idx++, e.getMetadata());
             setInstantParameter(ps, idx++, Instant.now());
             

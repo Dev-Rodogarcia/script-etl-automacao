@@ -30,7 +30,7 @@ SELECT
     END                                                 AS [MDFe/Status],
     distribution_pole                                   AS [Polo de distribuição],
     vehicle_plate                                       AS [Veículo/Placa],
-    vehicle_type                                        AS [Tipo Veículo/Nome],
+    vehicle_type                                        AS [Tipo Veículo],
     vehicle_owner                                       AS [Proprietário/Nome],
     driver_name                                         AS [Motorista],
     vehicle_departure_km                                AS [Km saída],
@@ -108,6 +108,7 @@ SELECT
     additionals_subtotal                                AS [Adicionais],
     discounts_subtotal                                  AS [Descontos],
     discount_value                                      AS [Desconto/Valor],
+    adjustment_comments                                 AS [Liberação de Custo de Agregado/Comentários],
     iks_id                                              AS [IKS ID],
     programacao_sequence_code                           AS [Programação/Número],
     programacao_starting_at                             AS [Programação/Início],
@@ -118,6 +119,7 @@ SELECT
     trailer2_weight_capacity                            AS [Carreta 2/Capacidade Peso],
     vehicle_weight_capacity                             AS [Veículo/Capacidade Peso],
     vehicle_cubic_weight                                AS [Veículo/Peso Cubado],
+    capacidade_kg                                       AS [Capacidade Lotação Kg],
     REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', '')
                                                         AS [Descarregamento/Destinatários],
     REPLACE(REPLACE(REPLACE(delivery_region_names, '[', ''), ']', ''), '"', '')
@@ -126,6 +128,8 @@ SELECT
     programacao_tipo_servico                            AS [Programação/Tipo Serviço],
     creation_user_name                                  AS [Usuário/Emissor],
     adjustment_user_name                                AS [Usuário/Ajuste],
+    obs_operacional                                     AS [Liberação/Comentários Operacionais],
+    obs_financeira                                      AS [Comentários Fechamento],
     metadata                                            AS [Metadata],
     data_extracao                                       AS [Data de extracao]
 FROM dbo.manifestos;

@@ -366,6 +366,18 @@ public class ManifestoDTO {
     @JsonProperty("mft_vie_cubic_weight")
     private String vehicleCubicWeight;
     
+    // 88. Comentários operacionais (operationalComments - Liberação)
+    @JsonProperty("operational_comments")
+    private String obsOperacional;
+    
+    // 89. Comentários financeiros (closingComments)
+    @JsonProperty("closing_comments")
+    private String obsFinanceira;
+    
+    // NOTA: capacidadeKg não é um campo separado no DTO.
+    // O campo JSON "mft_vie_weight_capacity" já é mapeado para vehicleWeightCapacity.
+    // No Mapper, vehicleWeightCapacity será usado para preencher capacidadeKg na Entity.
+    
     // Nota: Campos de arrays (mft_mte_unloading_recipient_names, mft_mte_delivery_region_names) 
     // são capturados via @JsonAnySetter como Object para manter flexibilidade
 
@@ -473,6 +485,10 @@ public class ManifestoDTO {
         allProps.put("mft_tl2_weight_capacity", trailer2WeightCapacity);
         allProps.put("mft_vie_weight_capacity", vehicleWeightCapacity);
         allProps.put("mft_vie_cubic_weight", vehicleCubicWeight);
+        // capacidade_kg: usar vehicleWeightCapacity (mesmo campo JSON)
+        allProps.put("capacidade_kg", vehicleWeightCapacity);
+        allProps.put("operational_comments", obsOperacional);
+        allProps.put("closing_comments", obsFinanceira);
         // Adiciona todos os outros campos capturados dinamicamente (incluindo arrays)
         allProps.putAll(otherProperties);
         return allProps;
@@ -1176,6 +1192,22 @@ public class ManifestoDTO {
 
     public void setVehicleCubicWeight(final String vehicleCubicWeight) {
         this.vehicleCubicWeight = vehicleCubicWeight;
+    }
+
+    public String getObsOperacional() {
+        return obsOperacional;
+    }
+
+    public void setObsOperacional(final String obsOperacional) {
+        this.obsOperacional = obsOperacional;
+    }
+
+    public String getObsFinanceira() {
+        return obsFinanceira;
+    }
+
+    public void setObsFinanceira(final String obsFinanceira) {
+        this.obsFinanceira = obsFinanceira;
     }
 
     @JsonAnyGetter

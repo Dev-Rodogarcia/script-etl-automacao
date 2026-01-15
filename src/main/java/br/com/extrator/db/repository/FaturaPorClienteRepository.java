@@ -60,9 +60,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 ? AS destinatario_documento,
                 ? AS vendedor_nome,
                 ? AS notas_fiscais,
-                    ? AS pedidos_cliente,
-                    ? AS metadata,
-                    ? AS data_extracao
+                ? AS pedidos_cliente,
+                ? AS metadata,
+                ? AS data_extracao
         ) AS source
         ON target.unique_id = source.unique_id
         WHEN MATCHED THEN

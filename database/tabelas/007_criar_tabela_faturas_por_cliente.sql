@@ -1,8 +1,3 @@
--- ============================================
--- Script de criação da tabela 'faturas_por_cliente'
--- Execute este script UMA VEZ antes de colocar o sistema em produção
--- ============================================
-
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'dbo.faturas_por_cliente') AND type in (N'U'))
 BEGIN
     CREATE TABLE dbo.faturas_por_cliente (
@@ -41,7 +36,6 @@ BEGIN
         metadata NVARCHAR(MAX),
         data_extracao DATETIME2 DEFAULT GETDATE()
     );
-    
     PRINT 'Tabela faturas_por_cliente criada com sucesso!';
 END
 ELSE
@@ -50,47 +44,18 @@ BEGIN
 END
 GO
 
--- Criar índices (idempotente - só cria se não existir)
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_fpc_vencimento' AND object_id = OBJECT_ID('dbo.faturas_por_cliente'))
-BEGIN
     CREATE INDEX IX_fpc_vencimento ON dbo.faturas_por_cliente(data_vencimento_fatura);
-    PRINT 'Índice IX_fpc_vencimento criado com sucesso!';
-END
-ELSE
-BEGIN
-    PRINT 'Índice IX_fpc_vencimento já existe. Pulando criação.';
-END
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_fpc_pagador' AND object_id = OBJECT_ID('dbo.faturas_por_cliente'))
-BEGIN
     CREATE INDEX IX_fpc_pagador ON dbo.faturas_por_cliente(pagador_nome);
-    PRINT 'Índice IX_fpc_pagador criado com sucesso!';
-END
-ELSE
-BEGIN
-    PRINT 'Índice IX_fpc_pagador já existe. Pulando criação.';
-END
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_fpc_filial' AND object_id = OBJECT_ID('dbo.faturas_por_cliente'))
-BEGIN
     CREATE INDEX IX_fpc_filial ON dbo.faturas_por_cliente(filial);
-    PRINT 'Índice IX_fpc_filial criado com sucesso!';
-END
-ELSE
-BEGIN
-    PRINT 'Índice IX_fpc_filial já existe. Pulando criação.';
-END
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_fpc_chave_cte' AND object_id = OBJECT_ID('dbo.faturas_por_cliente'))
-BEGIN
     CREATE INDEX IX_fpc_chave_cte ON dbo.faturas_por_cliente(chave_cte);
-    PRINT 'Índice IX_fpc_chave_cte criado com sucesso!';
-END
-ELSE
-BEGIN
-    PRINT 'Índice IX_fpc_chave_cte já existe. Pulando criação.';
-END
 GO

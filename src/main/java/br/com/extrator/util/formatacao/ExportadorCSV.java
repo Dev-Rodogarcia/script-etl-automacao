@@ -71,11 +71,8 @@ public class ExportadorCSV {
         log.info("📅 Timestamp: {} | 📁 Destino: {}", timestamp, PASTA_DESTINO);
         log.console("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         
-        try {
-            atualizarViewsPowerBI();
-        } catch (final Exception e) {
-            log.debug("Erro ao atualizar views: {}", e.getMessage());
-        }
+        // NOTA: As views Power BI são criadas/atualizadas pelos scripts SQL (database/views/).
+        // Não é mais necessário atualizar views aqui.
         
         if (somenteUmaTabela) {
             log.info("📌 Exportando tabela específica: {}", tabelaEspecifica);
@@ -112,21 +109,10 @@ public class ExportadorCSV {
     }
 
     /**
-     * Atualiza todas as views do Power BI usando a classe centralizada de constantes.
-     * Isso garante que mudanças nas views são feitas em um único lugar (ConstantesViewsPowerBI).
+     * NOTA: As views do Power BI são criadas/atualizadas pelos scripts SQL em database/views/.
+     * Não é mais necessário atualizar views aqui, pois elas são gerenciadas via executar_database.bat.
+     * Este método foi removido para evitar duplicação de código DDL.
      */
-    private static void atualizarViewsPowerBI() throws Exception {
-        try (Connection conn = GerenciadorConexao.obterConexao();
-             Statement stmt = conn.createStatement()) {
-            // Itera sobre todas as views definidas na classe de constantes
-            for (final ConstantesViewsPowerBI.ViewPowerBI view : ConstantesViewsPowerBI.obterTodasViews()) {
-                log.debug("Atualizando view: {}", view.nomeView());
-                stmt.execute(view.sqlView());
-            }
-            log.debug("✅ Todas as {} views Power BI atualizadas via ConstantesViewsPowerBI", 
-                ConstantesViewsPowerBI.obterTodasViews().size());
-        }
-    }
     
     /**
      * Exporta uma entidade para CSV

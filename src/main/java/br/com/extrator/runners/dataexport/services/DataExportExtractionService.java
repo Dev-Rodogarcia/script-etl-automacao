@@ -87,41 +87,66 @@ public class DataExportExtractionService {
             || Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_CLIENTE).anyMatch(alias -> alias.equals(ent));
         
         if (executarManifestos) {
-            final ExtractionResult result = extractManifestos(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractManifestos(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Manifestos: {}", e.getMessage());
+                resultados.add(ExtractionResult.erro("manifestos", LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
         
         if (executarCotacoes) {
-            final ExtractionResult result = extractCotacoes(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractCotacoes(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Cotações: {}", e.getMessage());
+                resultados.add(ExtractionResult.erro("cotacoes", LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
         
         if (executarLocalizacao) {
-            final ExtractionResult result = extractLocalizacoes(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractLocalizacoes(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Localização de Cargas: {}", e.getMessage());
+                resultados.add(ExtractionResult.erro("localizacao_cargas", LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
         
         if (executarContasAPagar) {
-            final ExtractionResult result = extractContasAPagar(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractContasAPagar(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Contas a Pagar: {}", e.getMessage());
+                resultados.add(ExtractionResult.erro("contas_a_pagar", LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
         
         if (executarFaturasPorCliente) {
-            final ExtractionResult result = extractFaturasPorCliente(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractFaturasPorCliente(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Faturas por Cliente: {}", e.getMessage());
+                resultados.add(ExtractionResult.erro("faturas_por_cliente", LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }

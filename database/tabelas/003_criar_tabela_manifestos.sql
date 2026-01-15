@@ -96,6 +96,9 @@ BEGIN
         trailer2_weight_capacity DECIMAL(18, 2),
         vehicle_weight_capacity DECIMAL(18, 2),
         vehicle_cubic_weight DECIMAL(18, 2),
+        capacidade_kg DECIMAL(18, 2), -- Capacidade do veículo em kg (vehicle.weightCapacity)
+        obs_operacional NVARCHAR(MAX), -- Comentários operacionais/liberação (operationalComments)
+        obs_financeira NVARCHAR(MAX), -- Comentários financeiros/fechamento (closingComments)
         unloading_recipient_names NVARCHAR(MAX),
         delivery_region_names NVARCHAR(MAX),
         programacao_cliente NVARCHAR(255),
