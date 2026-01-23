@@ -27,6 +27,7 @@ public class LoopExtracaoComando implements Comando {
     public void executar(String[] args) throws Exception {
         log.console("=".repeat(80));
         log.info("🕒 LOOP DE EXTRACAO A CADA 30 MINUTOS");
+        log.info("   Se uma tabela/entidade falhar, será reextraída na próxima execução (em 30 min).");
         log.console("=".repeat(80));
         imprimirStatus();
         try (Scanner scanner = new Scanner(System.in)) {

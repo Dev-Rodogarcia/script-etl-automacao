@@ -31,8 +31,10 @@ WITH FiliaisUnificadas AS (
     FROM dbo.vw_faturas_por_cliente_powerbi
     WHERE [Filial] IS NOT NULL AND LTRIM(RTRIM([Filial])) <> ''
 )
-SELECT [NomeFilial]
-FROM FiliaisUnificadas;
+SELECT 
+    [NomeFilial],
+    CAST('00:00:00' AS TIME(0)) AS [Hora (Solicitacao)]
+FROM FiliaisUnificadas
 GO
 
 PRINT 'View vw_dim_filiais criada/atualizada com sucesso!';

@@ -27,6 +27,11 @@ SELECT
     corporation_id     AS [Filial/ID],
     corporation_name   AS [Filial/Nome],
     corporation_cnpj   AS [Filial/CNPJ],
+    nfse_numero        AS [NFS-e/Número],
+    carteira_banco     AS [Banco/Carteira],
+    instrucao_boleto   AS [Banco/Instrução Boleto],
+    banco_nome         AS [Banco/Nome],
+    metodo_pagamento   AS [Método Pagamento],
     metadata           AS [Metadata],
     data_extracao      AS [Data de extracao]
 FROM dbo.faturas_graphql;

@@ -71,51 +71,78 @@ public class GraphQLExtractionService {
         
         CarregadorConfig.validarConexaoBancoDados();
         CarregadorConfig.validarTabelasEssenciais();
+        ExtractionHelper.limparAvisosSeguranca();
+
         final boolean executarColetas = shouldExecute(entidade, ConstantesEntidades.COLETAS);
         final boolean executarFretes = shouldExecute(entidade, ConstantesEntidades.FRETES);
-        final boolean executarFaturasGraphql = shouldExecute(entidade, ConstantesEntidades.FATURAS_GRAPHQL, 
+        final boolean executarFaturasGraphql = shouldExecute(entidade, ConstantesEntidades.FATURAS_GRAPHQL,
             ConstantesEntidades.ALIASES_FATURAS_GRAPHQL);
         final boolean executarUsuariosSistema = shouldExecute(entidade, ConstantesEntidades.USUARIOS_SISTEMA);
-        
+
         // Extrair usuários ANTES de coletas (dependência)
         if (executarColetas) {
-            final ExtractionResult resultUsuarios = extractUsuarios(dataInicio, dataFim, false); // Não interrompe se falhar
-            if (resultUsuarios != null) {
-                resultados.add(resultUsuarios);
+            try {
+                final ExtractionResult resultUsuarios = extractUsuarios(dataInicio, dataFim, false);
+                if (resultUsuarios != null) {
+                    resultados.add(resultUsuarios);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         } else if (executarUsuariosSistema) {
-            final ExtractionResult resultUsuarios = extractUsuarios(dataInicio, dataFim, true); // Interrompe se falhar
-            if (resultUsuarios != null) {
-                resultados.add(resultUsuarios);
+            try {
+                final ExtractionResult resultUsuarios = extractUsuarios(dataInicio, dataFim, true);
+                if (resultUsuarios != null) {
+                    resultados.add(resultUsuarios);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
-        
+
         if (executarColetas) {
-            final ExtractionResult result = extractColetas(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractColetas(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Coletas: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.COLETAS, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
-        
+
         if (executarFretes) {
-            final ExtractionResult result = extractFretes(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractFretes(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Fretes: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.FRETES, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
-        
+
         if (executarFaturasGraphql) {
-            final ExtractionResult result = extractFaturasGraphQL(dataInicio, dataFim);
-            if (result != null) {
-                resultados.add(result);
+            try {
+                final ExtractionResult result = extractFaturasGraphQL(dataInicio, dataFim);
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                log.error("❌ Erro ao extrair Faturas GraphQL: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.FATURAS_GRAPHQL, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
-        
+
         // Resumo consolidado final
         exibirResumoConsolidado(resultados, inicioExecucao);
     }
@@ -165,13 +192,9 @@ public class GraphQLExtractionService {
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
         
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "coletas"), result.getErro());
-        }
-        
         return result;
     }
-    
+
     private ExtractionResult extractFretes(final LocalDate dataInicio, final LocalDate dataFim) {
         final FreteExtractor extractor = new FreteExtractor(
             apiClient,
@@ -200,13 +223,9 @@ public class GraphQLExtractionService {
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
         
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "faturas GraphQL"), result.getErro());
-        }
-        
         return result;
     }
-    
+
     /**
      * Exibe resumo consolidado de todas as extrações GraphQL executadas.
      */
@@ -268,10 +287,10 @@ public class GraphQLExtractionService {
         log.info("📋 Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
-            final String statusIcon = result.isSucesso() 
+            final String statusIcon = result.isSucesso()
                 ? (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus()) ? "✅" : "⚠️")
                 : "❌";
-            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}", 
+            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
                 i + 1,
                 statusIcon,
                 result.getEntityName(),
@@ -279,6 +298,22 @@ public class GraphQLExtractionService {
                 result.getPaginasProcessadas(),
                 result.getStatus());
         }
+
+        // EVENTOS / OBSERVAÇÕES: timeouts, entidades com erro (ficam gravados no log)
+        final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
+        for (final ExtractionResult r : resultados) {
+            if (!r.isSucesso()) {
+                eventos.add("Entidade " + r.getEntityName() + " falhou. Será reextraída na próxima execução.");
+            }
+        }
+        if (!eventos.isEmpty()) {
+            log.info("");
+            log.info("⚠️ EVENTOS / OBSERVAÇÕES (registrado para auditoria):");
+            for (final String ev : eventos) {
+                log.info("   • {}", ev);
+            }
+        }
+
         log.info("");
         log.info("⏰ Fim: {}", fimExecucao);
         log.info("╔" + "═".repeat(78) + "╗");

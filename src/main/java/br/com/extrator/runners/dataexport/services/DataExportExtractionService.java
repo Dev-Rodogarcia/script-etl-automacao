@@ -74,6 +74,8 @@ public class DataExportExtractionService {
         
         CarregadorConfig.validarConexaoBancoDados();
         CarregadorConfig.validarTabelasEssenciais();
+        ExtractionHelper.limparAvisosSeguranca();
+
         final String ent = entidade == null ? "" : entidade.trim().toLowerCase();
         final boolean executarManifestos = ent.isEmpty() || ConstantesEntidades.MANIFESTOS.equals(ent);
         final boolean executarCotacoes = ent.isEmpty() || ConstantesEntidades.COTACOES.equals(ent) 
@@ -106,8 +108,8 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Cotações: {}", e.getMessage());
-                resultados.add(ExtractionResult.erro("cotacoes", LocalDateTime.now(), e).build());
+                log.error("❌ Erro ao extrair Cotações: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.COTACOES, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -132,8 +134,8 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Contas a Pagar: {}", e.getMessage());
-                resultados.add(ExtractionResult.erro("contas_a_pagar", LocalDateTime.now(), e).build());
+                log.error("❌ Erro ao extrair Contas a Pagar: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.CONTAS_A_PAGAR, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -314,10 +316,10 @@ public class DataExportExtractionService {
         log.info("📋 Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
-            final String statusIcon = result.isSucesso() 
+            final String statusIcon = result.isSucesso()
                 ? (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus()) ? "✅" : "⚠️")
                 : "❌";
-            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}", 
+            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
                 i + 1,
                 statusIcon,
                 result.getEntityName(),
@@ -325,6 +327,22 @@ public class DataExportExtractionService {
                 result.getPaginasProcessadas(),
                 result.getStatus());
         }
+
+        // EVENTOS / OBSERVAÇÕES: timeouts, entidades com erro (ficam gravados no log)
+        final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
+        for (final ExtractionResult r : resultados) {
+            if (!r.isSucesso()) {
+                eventos.add("Entidade " + r.getEntityName() + " falhou. Será reextraída na próxima execução.");
+            }
+        }
+        if (!eventos.isEmpty()) {
+            log.info("");
+            log.info("⚠️ EVENTOS / OBSERVAÇÕES (registrado para auditoria):");
+            for (final String ev : eventos) {
+                log.info("   • {}", ev);
+            }
+        }
+
         log.info("");
         log.info("⏰ Fim: {}", fimExecucao);
         log.info("╔" + "═".repeat(78) + "╗");
@@ -332,7 +350,7 @@ public class DataExportExtractionService {
         log.info("╚" + "═".repeat(78) + "╝");
         log.info("");
     }
-    
+
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
     }

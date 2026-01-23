@@ -20,6 +20,7 @@ import br.com.extrator.modelo.graphql.faturas.CreditCustomerBillingNodeDTO;
 import br.com.extrator.modelo.graphql.bancos.BankAccountNodeDTO;
 import br.com.extrator.runners.common.ConstantesExtracao;
 import br.com.extrator.runners.common.EntityExtractor;
+import br.com.extrator.runners.common.ExtractionHelper;
 import br.com.extrator.util.console.LoggerConsole;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
@@ -135,46 +136,45 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         }
         
         log.info("🔍 {} faturas precisam de enriquecimento adicional (falta NFS-e ou ticketAccountId)", faturasParaEnriquecer.size());
-        
+
         for (final Long faturaId : faturasParaEnriquecer) {
             final FaturaGraphQLEntity entity = faturasUnicas.get(faturaId);
             if (entity == null) {
                 continue;
             }
-            
             try {
                 // CHAMADA GRAPHQL: Dados da Cobrança e NFS-e (apenas se necessário)
                 final var dadosCobrancaOpt = apiClient.buscarDadosCobranca(faturaId);
-                
+
                 if (dadosCobrancaOpt.isPresent()) {
                     final var dadosCobranca = dadosCobrancaOpt.get();
-                    
+
                     // 1. Pega ID do Banco para o Cache (se ainda não tiver)
                     if (dadosCobranca.getTicketAccountId() != null && !faturaIdParaBancoId.containsKey(faturaId)) {
                         idsBancos.add(dadosCobranca.getTicketAccountId());
                         faturaIdParaBancoId.put(faturaId, dadosCobranca.getTicketAccountId());
                     }
-                    
+
                     // 2. Entra na Parcela para pegar NFS-e e Método Pagamento (se ainda não tiver)
                     if (dadosCobranca.getInstallments() != null && !dadosCobranca.getInstallments().isEmpty()) {
                         final var parcela = dadosCobranca.getInstallments().get(0);
-                        
+
                         // Método de Pagamento (apenas se ainda não tiver)
-                        if (parcela.getPaymentMethod() != null && !parcela.getPaymentMethod().trim().isEmpty() 
+                        if (parcela.getPaymentMethod() != null && !parcela.getPaymentMethod().trim().isEmpty()
                                 && (entity.getMetodoPagamento() == null || entity.getMetodoPagamento().trim().isEmpty())) {
                             entity.setMetodoPagamento(parcela.getPaymentMethod().trim());
                         }
-                        
+
                         // N° NFS-e (apenas se ainda não tiver)
                         if (parcela.getAccountingCredit() != null) {
                             final String nfseNumero = parcela.getAccountingCredit().getDocument();
-                            if (nfseNumero != null && !nfseNumero.trim().isEmpty() 
+                            if (nfseNumero != null && !nfseNumero.trim().isEmpty()
                                     && (entity.getNfseNumero() == null || entity.getNfseNumero().trim().isEmpty())) {
                                 entity.setNfseNumero(nfseNumero.trim());
                             }
                         }
                     }
-                    
+
                     totalEnriquecidas++;
                 }
             } catch (final Exception e) {
@@ -182,19 +182,19 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                 totalComErro++;
             }
         }
-        
-        log.info("✓ Enriquecimento concluído: {} faturas enriquecidas, {} erros, {} IDs de bancos únicos coletados", 
+
+        log.info("✓ Enriquecimento concluído: {} faturas enriquecidas, {} erros, {} IDs de bancos únicos coletados",
                 totalEnriquecidas, totalComErro, idsBancos.size());
-        
+
         // PASSO 4: CACHE BANCÁRIO (Busca detalhes apenas uma vez por Banco)
         final Map<Integer, BankAccountNodeDTO> cacheBanco = new HashMap<>();
         int totalBancosBuscados = 0;
-        
+
         for (final Integer idBanco : idsBancos) {
             try {
                 // CHAMADA GRAPHQL 2: Detalhes do Banco
                 final var dadosBancoOpt = apiClient.buscarDetalhesBanco(idBanco);
-                
+
                 if (dadosBancoOpt.isPresent()) {
                     cacheBanco.put(idBanco, dadosBancoOpt.get());
                     totalBancosBuscados++;
@@ -203,7 +203,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                 log.warn("⚠️ Erro ao buscar detalhes do banco ID {}: {}", idBanco, e.getMessage());
             }
         }
-        
+
         log.info("✓ Cache bancário preenchido: {} bancos buscados com sucesso", totalBancosBuscados);
         
         // PASSO 5: MERGE FINAL
@@ -246,6 +246,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
             log.info("✓ Relatório Faturas enriquecido com Pagador: {} linhas atualizadas", pagadorAtualizadas);
         } catch (final java.sql.SQLException e) {
             log.warn("⚠️ Enriquecimento via tabela ponte ignorado: {}", e.getMessage());
+            ExtractionHelper.appendAvisoSeguranca("Faturas GraphQL: enriquecimento via tabela ponte (NFS-e/Pagador) ignorado. Erro: " + e.getMessage());
         }
         
         return salvos;

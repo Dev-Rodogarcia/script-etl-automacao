@@ -6,10 +6,10 @@ REM NUNCA commite o arquivo config.bat no Git!
 REM ============================================
 
 REM Opcao 1: Autenticacao SQL Server
-set DB_SERVER=localhost
-set DB_NAME=eslcloud
-set DB_USER=sa
-set DB_PASSWORD=SqlDocker!2025
+set DB_SERVER=
+set DB_NAME=
+set DB_USER=
+set DB_PASSWORD=
 
 REM Opcao 2: Autenticacao Integrada do Windows (deixe DB_USER e DB_PASSWORD vazios)
 REM set DB_SERVER=localhost

@@ -5,6 +5,9 @@
 
 CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
 SELECT
+
+    CAST(CAST(servico_em AS DATETIME) AS TIME(0)) AS [Hora (Solicitacao)],
+
     id AS [ID],
     chave_cte AS [Chave CT-e],
     numero_cte AS [Nº CT-e],

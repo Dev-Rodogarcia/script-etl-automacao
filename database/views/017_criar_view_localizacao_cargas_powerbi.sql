@@ -5,6 +5,8 @@
 
 CREATE OR ALTER VIEW dbo.vw_localizacao_cargas_powerbi AS
 SELECT
+
+    CAST(service_at AS TIME(0)) AS [Hora (Solicitacao)],
     sequence_number AS [N° Minuta], -- CHECK
     REPLACE(type, 'Freight::', '') AS [Tipo], -- CHECK
     service_at AS [Data do frete], -- CHECK

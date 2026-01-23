@@ -15,9 +15,9 @@ PRINT '';
 SELECT 
     'usuarios_sistema' AS entidade,
     COUNT(*) AS total_registros,
-    MAX(data_extracao) AS ultima_extracao
+    MAX(data_atualizacao) AS ultima_extracao
 FROM dbo.dim_usuarios
-WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
+WHERE data_atualizacao >= DATEADD(hour, -24, GETDATE())
 
 UNION ALL
 
@@ -99,16 +99,16 @@ PRINT '';
 
 SELECT TOP 10
     entidade,
-    status,
+    status_final,
     registros_extraidos,
     paginas_processadas,
-    data_inicio,
-    data_fim,
-    DATEDIFF(second, data_inicio, data_fim) AS duracao_segundos,
+    timestamp_inicio,
+    timestamp_fim,
+    DATEDIFF(second, timestamp_inicio, timestamp_fim) AS duracao_segundos,
     mensagem
 FROM dbo.log_extracoes
-WHERE data_inicio >= DATEADD(hour, -24, GETDATE())
-ORDER BY data_inicio DESC;
+WHERE timestamp_inicio >= DATEADD(hour, -24, GETDATE())
+ORDER BY timestamp_inicio DESC;
 
 PRINT '';
 PRINT '3. VERIFICANDO PAGE_AUDIT (Últimas 24 horas):';
@@ -120,9 +120,9 @@ SELECT
     COUNT(*) AS total_paginas,
     MIN(page) AS primeira_pagina,
     MAX(page) AS ultima_pagina,
-    MAX(data_audit) AS ultima_auditoria
+    MAX(timestamp) AS ultima_auditoria
 FROM dbo.page_audit
-WHERE data_audit >= DATEADD(hour, -24, GETDATE())
+WHERE timestamp >= DATEADD(hour, -24, GETDATE())
 GROUP BY template_id
 ORDER BY template_id;
 
@@ -156,8 +156,8 @@ PRINT '';
 
 SELECT TOP 10
     sequence_code,
-    placa_veiculo,
-    tipo_veiculo,
+    vehicle_plate,
+    vehicle_type,
     capacidade_kg,
     CASE 
         WHEN obs_operacional IS NOT NULL THEN 'SIM'
@@ -179,7 +179,7 @@ PRINT '';
 SELECT 
     COUNT(*) AS total_usuarios,
     COUNT(DISTINCT user_id) AS usuarios_unicos,
-    MAX(data_extracao) AS ultima_extracao
+    MAX(data_atualizacao) AS ultima_extracao
 FROM dbo.dim_usuarios;
 
 PRINT '';

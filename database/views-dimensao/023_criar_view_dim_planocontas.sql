@@ -8,10 +8,15 @@
 -- Usa GROUP BY para garantir uma única linha por descrição, agrega Classificacao com MAX
 -- ============================================
 
-CREATE OR ALTER VIEW dbo.vw_dim_planocontas AS
+IF OBJECT_ID('dbo.vw_dim_planocontas', 'V') IS NOT NULL 
+    DROP VIEW dbo.vw_dim_planocontas;
+GO
+
+CREATE VIEW dbo.vw_dim_planocontas AS
 SELECT
     UPPER(LTRIM(RTRIM([Conta Contábil/Descrição]))) AS Descricao,
-    ISNULL(MAX([Conta Contábil/Classificação]), 'OUTROS / NÃO CLASSIFICADO') AS Classificacao
+    ISNULL(MAX([Conta Contábil/Classificação]), 'OUTROS / NÃO CLASSIFICADO') AS Classificacao,
+    CAST('00:00:00' AS TIME(0)) AS [Hora (Solicitacao)]
 FROM dbo.vw_contas_a_pagar_powerbi
 WHERE [Conta Contábil/Descrição] IS NOT NULL
   AND LTRIM(RTRIM([Conta Contábil/Descrição])) <> ''

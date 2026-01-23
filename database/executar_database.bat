@@ -1,232 +1,129 @@
 @echo off
+chcp 65001 >nul
+setlocal
+
 REM ============================================
-REM Script para executar todas as databases SQL
-REM Execute este script UMA VEZ antes de colocar o sistema em produção
+REM Executar todos os scripts SQL do banco de dados
+REM Usa sqlcmd + config.bat (sem precisar do SSMS)
+REM Inclui: tabelas, views, views-dimensao, seguranca e validacao
 REM ============================================
+
+cd /d "%~dp0"
 
 echo.
 echo ============================================
-echo Executando database SQL para producao
+echo   EXECUTAR DATABASE - Scripts SQL
 echo ============================================
 echo.
 
-REM ============================================
-REM Configuracao do banco de dados via variaveis de ambiente
-REM 
-REM Opcao 1: Carrega config.bat se existir (recomendado)
-REM Opcao 2: Defina as variaveis manualmente antes de executar
-REM 
-REM OU use autenticacao integrada do Windows (deixe DB_USER e DB_PASSWORD vazios)
-REM ============================================
-
-REM Tenta carregar config.bat se existir
-if exist "%~dp0config.bat" (
-    call "%~dp0config.bat"
-    echo Arquivo config.bat carregado.
+REM --- 1. Verificar se config.bat existe ---
+if not exist "config.bat" (
+    echo [ERRO] Arquivo config.bat nao encontrado!
     echo.
+    echo Copie config_exemplo.bat para config.bat e preencha:
+    echo   DB_SERVER, DB_NAME e, se usar autenticacao SQL: DB_USER, DB_PASSWORD
+    echo.
+    pause
+    exit /b 1
 )
 
-REM Verifica se as variaveis de ambiente estao definidas
+REM --- 2. Carregar config.bat ---
+call config.bat
+
+REM --- 3. Validar variaveis obrigatorias ---
 if "%DB_SERVER%"=="" (
-    echo ERRO: Variavel de ambiente DB_SERVER nao definida!
-    echo Defina antes de executar: set DB_SERVER=servidor
+    echo [ERRO] DB_SERVER nao definido no config.bat
     pause
     exit /b 1
 )
-
 if "%DB_NAME%"=="" (
-    echo ERRO: Variavel de ambiente DB_NAME nao definida!
-    echo Defina antes de executar: set DB_NAME=banco_de_dados
+    echo [ERRO] DB_NAME nao definido no config.bat
     pause
     exit /b 1
 )
 
-REM Define variaveis locais a partir das variaveis de ambiente
-set SERVER=%DB_SERVER%
-set DATABASE=%DB_NAME%
-set USER=%DB_USER%
-set PASSWORD=%DB_PASSWORD%
-
-REM Detecta se deve usar autenticacao integrada (Windows Authentication)
-set USE_WINDOWS_AUTH=0
-if "%DB_USER%"=="" set USE_WINDOWS_AUTH=1
-if "%DB_PASSWORD%"=="" set USE_WINDOWS_AUTH=1
-
-echo Configuracao do banco de dados:
-echo   Servidor: %SERVER%
-echo   Banco: %DATABASE%
-if %USE_WINDOWS_AUTH%==1 (
-    echo   Autenticacao: Windows (Integrada)
-) else (
-    echo   Usuario: %USER%
-)
-echo.
-
-REM Verifica se o banco existe e cria se necessario
-echo Verificando se o banco de dados existe...
-if %USE_WINDOWS_AUTH%==1 (
-    sqlcmd -S %SERVER% -E -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = '%DATABASE%') CREATE DATABASE [%DATABASE%]" >nul 2>&1
-) else (
-    sqlcmd -S %SERVER% -U %USER% -P %PASSWORD% -Q "IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = '%DATABASE%') CREATE DATABASE [%DATABASE%]" >nul 2>&1
-)
+REM --- 4. Verificar se sqlcmd esta disponivel ---
+where sqlcmd >nul 2>nul
 if errorlevel 1 (
-    echo AVISO: Nao foi possivel criar o banco de dados automaticamente.
-    echo Por favor, crie manualmente antes de continuar.
+    echo [ERRO] sqlcmd nao encontrado no PATH.
     echo.
-) else (
-    echo Banco de dados verificado/criado com sucesso.
+    echo Instale as "SQL Server Command Line Utilities" ou adicione o diretorio
+    echo do SQL Server ao PATH. Ex: C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn
     echo.
-)
-
-set /p CONFIRMAR="Deseja continuar? (S/N): "
-if /i not "%CONFIRMAR%"=="S" (
-    echo Operacao cancelada.
     pause
-    exit /b
+    exit /b 1
 )
 
-echo.
-echo Executando scripts de criacao de tabelas...
-echo.
-
-REM Executa scripts de tabelas (001-011) na pasta tabelas/
-for %%f in (tabelas\001_*.sql tabelas\002_*.sql tabelas\003_*.sql tabelas\004_*.sql tabelas\005_*.sql tabelas\006_*.sql tabelas\007_*.sql tabelas\008_*.sql tabelas\009_*.sql tabelas\010_*.sql tabelas\011_*.sql) do (
-    echo Executando: %%f
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%%f" -b
-    ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%%f" -b
-    )
-    if errorlevel 1 (
-        echo ERRO ao executar %%f
-        pause
-        exit /b 1
-    )
-    echo OK: %%f
-    echo.
+REM --- 5. Definir autenticacao: -E (Windows) ou -U -P (SQL) ---
+if "%DB_USER%"=="" (
+    set "AUTH_CMD=-E"
+    echo Autenticacao: Windows ^(integrada^)
+) else (
+    set AUTH_CMD=-U %DB_USER% -P "%DB_PASSWORD%"
+    echo Autenticacao: SQL ^(%DB_USER%^)
 )
-
-echo.
-echo Executando scripts de criacao de views Power BI principais...
+echo Servidor: %DB_SERVER%  ^|  Banco: %DB_NAME%
 echo.
 
-REM Executa scripts de views principais (011-018) na pasta views/
-for %%f in (views\011_*.sql views\012_*.sql views\013_*.sql views\014_*.sql views\015_*.sql views\016_*.sql views\017_*.sql views\018_*.sql) do (
-    echo Executando: %%f
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%%f" -b
+REM --- 6. Executar scripts na ordem (tabelas, views, views-dimensao, seguranca, validacao) ---
+for %%F in (
+    "tabelas\001_criar_tabela_coletas.sql"
+    "tabelas\002_criar_tabela_fretes.sql"
+    "tabelas\003_criar_tabela_manifestos.sql"
+    "tabelas\004_criar_tabela_cotacoes.sql"
+    "tabelas\005_criar_tabela_localizacao_cargas.sql"
+    "tabelas\006_criar_tabela_contas_a_pagar.sql"
+    "tabelas\007_criar_tabela_faturas_por_cliente.sql"
+    "tabelas\008_criar_tabela_faturas_graphql.sql"
+    "tabelas\009_criar_tabela_log_extracoes.sql"
+    "tabelas\010_criar_tabela_page_audit.sql"
+    "tabelas\011_criar_tabela_dim_usuarios.sql"
+    "views\011_criar_view_faturas_por_cliente_powerbi.sql"
+    "views\012_criar_view_fretes_powerbi.sql"
+    "views\013_criar_view_coletas_powerbi.sql"
+    "views\014_criar_view_faturas_graphql_powerbi.sql"
+    "views\015_criar_view_cotacoes_powerbi.sql"
+    "views\016_criar_view_contas_a_pagar_powerbi.sql"
+    "views\017_criar_view_localizacao_cargas_powerbi.sql"
+    "views\018_criar_view_manifestos_powerbi.sql"
+    "views-dimensao\019_criar_view_dim_filiais.sql"
+    "views-dimensao\020_criar_view_dim_clientes.sql"
+    "views-dimensao\021_criar_view_dim_veiculos.sql"
+    "views-dimensao\022_criar_view_dim_motoristas.sql"
+    "views-dimensao\023_criar_view_dim_planocontas.sql"
+    "views-dimensao\024_criar_view_dim_usuarios.sql"
+    "views-dimensao\027_criar_view_dim_usuarios.sql"
+    "seguranca\024_configurar_permissoes_usuario.sql"
+    "validacao\025_validar_views_dimensao.sql"
+    "validacao\026_validar_tipo_destroy_user_id.sql"
+    "validacao\027_diagnosticar_campos_null_coletas.sql"
+    "validacao\028_validacao_rapida_extracao.sql"
+    "validacao\029_verificar_duplicacao_faturas.sql"
+) do (
+    if not exist %%F (
+        echo [AVISO] Ignorado - nao encontrado: %%F
     ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%%f" -b
-    )
-    if errorlevel 1 (
-        echo ERRO ao executar %%f
-        pause
-        exit /b 1
-    )
-    echo OK: %%f
-    echo.
-)
-
-echo.
-echo Executando scripts de criacao de views de dimensoes...
-echo.
-
-REM Executa scripts de views de dimensões (019-023, 027) na pasta views-dimensao/
-for %%f in (views-dimensao\019_*.sql views-dimensao\020_*.sql views-dimensao\021_*.sql views-dimensao\022_*.sql views-dimensao\023_*.sql views-dimensao\027_*.sql) do (
-    echo Executando: %%f
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%%f" -b
-    ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%%f" -b
-    )
-    if errorlevel 1 (
-        echo ERRO ao executar %%f
-        pause
-        exit /b 1
-    )
-    echo OK: %%f
-    echo.
-)
-
-echo.
-echo Executando scripts de validacao...
-echo.
-
-REM Executa script de validação de views de dimensão (025)
-set VALIDACAO_SCRIPT=validacao\025_validar_views_dimensao.sql
-if exist "%VALIDACAO_SCRIPT%" (
-    echo Executando: %VALIDACAO_SCRIPT%
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%VALIDACAO_SCRIPT%" -b
-    ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%VALIDACAO_SCRIPT%" -b
-    )
-    if errorlevel 1 (
-        echo.
-        echo AVISO: Erro ao executar %VALIDACAO_SCRIPT% (pode ser ignorado se views ainda estao vazias)
-        echo.
-    ) else (
-        echo OK: %VALIDACAO_SCRIPT%
+        set "CURRENT_SCRIPT=%%F"
+        echo [EXEC] %%F
+        sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
+        if errorlevel 1 goto :err
         echo.
     )
 )
+goto :fim
 
-REM Executa script de validação de tipo destroy_user_id (026)
-set VALIDACAO_SCRIPT=validacao\026_validar_tipo_destroy_user_id.sql
-if exist "%VALIDACAO_SCRIPT%" (
-    echo Executando: %VALIDACAO_SCRIPT%
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%VALIDACAO_SCRIPT%" -b
-    ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%VALIDACAO_SCRIPT%" -b
-    )
-    if errorlevel 1 (
-        echo.
-        echo AVISO: Erro ao executar %VALIDACAO_SCRIPT% (pode ser ignorado se tabelas ainda estao vazias)
-        echo.
-    ) else (
-        echo OK: %VALIDACAO_SCRIPT%
-        echo.
-    )
-)
-
+:err
 echo.
-echo Executando script de configuracao de permissoes...
+echo [ERRO] Falha ao executar: %CURRENT_SCRIPT%
 echo.
+pause
+exit /b 1
 
-REM Executa script de segurança (024)
-set SEGURANCA_SCRIPT=seguranca\024_configurar_permissoes_usuario.sql
-if exist "%SEGURANCA_SCRIPT%" (
-    echo Executando: %SEGURANCA_SCRIPT%
-    if %USE_WINDOWS_AUTH%==1 (
-        sqlcmd -S %SERVER% -d %DATABASE% -E -i "%SEGURANCA_SCRIPT%" -b
-    ) else (
-        sqlcmd -S %SERVER% -d %DATABASE% -U %USER% -P %PASSWORD% -i "%SEGURANCA_SCRIPT%" -b
-    )
-    if errorlevel 1 (
-        echo.
-        echo AVISO: Erro ao executar %SEGURANCA_SCRIPT%
-        echo.
-    ) else (
-        echo OK: %SEGURANCA_SCRIPT%
-        echo.
-    )
-)
+:fim
 
 echo.
 echo ============================================
-echo Todas as scripts de database foram executados!
+echo   CONCLUIDO - Todos os scripts executados
 echo ============================================
 echo.
-echo RESUMO:
-echo   - Tabelas: Criadas (001-011)
-echo   - Views Power BI: Criadas (011-018)
-echo   - Views Dimensao: Criadas (019-023, 027)
-echo   - Validacao: Executada (025, 026)
-echo   - Seguranca: Executado (024)
-echo.
-echo NOTA: O script de seguranca (024) configura permissoes para o usuario do config.bat.
-echo        Em desenvolvimento com 'sa', as permissoes nao sao necessarias (ja e sysadmin).
-echo.
-
 pause

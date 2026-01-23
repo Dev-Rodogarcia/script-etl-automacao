@@ -5,6 +5,10 @@
 
 CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
 SELECT
+
+    CAST(created_at AS TIME(0)) AS [Hora (Solicitacao)],
+
+    CAST(created_at AS TIME(0)) AS [Hora (Criação)],
     sequence_code                                       AS [Número],
     identificador_unico                                 AS [Identificador Único],
     CASE status

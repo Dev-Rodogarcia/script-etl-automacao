@@ -195,8 +195,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
              PreparedStatement ps = conn.prepareStatement("""
                 UPDATE fpc
                 SET 
-                    fpc.pagador_nome = COALESCE(fpc.pagador_nome, fg.customer_name),
-                    fpc.pagador_documento = COALESCE(fpc.pagador_documento, fg.customer_cnpj)
+                    fpc.pagador_nome = COALESCE(fpc.pagador_nome, fg.corporation_name),
+                    fpc.pagador_documento = COALESCE(fpc.pagador_documento, fg.corporation_cnpj)
                 FROM dbo.faturas_por_cliente fpc
                 INNER JOIN dbo.faturas_graphql fg ON fg.document = fpc.fit_ant_document
                 WHERE fpc.pagador_nome IS NULL OR fpc.pagador_documento IS NULL

@@ -43,7 +43,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 
 ### Opção 1: Script Automático (Recomendado)
 
-1. **Configure as variáveis de ambiente** antes de executar:
+1. **Configure o `config.bat`** (copie `config_exemplo.bat` para `config.bat` e preencha):
    
    **Para autenticação SQL Server:**
    ```cmd
@@ -53,22 +53,14 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
    set DB_PASSWORD=senha
    ```
    
-   **Para autenticação integrada do Windows:**
-   ```cmd
-   set DB_SERVER=servidor
-   set DB_NAME=banco_de_dados
-   ```
+   **Para autenticação integrada do Windows:** deixe `DB_USER` e `DB_PASSWORD` vazios no `config.bat`.
 
-2. Execute o script:
+2. Execute na pasta `database`:
    ```cmd
    executar_database.bat
    ```
 
-   **Nota:** As credenciais são lidas das variáveis de ambiente para maior segurança.
-
-3. **APÓS executar todos os scripts**, configure as permissões do usuário:
-   - Execute manualmente o script `024_configurar_permissoes_usuario.sql` no SSMS
-   - Este script **não está incluído** no `executar_database.bat` por questões de segurança (requer permissões de administrador)
+   O `executar_database.bat` usa **sqlcmd** e o `config.bat`; não é preciso ter o SSMS aberto. Ele roda na ordem: tabelas, views, views-dimensão, segurança (024) e **todas as validações (025-029)**.
 
 ### Opção 2: SQL Server Management Studio (SSMS)
 

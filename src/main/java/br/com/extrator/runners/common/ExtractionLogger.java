@@ -74,9 +74,10 @@ public class ExtractionLogger {
             log.info("   • Páginas processadas: {}", totalPaginas);
             log.info("   • Status: {}", statusMsg);
             final double segundosExtracao = duracaoExtracao.toMillis() / 1000.0;
-            log.info("   • Tempo de extração: {} ms ({} s)", 
-                duracaoExtracao.toMillis(), 
+            log.info("   • Tempo de extração (apenas busca na API): {} ms ({} s)",
+                duracaoExtracao.toMillis(),
                 String.format("%.2f", segundosExtracao));
+            log.info("      ↳ enriquecimento e gravação entram no Tempo de salvamento abaixo");
             if (dtos.size() > 0 && duracaoExtracao.toMillis() > 0) {
                 final double registrosPorSegundo = (dtos.size() * 1000.0) / duracaoExtracao.toMillis();
                 log.info("   • Taxa de extração: {} registros/segundo", String.format("%.2f", registrosPorSegundo));

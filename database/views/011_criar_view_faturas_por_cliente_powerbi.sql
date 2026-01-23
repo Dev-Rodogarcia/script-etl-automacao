@@ -1,5 +1,7 @@
 CREATE OR ALTER VIEW dbo.vw_faturas_por_cliente_powerbi AS
 SELECT
+
+    CAST(fpc.data_emissao_cte AS TIME(0)) AS [Hora (Solicitacao)],
     fpc.unique_id AS [ID Único],
     fpc.filial AS [Filial],
     fpc.estado AS [Estado],
