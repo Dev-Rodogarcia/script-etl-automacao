@@ -15,9 +15,24 @@ SELECT
     value_to_pay       AS [Valor a Pagar],
     discount_value     AS [Valor Desconto],
     interest_value     AS [Valor Juros],
-    paid               AS [Pago],
-    status             AS [Status],
-    type               AS [Tipo],
+    CASE 
+        WHEN paid = 1 THEN N'Pago'
+        WHEN paid = 0 THEN N'Não Pago'
+        ELSE N'Indefinido'
+    END AS [Pago],
+
+    CASE LOWER(status)
+        WHEN 'paid' THEN N'Pago'
+        WHEN 'pending' THEN N'Pendente'
+        ELSE CONCAT(N'Não mapeado: ', ISNULL(status, 'NULL'))
+    END AS [Status],
+
+
+    CASE type
+        WHEN 'Accounting::Credit::CustomerBilling' THEN N'Fatura de cliente'
+        ELSE CONCAT(N'Não mapeado: ', type)
+    END AS [Tipo],
+
     comments           AS [Observações],
     sequence_code      AS [Código Sequencial],
     competence_month   AS [Mês Competência],
@@ -31,7 +46,12 @@ SELECT
     carteira_banco     AS [Banco/Carteira],
     instrucao_boleto   AS [Banco/Instrução Boleto],
     banco_nome         AS [Banco/Nome],
-    metodo_pagamento   AS [Método Pagamento],
+
+    CASE metodo_pagamento
+        WHEN 'credit_in_account' THEN N'Crédito em conta'
+        ELSE CONCAT(N'Não mapeado: ', metodo_pagamento)
+    END AS [Método Pagamento],
+
     metadata           AS [Metadata],
     data_extracao      AS [Data de extracao]
 FROM dbo.faturas_graphql;

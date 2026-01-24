@@ -102,8 +102,8 @@ public class ClienteApiDataExport {
         // Template IDs agora são obtidos de ConstantesApiDataExport.obterConfiguracao(entidade)
         logger.debug("Template IDs configurados via ConstantesApiDataExport");
 
-        // Inicializa o gerenciador de requisições HTTP
-        this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
+        // Inicializa o gerenciador de requisições HTTP (Singleton - throttling GLOBAL)
+        this.gerenciadorRequisicao = GerenciadorRequisicaoHttp.getInstance();
         this.pageAuditRepository = new PageAuditRepository();
 
         logger.info("Cliente da API Data Export inicializado com sucesso");

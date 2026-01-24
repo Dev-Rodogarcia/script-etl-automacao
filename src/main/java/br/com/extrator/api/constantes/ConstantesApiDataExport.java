@@ -59,10 +59,11 @@ public final class ConstantesApiDataExport {
      */
     private static final Map<String, ConfiguracaoEntidade> CONFIGURACOES = Map.of(
         // MANIFESTOS - Template 6399
+        // FASE 2: CORRIGIDO - Alterado de service_date para created_at (data de criação é mais confiável)
         ConstantesEntidades.MANIFESTOS,
         new ConfiguracaoEntidade(
             6399,                           // templateId
-            "service_date",                 // campoData
+            "created_at",                   // campoData (CORRIGIDO: era service_date)
             "manifests",                    // tabelaApi
             "10000",                        // valorPer
             Duration.ofSeconds(120),        // timeout (2 min - páginas grandes)
@@ -107,10 +108,11 @@ public final class ConstantesApiDataExport {
         ),
 
         // FATURAS_POR_CLIENTE - Template 4924
+        // FASE 2: CORRIGIDO - Alterado de service_at para data_emissao_fatura (campo correto de data)
         ConstantesEntidades.FATURAS_POR_CLIENTE,
         new ConfiguracaoEntidade(
             4924,                           // templateId
-            "service_at",                   // campoData
+            "data_emissao_fatura",          // campoData (CORRIGIDO: era service_at)
             "freights",                     // tabelaApi
             "100",                          // valorPer (ajustado)
             Duration.ofSeconds(60),         // timeout

@@ -299,7 +299,7 @@ public class ClienteApiGraphQL {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         this.mapeadorJson = new ObjectMapper();
-        this.gerenciadorRequisicao = new GerenciadorRequisicaoHttp();
+        this.gerenciadorRequisicao = GerenciadorRequisicaoHttp.getInstance();
         this.pageAuditRepository = new PageAuditRepository();
         this.executionUuid = java.util.UUID.randomUUID().toString();
     }

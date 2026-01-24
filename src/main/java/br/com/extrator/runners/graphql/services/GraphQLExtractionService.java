@@ -56,7 +56,11 @@ public class GraphQLExtractionService {
      * @param entidade Nome da entidade específica (null = todas)
      * @throws RuntimeException Se houver falha crítica na extração
      */
+    // Referência para a entidade específica (usada na lógica de faturas_graphql)
+    private String entidadeEspecifica;
+    
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
+        this.entidadeEspecifica = entidade;
         final LocalDateTime inicioExecucao = LocalDateTime.now();
         final List<ExtractionResult> resultados = new ArrayList<>();
         
@@ -130,7 +134,23 @@ public class GraphQLExtractionService {
             ExtractionHelper.aplicarDelay();
         }
 
-        if (executarFaturasGraphql) {
+        // FASE 3: FATURAS_GRAPHQL foi movido para ser executado POR ÚLTIMO
+        // A extração de faturas_graphql agora é controlada pelos comandos (ExecutarFluxoCompletoComando
+        // e ExecutarExtracaoPorIntervaloComando) que chamam GraphQLRunner.executarFaturasGraphQLPorIntervalo()
+        // APÓS todas as outras entidades serem extraídas.
+        // 
+        // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
+        // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
+        //
+        // Se executarFaturasGraphql for true E estivermos em modo de extração específica de faturas_graphql,
+        // executamos aqui. Caso contrário, deixamos para o comando orquestrador.
+        final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null && 
+            (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica) ||
+             java.util.Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_GRAPHQL)
+                 .anyMatch(alias -> alias.equalsIgnoreCase(entidadeEspecifica)));
+        
+        if (executarFaturasGraphql && isSomenteFaturasGraphQL) {
+            // Extração específica de faturas_graphql foi solicitada explicitamente
             try {
                 final ExtractionResult result = extractFaturasGraphQL(dataInicio, dataFim);
                 if (result != null) {
@@ -141,6 +161,9 @@ public class GraphQLExtractionService {
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.FATURAS_GRAPHQL, LocalDateTime.now(), e).build());
             }
             ExtractionHelper.aplicarDelay();
+        } else if (executarFaturasGraphql) {
+            // Faturas GraphQL será executado POR ÚLTIMO pelo comando orquestrador
+            log.info("ℹ️ Faturas GraphQL será extraído POR ÚLTIMO após todas as outras entidades (FASE 3)");
         }
 
         // Resumo consolidado final

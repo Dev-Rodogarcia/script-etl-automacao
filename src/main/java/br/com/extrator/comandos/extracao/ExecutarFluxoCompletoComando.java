@@ -111,7 +111,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
             
             // Resumo da execução dos runners
             log.console("\n" + "=".repeat(60));
-            log.info("📊 RESUMO DA EXECUÇÃO DOS RUNNERS");
+            log.info("📊 RESUMO DA EXECUÇÃO DOS RUNNERS (APIs principais)");
             log.console("=".repeat(60));
             log.info("✅ Runners bem-sucedidos: {}/2", totalSucessos);
             if (totalFalhas > 0) {
@@ -123,6 +123,26 @@ public class ExecutarFluxoCompletoComando implements Comando {
             executor.shutdown();
             log.debug("ExecutorService encerrado");
         }
+        
+        // ========== FASE 3: EXTRAÇÃO DE FATURAS GRAPHQL POR ÚLTIMO ==========
+        // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
+        // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
+        log.console("\n" + "=".repeat(60));
+        log.info("🔄 [FASE 3] EXECUTANDO FATURAS GRAPHQL POR ÚLTIMO");
+        log.console("=".repeat(60));
+        log.info("ℹ️ Todas as outras entidades já foram extraídas.");
+        log.info("ℹ️ Faturas GraphQL é executado por último devido ao processo de enriquecimento demorado.");
+        
+        try {
+            GraphQLRunner.executarFaturasGraphQLPorIntervalo(dataHoje, dataHoje);
+            log.info("✅ Faturas GraphQL concluídas com sucesso!");
+            totalSucessos++;
+        } catch (final Exception e) {
+            log.error("❌ Falha na extração de Faturas GraphQL: {}. Dados já extraídos das outras entidades foram preservados.", e.getMessage(), e);
+            totalFalhas++;
+            runnersFalhados.add("FaturasGraphQL");
+        }
+        log.console("=".repeat(60) + "\n");
 
         
         // ========== PASSO B: VALIDAÇÃO DE COMPLETUDE ==========

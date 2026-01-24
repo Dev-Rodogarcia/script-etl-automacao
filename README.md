@@ -28,7 +28,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução, sistema robusto de deduplicação e validação completa de integridade dos dados.
 
-**Versão:** 2.3.0 | **Última Atualização:** 14/01/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.1 | **Última Atualização:** 23/01/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -93,6 +93,16 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **Scripts Batch**: Automação completa via scripts .bat
 
 ---
+
+## 🆕 Novidades 2.3.1 (23/01/2026)
+
+- ✅ **Correção Crítica na Validação de Limites por Intervalo**:
+  - **Bug Corrigido**: Sistema estava aplicando regra de limitação baseada no período total (ex: 366 dias = 12 horas) mesmo quando dividindo em blocos menores
+  - **Solução**: Validação agora usa tamanho do **bloco** (30 dias) em vez do período total
+  - **Tamanho do Bloco**: Alterado de `31` para `30` dias para garantir regra de "sem limite" (< 31 dias)
+  - **Impacto**: Extrações por intervalo agora executam sequencialmente sem esperas longas, mesmo para períodos grandes (ex: 2 anos)
+  - **Documentação**: Comentários, Javadoc e scripts atualizados para refletir estratégia correta
+  - **Verificação Completa**: Sistema verificado profundamente, correção aplicada apenas onde necessário
 
 ## 🆕 Novidades 2.3 (14/01/2026)
 
@@ -1253,13 +1263,30 @@ O projeto inclui scripts batch (.bat) para facilitar a execução:
 08-auditar_api.bat
 ```
 
-#### 9. `09-extracao_por_intervalo.bat`
-**Finalidade:** Executa extração por intervalo de datas.
+#### 9. `04-extracao_por_intervalo.bat`
+**Finalidade:** Executa extração por intervalo de datas com divisão automática em blocos.
+
+**Características:**
+- Divide períodos grandes automaticamente em blocos de **30 dias**
+- Cada bloco de 30 dias é tratado como "< 31 dias" (sem limite de horas)
+- Permite extrair períodos grandes (ex: 2 anos) sem esperas longas
+- Validação de limites aplicada por **bloco**, não pelo período total
 
 **Uso:**
 ```batch
-09-extracao_por_intervalo.bat
+# Modo interativo
+04-extracao_por_intervalo.bat
+
+# Com parâmetros
+04-extracao_por_intervalo.bat YYYY-MM-DD YYYY-MM-DD [api] [entidade]
+
+# Exemplos
+04-extracao_por_intervalo.bat 2024-01-01 2025-12-31
+04-extracao_por_intervalo.bat 2024-01-01 2025-12-31 graphql
+04-extracao_por_intervalo.bat 2024-01-01 2025-12-31 dataexport manifestos
 ```
+
+**Nota:** Para períodos grandes, o sistema divide automaticamente em blocos de 30 dias e executa sequencialmente sem esperas, respeitando as regras de limitação da API ESL.
 
 #### 10. `mvn.bat`
 **Finalidade:** Wrapper do Maven com detecção automática de Java e Maven.
@@ -1653,7 +1680,7 @@ script-automacao/
 ├── 06-exportar_csv.bat
 ├── 07-validar-manifestos.bat
 ├── 08-auditar_api.bat
-├── 09-extracao_por_intervalo.bat
+├── 04-extracao_por_intervalo.bat
 ├── mvn.bat                                      # Wrapper Maven
 ├── pom.xml                                      # Configuração Maven
 └── README.md                                    # Este arquivo

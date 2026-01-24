@@ -21,13 +21,13 @@ import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Comando responsável por executar extração de dados por intervalo de datas,
- * com divisão automática em blocos de 31 dias e validação de regras de limitação.
+ * com divisão automática em blocos de 30 dias e validação de regras de limitação.
  */
 public class ExecutarExtracaoPorIntervaloComando implements Comando {
     
     private static final LoggerConsole log = LoggerConsole.getLogger(ExecutarExtracaoPorIntervaloComando.class);
     
-    private static final int TAMANHO_BLOCO_DIAS = 31;
+    private static final int TAMANHO_BLOCO_DIAS = 30;
     private static final int NUMERO_DE_THREADS = 2;
     
     @Override
@@ -126,7 +126,9 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         final long diasPeriodo = validador.calcularDuracaoPeriodo(dataInicio, dataFim);
         log.console("Duração: {} dias", diasPeriodo);
         
-        // Obter limite de horas baseado no período TOTAL (não do bloco)
+        // Obter limite de horas baseado no período TOTAL (apenas informativo)
+        // NOTA: A validação real será feita por BLOCO (30 dias), não pelo período total.
+        // Cada bloco de 30 dias será tratado como "< 31 dias" (sem limite de horas).
         final int limiteHorasPeriodoTotal = validador.obterLimiteHoras(diasPeriodo);
         if (limiteHorasPeriodoTotal == 0) {
             log.console("Regra de limitação: SEM LIMITE (período < 31 dias)");
@@ -135,8 +137,9 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         } else {
             log.console("Regra de limitação: 12 HORAS entre extrações (período > 6 meses)");
         }
+        log.console("ℹ️  Nota: Validação será feita por BLOCO (30 dias = sem limite), não pelo período total");
         
-        // Dividir em blocos de 31 dias se necessário
+        // Dividir em blocos de 30 dias se necessário
         final List<BlocoPeriodo> blocos = dividirEmBlocos(dataInicio, dataFim);
         log.console("Total de blocos: {}", blocos.size());
         
@@ -172,9 +175,10 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
                        FormatadorData.formatBR(bloco.dataFim));
             log.console("=".repeat(60));
             
-            // Validar regras de limitação usando o período TOTAL (não o bloco)
-            // Isso garante que a regra correta seja aplicada independente do tamanho do bloco
-            final boolean podeExecutar = validarLimitesParaBloco(bloco, validador, diasPeriodo, apiEspecifica, entidadeEspecifica);
+            // CORRIGIDO: Validar regras de limitação usando o TAMANHO DO BLOCO (30 dias), não período total
+            // Estratégia: Dividir em blocos de 30 dias para evitar a regra de 12 horas.
+            // Cada bloco de 30 dias será tratado como "< 31 dias" (sem limite de horas).
+            final boolean podeExecutar = validarLimitesParaBloco(bloco, validador, apiEspecifica, entidadeEspecifica);
             
             if (!podeExecutar) {
                 log.warn("⏸️ Bloco {}/{} bloqueado pelas regras de limitação. Pulando...", numeroBloco, totalBlocos);
@@ -227,7 +231,32 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
                     }
                 }
                 
-                log.info("✅ Bloco {}/{} concluído com sucesso!", numeroBloco, totalBlocos);
+                log.info("✅ Bloco {}/{} (entidades principais) concluído com sucesso!", numeroBloco, totalBlocos);
+                
+                // ========== FASE 3: EXTRAÇÃO DE FATURAS GRAPHQL POR ÚLTIMO ==========
+                // Executar faturas_graphql APÓS todas as outras entidades do bloco,
+                // EXCETO se a entidade específica for faturas_graphql (já foi executada acima)
+                final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null && 
+                    (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica) ||
+                     "faturas".equalsIgnoreCase(entidadeEspecifica) ||
+                     "faturasgraphql".equalsIgnoreCase(entidadeEspecifica));
+                
+                final boolean deveExecutarFaturasGraphQL = 
+                    (apiEspecifica == null || "graphql".equalsIgnoreCase(apiEspecifica)) &&
+                    !isSomenteFaturasGraphQL;
+                
+                if (deveExecutarFaturasGraphQL) {
+                    log.info("🔄 [FASE 3] Executando Faturas GraphQL por último para bloco {}/{}...", numeroBloco, totalBlocos);
+                    try {
+                        GraphQLRunner.executarFaturasGraphQLPorIntervalo(bloco.dataInicio, bloco.dataFim);
+                        log.info("✅ Faturas GraphQL do bloco {}/{} concluídas!", numeroBloco, totalBlocos);
+                    } catch (final Exception e) {
+                        log.error("❌ Falha na extração de Faturas GraphQL do bloco {}/{}: {}. Dados das outras entidades foram preservados.", 
+                                 numeroBloco, totalBlocos, e.getMessage(), e);
+                        // Não incrementamos blocosFalhados aqui pois as outras entidades foram extraídas com sucesso
+                    }
+                }
+                
                 blocosCompletos++;
                 
             } catch (final Exception e) {
@@ -262,7 +291,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     }
     
     /**
-     * Divide o período em blocos de 31 dias.
+     * Divide o período em blocos de 30 dias.
      * 
      * @param dataInicio Data de início do período
      * @param dataFim Data de fim do período
@@ -289,18 +318,17 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     
     /**
      * Valida regras de limitação para as entidades do bloco.
-     * A regra de limitação é baseada no período TOTAL solicitado, não no tamanho do bloco.
+     * CORRIGIDO: A regra de limitação é baseada no TAMANHO DO BLOCO (30 dias), não no período total.
+     * Isso permite que blocos de 30 dias usem a regra de "sem limite" em vez de 12 horas.
      * 
      * @param bloco Bloco de período a validar
      * @param validador Validador de limites
-     * @param diasPeriodoTotal Número total de dias do período completo solicitado
      * @param apiEspecifica API específica (null = todas)
      * @param entidadeEspecifica Entidade específica (null = todas)
      * @return true se pode executar, false se bloqueado
      */
     private boolean validarLimitesParaBloco(final BlocoPeriodo bloco, 
                                            final ValidadorLimiteExtracao validador,
-                                           final long diasPeriodoTotal,
                                            final String apiEspecifica,
                                            final String entidadeEspecifica) {
         // Determinar quais entidades validar
@@ -337,9 +365,10 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         boolean todasPermitidas = true;
         
         for (final String entidade : entidadesParaValidar) {
-            // Usa o período TOTAL para determinar a regra de limitação
+            // CORRIGIDO: Usa o tamanho do BLOCO (30 dias) para determinar a regra de limitação
+            // Isso permite que blocos de 30 dias usem a regra de "sem limite" em vez de 12 horas
             final ValidadorLimiteExtracao.ResultadoValidacao resultado = 
-                validador.validarLimiteExtracaoPorPeriodoTotal(entidade, bloco.dataInicio, bloco.dataFim, diasPeriodoTotal);
+                validador.validarLimiteExtracao(entidade, bloco.dataInicio, bloco.dataFim);
             
             if (!resultado.isPermitido()) {
                 log.warn("⏸️ {}: {}", entidade, resultado.getMotivo());

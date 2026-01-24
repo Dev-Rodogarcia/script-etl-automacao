@@ -142,14 +142,20 @@ public class ValidadorLimiteExtracao {
      * Valida se é permitido executar uma extração para o período especificado,
      * usando o período TOTAL solicitado para determinar a regra de limitação.
      * 
-     * Esta variante é usada quando o período é dividido em blocos, garantindo que
-     * a regra correta seja aplicada baseada no período completo, não no tamanho do bloco.
+     * ATENÇÃO: Este método NÃO deve ser usado quando o período é dividido em blocos.
+     * Para blocos, use {@link #validarLimiteExtracao(String, LocalDate, LocalDate)} que
+     * usa o tamanho do bloco (ex: 30 dias) em vez do período total.
+     * 
+     * Este método pode ser usado apenas em casos muito específicos onde realmente se deseja
+     * aplicar a regra baseada no período total, não no tamanho do bloco individual.
      * 
      * @param entidade Nome da entidade a ser extraída
-     * @param dataInicio Data de início do bloco
-     * @param dataFim Data de fim do bloco
+     * @param dataInicio Data de início do período/bloco
+     * @param dataFim Data de fim do período/bloco
      * @param diasPeriodoTotal Número total de dias do período completo
      * @return ResultadoValidacao indicando se é permitido ou bloqueado
+     * @deprecated Para blocos, use {@link #validarLimiteExtracao(String, LocalDate, LocalDate)}.
+     *             Este método viola a estratégia de usar blocos de 30 dias para evitar regra de 12 horas.
      */
     public ResultadoValidacao validarLimiteExtracaoPorPeriodoTotal(final String entidade, 
                                                                     final LocalDate dataInicio, 

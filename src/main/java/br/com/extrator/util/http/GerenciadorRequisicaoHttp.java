@@ -12,19 +12,45 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Gerenciador centralizado para requisições HTTP com throttling, retry e backoff exponencial.
  * Implementa as regras mandatórias da API:
- * - Rate Limit: 2 segundos entre requisições
+ * - Rate Limit: 2 segundos entre requisições (GLOBAL - compartilhado entre todas as threads)
  * - Tratamento de HTTP 429: espera 2 segundos e retenta
  * - Tratamento de erros 5xx: backoff exponencial
- * PROBLEMA 5 CORRIGIDO: Retry seletivo implementado
+ * 
+ * SINGLETON THREAD-SAFE: Usa padrão Bill Pugh (Holder) para garantir:
+ * - Lazy-loading (instância criada apenas quando necessário)
+ * - Thread-safety sem synchronized
+ * - Throttling GLOBAL (todas as threads respeitam o mesmo intervalo de 2s)
+ * 
+ * FASE 1: Arquitetura de Segurança - Garante que ESL não bloqueie o token
  */
 public class GerenciadorRequisicaoHttp {
     private static final Logger logger = LoggerFactory.getLogger(GerenciadorRequisicaoHttp.class);
     
-    // Controle de throttling thread-safe
+    // ========== SINGLETON (Bill Pugh Holder Pattern) ==========
+    private static class Holder {
+        private static final GerenciadorRequisicaoHttp INSTANCE = new GerenciadorRequisicaoHttp();
+    }
+    
+    /**
+     * Obtém a instância única do GerenciadorRequisicaoHttp.
+     * Thread-safe e lazy-loaded (criado apenas na primeira chamada).
+     * 
+     * @return Instância singleton do gerenciador
+     */
+    public static GerenciadorRequisicaoHttp getInstance() {
+        return Holder.INSTANCE;
+    }
+    // ==========================================================
+    
+    // Fair lock para garantir ordem FIFO no throttling (evita starvation)
+    private final ReentrantLock lockThrottling = new ReentrantLock(true);
+    
+    // Controle de throttling thread-safe (timestamp da última requisição)
     private final AtomicLong ultimaRequisicaoTimestamp = new AtomicLong(0);
     
     // Configurações de retry
@@ -38,13 +64,17 @@ public class GerenciadorRequisicaoHttp {
     // Constantes da API
     private static final long DELAY_HTTP_429_MS = 2000L; // 2 segundos para 429
     
-    public GerenciadorRequisicaoHttp() {
+    /**
+     * Construtor privado (Singleton).
+     * Use getInstance() para obter a instância.
+     */
+    private GerenciadorRequisicaoHttp() {
         this.maxTentativas = CarregadorConfig.obterMaxTentativasRetry();
         this.delayBaseMs = CarregadorConfig.obterDelayBaseRetry();
         this.multiplicador = CarregadorConfig.obterMultiplicadorRetry();
         this.throttlingMinimoMs = CarregadorConfig.obterThrottlingMinimo();
         
-        logger.info("GerenciadorRequisicaoHttp inicializado - Max tentativas: {}, Delay base: {}ms, Multiplicador: {}, Throttling mínimo: {}ms", 
+        logger.info("🔒 GerenciadorRequisicaoHttp (SINGLETON) inicializado - Max tentativas: {}, Delay base: {}ms, Multiplicador: {}, Throttling mínimo: {}ms", 
                    maxTentativas, delayBaseMs, multiplicador, throttlingMinimoMs);
     }
     
@@ -288,27 +318,37 @@ public class GerenciadorRequisicaoHttp {
     }
     
     /**
-     * Aplica throttling para respeitar o rate limit da API.
+     * Aplica throttling GLOBAL para respeitar o rate limit da API.
      * Garante que haja pelo menos o intervalo mínimo configurado entre requisições.
+     * 
+     * IMPORTANTE: Usa ReentrantLock fair=true para garantir:
+     * - Ordem FIFO (First In, First Out) entre threads concorrentes
+     * - Evita starvation (nenhuma thread fica esperando indefinidamente)
+     * - Throttling é GLOBAL (todas as threads respeitam o mesmo intervalo)
      */
     private void aplicarThrottling() {
-        long agora = System.currentTimeMillis();
-        long ultimaRequisicao = ultimaRequisicaoTimestamp.get();
-        long tempoDecorrido = agora - ultimaRequisicao;
-        
-        if (tempoDecorrido < throttlingMinimoMs) {
-            long tempoEspera = throttlingMinimoMs - tempoDecorrido;
-            logger.debug("🕒 Throttling aplicado - Espera: {}ms | Limite configurado: {}ms | Tempo decorrido: {}ms", 
-                        tempoEspera, throttlingMinimoMs, tempoDecorrido);
+        lockThrottling.lock();
+        try {
+            long agora = System.currentTimeMillis();
+            long ultimaRequisicao = ultimaRequisicaoTimestamp.get();
+            long tempoDecorrido = agora - ultimaRequisicao;
             
-            aguardarComTratamentoInterrupcao(tempoEspera, "throttling");
-        } else {
-            logger.debug("✅ Throttling OK - Tempo decorrido: {}ms | Limite: {}ms", 
-                        tempoDecorrido, throttlingMinimoMs);
+            if (tempoDecorrido < throttlingMinimoMs) {
+                long tempoEspera = throttlingMinimoMs - tempoDecorrido;
+                logger.debug("🕒 Throttling GLOBAL aplicado - Espera: {}ms | Limite configurado: {}ms | Tempo decorrido: {}ms", 
+                            tempoEspera, throttlingMinimoMs, tempoDecorrido);
+                
+                aguardarComTratamentoInterrupcao(tempoEspera, "throttling global");
+            } else {
+                logger.debug("✅ Throttling GLOBAL OK - Tempo decorrido: {}ms | Limite: {}ms", 
+                            tempoDecorrido, throttlingMinimoMs);
+            }
+            
+            // Atualiza timestamp APÓS o throttling (garante que próxima requisição respeitará o intervalo)
+            ultimaRequisicaoTimestamp.set(System.currentTimeMillis());
+        } finally {
+            lockThrottling.unlock();
         }
-        
-        // Atualiza timestamp da última requisição
-        ultimaRequisicaoTimestamp.set(System.currentTimeMillis());
     }
     
     /**

@@ -1,12 +1,22 @@
 package br.com.extrator.runners.graphql.extractors;
 
 import java.time.LocalDate;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,12 +31,19 @@ import br.com.extrator.modelo.graphql.bancos.BankAccountNodeDTO;
 import br.com.extrator.runners.common.ConstantesExtracao;
 import br.com.extrator.runners.common.EntityExtractor;
 import br.com.extrator.runners.common.ExtractionHelper;
+import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.console.LoggerConsole;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Extractor para entidade Faturas GraphQL.
  * Possui lógica especial de mapeamento e enriquecimento.
+ * 
+ * FASE 4: Implementa padrão Producer-Consumer para otimização:
+ * - Thread Produtora: Faz requisições HTTP sequenciais (respeitando throttling global de 2s)
+ * - Threads Consumidoras: Processam resultados em paralelo (parsing, mapeamento)
+ * - Logs de progresso detalhados a cada N registros
+ * - Heartbeat para indicar que o processo está vivo
  */
 public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBillingNodeDTO> {
     
@@ -35,6 +52,25 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
     private final FaturaPorClienteRepository faturasPorClienteRepository;
     private final LoggerConsole log;
     private final ObjectMapper objectMapper;
+    
+    // FASE 4: Contadores para logs de progresso
+    private final AtomicInteger totalProcessadas = new AtomicInteger(0);
+    private final AtomicInteger totalEnriquecidas = new AtomicInteger(0);
+    private final AtomicInteger totalComErro = new AtomicInteger(0);
+    private final AtomicInteger errosConsecutivos = new AtomicInteger(0);
+    private final AtomicLong ultimoLogTimestamp = new AtomicLong(0);
+    
+    // FASE 4: Poison pill para sinalizar fim da fila
+    private static final EnriquecimentoTask POISON_PILL = new EnriquecimentoTask(-1L, null);
+    
+    /**
+     * FASE 4: Task para a fila de enriquecimento.
+     * Contém o ID da fatura e o resultado da requisição HTTP.
+     */
+    private record EnriquecimentoTask(
+        Long faturaId,
+        Optional<CreditCustomerBillingNodeDTO> resultado
+    ) {}
     
     public FaturaGraphQLExtractor(final ClienteApiGraphQL apiClient,
                                  final FaturaGraphQLRepository repository,
@@ -118,8 +154,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         }
         
         // Agora enriquece apenas as faturas que precisam (falta NFS-e ou ticketAccountId)
-        int totalEnriquecidas = 0;
-        int totalComErro = 0;
+        // FASE 4: Removidas variáveis locais - usar AtomicInteger da classe
         final Set<Long> faturasParaEnriquecer = new HashSet<>();
         
         for (final Map.Entry<Long, FaturaGraphQLEntity> entry : faturasUnicas.entrySet()) {
@@ -137,54 +172,30 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         
         log.info("🔍 {} faturas precisam de enriquecimento adicional (falta NFS-e ou ticketAccountId)", faturasParaEnriquecer.size());
 
-        for (final Long faturaId : faturasParaEnriquecer) {
-            final FaturaGraphQLEntity entity = faturasUnicas.get(faturaId);
-            if (entity == null) {
-                continue;
-            }
-            try {
-                // CHAMADA GRAPHQL: Dados da Cobrança e NFS-e (apenas se necessário)
-                final var dadosCobrancaOpt = apiClient.buscarDadosCobranca(faturaId);
-
-                if (dadosCobrancaOpt.isPresent()) {
-                    final var dadosCobranca = dadosCobrancaOpt.get();
-
-                    // 1. Pega ID do Banco para o Cache (se ainda não tiver)
-                    if (dadosCobranca.getTicketAccountId() != null && !faturaIdParaBancoId.containsKey(faturaId)) {
-                        idsBancos.add(dadosCobranca.getTicketAccountId());
-                        faturaIdParaBancoId.put(faturaId, dadosCobranca.getTicketAccountId());
-                    }
-
-                    // 2. Entra na Parcela para pegar NFS-e e Método Pagamento (se ainda não tiver)
-                    if (dadosCobranca.getInstallments() != null && !dadosCobranca.getInstallments().isEmpty()) {
-                        final var parcela = dadosCobranca.getInstallments().get(0);
-
-                        // Método de Pagamento (apenas se ainda não tiver)
-                        if (parcela.getPaymentMethod() != null && !parcela.getPaymentMethod().trim().isEmpty()
-                                && (entity.getMetodoPagamento() == null || entity.getMetodoPagamento().trim().isEmpty())) {
-                            entity.setMetodoPagamento(parcela.getPaymentMethod().trim());
-                        }
-
-                        // N° NFS-e (apenas se ainda não tiver)
-                        if (parcela.getAccountingCredit() != null) {
-                            final String nfseNumero = parcela.getAccountingCredit().getDocument();
-                            if (nfseNumero != null && !nfseNumero.trim().isEmpty()
-                                    && (entity.getNfseNumero() == null || entity.getNfseNumero().trim().isEmpty())) {
-                                entity.setNfseNumero(nfseNumero.trim());
-                            }
-                        }
-                    }
-
-                    totalEnriquecidas++;
-                }
-            } catch (final Exception e) {
-                log.warn("⚠️ Erro ao enriquecer fatura ID {}: {}", faturaId, e.getMessage());
-                totalComErro++;
-            }
+        // FASE 4: Reset dos contadores
+        totalProcessadas.set(0);
+        totalEnriquecidas.set(0);
+        totalComErro.set(0);
+        errosConsecutivos.set(0);
+        ultimoLogTimestamp.set(System.currentTimeMillis());
+        
+        final int totalParaEnriquecer = faturasParaEnriquecer.size();
+        final Instant inicioEnriquecimento = Instant.now();
+        
+        if (totalParaEnriquecer > 0) {
+            // FASE 4: Producer-Consumer Pattern
+            executarEnriquecimentoProducerConsumer(
+                faturasParaEnriquecer,
+                faturasUnicas,
+                idsBancos,
+                faturaIdParaBancoId,
+                totalParaEnriquecer,
+                inicioEnriquecimento
+            );
         }
 
         log.info("✓ Enriquecimento concluído: {} faturas enriquecidas, {} erros, {} IDs de bancos únicos coletados",
-                totalEnriquecidas, totalComErro, idsBancos.size());
+                totalEnriquecidas.get(), totalComErro.get(), idsBancos.size());
 
         // PASSO 4: CACHE BANCÁRIO (Busca detalhes apenas uma vez por Banco)
         final Map<Integer, BankAccountNodeDTO> cacheBanco = new HashMap<>();
@@ -369,6 +380,260 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         }
         
         return entity;
+    }
+    
+    /**
+     * FASE 4: Executa o enriquecimento usando padrão Producer-Consumer.
+     * 
+     * Thread Produtora: Faz requisições HTTP sequenciais (respeitando throttling global de 2s)
+     * Threads Consumidoras: Processam resultados em paralelo
+     */
+    private void executarEnriquecimentoProducerConsumer(
+            final Set<Long> faturasParaEnriquecer,
+            final Map<Long, FaturaGraphQLEntity> faturasUnicas,
+            final Set<Integer> idsBancos,
+            final Map<Long, Integer> faturaIdParaBancoId,
+            final int totalParaEnriquecer,
+            final Instant inicioEnriquecimento) {
+        
+        final int numThreadsConsumidoras = CarregadorConfig.obterThreadsProcessamentoFaturas();
+        final int intervaloLogProgresso = CarregadorConfig.obterIntervaloLogProgressoEnriquecimento();
+        final int limiteErrosConsecutivos = CarregadorConfig.obterLimiteErrosConsecutivos();
+        final int heartbeatSegundos = CarregadorConfig.obterHeartbeatSegundos();
+        
+        log.info("🚀 [FASE 4] Iniciando enriquecimento com padrão Producer-Consumer");
+        log.info("   • Thread Produtora: 1 (requisições HTTP sequenciais com throttling 2s)");
+        log.info("   • Threads Consumidoras: {} (processamento paralelo)", numThreadsConsumidoras);
+        log.info("   • Log de progresso: a cada {} faturas", intervaloLogProgresso);
+        log.info("   • Heartbeat: a cada {}s", heartbeatSegundos);
+        
+        // Fila de comunicação entre Producer e Consumers
+        final BlockingQueue<EnriquecimentoTask> fila = new LinkedBlockingQueue<>(100);
+        
+        // Thread Produtora: Faz requisições HTTP sequenciais
+        final Thread threadProdutora = new Thread(() -> {
+            try {
+                for (final Long faturaId : faturasParaEnriquecer) {
+                    try {
+                        // Requisição HTTP (sequencial, respeitando throttling global via Singleton)
+                        final var dadosCobrancaOpt = apiClient.buscarDadosCobranca(faturaId);
+                        fila.put(new EnriquecimentoTask(faturaId, dadosCobrancaOpt));
+                        
+                        // Reset do contador de erros consecutivos em caso de sucesso
+                        errosConsecutivos.set(0);
+                        
+                    } catch (final Exception e) {
+                        log.warn("⚠️ Erro HTTP ao buscar dados de cobrança para fatura {}: {}", faturaId, e.getMessage());
+                        
+                        // Incrementa contador de erros consecutivos
+                        final int erros = errosConsecutivos.incrementAndGet();
+                        totalComErro.incrementAndGet();
+                        
+                        // Se muitos erros consecutivos, aguarda mais (resiliência)
+                        if (erros >= limiteErrosConsecutivos) {
+                            final double multiplicador = CarregadorConfig.obterMultiplicadorDelayErros();
+                            final long delayAdicional = (long) (2000 * multiplicador);
+                            log.warn("⚠️ {} erros consecutivos detectados. Aguardando {}ms adicional...", erros, delayAdicional);
+                            try {
+                                Thread.sleep(delayAdicional);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                        }
+                        
+                        // Coloca resultado vazio na fila para manter a contagem
+                        try {
+                            fila.put(new EnriquecimentoTask(faturaId, Optional.empty()));
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+            } finally {
+                // Sinaliza fim para todas as threads consumidoras
+                for (int i = 0; i < numThreadsConsumidoras; i++) {
+                    try {
+                        fila.put(POISON_PILL);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        }, "EnriquecimentoProducer");
+        
+        // Executor para threads consumidoras
+        final ExecutorService executorConsumidores = Executors.newFixedThreadPool(numThreadsConsumidoras);
+        
+        // Threads Consumidoras: Processam resultados em paralelo
+        for (int i = 0; i < numThreadsConsumidoras; i++) {
+            executorConsumidores.submit(() -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                    try {
+                        final EnriquecimentoTask task = fila.take();
+                        
+                        // Verifica poison pill
+                        if (task == POISON_PILL) {
+                            break;
+                        }
+                        
+                        // Processa a task
+                        processarTaskEnriquecimento(
+                            task,
+                            faturasUnicas,
+                            idsBancos,
+                            faturaIdParaBancoId,
+                            totalParaEnriquecer,
+                            inicioEnriquecimento,
+                            intervaloLogProgresso,
+                            heartbeatSegundos
+                        );
+                        
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            });
+        }
+        
+        // Inicia a thread produtora
+        threadProdutora.start();
+        
+        // Aguarda a thread produtora terminar
+        try {
+            threadProdutora.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Thread principal interrompida durante enriquecimento");
+        }
+        
+        // Aguarda todas as consumidoras terminarem
+        executorConsumidores.shutdown();
+        try {
+            if (!executorConsumidores.awaitTermination(5, TimeUnit.MINUTES)) {
+                log.warn("Timeout aguardando threads consumidoras. Forçando shutdown...");
+                executorConsumidores.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executorConsumidores.shutdownNow();
+        }
+        
+        // Log final
+        final Duration duracao = Duration.between(inicioEnriquecimento, Instant.now());
+        final double taxaSegundo = totalParaEnriquecer > 0 && duracao.getSeconds() > 0 
+            ? (double) totalParaEnriquecer / duracao.getSeconds() 
+            : 0;
+        
+        log.info("📊 [FASE 4] Enriquecimento Producer-Consumer concluído:");
+        log.info("   • Total processadas: {}/{}", totalProcessadas.get(), totalParaEnriquecer);
+        log.info("   • Enriquecidas com sucesso: {}", totalEnriquecidas.get());
+        log.info("   • Erros HTTP: {}", totalComErro.get());
+        log.info("   • Duração: {} segundos", duracao.getSeconds());
+        log.info("   • Taxa: {:.2f} faturas/segundo", taxaSegundo);
+    }
+    
+    /**
+     * FASE 4: Processa uma task de enriquecimento (chamada pelas threads consumidoras).
+     */
+    private void processarTaskEnriquecimento(
+            final EnriquecimentoTask task,
+            final Map<Long, FaturaGraphQLEntity> faturasUnicas,
+            final Set<Integer> idsBancos,
+            final Map<Long, Integer> faturaIdParaBancoId,
+            final int totalParaEnriquecer,
+            final Instant inicioEnriquecimento,
+            final int intervaloLogProgresso,
+            final int heartbeatSegundos) {
+        
+        final Long faturaId = task.faturaId();
+        final FaturaGraphQLEntity entity = faturasUnicas.get(faturaId);
+        
+        if (entity == null) {
+            totalProcessadas.incrementAndGet();
+            return;
+        }
+        
+        if (task.resultado().isPresent()) {
+            final var dadosCobranca = task.resultado().get();
+            
+            // 1. Pega ID do Banco para o Cache (thread-safe)
+            if (dadosCobranca.getTicketAccountId() != null) {
+                synchronized (idsBancos) {
+                    idsBancos.add(dadosCobranca.getTicketAccountId());
+                }
+                synchronized (faturaIdParaBancoId) {
+                    if (!faturaIdParaBancoId.containsKey(faturaId)) {
+                        faturaIdParaBancoId.put(faturaId, dadosCobranca.getTicketAccountId());
+                    }
+                }
+            }
+            
+            // 2. Entra na Parcela para pegar NFS-e e Método Pagamento
+            if (dadosCobranca.getInstallments() != null && !dadosCobranca.getInstallments().isEmpty()) {
+                final var parcela = dadosCobranca.getInstallments().get(0);
+                
+                // Método de Pagamento (synchronized para entity)
+                synchronized (entity) {
+                    if (parcela.getPaymentMethod() != null && !parcela.getPaymentMethod().trim().isEmpty()
+                            && (entity.getMetodoPagamento() == null || entity.getMetodoPagamento().trim().isEmpty())) {
+                        entity.setMetodoPagamento(parcela.getPaymentMethod().trim());
+                    }
+                    
+                    // N° NFS-e
+                    if (parcela.getAccountingCredit() != null) {
+                        final String nfseNumero = parcela.getAccountingCredit().getDocument();
+                        if (nfseNumero != null && !nfseNumero.trim().isEmpty()
+                                && (entity.getNfseNumero() == null || entity.getNfseNumero().trim().isEmpty())) {
+                            entity.setNfseNumero(nfseNumero.trim());
+                        }
+                    }
+                }
+            }
+            
+            totalEnriquecidas.incrementAndGet();
+        }
+        
+        final int processadas = totalProcessadas.incrementAndGet();
+        
+        // Log de progresso a cada N faturas
+        if (processadas % intervaloLogProgresso == 0 || processadas == totalParaEnriquecer) {
+            logProgresso(processadas, totalParaEnriquecer, inicioEnriquecimento);
+        }
+        
+        // Heartbeat a cada N segundos (mesmo sem novos registros)
+        final long agora = System.currentTimeMillis();
+        final long ultimoLog = ultimoLogTimestamp.get();
+        if ((agora - ultimoLog) > (heartbeatSegundos * 1000L)) {
+            if (ultimoLogTimestamp.compareAndSet(ultimoLog, agora)) {
+                log.info("💓 [Heartbeat] Enriquecimento em andamento: {}/{} ({:.1f}%)", 
+                        processadas, totalParaEnriquecer, 
+                        (100.0 * processadas / totalParaEnriquecer));
+            }
+        }
+    }
+    
+    /**
+     * FASE 4: Log de progresso detalhado.
+     */
+    private void logProgresso(final int processadas, final int total, final Instant inicio) {
+        final Duration duracao = Duration.between(inicio, Instant.now());
+        final double percentual = (100.0 * processadas / total);
+        final double taxaSegundo = duracao.getSeconds() > 0 ? (double) processadas / duracao.getSeconds() : 0;
+        
+        // Estimar tempo restante
+        final int restantes = total - processadas;
+        final long segundosRestantes = taxaSegundo > 0 ? (long) (restantes / taxaSegundo) : 0;
+        final long minutosRestantes = segundosRestantes / 60;
+        
+        log.info("📊 Progresso Enriquecimento: {}/{} ({:.1f}%) | Enriquecidas: {} | Erros: {} | Taxa: {:.2f} faturas/s | Tempo restante: ~{} min",
+                processadas, total, percentual,
+                totalEnriquecidas.get(), totalComErro.get(),
+                taxaSegundo, minutosRestantes);
+        
+        ultimoLogTimestamp.set(System.currentTimeMillis());
     }
     
     @Override

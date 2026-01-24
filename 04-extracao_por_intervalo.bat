@@ -7,8 +7,8 @@ REM Script: 04-extracao_por_intervalo.bat
 REM Finalidade:
 REM   Executa a extracao de dados por intervalo de datas.
 REM   Permite extrair dados de um periodo especifico (ex: 2024-11-01 a 2025-03-31).
-REM   O sistema divide automaticamente em blocos de 31 dias e valida
-REM   regras de limitacao de tempo.
+REM   O sistema divide automaticamente em blocos de 30 dias e valida
+REM   regras de limitacao de tempo (cada bloco de 30 dias = sem limite de horas).
 REM   Permite escolher API e entidade especifica.
 REM
 REM Uso:
@@ -26,8 +26,8 @@ REM Funcionalidades:
 REM   - Aceita parametros na linha de comando OU menu interativo
 REM   - Permite escolher API especifica (GraphQL ou DataExport)
 REM   - Permite escolher entidade especifica
-REM   - Divide periodo em blocos de 31 dias automaticamente
-REM   - Valida regras de limitacao (1h para 31 dias-6 meses, 12h para >6 meses)
+REM   - Divide periodo em blocos de 30 dias automaticamente
+REM   - Cada bloco de 30 dias e tratado como "< 31 dias" (sem limite de horas)
 REM   - Executa extracao para cada bloco sequencialmente
 REM   - Gera logs detalhados
 REM ================================================================
@@ -313,7 +313,7 @@ if not "%API_ESCOLHIDA%"=="" (
 )
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
-echo O sistema dividira automaticamente em blocos de 31 dias.
+echo O sistema dividira automaticamente em blocos de 30 dias (sem limite de horas).
 echo.
 echo.
 

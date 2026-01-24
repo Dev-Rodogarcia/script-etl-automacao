@@ -611,4 +611,84 @@ public final class CarregadorConfig {
             return 5;
         }
     }
+
+    // ========== FASE 4: CONFIGURAÇÕES DE ENRIQUECIMENTO DE FATURAS ==========
+
+    /**
+     * Obtém o número de threads para processamento paralelo de resultados do enriquecimento.
+     * IMPORTANTE: Essas threads são para processamento de dados (parsing, mapeamento, salvamento),
+     * NÃO para requisições HTTP. As requisições HTTP continuam sequenciais com throttling global de 2s.
+     * 
+     * @return Número de threads (padrão: 5)
+     */
+    public static int obterThreadsProcessamentoFaturas() {
+        final String valor = obterConfiguracao("API_ENRIQUECIMENTO_FATURAS_THREADS", "api.enriquecimento.faturas.threads");
+        try {
+            final int threads = Integer.parseInt(valor);
+            return threads > 0 ? threads : 5;
+        } catch (NumberFormatException | NullPointerException e) {
+            logger.debug("Propriedade 'api.enriquecimento.faturas.threads' não encontrada. Usando padrão: 5");
+            return 5;
+        }
+    }
+
+    /**
+     * Obtém o limite de erros consecutivos antes de aumentar delay.
+     * 
+     * @return Limite de erros (padrão: 10)
+     */
+    public static int obterLimiteErrosConsecutivos() {
+        final String valor = obterConfiguracao("API_ENRIQUECIMENTO_ERROS_LIMITE", "api.enriquecimento.erros_consecutivos_limite");
+        try {
+            final int limite = Integer.parseInt(valor);
+            return limite > 0 ? limite : 10;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 10;
+        }
+    }
+
+    /**
+     * Obtém o multiplicador de delay quando há muitos erros consecutivos.
+     * 
+     * @return Multiplicador (padrão: 2.0)
+     */
+    public static double obterMultiplicadorDelayErros() {
+        final String valor = obterConfiguracao("API_ENRIQUECIMENTO_DELAY_MULTIPLIER", "api.enriquecimento.delay_multiplier_erros");
+        try {
+            final double multiplicador = Double.parseDouble(valor);
+            return multiplicador > 1.0 ? multiplicador : 2.0;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 2.0;
+        }
+    }
+
+    /**
+     * Obtém o intervalo (em número de faturas) para log de progresso.
+     * 
+     * @return Intervalo (padrão: 100)
+     */
+    public static int obterIntervaloLogProgressoEnriquecimento() {
+        final String valor = obterConfiguracao("API_ENRIQUECIMENTO_INTERVALO_LOG", "api.enriquecimento.intervalo_log_progresso");
+        try {
+            final int intervalo = Integer.parseInt(valor);
+            return intervalo > 0 ? intervalo : 100;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 100;
+        }
+    }
+
+    /**
+     * Obtém o intervalo (em segundos) para heartbeat durante enriquecimento.
+     * 
+     * @return Intervalo em segundos (padrão: 10)
+     */
+    public static int obterHeartbeatSegundos() {
+        final String valor = obterConfiguracao("API_ENRIQUECIMENTO_HEARTBEAT", "api.enriquecimento.heartbeat_segundos");
+        try {
+            final int segundos = Integer.parseInt(valor);
+            return segundos > 0 ? segundos : 10;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 10;
+        }
+    }
 }

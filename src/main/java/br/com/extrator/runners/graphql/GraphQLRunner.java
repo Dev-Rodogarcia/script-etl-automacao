@@ -64,4 +64,23 @@ public final class GraphQLRunner {
         final GraphQLExtractionService service = new GraphQLExtractionService();
         service.execute(dataInicio, dataInicio, entidade);
     }
+    
+    /**
+     * FASE 3: Executa extração APENAS de Faturas GraphQL para um intervalo de datas.
+     * Este método é chamado APÓS todas as outras entidades serem extraídas.
+     * 
+     * Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
+     * então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
+     * 
+     * @param dataInicio Data de início do período
+     * @param dataFim Data de fim do período
+     * @throws Exception Se houver falha na extração
+     */
+    public static void executarFaturasGraphQLPorIntervalo(final LocalDate dataInicio, final LocalDate dataFim) throws Exception {
+        log.info("🔄 [FASE 3] Executando extração de Faturas GraphQL por último...");
+        log.info("📅 Período: {} a {}", dataInicio, dataFim);
+        
+        final GraphQLExtractionService service = new GraphQLExtractionService();
+        service.execute(dataInicio, dataFim, br.com.extrator.util.validacao.ConstantesEntidades.FATURAS_GRAPHQL);
+    }
 }
