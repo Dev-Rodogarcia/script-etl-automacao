@@ -1,4 +1,3 @@
-
 <!-- PORTFOLIO-FEATURED
 title: Extrator de Dados ESL Cloud (ETL)
 description: Sistema de automação ETL (Java) para extrair dados de 2 APIs (GraphQL, Data Export) do ESL Cloud e carregar em SQL Server, com sistema robusto de deduplicação, validação de completude e execução paralela resiliente.
