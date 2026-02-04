@@ -5,7 +5,7 @@ setlocal
 REM ============================================
 REM Executar todos os scripts SQL do banco de dados
 REM Usa sqlcmd + config.bat (sem precisar do SSMS)
-REM Inclui: tabelas, views, views-dimensao, seguranca e validacao
+REM Inclui: tabelas, indices, views, views-dimensao, seguranca e validacao
 REM ============================================
 
 cd /d "%~dp0"
@@ -65,7 +65,7 @@ if "%DB_USER%"=="" (
 echo Servidor: %DB_SERVER%  ^|  Banco: %DB_NAME%
 echo.
 
-REM --- 6. Executar scripts na ordem (tabelas, views, views-dimensao, seguranca, validacao) ---
+REM --- 6. Executar scripts na ordem (tabelas, indices, views, views-dimensao, seguranca, validacao) ---
 for %%F in (
     "tabelas\001_criar_tabela_coletas.sql"
     "tabelas\002_criar_tabela_fretes.sql"
@@ -78,6 +78,7 @@ for %%F in (
     "tabelas\009_criar_tabela_log_extracoes.sql"
     "tabelas\010_criar_tabela_page_audit.sql"
     "tabelas\011_criar_tabela_dim_usuarios.sql"
+    "indices\001_criar_indices_performance.sql"
     "views\011_criar_view_faturas_por_cliente_powerbi.sql"
     "views\012_criar_view_fretes_powerbi.sql"
     "views\013_criar_view_coletas_powerbi.sql"

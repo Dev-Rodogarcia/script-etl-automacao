@@ -2,7 +2,7 @@
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server.
 
-**Versão:** 2.2.1 | **Última Atualização:** 12/01/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.3 | **Última Atualização:** 03/02/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -48,10 +48,10 @@ Ver documentação completa em `database/README.md`.
 
 ## 📊 Entidades Extraídas
 
-- **GraphQL**: Coletas, Fretes, Faturas GraphQL
+- **GraphQL**: Usuários do Sistema (dim_usuarios), Coletas, Fretes, Faturas GraphQL
 - **Data Export**: Manifestos, Cotações, Localização de Carga, Contas a Pagar, Faturas por Cliente
 
-**Total**: 8 entidades
+**Total**: 9 entidades
 
 ---
 
@@ -61,8 +61,10 @@ Ver documentação completa em `database/README.md`.
 Main.java (CLI)
     ├── ExecutarFluxoCompletoComando
     │   ├── GraphQLRunner (Thread 1)
+    │   │   ├── Usuários do Sistema (dim_usuarios)
     │   │   ├── Coletas
-    │   │   └── Fretes
+    │   │   ├── Fretes
+    │   │   └── Faturas GraphQL (Fase 3)
     │   └── DataExportRunner (Thread 2)
     │       ├── Manifestos
     │       ├── Cotações
@@ -100,7 +102,7 @@ script-automacao/
 ## 🔑 Características Principais
 
 - ✅ **2 APIs**: GraphQL e Data Export
-- ✅ **8 Entidades** extraídas
+- ✅ **9 Entidades** extraídas
 - ✅ **Execução Paralela** (2 threads)
 - ✅ **Sistema MERGE Robusto** (previne duplicados)
 - ✅ **Validação Automática** (completude, gaps, temporal)
@@ -160,6 +162,19 @@ Para documentação detalhada, consulte:
 - **database/README.md** - Guia de scripts SQL
 
 ---
+
+## 🆕 Novidades 2.3.3 (03/02/2026)
+
+- ✅ **ThreadUtil**: Utilitário centralizado para pausas (substitui `Thread.sleep` direto)
+- ✅ **Validação de Completude**: Inclusão de `usuarios_sistema`/dim_usuarios na "Prova dos 9"
+- ✅ **README Resumido**: Alinhado a 9 entidades e fluxo com Usuários do Sistema e Fase 3 Faturas GraphQL
+
+## 🆕 Novidades 2.3.2 (03/02/2026)
+
+- ✅ **Documentação Atualizada**: Alinhamento completo entre documentação e código
+- ✅ **Deduplicação Documentada**: Estratégia "Keep Last" documentada corretamente
+- ✅ **Database README Melhorado**: Documentação completa de todos os scripts SQL (001-029)
+- ✅ **Análise de Deduplicação**: Marcada como "Correções Aplicadas"
 
 ## 🆕 Novidades 2.2.1 (12/01/2026)
 

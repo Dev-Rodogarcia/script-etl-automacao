@@ -168,6 +168,16 @@ public class GraphQLExtractionService {
 
         // Resumo consolidado final
         exibirResumoConsolidado(resultados, inicioExecucao);
+
+        // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+        final List<String> entidadesComFalha = resultados.stream()
+            .filter(r -> !r.isSucesso())
+            .map(ExtractionResult::getEntityName)
+            .toList();
+        if (!entidadesComFalha.isEmpty()) {
+            throw new RuntimeException("Extração GraphQL com falhas: " + String.join(", ", entidadesComFalha)
+                + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+        }
     }
     
     private boolean shouldExecute(final String entidade, final String entityName) {

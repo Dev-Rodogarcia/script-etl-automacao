@@ -13,8 +13,10 @@ WITH LogUltimasExtracoes AS (
     FROM log_extracoes
 ),
 ContagensBanco AS (
-    SELECT 'coletas' AS entidade, COUNT(*) AS registros_banco_24h
-    FROM coletas WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
+    SELECT 'usuarios_sistema' AS entidade, COUNT(*) AS registros_banco_24h
+    FROM dim_usuarios
+    UNION ALL
+    SELECT 'coletas', COUNT(*) FROM coletas WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
     UNION ALL
     SELECT 'fretes', COUNT(*) FROM fretes WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
     UNION ALL

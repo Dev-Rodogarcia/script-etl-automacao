@@ -23,10 +23,8 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import br.com.extrator.api.constantes.ConstantesApiDataExport;
@@ -39,6 +37,7 @@ import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.http.GerenciadorRequisicaoHttp;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import br.com.extrator.db.entity.PageAuditEntity;
 import br.com.extrator.db.repository.PageAuditRepository;
 
@@ -53,7 +52,6 @@ public class ClienteApiDataExport {
 
     // Atributos da classe
     private final HttpClient httpClient;
-    private final ObjectMapper objectMapper;
     private final String urlBase;
     private final String token;
     private final GerenciadorRequisicaoHttp gerenciadorRequisicao;
@@ -80,11 +78,10 @@ public class ClienteApiDataExport {
     public ClienteApiDataExport() {
         logger.info("Inicializando cliente da API Data Export");
 
-        // Inicializa HttpClient e ObjectMapper
+        // Inicializa HttpClient
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
-        this.objectMapper = new ObjectMapper();
 
         // Carrega configurações usando CarregadorConfig
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
@@ -418,7 +415,7 @@ public class ClienteApiDataExport {
                 // Parse da resposta
                 List<T> registrosPagina;
                 try {
-                    final JsonNode raizJson = objectMapper.readTree(resposta.body());
+                    final JsonNode raizJson = MapperUtil.sharedJson().readTree(resposta.body());
                     final JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
                     // Obtém o campo de ID primário do orderBy da configuração
                     final String idKey = ConstantesApiDataExport.obterCampoIdPrimario(config);
@@ -482,7 +479,7 @@ public class ClienteApiDataExport {
                         audit.setStatusCode(resposta.statusCode());
                         audit.setDuracaoMs((int) duracaoMs);
                         pageAuditRepository.inserir(audit);
-                        registrosPagina = objectMapper.convertValue(dadosNode, typeReference);
+                        registrosPagina = MapperUtil.sharedJson().convertValue(dadosNode, typeReference);
                     } else {
                         final PageAuditEntity audit = new PageAuditEntity();
                         audit.setExecutionUuid(this.executionUuid);
@@ -502,7 +499,7 @@ public class ClienteApiDataExport {
                         totalPaginas = paginaAtual - 1;
                         break;
                     }
-                } catch (final JsonProcessingException e) {
+                } catch (final Exception e) {
                     logger.error("❌ Erro ao parsear JSON da página {}: {}", paginaAtual, e.getMessage());
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
                     throw new RuntimeException("Erro ao parsear página " + paginaAtual, e);
@@ -609,9 +606,9 @@ public class ClienteApiDataExport {
     private String construirCorpoRequisicao(final String nomeTabela, final String campoData, 
             final Instant dataInicio, final Instant dataFim, final int pagina, final ConfiguracaoEntidade config) {
         try {
-            final ObjectNode corpo = objectMapper.createObjectNode();
-            final ObjectNode search = objectMapper.createObjectNode();
-            final ObjectNode table = objectMapper.createObjectNode();
+            final ObjectNode corpo = MapperUtil.sharedJson().createObjectNode();
+            final ObjectNode search = MapperUtil.sharedJson().createObjectNode();
+            final ObjectNode table = MapperUtil.sharedJson().createObjectNode();
 
             // PROBLEMA 13 CORRIGIDO: Usar FormatadorData em vez de criar formatter inline
             // Formata as datas no formato yyyy-MM-dd - yyyy-MM-dd
@@ -622,7 +619,7 @@ public class ClienteApiDataExport {
             // Constrói a estrutura JSON conforme formato do Postman
             // Usa config.usaSearchNested() para determinar estrutura
             if (config.usaSearchNested()) {
-                final ObjectNode searchNested = objectMapper.createObjectNode();
+                final ObjectNode searchNested = MapperUtil.sharedJson().createObjectNode();
                 searchNested.put(campoData, range);
                 searchNested.put("created_at", "");
                 search.set(nomeTabela, searchNested);
@@ -636,11 +633,11 @@ public class ClienteApiDataExport {
             corpo.put("per", config.valorPer());
             corpo.put("order_by", config.orderBy());
 
-            final String corpoJson = objectMapper.writeValueAsString(corpo);
+            final String corpoJson = MapperUtil.toJson(corpo);
             logger.debug("Corpo JSON construído: {}", corpoJson);
             return corpoJson;
             
-        } catch (final JsonProcessingException e) {
+        } catch (final Exception e) {
             logger.error("Erro ao construir corpo da requisição: {}", e.getMessage(), e);
             return "{}";
         }
@@ -840,9 +837,9 @@ public class ClienteApiDataExport {
     private String construirCorpoRequisicaoCsv(final String nomeTabela, final String campoData, 
             final Instant dataInicio, final Instant dataFim) {
         try {
-            final ObjectNode corpo = objectMapper.createObjectNode();
-            final ObjectNode search = objectMapper.createObjectNode();
-            final ObjectNode table = objectMapper.createObjectNode();
+            final ObjectNode corpo = MapperUtil.sharedJson().createObjectNode();
+            final ObjectNode search = MapperUtil.sharedJson().createObjectNode();
+            final ObjectNode table = MapperUtil.sharedJson().createObjectNode();
 
             // Formatar as datas no formato yyyy-MM-dd - yyyy-MM-dd
             final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -859,11 +856,11 @@ public class ClienteApiDataExport {
             corpo.put("per", "10000");
             corpo.put("order_by", "sequence_code asc");
 
-            final String corpoJson = objectMapper.writeValueAsString(corpo);
+            final String corpoJson = MapperUtil.toJson(corpo);
             logger.debug("Corpo JSON para contagem CSV construído: {}", corpoJson);
             return corpoJson;
             
-        } catch (final JsonProcessingException e) {
+        } catch (final Exception e) {
             logger.error("Erro ao construir corpo da requisição para contagem CSV: {}", e.getMessage(), e);
             return "{}";
         }

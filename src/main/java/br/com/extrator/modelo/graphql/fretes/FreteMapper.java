@@ -7,11 +7,9 @@ import java.time.format.DateTimeParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
 import br.com.extrator.db.entity.FreteEntity;
+import br.com.extrator.util.mapeamento.MapperUtil;
+import br.com.extrator.util.mapeamento.NumeroUtil;
 
 /**
  * Mapper (Tradutor) que transforma o FreteNodeDTO (dados brutos do GraphQL)
@@ -23,27 +21,16 @@ public class FreteMapper {
 
     private static final Logger logger = LoggerFactory.getLogger(FreteMapper.class);
 
-    private final ObjectMapper objectMapper;
-
     public FreteMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        // Usando MapperUtil para ObjectMapper compartilhado
     }
 
     /**
      * Converte String para Integer de forma segura.
-     * Retorna null se a string for null, vazia ou não puder ser convertida.
+     * Delega para NumeroUtil.parseIntegerOrNull().
      */
     private Integer parseIntegerOrNull(final String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (final NumberFormatException e) {
-            logger.warn("Erro ao converter '{}' para Integer: {}", value, e.getMessage());
-            return null;
-        }
+        return NumeroUtil.parseIntegerOrNull(value);
     }
 
     /**
@@ -261,14 +248,8 @@ public class FreteMapper {
         }
 
         // 3. Empacotamento de todos os metadados
-        try {
-            final String metadata = objectMapper.writeValueAsString(dto);
-            entity.setMetadata(metadata);
-        } catch (final JsonProcessingException e) {
-            logger.error("❌ CRÍTICO: Falha ao serializar metadados para frete ID {}: {}", 
-                dto.getId(), e.getMessage(), e);
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":%d}", dto.getId()));
-        }
+        final String metadata = MapperUtil.toJson(dto);
+        entity.setMetadata(metadata);
 
         return entity;
     }

@@ -18,10 +18,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import br.com.extrator.api.ClienteApiGraphQL;
+import br.com.extrator.util.ThreadUtil;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.db.entity.FaturaGraphQLEntity;
 import br.com.extrator.db.repository.FaturaGraphQLRepository;
@@ -51,7 +50,6 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
     private final FaturaGraphQLRepository repository;
     private final FaturaPorClienteRepository faturasPorClienteRepository;
     private final LoggerConsole log;
-    private final ObjectMapper objectMapper;
     
     // FASE 4: Contadores para logs de progresso
     private final AtomicInteger totalProcessadas = new AtomicInteger(0);
@@ -76,19 +74,10 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                                  final FaturaGraphQLRepository repository,
                                  final FaturaPorClienteRepository faturasPorClienteRepository,
                                  final LoggerConsole log) {
-        this(apiClient, repository, faturasPorClienteRepository, log, new ObjectMapper());
-    }
-    
-    public FaturaGraphQLExtractor(final ClienteApiGraphQL apiClient,
-                                 final FaturaGraphQLRepository repository,
-                                 final FaturaPorClienteRepository faturasPorClienteRepository,
-                                 final LoggerConsole log,
-                                 final ObjectMapper objectMapper) {
         this.apiClient = apiClient;
         this.repository = repository;
         this.faturasPorClienteRepository = faturasPorClienteRepository;
         this.log = log;
-        this.objectMapper = objectMapper;
     }
     
     @Override
@@ -373,11 +362,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         }
         
         // Metadata (JSON completo)
-        try {
-            entity.setMetadata(objectMapper.writeValueAsString(dto));
-        } catch (final JsonProcessingException ex) {
-            entity.setMetadata(null);
-        }
+        entity.setMetadata(MapperUtil.toJson(dto));
         
         return entity;
     }
@@ -435,7 +420,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                             final long delayAdicional = (long) (2000 * multiplicador);
                             log.warn("⚠️ {} erros consecutivos detectados. Aguardando {}ms adicional...", erros, delayAdicional);
                             try {
-                                Thread.sleep(delayAdicional);
+                                ThreadUtil.aguardar(delayAdicional);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 break;

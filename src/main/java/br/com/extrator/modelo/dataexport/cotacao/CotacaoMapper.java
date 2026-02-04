@@ -3,9 +3,7 @@ package br.com.extrator.modelo.dataexport.cotacao;
 import br.com.extrator.db.entity.CotacaoEntity;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -24,11 +22,9 @@ import org.slf4j.LoggerFactory;
 public class CotacaoMapper {
 
     private static final Logger logger = LoggerFactory.getLogger(CotacaoMapper.class);
-    private final ObjectMapper objectMapper;
 
     public CotacaoMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        // Usando MapperUtil para ObjectMapper compartilhado
     }
 
     /**
@@ -126,15 +122,9 @@ public class CotacaoMapper {
         }
 
         // 3. Empacotamento de todos os metadados
-        try {
-            // Serializa o mapa completo que inclui campos explícitos e o "resto"
-            String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
-            entity.setMetadata(metadata);
-        } catch (JsonProcessingException e) {
-            logger.error("❌ CRÍTICO: Falha ao serializar metadados para cotação {}: {}", 
-                dto.getSequenceCode(), e.getMessage(), e);
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
-        }
+        // Serializa o mapa completo que inclui campos explícitos e o "resto"
+        String metadata = MapperUtil.toJson(dto.getAllProperties());
+        entity.setMetadata(metadata);
 
         return entity;
     }

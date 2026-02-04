@@ -4,7 +4,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 
 ## 📋 Estrutura
 
-### Tabelas (001-010)
+### Tabelas (001-011)
 - `001_criar_tabela_coletas.sql`
 - `002_criar_tabela_fretes.sql`
 - `003_criar_tabela_manifestos.sql`
@@ -15,6 +15,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 - `008_criar_tabela_faturas_graphql.sql`
 - `009_criar_tabela_log_extracoes.sql`
 - `010_criar_tabela_page_audit.sql`
+- `011_criar_tabela_dim_usuarios.sql`
 
 ### Views Power BI Principais (011-018)
 - `011_criar_view_faturas_por_cliente_powerbi.sql`
@@ -26,18 +27,26 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 - `017_criar_view_localizacao_cargas_powerbi.sql`
 - `018_criar_view_manifestos_powerbi.sql`
 
-### Views de Dimensões (019-023)
+### Views de Dimensões (019-024, 027)
 - `019_criar_view_dim_filiais.sql`
 - `020_criar_view_dim_clientes.sql`
 - `021_criar_view_dim_veiculos.sql`
 - `022_criar_view_dim_motoristas.sql`
 - `023_criar_view_dim_planocontas.sql`
+- `024_criar_view_dim_usuarios.sql`
+- `027_criar_view_dim_usuarios.sql` (versão atualizada)
+
+**Nota sobre numeração:** Os prefixos numéricos podem se repetir entre pastas diferentes (ex.: `024` existe em `seguranca/` e em `views-dimensao/`). A ordem correta de execução é definida em `executar_database.bat`.
 
 ### Configuração de Segurança (024)
 - `024_configurar_permissoes_usuario.sql` - Configura permissões do usuário da aplicação (PRINCÍPIO DO MENOR PRIVILÉGIO)
 
-### Validação (025)
+### Validação (025-029)
 - `025_validar_views_dimensao.sql` - Valida unicidade das chaves primárias nas views de dimensão (CRÍTICO para Power BI)
+- `026_validar_tipo_destroy_user_id.sql` - Valida tipo de destroyUserId e cancellationUserId
+- `027_diagnosticar_campos_null_coletas.sql` - Diagnostica campos NULL em coletas
+- `028_validacao_rapida_extracao.sql` - Validação rápida de extração
+- `029_verificar_duplicacao_faturas.sql` - Verifica duplicação de faturas
 
 ## 🚀 Como Executar
 
@@ -66,8 +75,8 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 
 1. Abra o SQL Server Management Studio
 2. Conecte-se ao banco de dados de produção
-3. Execute os scripts na ordem numérica (001, 002, 003, ... 023)
-4. **IMPORTANTE**: Execute primeiro as tabelas (001-010), depois as views principais (011-018) e por último as views de dimensões (019-023)
+3. Execute os scripts na ordem definida em `executar_database.bat`
+4. **IMPORTANTE**: Execute primeiro as tabelas (001-011), depois as views principais (011-018), views de dimensões (019-024, 027), segurança (024) e validações (025-029)
 
 ### Opção 3: sqlcmd (Linha de Comando)
 
@@ -81,13 +90,14 @@ sqlcmd -S servidor -d banco -U usuario -P senha -i 002_criar_tabela_fretes.sql
 
 1. **Execute apenas UMA VEZ** no ambiente de produção
 2. **Ordem de execução é crítica**: 
-   - Primeiro as tabelas (001-010)
+   - Primeiro as tabelas (001-011)
    - Depois as views principais (011-018)
-   - Por último as views de dimensões (019-023)
-   - **Finalmente**: Configure permissões (024) - PRINCÍPIO DO MENOR PRIVILÉGIO
-   - **Recomendado**: Execute validação (025) - Garante unicidade das views de dimensão
+   - Por último as views de dimensões (019-024, 027)
+   - **Segurança**: Configure permissões (024 em `seguranca/`) - PRINCÍPIO DO MENOR PRIVILÉGIO
+   - **Validações**: Execute scripts de validação (025-029) - Garante integridade e unicidade
 3. **Backup**: Faça backup do banco antes de executar
 4. **Teste**: Teste primeiro em ambiente de desenvolvimento/staging
+5. **Numeração**: A ordem correta está definida em `executar_database.bat` (prefixos podem se repetir entre pastas)
 
 ## 🔒 Segurança: Permissões do Usuário da Aplicação
 

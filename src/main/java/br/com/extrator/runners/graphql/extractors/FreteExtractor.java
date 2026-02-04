@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import br.com.extrator.api.ClienteApiGraphQL;
 import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.db.entity.FreteEntity;
@@ -16,8 +19,11 @@ import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Extractor para entidade Fretes (GraphQL).
+ * 
+ * @since 2.3.2 - Adicionada deduplicação preventiva por ID
  */
 public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
+    private static final Logger logger = LoggerFactory.getLogger(FreteExtractor.class);
     
     private final ClienteApiGraphQL apiClient;
     private final FreteRepository repository;
@@ -46,7 +52,40 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             .map(mapper::toEntity)
             .collect(Collectors.toList());
         
-        return repository.salvar(entities);
+        // Deduplicação preventiva por ID (Keep Last)
+        final List<FreteEntity> entitiesUnicos = deduplicarPorId(entities);
+        
+        if (entities.size() != entitiesUnicos.size()) {
+            logger.warn("⚠️ Duplicados removidos na API GraphQL (Fretes): {} duplicados", 
+                entities.size() - entitiesUnicos.size());
+        }
+        
+        return repository.salvar(entitiesUnicos);
+    }
+    
+    /**
+     * Deduplica entidades por ID, mantendo o último (Keep Last).
+     * 
+     * Proteção preventiva contra duplicados na resposta da API GraphQL.
+     * 
+     * @param entities Lista de entidades
+     * @return Lista deduplicada
+     * @since 2.3.2
+     */
+    private List<FreteEntity> deduplicarPorId(final List<FreteEntity> entities) {
+        return entities.stream()
+            .collect(Collectors.toMap(
+                FreteEntity::getId,
+                e -> e,
+                (primeiro, segundo) -> {
+                    logger.warn("⚠️ Duplicado detectado na API GraphQL: id={}. Mantendo o último.", 
+                        primeiro.getId());
+                    return segundo; // Keep Last
+                }
+            ))
+            .values()
+            .stream()
+            .collect(Collectors.toList());
     }
     
     @Override

@@ -24,14 +24,16 @@
 
   🟢 API GraphQL
      ├─ Coletas
-     └─ Fretes
+     ├─ Fretes
+     ├─ Faturas GraphQL
+     └─ Usuários do Sistema
 
   🟣 API Data Export
      ├─ Manifestos
      ├─ Cotações
      ├─ Localização da Carga
-     ├─ Faturas a Pagar
-     └─ Ocorrências
+     ├─ Contas a Pagar
+     └─ Faturas por Cliente
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                          ⏱️  INICIANDO EXTRAÇÃO                           ║

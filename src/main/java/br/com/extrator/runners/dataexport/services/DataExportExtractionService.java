@@ -155,6 +155,16 @@ public class DataExportExtractionService {
         
         // Resumo consolidado final
         exibirResumoConsolidado(resultados, inicioExecucao);
+
+        // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+        final List<String> entidadesComFalha = resultados.stream()
+            .filter(r -> !r.isSucesso())
+            .map(ExtractionResult::getEntityName)
+            .toList();
+        if (!entidadesComFalha.isEmpty()) {
+            throw new RuntimeException("Extração DataExport com falhas: " + String.join(", ", entidadesComFalha)
+                + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+        }
     }
     
     private ExtractionResult extractManifestos(final LocalDate dataInicio, final LocalDate dataFim) {
@@ -346,7 +356,11 @@ public class DataExportExtractionService {
         log.info("");
         log.info("⏰ Fim: {}", fimExecucao);
         log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(18) + "✅ EXTRAÇÕES DATAEXPORT CONCLUÍDAS" + " ".repeat(26) + "║");
+        if (entidadesComErro > 0) {
+            log.info("║" + " ".repeat(14) + "⚠️ EXTRAÇÕES DATAEXPORT CONCLUÍDAS COM FALHAS (" + entidadesComErro + ")" + " ".repeat(10) + "║");
+        } else {
+            log.info("║" + " ".repeat(18) + "✅ EXTRAÇÕES DATAEXPORT CONCLUÍDAS" + " ".repeat(26) + "║");
+        }
         log.info("╚" + "═".repeat(78) + "╝");
         log.info("");
     }

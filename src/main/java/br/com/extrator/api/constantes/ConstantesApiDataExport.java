@@ -59,11 +59,11 @@ public final class ConstantesApiDataExport {
      */
     private static final Map<String, ConfiguracaoEntidade> CONFIGURACOES = Map.of(
         // MANIFESTOS - Template 6399
-        // FASE 2: CORRIGIDO - Alterado de service_date para created_at (data de criação é mais confiável)
+        // API exige filtro com nome "service_date" (422 se enviar created_at). Ver docs/02-apis/dataexport/manifestos.md
         ConstantesEntidades.MANIFESTOS,
         new ConfiguracaoEntidade(
             6399,                           // templateId
-            "created_at",                   // campoData (CORRIGIDO: era service_date)
+            "service_date",                 // campoData (obrigatório: nome do filtro na API)
             "manifests",                    // tabelaApi
             "10000",                        // valorPer
             Duration.ofSeconds(120),        // timeout (2 min - páginas grandes)
@@ -108,11 +108,11 @@ public final class ConstantesApiDataExport {
         ),
 
         // FATURAS_POR_CLIENTE - Template 4924
-        // FASE 2: CORRIGIDO - Alterado de service_at para data_emissao_fatura (campo correto de data)
+        // API exige search.freights.service_at (422 se enviar outro nome). Ver docs/02-apis/dataexport/faturaporcliente.md
         ConstantesEntidades.FATURAS_POR_CLIENTE,
         new ConfiguracaoEntidade(
             4924,                           // templateId
-            "data_emissao_fatura",          // campoData (CORRIGIDO: era service_at)
+            "service_at",                   // campoData (obrigatório: nome do filtro na API)
             "freights",                     // tabelaApi
             "100",                          // valorPer (ajustado)
             Duration.ofSeconds(60),         // timeout

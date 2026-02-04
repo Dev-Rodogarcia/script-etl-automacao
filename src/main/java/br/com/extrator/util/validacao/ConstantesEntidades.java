@@ -1,5 +1,6 @@
 package br.com.extrator.util.validacao;
 
+import br.com.extrator.util.ThreadUtil;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 
 /**
@@ -53,7 +54,7 @@ public final class ConstantesEntidades {
      * @throws InterruptedException se a thread for interrompida
      */
     public static void aplicarDelayEntreExtracoes() throws InterruptedException {
-        Thread.sleep(obterDelayEntreExtracoes());
+        ThreadUtil.aguardar(obterDelayEntreExtracoes());
     }
     
     private ConstantesEntidades() {

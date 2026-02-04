@@ -310,8 +310,8 @@ INÍCIO DataExportRunner
   │   │   │   └─► Adicionar metadata JSON completo
   │   │   │
   │   │   ├─► DEDUPLICAÇÃO (antes de salvar)
-  │   │   │   ├─► Chave: sequence_code + "_" + identificador_unico
-  │   │   │   └─► Manter primeiro registro encontrado
+  │   │   │   ├─► Chave: (sequence_code, pick_sequence_code, mdfe_number)
+  │   │   │   └─► Manter registro mais recente (Keep Last)
   │   │   │
   │   │   ├─► Salvar no banco (ManifestoRepository)
   │   │   │   ├─► Verificar se tabela existe

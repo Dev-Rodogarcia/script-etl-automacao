@@ -5,11 +5,8 @@ import java.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
 import br.com.extrator.db.entity.ColetaEntity;
+import br.com.extrator.util.mapeamento.MapperUtil;
 
 /**
  * Mapper (Tradutor) que transforma o ColetaNodeDTO (dados brutos do GraphQL)
@@ -21,11 +18,8 @@ public class ColetaMapper {
 
     private static final Logger logger = LoggerFactory.getLogger(ColetaMapper.class);
 
-    private final ObjectMapper objectMapper;
-
     public ColetaMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        // Usando MapperUtil para ObjectMapper compartilhado
     }
 
     /**
@@ -148,15 +142,9 @@ public class ColetaMapper {
         }
 
         // 3. Empacotamento de todos os metadados
-        try {
-            // Serializa o DTO original completo para a coluna de metadados
-            final String metadata = objectMapper.writeValueAsString(dto);
-            entity.setMetadata(metadata);
-        } catch (final JsonProcessingException e) {
-            logger.error("❌ CRÍTICO: Falha ao serializar metadados para coleta ID {}: {}", 
-                dto.getId(), e.getMessage(), e);
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"id\":\"%s\"}", dto.getId()));
-        }
+        // Serializa o DTO original completo para a coluna de metadados usando MapperUtil
+        final String metadata = MapperUtil.toJson(dto);
+        entity.setMetadata(metadata);
 
         return entity;
     }

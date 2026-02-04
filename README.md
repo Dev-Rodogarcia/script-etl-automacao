@@ -15,7 +15,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução, sistema robusto de deduplicação e validação completa de integridade dos dados.
 
-**Versão:** 2.3.1 | **Última Atualização:** 23/01/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.2 | **Última Atualização:** 03/02/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -65,7 +65,7 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 ### Características Principais
 
 - ✅ **2 APIs Integradas**: GraphQL e Data Export
-- ✅ **8 Entidades Extraídas**: Coletas, Fretes, Manifestos, Cotações, Localização de Carga, Contas a Pagar, Faturas por Cliente, Ocorrências (preparado)
+- ✅ **9 Entidades Extraídas**: Usuários do Sistema (dim_usuarios), Coletas, Fretes, Faturas GraphQL, Manifestos, Cotações, Localização de Carga, Contas a Pagar, Faturas por Cliente — Ocorrências (preparado, sem tabela ainda)
 - ✅ **Execução Paralela**: Processamento simultâneo de múltiplas APIs com threads dedicadas
 - ✅ **Sistema MERGE Robusto**: Previne duplicados falsos e preserva duplicados naturais
 - ✅ **Deduplicação Inteligente**: Remove duplicados da API antes de salvar
@@ -80,6 +80,15 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **Scripts Batch**: Automação completa via scripts .bat
 
 ---
+
+## 🆕 Novidades 2.3.2 (03/02/2026)
+
+- ✅ **Documentação Atualizada e Alinhada ao Código**:
+  - **Deduplicação**: Documentação agora reflete corretamente a estratégia "Keep Last" (mantém registro mais recente)
+  - **Chave de Manifestos**: Documentado que a chave de deduplicação usa `(sequence_code, pick_sequence_code, mdfe_number)` alinhada ao MERGE SQL
+  - **Criação de Tabelas**: Esclarecido que tabelas são criadas via scripts SQL em `database/`, não pelo código Java
+  - **Database README**: Documentação completa de todos os scripts (001-011 tabelas, 011-018 views, 019-027 views dimensão, 024 segurança, 025-029 validações)
+  - **Análise de Deduplicação**: Marcada como "Correções Aplicadas" com histórico das melhorias implementadas
 
 ## 🆕 Novidades 2.3.1 (23/01/2026)
 
@@ -412,7 +421,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `id` como chave de matching
 - **Tabela**: `coletas`
-- **Criação Automática**: Sim
+- **Criação**: Via scripts SQL (`database/tabelas/001_criar_tabela_coletas.sql`)
 
 #### 2. Fretes (`FreteEntity`)
 
@@ -436,7 +445,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `id` como chave de matching
 - **Tabela**: `fretes`
-- **Criação Automática**: Sim
+- **Criação**: Via scripts SQL (`database/tabelas/002_criar_tabela_fretes.sql`)
 
 ---
 
@@ -473,7 +482,7 @@ Main.java (Orquestrador)
 - **MERGE**: Usa `(sequence_code, pick_sequence_code, mdfe_number)` como chave de matching
 - **Tabela**: `manifestos`
 - **Constraint UNIQUE**: `(sequence_code, identificador_unico)`
-- **Criação Automática**: Sim
+- **Criação**: Via scripts SQL (`database/tabelas/003_criar_tabela_manifestos.sql`)
 - **Deduplicação**: Sim (antes de salvar)
 
 #### 4. Cotações (`CotacaoEntity`)
@@ -496,7 +505,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `sequence_code` como chave de matching
 - **Tabela**: `cotacoes`
-- **Criação Automática**: Sim
+- **Criação**: Via scripts SQL (`database/tabelas/004_criar_tabela_cotacoes.sql`)
 - **Deduplicação**: Sim (antes de salvar)
 
 #### 5. Localização de Carga (`LocalizacaoCargaEntity`)
@@ -519,7 +528,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `sequence_number` como chave de matching
 - **Tabela**: `localizacao_cargas`
-- **Criação Automática**: Sim
+- **Criação**: Via scripts SQL (`database/tabelas/005_criar_tabela_localizacao_cargas.sql`)
 - **Deduplicação**: Sim (antes de salvar)
 
 #### 6. Contas a Pagar (`ContasAPagarDataExportEntity`)
@@ -542,7 +551,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `sequence_code` como chave de matching
 - **Tabela**: `contas_a_pagar`
-- **Criação Automática**: Sim (com índices e view para PowerBI)
+- **Criação**: Via scripts SQL (`database/tabelas/006_criar_tabela_contas_a_pagar.sql` + views)
 
 #### 7. Faturas por Cliente (`FaturaPorClienteEntity`)
 
@@ -564,7 +573,7 @@ Main.java (Orquestrador)
 **Repository:**
 - **MERGE**: Usa `unique_id` como chave de matching
 - **Tabela**: `faturas_por_cliente`
-- **Criação Automática**: Sim (com índices e view para PowerBI)
+- **Criação**: Via scripts SQL (`database/tabelas/007_criar_tabela_faturas_por_cliente.sql` + views)
 
 #### 8. Ocorrências (Data Export) — Preparado
 
@@ -589,6 +598,7 @@ Main.java (Orquestrador)
 
 2. EXTRAÇÃO PARALELA (Extract)
    ├── Thread 1: API GraphQL
+   │   ├── Usuários do Sistema (dim_usuarios)
    │   ├── Coletas
    │   └── Fretes
    └── Thread 2: API Data Export
@@ -597,6 +607,7 @@ Main.java (Orquestrador)
        ├── Localização de Carga
        ├── Contas a Pagar
        └── Faturas por Cliente
+   FASE 3 (por último): Faturas GraphQL (extração pesada, executada após as demais)
    
    Para cada API:
    ├── Construir requisição HTTP
@@ -620,7 +631,7 @@ Main.java (Orquestrador)
    └── Resultado: Lista de Entities (prontas para salvar)
 
 4. DEDUPLICAÇÃO (Opcional - para algumas entidades)
-   ├── Manifestos: Usa (sequence_code + identificador_unico)
+   ├── Manifestos: Usa (sequence_code, pick_sequence_code, mdfe_number)
    ├── Cotações: Usa sequence_code
    ├── Localização de Carga: Usa sequence_number
    ├── Outras entidades: Não aplica deduplicação (MERGE já previne duplicados)
@@ -752,19 +763,19 @@ O sistema implementa **duas camadas de proteção** contra duplicados:
 #### Entidades com Deduplicação
 
 **Manifestos** (`DataExportRunner.deduplicarManifestos()`):
-- **Chave**: `sequence_code + "_" + identificador_unico`
+- **Chave**: `(sequence_code, pick_sequence_code, mdfe_number)` – alinhada ao MERGE SQL
 - **Método**: `Collectors.toMap` com merge function
-- **Resultado**: Mantém o primeiro registro encontrado
+- **Resultado**: Mantém o registro mais recente (Keep Last: finishedAt/createdAt ou último processado)
 
 **Cotações** (`DataExportRunner.deduplicarCotacoes()`):
 - **Chave**: `sequence_code`
 - **Método**: `Collectors.toMap` com merge function
-- **Resultado**: Mantém o primeiro registro encontrado
+- **Resultado**: Mantém o registro mais recente (Keep Last: requestedAt ou último processado)
 
 **Localização de Carga** (`DataExportRunner.deduplicarLocalizacoes()`):
 - **Chave**: `sequence_number`
 - **Método**: `Collectors.toMap` com merge function
-- **Resultado**: Mantém o primeiro registro encontrado
+- **Resultado**: Mantém o registro mais recente (Keep Last: serviceAt ou último processado)
 
 #### Entidades sem Deduplicação
 

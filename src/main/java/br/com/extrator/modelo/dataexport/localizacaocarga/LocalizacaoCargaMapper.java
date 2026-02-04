@@ -3,9 +3,7 @@ package br.com.extrator.modelo.dataexport.localizacaocarga;
 import br.com.extrator.db.entity.LocalizacaoCargaEntity;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -22,11 +20,9 @@ import org.slf4j.LoggerFactory;
 public class LocalizacaoCargaMapper {
 
     private static final Logger logger = LoggerFactory.getLogger(LocalizacaoCargaMapper.class);
-    private final ObjectMapper objectMapper;
 
     public LocalizacaoCargaMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        // Usando MapperUtil para ObjectMapper compartilhado
     }
 
     /**
@@ -88,14 +84,8 @@ public class LocalizacaoCargaMapper {
         }
 
         // 3. Empacotamento de todos os metadados
-        try {
-            String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
-            entity.setMetadata(metadata);
-        } catch (JsonProcessingException e) {
-            logger.error("❌ CRÍTICO: Falha ao serializar metadados para localização carga {}: {}", 
-                dto.getSequenceNumber(), e.getMessage(), e);
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_number\":%d}", dto.getSequenceNumber()));
-        }
+        String metadata = MapperUtil.toJson(dto.getAllProperties());
+        entity.setMetadata(metadata);
 
         return entity;
     }

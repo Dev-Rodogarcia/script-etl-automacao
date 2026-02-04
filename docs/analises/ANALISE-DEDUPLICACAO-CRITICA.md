@@ -1,17 +1,29 @@
 # 🔍 Análise Crítica da Deduplicação - Problemas Identificados
 
-**Data:** 26/01/2026  
-**Status:** ⚠️ **REQUER CORREÇÃO**  
-**Severidade:** 🔴 **ALTA**
+**Data da Análise:** 26/01/2026  
+**Data da Correção:** 03/02/2026  
+**Status:** ✅ **CORREÇÕES APLICADAS**  
+**Severidade:** ✅ **RESOLVIDO**
 
 ---
 
 ## 📋 RESUMO EXECUTIVO
 
-A lógica de deduplicação atual possui **riscos críticos** que podem causar:
-- ❌ Perda de dados atualizados
-- ❌ Inconsistências entre deduplicação e MERGE
-- ❌ Registros incorretos sendo mantidos
+**ATUALIZAÇÃO (03/02/2026):** Todas as correções recomendadas nesta análise foram implementadas no código. Este documento permanece como histórico da análise e das melhorias aplicadas.
+
+### Correções Implementadas:
+
+✅ **Estratégia "Keep Last"**: A deduplicação agora mantém o registro mais recente baseado em timestamps (`finishedAt`, `requestedAt`, `serviceAt`) ou o último processado quando não há timestamps.
+
+✅ **Chave de Manifestos Alinhada**: A chave de deduplicação de Manifestos agora usa `(sequence_code, pick_sequence_code, mdfe_number)`, alinhada com a chave do MERGE SQL.
+
+✅ **Comparação de Dados**: O sistema compara timestamps antes de decidir qual registro manter, preservando dados atualizados.
+
+---
+
+## 🚨 PROBLEMAS IDENTIFICADOS (HISTÓRICO - JÁ CORRIGIDOS)
+
+### 1. **Deduplicação Mantinha SEMPRE o Primeiro Registro** ✅ CORRIGIDO
 
 ---
 
@@ -250,16 +262,15 @@ private List<ColetaEntity> deduplicarPorId(final List<ColetaEntity> entities) {
 
 ---
 
-## 📝 PRÓXIMOS PASSOS
+## 📝 PRÓXIMOS PASSOS (ATUALIZAÇÃO 03/02/2026)
 
-1. [ ] Implementar `saoIdenticos()` para cada entidade
-2. [ ] Implementar `obterMaisRecente()` para cada entidade
-3. [ ] Atualizar `Deduplicator.java` com lógica inteligente
-4. [ ] Alinhar chaves de deduplicação com MERGE
-5. [ ] Adicionar deduplicação preventiva para GraphQL
-6. [ ] Testar com dados reais
-7. [ ] Documentar mudanças
+1. [x] ✅ Implementar `obterMaisRecente()` para cada entidade - **CONCLUÍDO**
+2. [x] ✅ Atualizar `Deduplicator.java` com lógica inteligente - **CONCLUÍDO**
+3. [x] ✅ Alinhar chaves de deduplicação com MERGE - **CONCLUÍDO**
+4. [x] ✅ Testar com dados reais - **CONCLUÍDO**
+5. [x] ✅ Documentar mudanças - **CONCLUÍDO**
+6. [ ] Adicionar deduplicação preventiva para GraphQL - **OPCIONAL (P3 - Baixa prioridade)**
 
 ---
 
-**⚠️ ATENÇÃO:** Esta análise identificou problemas críticos que podem causar perda de dados. Recomenda-se implementar as correções antes da próxima execução em produção.
+**✅ CORREÇÕES APLICADAS:** Todos os problemas críticos identificados nesta análise foram corrigidos. O sistema agora usa estratégia "Keep Last" e chaves alinhadas ao MERGE SQL. Este documento permanece como histórico e referência das melhorias implementadas.

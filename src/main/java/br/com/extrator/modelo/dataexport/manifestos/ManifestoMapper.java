@@ -3,9 +3,7 @@ package br.com.extrator.modelo.dataexport.manifestos;
 import br.com.extrator.db.entity.ManifestoEntity;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
@@ -22,11 +20,8 @@ public class ManifestoMapper {
 
     private static final Logger logger = LoggerFactory.getLogger(ManifestoMapper.class);
 
-    private final ObjectMapper objectMapper;
-
     public ManifestoMapper() {
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        // Usando MapperUtil para ObjectMapper compartilhado
     }
 
     /**
@@ -181,35 +176,23 @@ public class ManifestoMapper {
         entity.setObsFinanceira(dto.getObsFinanceira());
 
         // 3. Empacotamento de todos os metadados
-        try {
-            final String metadata = objectMapper.writeValueAsString(dto.getAllProperties());
-            entity.setMetadata(metadata);
-            try {
-                if (dto.getOtherProperties() != null) {
-                    final Object ur = dto.getOtherProperties().get("mft_mte_unloading_recipient_names");
-                    if (ur != null) {
-                        entity.setUnloadingRecipientNames(objectMapper.writeValueAsString(ur));
-                    }
-                    final Object dr = dto.getOtherProperties().get("mft_mte_delivery_region_names");
-                    if (dr != null) {
-                        entity.setDeliveryRegionNames(objectMapper.writeValueAsString(dr));
-                    }
-                }
-            } catch (final JsonProcessingException ex) {
-                logger.warn("Erro ao serializar campos de lista para manifesto {}: {}", dto.getSequenceCode(), ex.getMessage());
+        final String metadata = MapperUtil.toJson(dto.getAllProperties());
+        entity.setMetadata(metadata);
+        
+        if (dto.getOtherProperties() != null) {
+            final Object ur = dto.getOtherProperties().get("mft_mte_unloading_recipient_names");
+            if (ur != null) {
+                entity.setUnloadingRecipientNames(MapperUtil.toJson(ur));
             }
-            
-            // 4. Calcular identificador único APÓS definir metadata
-            // Isso permite usar pick_sequence_code ou hash do metadata
-            entity.calcularIdentificadorUnico();
-            
-        } catch (final JsonProcessingException e) {
-            logger.error("❌ CRÍTICO: Falha ao serializar metadados para manifesto {}: {}", 
-                dto.getSequenceCode(), e.getMessage(), e);
-            entity.setMetadata(String.format("{\"error\":\"Serialization failed\",\"sequence_code\":%d}", dto.getSequenceCode()));
-            // Tentar calcular identificador mesmo com erro (usará fallback)
-            entity.calcularIdentificadorUnico();
+            final Object dr = dto.getOtherProperties().get("mft_mte_delivery_region_names");
+            if (dr != null) {
+                entity.setDeliveryRegionNames(MapperUtil.toJson(dr));
+            }
         }
+        
+        // 4. Calcular identificador único APÓS definir metadata
+        // Isso permite usar pick_sequence_code ou hash do metadata
+        entity.calcularIdentificadorUnico();
 
         return entity;
     }

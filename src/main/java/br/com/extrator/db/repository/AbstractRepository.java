@@ -3,10 +3,10 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.Date;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
@@ -19,13 +19,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.util.configuracao.CarregadorConfig;
+import br.com.extrator.util.banco.GerenciadorConexao;
 
 /**
  * Classe base abstrata para repositórios com operações comuns de banco de dados.
  * Fornece métodos de conexão, MERGE (UPSERT) e utilitários para conversão de tipos.
  *
- * VERSÃO CORRIGIDA: Implementa tratamento robusto de erros individuais,
- * commit em batches e logging detalhado para identificar registros problemáticos.
+ * VERSÃO CORRIGIDA: 
+ * - Usa HikariCP pool via GerenciadorConexao (CORRIGE vazamento de conexões)
+ * - Implementa tratamento robusto de erros individuais
+ * - Commit em batches e logging detalhado para identificar registros problemáticos
+ * - Isolamento de transação apropriado para ETL
  *
  * @param <T> Tipo da entidade gerenciada pelo repositório
  */
@@ -48,27 +52,28 @@ public abstract class AbstractRepository<T> {
         return CarregadorConfig.isContinuarAposErro();
     }
 
-    private final String urlConexao;
-    private final String usuario;
-    private final String senha;
-
     /**
-     * Construtor que inicializa as configurações de conexão com o banco de dados
+     * Construtor padrão.
+     * 
+     * NOTA: Configurações de banco de dados agora são gerenciadas pelo GerenciadorConexao.
+     * Não é mais necessário armazenar URL, usuário e senha aqui.
      */
     protected AbstractRepository() {
-        this.urlConexao = CarregadorConfig.obterUrlBancoDados();
-        this.usuario = CarregadorConfig.obterUsuarioBancoDados();
-        this.senha = CarregadorConfig.obterSenhaBancoDados();
+        // Configurações gerenciadas pelo GerenciadorConexao (pool HikariCP)
     }
 
     /**
-     * Obtém uma conexão com o banco de dados
-     * @return Conexão com o banco de dados
-     * @throws SQLException Se ocorrer um erro ao conectar
+     * Obtém uma conexão com o banco de dados do pool HikariCP.
+     * 
+     * CORREÇÃO CRÍTICA: Agora usa GerenciadorConexao em vez de DriverManager.getConnection().
+     * Isso elimina o vazamento de recursos e melhora drasticamente a performance.
+     * 
+     * @return Conexão do pool HikariCP
+     * @throws SQLException Se ocorrer um erro ao obter conexão do pool
      */
     protected Connection obterConexao() throws SQLException {
-        logger.debug("Conectando ao banco de dados: {}", urlConexao);
-        return DriverManager.getConnection(urlConexao, usuario, senha);
+        logger.debug("Obtendo conexão do pool HikariCP");
+        return GerenciadorConexao.obterConexao();
     }
 
     /**
@@ -100,7 +105,20 @@ public abstract class AbstractRepository<T> {
             totalRegistros, getClass().getSimpleName(), batchSize);
 
         try (Connection conexao = obterConexao()) {
+            // ✅ CORREÇÃO CRÍTICA #3: Configurar isolamento de transação apropriado
+            // READ_COMMITTED é suficiente para ETL e evita locks desnecessários
+            conexao.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             conexao.setAutoCommit(false);
+            
+            // ✅ CORREÇÃO CRÍTICA #3: Definir timeout de transação (30 segundos)
+            // Previne deadlocks e transações travadas
+            try (Statement stmt = conexao.createStatement()) {
+                stmt.execute("SET LOCK_TIMEOUT 30000"); // 30 segundos
+                logger.debug("Timeout de transação configurado: 30s");
+            } catch (SQLException e) {
+                logger.warn("Não foi possível definir LOCK_TIMEOUT: {}", e.getMessage());
+                // Continua - não é crítico
+            }
 
             try {
                 // Verificar que a tabela existe (NÃO criar - schema deve ser gerenciado via scripts SQL)
@@ -162,6 +180,7 @@ public abstract class AbstractRepository<T> {
 
                 // Commit final dos registros restantes
                 conexao.commit();
+                logger.debug("✅ Commit final executado com sucesso");
                 
                 // Log final com estatísticas
                 // IMPORTANTE: "totalSucesso" = operações bem-sucedidas (INSERTs + UPDATEs)
@@ -189,7 +208,12 @@ public abstract class AbstractRepository<T> {
 
             } catch (final SQLException e) {
                 // Erro crítico na conexão/transação
-                conexao.rollback();
+                try {
+                    conexao.rollback();
+                    logger.warn("⚠️ Rollback executado devido a erro: {}", e.getMessage());
+                } catch (SQLException rollbackEx) {
+                    logger.error("🚨 ERRO ao executar rollback: {}", rollbackEx.getMessage());
+                }
                 logger.error("🚨 Erro crítico ao salvar entidades de {}: {}", 
                     getClass().getSimpleName(), e.getMessage());
                 throw e;
@@ -545,5 +569,62 @@ public abstract class AbstractRepository<T> {
                 .replaceAll("_{2,}", "_")
                 .replaceAll("^_|_$", "")
                 .toLowerCase();
+    }
+
+    /**
+     * Adiciona uma coluna à tabela se ela não existir.
+     * 
+     * Utilitário centralizado para evitar duplicação em ColetaRepository e ManifestoRepository.
+     * 
+     * @param conn Conexão com o banco
+     * @param tabela Nome da tabela
+     * @param coluna Nome da coluna
+     * @param definicao Definição SQL da coluna (ex: "NVARCHAR(MAX)")
+     * @throws SQLException Se ocorrer erro ao verificar ou adicionar coluna
+     * @since 2.3.2
+     */
+    protected void adicionarColunaSeNaoExistir(
+        final Connection conn,
+        final String tabela,
+        final String coluna,
+        final String definicao
+    ) throws SQLException {
+        final String checkSql = 
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+            "WHERE TABLE_NAME = ? AND COLUMN_NAME = ?";
+        
+        try (final PreparedStatement ps = conn.prepareStatement(checkSql)) {
+            ps.setString(1, tabela);
+            ps.setString(2, coluna);
+            try (final ResultSet rs = ps.executeQuery()) {
+                if (rs.next() && rs.getInt(1) == 0) {
+                    final String alterSql = String.format(
+                        "ALTER TABLE %s ADD %s %s",
+                        tabela, coluna, definicao
+                    );
+                    try (final java.sql.Statement stmt = conn.createStatement()) {
+                        stmt.execute(alterSql);
+                        logger.info("Coluna {} adicionada à tabela {}", coluna, tabela);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Trunca string para tamanho máximo.
+     * 
+     * Utilitário centralizado para evitar duplicação em ManifestoRepository.
+     * 
+     * @param valor String a ser truncada
+     * @param maxLen Tamanho máximo
+     * @return String truncada ou original se menor que maxLen
+     * @since 2.3.2
+     */
+    protected String truncate(final String valor, final int maxLen) {
+        if (valor == null || valor.length() <= maxLen) {
+            return valor;
+        }
+        return valor.substring(0, maxLen);
     }
 }

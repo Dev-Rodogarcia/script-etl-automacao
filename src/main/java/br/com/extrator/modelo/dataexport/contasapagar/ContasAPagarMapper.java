@@ -7,19 +7,17 @@ import java.time.OffsetDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import br.com.extrator.db.entity.ContasAPagarDataExportEntity;
 import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
+import br.com.extrator.util.mapeamento.MapperUtil;
 
 /**
  * Mapper para conversão de FaturaAPagarDataExportDTO em FaturaAPagarDataExportEntity.
  */
 public class ContasAPagarMapper {
     private static final Logger logger = LoggerFactory.getLogger(ContasAPagarMapper.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
     
     /**
      * Converte DTO em Entity com tratamento de erros robusto.
@@ -99,12 +97,8 @@ public class ContasAPagarMapper {
         entity.setReconciliado(dto.getReconciled());
         
         // GERAR METADATA (JSON completo do DTO)
-        try {
-            entity.setMetadata(objectMapper.writeValueAsString(dto.getAllProperties()));
-        } catch (final com.fasterxml.jackson.core.JsonProcessingException e) {
-            logger.warn("Erro ao serializar metadata para Fatura a Pagar (Data Export): {}", e.getMessage());
-            entity.setMetadata("{}");
-        }
+        final String metadata = MapperUtil.toJson(dto.getAllProperties());
+        entity.setMetadata(metadata != null ? metadata : "{}");
         
         // DATA DE EXTRAÇÃO (sempre now)
         entity.setDataExtracao(LocalDateTime.now());

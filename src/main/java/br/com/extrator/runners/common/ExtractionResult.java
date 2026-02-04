@@ -83,10 +83,16 @@ public class ExtractionResult {
     
     public LogExtracaoEntity toLogEntity() {
         // Para DataExport, usa totalUnicos como registrosExtraidos no log
-        // Para GraphQL, usa registrosExtraidos diretamente
-        final int registrosParaLog = (totalUnicos > 0 && totalUnicos != registrosExtraidos) 
-            ? totalUnicos 
-            : registrosExtraidos;
+        // Para usuarios_sistema (MERGE por user_id), gravar o que foi efetivamente salvo para bater com o banco
+        // Para demais GraphQL, usa registrosExtraidos diretamente
+        final int registrosParaLog;
+        if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entityName)) {
+            registrosParaLog = registrosSalvos;
+        } else if (totalUnicos > 0 && totalUnicos != registrosExtraidos) {
+            registrosParaLog = totalUnicos;
+        } else {
+            registrosParaLog = registrosExtraidos;
+        }
         
         // LogExtracaoEntity aceita String no construtor e converte para enum
         return new LogExtracaoEntity(

@@ -1,20 +1,16 @@
 package br.com.extrator.modelo.dataexport.faturaporcliente;
 
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import br.com.extrator.db.entity.FaturaPorClienteEntity;
+import br.com.extrator.util.mapeamento.MapperUtil;
+import br.com.extrator.util.mapeamento.NumeroUtil;
+import br.com.extrator.util.mapeamento.DataUtil;
 
 /**
  * Mapper para converter FaturaPorClienteDTO em FaturaPorClienteEntity.
@@ -25,14 +21,9 @@ import br.com.extrator.db.entity.FaturaPorClienteEntity;
  */
 public class FaturaPorClienteMapper {
     private static final Logger logger = LoggerFactory.getLogger(FaturaPorClienteMapper.class);
-    private final ObjectMapper objectMapper;
-    private final DecimalFormat numberFormatUS;
 
     public FaturaPorClienteMapper() {
-        this.objectMapper = new ObjectMapper();
-        // CRÍTICO: Usar Locale.US para parsing correto (ponto decimal)
-        this.numberFormatUS = (DecimalFormat) java.text.NumberFormat.getInstance(Locale.US);
-        this.numberFormatUS.setParseBigDecimal(true);
+        // Usando MapperUtil e NumeroUtil para utilitários compartilhados
     }
 
     /**
@@ -114,10 +105,10 @@ public class FaturaPorClienteMapper {
             entity.setPedidosCliente(converterListaParaString(dto.getPedidosCliente()));
 
             // 8. Metadata (JSON completo do DTO)
-            final String metadata = objectMapper.writeValueAsString(dto);
+            final String metadata = MapperUtil.toJson(dto);
             entity.setMetadata(metadata);
 
-        } catch (final JsonProcessingException e) {
+        } catch (final Exception e) {
             logger.error("Erro ao mapear FaturaPorClienteDTO para Entity: {}", e.getMessage(), e);
             throw new RuntimeException("Falha no mapeamento de Fatura por Cliente", e);
         }
@@ -148,47 +139,23 @@ public class FaturaPorClienteMapper {
      * CRÍTICO: Usar Locale.US para evitar erro de parsing (123.69 != 12369.00).
      */
     private BigDecimal converterParaBigDecimal(final String valor) {
-        if (valor == null || valor.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            // Remove espaços e usa Locale.US para parsing correto
-            final String valorLimpo = valor.trim();
-            return (BigDecimal) numberFormatUS.parse(valorLimpo);
-        } catch (java.text.ParseException | ClassCastException e) {
-            logger.warn("Erro ao converter valor '{}' para BigDecimal: {}", valor, e.getMessage());
-            return null;
-        }
+        return NumeroUtil.parseBigDecimalUS(valor);
     }
 
     /**
      * Converte string ISO para LocalDate (formato yyyy-MM-dd).
+     * Delega para DataUtil.
      */
     private LocalDate converterParaLocalDate(final String data) {
-        if (data == null || data.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(data.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
-        } catch (final DateTimeParseException e) {
-            logger.warn("Erro ao converter data '{}' para LocalDate: {}", data, e.getMessage());
-            return null;
-        }
+        return DataUtil.parseLocalDate(data);
     }
 
     /**
      * Converte string ISO para OffsetDateTime.
+     * Delega para DataUtil.
      */
     private OffsetDateTime converterParaOffsetDateTime(final String dataHora) {
-        if (dataHora == null || dataHora.trim().isEmpty()) {
-            return null;
-        }
-        try {
-            return OffsetDateTime.parse(dataHora.trim(), DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        } catch (final DateTimeParseException e) {
-            logger.warn("Erro ao converter data/hora '{}' para OffsetDateTime: {}", dataHora, e.getMessage());
-            return null;
-        }
+        return DataUtil.parseOffsetDateTime(dataHora);
     }
 
     /**

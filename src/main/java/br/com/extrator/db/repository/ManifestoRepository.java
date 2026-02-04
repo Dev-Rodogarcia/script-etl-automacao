@@ -56,6 +56,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
      * - Múltiplos MDF-es (mesmo sequence_code, diferentes mdfe_number) são preservados
      * - Duplicados falsos (mesmo sequence_code, pick NULL, mdfe NULL, hash diferente) são eliminados
      * - O identificador_unico é atualizado no UPDATE, mas não é usado para matching
+     * 
+     * CORREÇÃO CRÍTICA #2: Validação do nome da tabela para prevenir SQL injection
      */
     @Override
     protected int executarMerge(final Connection conexao, final ManifestoEntity manifesto) throws SQLException {
@@ -63,6 +65,13 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         if (manifesto == null) {
             logger.error("❌ Tentativa de salvar ManifestoEntity NULL");
             throw new SQLException("Não é possível executar MERGE para Manifesto nulo");
+        }
+        
+        // ✅ CORREÇÃO CRÍTICA #2: Validar nome da tabela (prevenir SQL injection)
+        final String nomeTabela = getNomeTabela();
+        if (!nomeTabela.matches("^[a-zA-Z0-9_]+$")) {
+            logger.error("❌ Nome de tabela inválido detectado: {}", nomeTabela);
+            throw new SQLException("Nome de tabela contém caracteres inválidos: " + nomeTabela);
         }
         
         // Para Manifestos, o 'sequence_code' é a chave de negócio primária.
@@ -93,6 +102,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         logger.debug("→ Salvando manifesto sequence_code={}, identificador_unico={} (estrutura nova)", 
                     manifesto.getSequenceCode(), identificadorUnico);
 
+        // ✅ Nome da tabela já foi validado acima (apenas caracteres alfanuméricos e underscore)
         final String sql = String.format("""
             MERGE %s AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
