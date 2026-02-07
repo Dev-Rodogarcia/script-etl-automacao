@@ -41,7 +41,11 @@ public class FaturaPorClienteExtractor implements DataExportEntityExtractor<Fatu
     
     @Override
     public ResultadoExtracao<FaturaPorClienteDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Faturas por Cliente não usa filtro de data, busca últimas 24h
+        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarFaturasPorCliente(dataInicio, fim);
+        }
         return apiClient.buscarFaturasPorCliente();
     }
     

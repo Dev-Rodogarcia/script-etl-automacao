@@ -39,7 +39,11 @@ public class LocalizacaoCargaExtractor implements DataExportEntityExtractor<Loca
     
     @Override
     public ResultadoExtracao<LocalizacaoCargaDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Localização de Cargas não usa filtro de data, busca últimas 24h
+        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarLocalizacaoCarga(dataInicio, fim);
+        }
         return apiClient.buscarLocalizacaoCarga();
     }
     

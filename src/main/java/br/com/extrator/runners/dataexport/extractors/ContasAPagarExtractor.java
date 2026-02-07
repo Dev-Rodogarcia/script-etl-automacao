@@ -39,7 +39,11 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
     
     @Override
     public ResultadoExtracao<ContasAPagarDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Contas a Pagar não usa filtro de data, busca últimas 24h
+        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarContasAPagar(dataInicio, fim);
+        }
         return apiClient.buscarContasAPagar();
     }
     

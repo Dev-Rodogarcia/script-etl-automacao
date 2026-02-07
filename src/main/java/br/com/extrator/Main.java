@@ -1,5 +1,7 @@
 package br.com.extrator;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +22,8 @@ import br.com.extrator.comandos.validacao.ValidarManifestosComando;
 import br.com.extrator.comandos.validacao.VerificarTimestampsComando;
 import br.com.extrator.comandos.validacao.VerificarTimezoneComando;
 import br.com.extrator.servicos.LoggingService;
+import br.com.extrator.auditoria.execucao.ExecutionAuditor;
+import br.com.extrator.db.repository.ExecutionHistoryRepository;
 
 /**
  * Sistema de Extração de Dados do ESL Cloud - Orquestrador Principal
@@ -78,10 +82,17 @@ public class Main {
         // Organiza quaisquer logs .txt gerados na raiz, movendo-os para a pasta logs/
         organizarLogsTxtNaPastaLogs();
         
+        final LocalDateTime inicioExecucao = LocalDateTime.now();
+        String status = "SUCCESS";
+        String errorMessage = null;
+        String errorCategory = null;
+        int exitCode = 0;
+        
+        // Determina o comando a ser executado
+        final String nomeComando = (args.length == 0) ? "--fluxo-completo" : args[0].toLowerCase();
+        final String tipoExecucao = nomeComando.startsWith("--") ? nomeComando.substring(2) : nomeComando;
+        
         try {
-            
-            // Determina o comando a ser executado
-            final String nomeComando = (args.length == 0) ? "--fluxo-completo" : args[0].toLowerCase();
             
             // Busca e executa o comando
             final Comando comando = COMANDOS.getOrDefault(nomeComando, new ExibirAjudaComando());
@@ -94,14 +105,57 @@ public class Main {
             comando.executar(args);
             
         } catch (final Exception e) {
+            status = "ERROR";
+            errorMessage = e.getMessage();
+            errorCategory = e.getClass().getSimpleName();
+            exitCode = 1;
             logger.error("Erro durante execução: {}", e.getMessage(), e);
             System.err.println("❌ Erro durante execução: " + e.getMessage());
-            // Salva os logs antes de encerrar com código de erro
-            loggingService.pararCaptura();
-            System.exit(1);
+            
+            
         } finally {
+            final LocalDateTime fimExecucao = LocalDateTime.now();
+            final long duracaoSegundos = Duration.between(inicioExecucao, fimExecucao).getSeconds();
+            final int duracaoSegundosInt = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, duracaoSegundos));
+            
+            int totalRecords = 0;
+            try {
+                final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
+                totalRecords = repo.calcularTotalRegistros(inicioExecucao, fimExecucao);
+            } catch (final Throwable t) {
+                logger.warn("Falha ao calcular total de registros: {}", t.getMessage());
+            }
+            
+            ExecutionAuditor.registrarCsv(
+                fimExecucao,
+                status,
+                duracaoSegundosInt,
+                totalRecords,
+                tipoExecucao,
+                errorMessage
+            );
+            
+            try {
+                final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
+                repo.inserirHistorico(
+                    inicioExecucao,
+                    fimExecucao,
+                    duracaoSegundosInt,
+                    status,
+                    totalRecords,
+                    errorCategory,
+                    errorMessage
+                );
+            } catch (final Throwable t) {
+                logger.warn("Falha ao gravar historico de execucao no banco: {}", t.getMessage());
+            }
+            
             // Finaliza captura de logs
             loggingService.pararCaptura();
+        }
+        
+        if (exitCode != 0) {
+            System.exit(exitCode);
         }
     }
 

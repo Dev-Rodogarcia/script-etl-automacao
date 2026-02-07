@@ -41,17 +41,24 @@ echo ═════════════════════════
 echo.
 
 REM Compilar projeto automaticamente (se necessário)
-echo Compilando projeto (se necessário)...
-call "%~dp0mvn.bat" -q -DskipTests package
-if errorlevel 1 (
-    echo ❌ ERRO: Compilação falhou
-    echo.
-    pause
-    exit /b 1
+if /i "%PROD_MODE%"=="1" (
+    echo Modo producao: pulando compilacao.
+) else (
+    echo Compilando projeto (se necessario)...
+    call "%~dp0mvn.bat" -q -DskipTests package
+    if errorlevel 1 (
+        echo ERRO: Compilacao falhou
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 if not exist "target\extrator.jar" (
-    echo ❌ ERRO: Arquivo target\extrator.jar não encontrado após compilação!
+    echo ERRO: Arquivo target\extrator.jar nao encontrado!
+    if /i "%PROD_MODE%"=="1" (
+        echo Modo producao requer JAR precompilado.
+    )
     echo.
     pause
     exit /b 1

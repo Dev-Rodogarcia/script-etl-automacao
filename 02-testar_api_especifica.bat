@@ -199,12 +199,22 @@ if /i "%API%"=="graphql" (
 )
 
 REM Compilar e gerar JAR antes de executar
-echo Compilando projeto (se necessario)...
-call "%~dp0mvn.bat" -q -DskipTests clean package
-if errorlevel 1 goto :COMPILE_FAIL
+if /i "%PROD_MODE%"=="1" (
+    echo Modo producao: pulando compilacao.
+) else (
+    echo Compilando projeto (se necessario)...
+    call "%~dp0mvn.bat" -q -DskipTests clean package
+    if errorlevel 1 goto :COMPILE_FAIL
+)
 
 if not exist "target\extrator.jar" (
-    echo ERRO: Arquivo target\extrator.jar nao encontrado apos compilacao!
+    echo ERRO: Arquivo target\extrator.jar nao encontrado!
+    if /i "%PROD_MODE%"=="1" (
+        echo Modo producao requer JAR precompilado.
+    ) else (
+        echo.
+        echo Execute primeiro: mvn clean package -DskipTests
+    )
     echo.
     pause
     exit /b 1

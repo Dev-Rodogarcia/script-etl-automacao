@@ -39,7 +39,11 @@ public class CotacaoExtractor implements DataExportEntityExtractor<CotacaoDTO> {
     
     @Override
     public ResultadoExtracao<CotacaoDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Cotações não usam filtro de data, busca últimas 24h
+        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarCotacoes(dataInicio, fim);
+        }
         return apiClient.buscarCotacoes();
     }
     

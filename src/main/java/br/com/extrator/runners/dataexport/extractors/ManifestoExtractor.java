@@ -39,7 +39,11 @@ public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDT
     
     @Override
     public ResultadoExtracao<ManifestoDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Manifestos não usam filtro de data, busca últimas 24h
+        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarManifestos(dataInicio, fim);
+        }
         return apiClient.buscarManifestos();
     }
     

@@ -279,17 +279,25 @@ echo ================================================================
 echo Compilando projeto...
 echo ================================================================
 
-call "%~dp0mvn.bat" -DskipTests clean package
-if errorlevel 1 (
-    echo ERRO: Compilacao falhou
-    echo.
-    pause
-    exit /b 1
+if /i "%PROD_MODE%"=="1" (
+    echo Modo producao: pulando compilacao.
+) else (
+    call "%~dp0mvn.bat" -DskipTests clean package
+    if errorlevel 1 (
+        echo ERRO: Compilacao falhou
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 if not exist "target\extrator.jar" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
-    echo Execute primeiro: mvn clean package -DskipTests
+    if /i "%PROD_MODE%"=="1" (
+        echo Modo producao requer JAR precompilado.
+    ) else (
+        echo Execute primeiro: mvn clean package -DskipTests
+    )
     echo.
     pause
     exit /b 1

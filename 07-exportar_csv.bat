@@ -14,18 +14,25 @@ echo ================================================================
 echo.
 
 REM Compilar e gerar JAR antes de executar
-echo Compilando projeto (se necessario)...
-call "%~dp0mvn.bat" -q -DskipTests clean package
-if errorlevel 1 (
-    echo ERRO: Compilacao falhou
-    echo.
-    pause
-    exit /b 1
+if /i "%PROD_MODE%"=="1" (
+    echo Modo producao: pulando compilacao.
+) else (
+    echo Compilando projeto (se necessario)...
+    call "%~dp0mvn.bat" -q -DskipTests clean package
+    if errorlevel 1 (
+        echo ERRO: Compilacao falhou
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
 REM Verificar se o JAR existe
 if not exist "target\extrator.jar" (
-    echo ERRO: Arquivo target\extrator.jar nao encontrado apos compilacao!
+    echo ERRO: Arquivo target\extrator.jar nao encontrado!
+    if /i "%PROD_MODE%"=="1" (
+        echo Modo producao requer JAR precompilado.
+    )
     echo.
     pause
     exit /b 1
