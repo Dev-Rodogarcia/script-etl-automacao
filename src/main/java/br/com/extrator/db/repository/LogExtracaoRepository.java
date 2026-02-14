@@ -97,6 +97,49 @@ public class LogExtracaoRepository {
         
         return Optional.empty();
     }
+
+    /**
+     * Busca o último log de extração de uma entidade dentro de uma janela de execução.
+     * Útil para correlacionar logs do bloco atual sem risco de capturar execução antiga.
+     *
+     * @param entidade Nome da entidade
+     * @param inicioExecucao Início da janela de execução
+     * @param fimExecucao Fim da janela de execução
+     * @return Optional com o último log encontrado na janela
+     */
+    public Optional<LogExtracaoEntity> buscarUltimoLogPorEntidadeNoIntervaloExecucao(final String entidade,
+                                                                                       final LocalDateTime inicioExecucao,
+                                                                                       final LocalDateTime fimExecucao) {
+        final String sql = """
+            SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
+                   registros_extraidos, paginas_processadas, mensagem
+            FROM dbo.log_extracoes
+            WHERE entidade = ?
+              AND timestamp_fim >= ?
+              AND timestamp_fim <= ?
+            ORDER BY timestamp_fim DESC
+            """;
+
+        try (Connection conn = GerenciadorConexao.obterConexao();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, entidade);
+            stmt.setTimestamp(2, Timestamp.valueOf(inicioExecucao));
+            stmt.setTimestamp(3, Timestamp.valueOf(fimExecucao));
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(criarLogExtracaoEntity(rs));
+                }
+            }
+
+        } catch (final SQLException e) {
+            logger.warn("Erro ao buscar log da entidade {} na janela {} até {}: {}",
+                entidade, inicioExecucao, fimExecucao, e.getMessage());
+        }
+
+        return Optional.empty();
+    }
     
     /**
      * Busca a última extração que tenha extraído dados do mesmo período.

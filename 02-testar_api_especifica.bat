@@ -203,7 +203,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto (se necessario)...
-    call "%~dp0mvn.bat" -q -DskipTests clean package
+    call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 goto :COMPILE_FAIL
 )
 
@@ -213,7 +213,7 @@ if not exist "target\extrator.jar" (
         echo Modo producao requer JAR precompilado.
     ) else (
         echo.
-        echo Execute primeiro: mvn clean package -DskipTests
+        echo Execute primeiro: mvn package -DskipTests
     )
     echo.
     pause
@@ -242,12 +242,15 @@ if defined JAVA_HOME (
     )
 )
 
+call :AUTH_CHECK RUN_TESTAR_API "Testar API especifica"
+if errorlevel 1 exit /b 1
+
 set "CMD_ARGS=--testar-api %API%"
 if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
-echo Executando: java -jar "target\extrator.jar" %CMD_ARGS%
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" %CMD_ARGS%
 echo.
 
-java -jar "target\extrator.jar" %CMD_ARGS%
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" %CMD_ARGS%
 if errorlevel 1 goto :FAIL
 goto :SUCCESS
 
@@ -274,3 +277,17 @@ exit /b 1
 :END
 echo.
 pause
+exit /b 0
+
+:AUTH_CHECK
+if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+echo.
+echo Autenticacao obrigatoria para executar esta acao.
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+if errorlevel 1 (
+    echo Acesso negado.
+    echo.
+    pause
+    exit /b 1
+)
+exit /b 0

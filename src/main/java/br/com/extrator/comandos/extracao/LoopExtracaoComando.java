@@ -153,10 +153,14 @@ public class LoopExtracaoComando implements Comando {
         try {
             final br.com.extrator.servicos.LoggingService ls = new br.com.extrator.servicos.LoggingService();
             ls.iniciarCaptura("extracao_dados_loop");
+            String statusExecucao = "SUCCESS";
             try {
                 new ExecutarFluxoCompletoComando().executar(new String[] { "--fluxo-completo" });
+            } catch (Exception e) {
+                statusExecucao = "ERROR";
+                throw e;
             } finally {
-                ls.pararCaptura();
+                ls.pararCaptura(statusExecucao);
             }
         } catch (Exception e) {
             log.error("Falha ao executar extracao: {}", e.getMessage());

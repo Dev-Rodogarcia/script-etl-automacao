@@ -25,86 +25,86 @@ import br.com.extrator.db.repository.LogExtracaoRepository;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
- * Classe responsável por validar a completude e integridade dos dados
- * extraídos das APIs do ESL Cloud.
+ * Classe responsÃ¡vel por validar a completude e integridade dos dados
+ * extraÃ­dos das APIs do ESL Cloud.
  * 
- * Verifica se os dados foram extraídos corretamente, identifica lacunas
- * e inconsistências nos dados armazenados.
+ * Verifica se os dados foram extraÃ­dos corretamente, identifica lacunas
+ * e inconsistÃªncias nos dados armazenados.
  * 
- * VERSÃO CORRIGIDA: Agora confia no log_extracoes quando a extração foi COMPLETA,
- * eliminando falsos-positivos causados por dados de múltiplas extrações.
+ * VERSÃƒO CORRIGIDA: Agora confia no log_extracoes quando a extraÃ§Ã£o foi COMPLETA,
+ * eliminando falsos-positivos causados por dados de mÃºltiplas extraÃ§Ãµes.
  */
 public class AuditoriaValidator {
     private static final Logger logger = LoggerFactory.getLogger(AuditoriaValidator.class);
     
-    // Cache para validações de colunas (evita consultas repetidas)
+    // Cache para validaÃ§Ãµes de colunas (evita consultas repetidas)
     private final Map<String, Boolean> cacheValidacaoColunas = new HashMap<>();
     
-    // Repository para consultar logs de extração
+    // Repository para consultar logs de extraÃ§Ã£o
     private final LogExtracaoRepository logExtracaoRepository;
     
     /**
-     * Construtor que inicializa o repository de logs de extração.
+     * Construtor que inicializa o repository de logs de extraÃ§Ã£o.
      */
     public AuditoriaValidator() {
         this.logExtracaoRepository = new LogExtracaoRepository();
         // NOTA: As tabelas devem ser criadas via scripts SQL da pasta database/
-        // O LogExtracaoRepository não cria mais tabelas automaticamente
+        // O LogExtracaoRepository nÃ£o cria mais tabelas automaticamente
     }
     
     /**
-     * Consulta o log de extração mais recente para uma entidade
+     * Consulta o log de extraÃ§Ã£o mais recente para uma entidade
      * 
      * @param nomeEntidade Nome da entidade a ser consultada
-     * @param dataInicio Data de início do período de interesse
-     * @return LogExtracaoEntity da última extração ou null se não encontrada
+     * @param dataInicio Data de inÃ­cio do perÃ­odo de interesse
+     * @return LogExtracaoEntity da Ãºltima extraÃ§Ã£o ou null se nÃ£o encontrada
      */
     private LogExtracaoEntity consultarLogExtracao(final String nomeEntidade, final Instant dataInicio) {
         try {
-            logger.debug("Consultando log de extração para entidade: {}", nomeEntidade);
+            logger.debug("Consultando log de extraÃ§Ã£o para entidade: {}", nomeEntidade);
             
             final Optional<LogExtracaoEntity> ultimoLog = logExtracaoRepository.buscarUltimoLogPorEntidade(nomeEntidade);
             
             if (ultimoLog.isPresent()) {
                 final LogExtracaoEntity log = ultimoLog.get();
                 
-                // Verificar se o log é recente (dentro do período de interesse)
+                // Verificar se o log Ã© recente (dentro do perÃ­odo de interesse)
                 final LocalDateTime dataInicioLocal = LocalDateTime.ofInstant(dataInicio, ZoneOffset.UTC);
                 if (log.getTimestampFim().isAfter(dataInicioLocal)) {
-                    logger.info("Log de extração encontrado para {}: Status={}, Registros={}, Páginas={}", 
+                    logger.info("Log de extraÃ§Ã£o encontrado para {}: Status={}, Registros={}, PÃ¡ginas={}", 
                         nomeEntidade, log.getStatusFinal(), log.getRegistrosExtraidos(), log.getPaginasProcessadas());
                     return log;
                 } else {
-                    logger.debug("Log de extração encontrado para {} mas é anterior ao período de interesse", nomeEntidade);
+                    logger.debug("Log de extraÃ§Ã£o encontrado para {} mas Ã© anterior ao perÃ­odo de interesse", nomeEntidade);
                 }
             } else {
-                logger.debug("Nenhum log de extração encontrado para {}", nomeEntidade);
+                logger.debug("Nenhum log de extraÃ§Ã£o encontrado para {}", nomeEntidade);
             }
             
         } catch (final Exception e) {
-            logger.error("Erro ao consultar log de extração para {}: {}", nomeEntidade, e.getMessage(), e);
+            logger.error("Erro ao consultar log de extraÃ§Ã£o para {}: {}", nomeEntidade, e.getMessage(), e);
         }
         
         return null;
     }
     
     /**
-     * Valida uma entidade específica verificando completude dos dados.
+     * Valida uma entidade especÃ­fica verificando completude dos dados.
      * 
-     * VERSÃO CORRIGIDA: Agora confia no log_extracoes quando status = COMPLETO.
-     * Não compara com contagem do banco para evitar falsos-positivos causados
-     * por dados de múltiplas extrações.
+     * VERSÃƒO CORRIGIDA: Agora confia no log_extracoes quando status = COMPLETO.
+     * NÃ£o compara com contagem do banco para evitar falsos-positivos causados
+     * por dados de mÃºltiplas extraÃ§Ãµes.
      * 
-     * @param conexao Conexão com o banco de dados
+     * @param conexao ConexÃ£o com o banco de dados
      * @param nomeEntidade Nome da entidade a ser validada
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
-     * @return ResultadoValidacaoEntidade com o resultado da validação
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
+     * @return ResultadoValidacaoEntidade com o resultado da validaÃ§Ã£o
      */
     public ResultadoValidacaoEntidade validarEntidade(final Connection conexao, final String nomeEntidade, 
                                                      final Instant dataInicio, final Instant dataFim) {
-        logger.info("🔍 Auditando {}...", nomeEntidade);
-        logger.debug("Parâmetros: dataInicio={}, dataFim={}", dataInicio, dataFim);
+        logger.info("ðŸ” Auditando {}...", nomeEntidade);
+        logger.debug("ParÃ¢metros: dataInicio={}, dataFim={}", dataInicio, dataFim);
         
         final ResultadoValidacaoEntidade resultado = new ResultadoValidacaoEntidade();
         resultado.setNomeEntidade(nomeEntidade);
@@ -112,42 +112,54 @@ public class AuditoriaValidator {
         resultado.setDataFim(dataFim);
         final String nomeTabela = mapearNomeTabela(nomeEntidade);
         
-        // PASSO 1: Consultar log de extrações primeiro
+        // PASSO 1: Consultar log de extraÃ§Ãµes primeiro
         final LogExtracaoEntity logExtracao = consultarLogExtracao(nomeEntidade, dataInicio);
         if (logExtracao != null) {
-             logger.info("📊 Log de extração encontrado para {}: status={}, registros={}, páginas={}", 
+             logger.info("ðŸ“Š Log de extraÃ§Ã£o encontrado para {}: status={}, registros={}, pÃ¡ginas={}", 
                  nomeEntidade, logExtracao.getStatusFinal(), logExtracao.getRegistrosExtraidos(), logExtracao.getPaginasProcessadas());
              
-             // Se a extração foi interrompida ou teve erro, ajustar expectativas
+             // Se a extraÃ§Ã£o foi interrompida ou teve erro, ajustar expectativas
              switch (logExtracao.getStatusFinal()) {
                  case INCOMPLETO_LIMITE -> {
-                     logger.warn("⚠️ Extração de {} foi interrompida por limite. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
-                     resultado.adicionarObservacao("Extração interrompida por limite: " + logExtracao.getMensagem());
+                     logger.warn("âš ï¸ ExtraÃ§Ã£o de {} foi interrompida por limite. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
+                     resultado.adicionarObservacao("ExtraÃ§Ã£o interrompida por limite: " + logExtracao.getMensagem());
+                 }
+                 case INCOMPLETO_DADOS -> {
+                     logger.warn("âš ï¸ ExtraÃ§Ã£o de {} concluiu com dados invÃ¡lidos descartados. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
+                     resultado.adicionarObservacao("ExtraÃ§Ã£o com dados invÃ¡lidos na origem: " + logExtracao.getMensagem());
+                 }
+                 case INCOMPLETO_DB -> {
+                     logger.warn("âš ï¸ ExtraÃ§Ã£o de {} concluiu com divergÃªncia de salvamento. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
+                     resultado.adicionarObservacao("ExtraÃ§Ã£o com divergÃªncia de persistÃªncia: " + logExtracao.getMensagem());
+                 }
+                 case INCOMPLETO -> {
+                     logger.warn("âš ï¸ ExtraÃ§Ã£o de {} ficou incompleta sem categoria especÃ­fica. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
+                     resultado.adicionarObservacao("ExtraÃ§Ã£o incompleta (status legado): " + logExtracao.getMensagem());
                  }
                  case ERRO_API -> {
-                     logger.warn("❌ Extração de {} teve erro de API. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
-                     resultado.adicionarObservacao("Erro na extração: " + logExtracao.getMensagem());
+                     logger.warn("âŒ ExtraÃ§Ã£o de {} teve erro de API. Detalhes: {}", nomeEntidade, logExtracao.getMensagem());
+                     resultado.adicionarObservacao("Erro na extraÃ§Ã£o: " + logExtracao.getMensagem());
                  }
                  case COMPLETO -> {
-                     logger.info("✅ Extração de {} foi completada com sucesso", nomeEntidade);
-                     resultado.adicionarObservacao("Extração completada com sucesso");
+                     logger.info("âœ… ExtraÃ§Ã£o de {} foi completada com sucesso", nomeEntidade);
+                     resultado.adicionarObservacao("ExtraÃ§Ã£o completada com sucesso");
                  }
-                 default -> logger.debug("Status de extração não reconhecido: {}", logExtracao.getStatusFinal());
+                 default -> logger.debug("Status de extraÃ§Ã£o nÃ£o reconhecido: {}", logExtracao.getStatusFinal());
              }
          } else {
-             logger.warn("⚠️ Nenhum log de extração encontrado para {} no período especificado", nomeEntidade);
-             resultado.adicionarObservacao("Nenhum log de extração encontrado para o período");
+             logger.warn("âš ï¸ Nenhum log de extraÃ§Ã£o encontrado para {} no perÃ­odo especificado", nomeEntidade);
+             resultado.adicionarObservacao("Nenhum log de extraÃ§Ã£o encontrado para o perÃ­odo");
          }
         
         try {
-            // Verificar se a tabela existe (NÃO criar - schema deve ser gerenciado via scripts SQL)
+            // Verificar se a tabela existe (NÃƒO criar - schema deve ser gerenciado via scripts SQL)
             if (!verificarExistenciaTabela(conexao, nomeTabela)) {
                 final String erro = String.format(
-                    "Tabela '%s' não encontrada. Execute os scripts SQL da pasta 'database/' antes de rodar a aplicação. " +
-                    "Veja database/README.md para instruções.",
+                    "Tabela '%s' nÃ£o encontrada. Execute os scripts SQL da pasta 'database/' antes de rodar a aplicaÃ§Ã£o. " +
+                    "Veja database/README.md para instruÃ§Ãµes.",
                     nomeEntidade
                 );
-                logger.error("❌ {}", erro);
+                logger.error("âŒ {}", erro);
                 resultado.setErro(erro);
                 resultado.setStatus(StatusValidacao.ERRO);
                 return resultado;
@@ -155,25 +167,25 @@ public class AuditoriaValidator {
             
             // Validar se a coluna data_extracao existe
             if (!validarColunaExiste(conexao, nomeTabela, "data_extracao")) {
-                final String erro = "Coluna 'data_extracao' não encontrada na tabela: " + nomeEntidade;
-                logger.error("❌ {}", erro);
+                final String erro = "Coluna 'data_extracao' nÃ£o encontrada na tabela: " + nomeEntidade;
+                logger.error("âŒ {}", erro);
                 resultado.setErro(erro);
                 resultado.setStatus(StatusValidacao.ERRO);
                 return resultado;
             }
             
-            // ✅ CORREÇÃO: Comparar dados do banco com dados do log_extracoes
+            // âœ… CORREÃ‡ÃƒO: Comparar dados do banco com dados do log_extracoes
             if (logExtracao != null && logExtracao.getStatusFinal() == StatusExtracao.COMPLETO) {
                 // Comparar: usar registros_extraidos do log como "esperado" e contar no banco
                 final int registrosEsperados = logExtracao.getRegistrosExtraidos();
                 
-                // Contar registros das últimas 24 horas (janela mais ampla e confiável)
+                // Contar registros das Ãºltimas 24 horas (janela mais ampla e confiÃ¡vel)
                 final Instant agora = Instant.now();
                 final Instant inicio24h = agora.minusSeconds(24 * 60 * 60);
                 final long registros24h = contarRegistrosPorDataExtracao(conexao, nomeTabela, inicio24h, agora, resultado);
                 
-                // Usar registros das últimas 24h como base de comparação
-                // Isso é mais confiável que usar a janela exata do log, pois data_extracao
+                // Usar registros das Ãºltimas 24h como base de comparaÃ§Ã£o
+                // Isso Ã© mais confiÃ¡vel que usar a janela exata do log, pois data_extracao
                 // pode ter timestamps diferentes do timestamp_inicio/fim do log
                 resultado.setTotalRegistros(registros24h);
                 resultado.setRegistrosUltimas24h(registros24h);
@@ -184,17 +196,17 @@ public class AuditoriaValidator {
                     resultado.setPercentualCompletude((registros24h * 100.0) / registrosEsperados);
                 }
                 
-                resultado.setColunaUtilizada("log_extracoes (comparação banco vs log - últimas 24h)");
+                resultado.setColunaUtilizada("log_extracoes (comparaÃ§Ã£o banco vs log - Ãºltimas 24h)");
                 
-                logger.info("✅ Comparando banco vs log para {}: {} registros no banco (24h), {} esperados do log", 
+                logger.info("âœ… Comparando banco vs log para {}: {} registros no banco (24h), {} esperados do log", 
                     nomeEntidade, registros24h, registrosEsperados);
                 
             } else {
-                // Se não tem log ou foi incompleto, fazer contagem tradicional no banco
+                // Se nÃ£o tem log ou foi incompleto, fazer contagem tradicional no banco
                 final long totalRegistros = contarRegistrosPorDataExtracao(conexao, nomeTabela, dataInicio, dataFim, resultado);
                 resultado.setTotalRegistros(totalRegistros);
                 
-                // Contar registros das últimas 24 horas
+                // Contar registros das Ãºltimas 24 horas
                 final Instant agora = Instant.now();
                 final Instant inicio24h = agora.minusSeconds(24 * 60 * 60);
                 final long registros24h = contarRegistrosPorDataExtracao(conexao, nomeTabela, inicio24h, agora, null);
@@ -203,11 +215,11 @@ public class AuditoriaValidator {
                 logger.debug("Contagem do banco para {} (tabela: {}): {} registros", nomeEntidade, nomeTabela, totalRegistros);
             }
             
-            // Verificar registros com dados nulos críticos
+            // Verificar registros com dados nulos crÃ­ticos
             final long registrosComNulos = contarRegistrosComNulos(conexao, nomeTabela);
             resultado.setRegistrosComNulos(registrosComNulos);
             
-            // Verificar último registro extraído
+            // Verificar Ãºltimo registro extraÃ­do
             final Instant ultimaExtracao = obterDataUltimaExtracao(conexao, nomeTabela);
             resultado.setUltimaExtracao(ultimaExtracao);
             
@@ -216,18 +228,18 @@ public class AuditoriaValidator {
                 investigarCausaRaizZeroRegistros(conexao, nomeTabela, resultado);
             }
             
-            // Determinar status da validação
+            // Determinar status da validaÃ§Ã£o
             determinarStatusValidacao(resultado, logExtracao);
             
-            logger.info("✓ {}: {} registros, coluna: {}", 
+            logger.info("âœ“ {}: {} registros, coluna: {}", 
                 nomeEntidade, resultado.getTotalRegistros(), resultado.getColunaUtilizada());
             
         } catch (final SQLException e) {
-            logger.error("❌ Erro SQL ao validar entidade {}: {}", nomeEntidade, e.getMessage(), e);
+            logger.error("âŒ Erro SQL ao validar entidade {}: {}", nomeEntidade, e.getMessage(), e);
             resultado.setErro("Erro SQL: " + e.getMessage());
             resultado.setStatus(StatusValidacao.ERRO);
         } catch (final Exception e) {
-            logger.error("❌ Erro inesperado ao validar entidade {}: {}", nomeEntidade, e.getMessage(), e);
+            logger.error("âŒ Erro inesperado ao validar entidade {}: {}", nomeEntidade, e.getMessage(), e);
             resultado.setErro("Erro inesperado: " + e.getMessage());
             resultado.setStatus(StatusValidacao.ERRO);
         }
@@ -236,12 +248,12 @@ public class AuditoriaValidator {
     }
     
     /**
-     * Verifica se existem dados recentes (últimas 24 horas) em todas as entidades.
+     * Verifica se existem dados recentes (Ãºltimas 24 horas) em todas as entidades.
      * 
-     * @param conexao Conexão com o banco de dados
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
-     * @return true se existem dados recentes, false caso contrário
+     * @param conexao ConexÃ£o com o banco de dados
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
+     * @return true se existem dados recentes, false caso contrÃ¡rio
      */
     public boolean verificarExistenciaDadosRecentes(final Connection conexao, final Instant dataInicio, final Instant dataFim) {
         try {
@@ -262,19 +274,19 @@ public class AuditoriaValidator {
             return false; // Nenhuma entidade tem dados recentes
             
         } catch (final SQLException e) {
-            logger.error("Erro ao verificar existência de dados recentes: {}", e.getMessage(), e);
+            logger.error("Erro ao verificar existÃªncia de dados recentes: {}", e.getMessage(), e);
             return false;
         }
     }
     
     /**
-     * Verifica se todas as tabelas necessárias existem.
+     * Verifica se todas as tabelas necessÃ¡rias existem.
      * 
-     * ⚠️ IMPORTANTE: Em produção, as tabelas devem ser criadas via scripts SQL versionados (pasta database/).
-     * Este método apenas verifica a existência, não cria tabelas.
+     * âš ï¸ IMPORTANTE: Em produÃ§Ã£o, as tabelas devem ser criadas via scripts SQL versionados (pasta database/).
+     * Este mÃ©todo apenas verifica a existÃªncia, nÃ£o cria tabelas.
      * 
-     * @param conexao Conexão com o banco de dados
-     * @throws SQLException Se alguma tabela não existir
+     * @param conexao ConexÃ£o com o banco de dados
+     * @throws SQLException Se alguma tabela nÃ£o existir
      */
     public void verificarTodasTabelasExistem(final Connection conexao) throws SQLException {
         final List<String> entidades = List.of(
@@ -284,44 +296,44 @@ public class AuditoriaValidator {
             ConstantesEntidades.MANIFESTOS, ConstantesEntidades.LOCALIZACAO_CARGAS
         );
         
-        logger.info("🔍 Verificando se todas as tabelas existem...");
+        logger.info("ðŸ” Verificando se todas as tabelas existem...");
         final List<String> tabelasFaltando = new ArrayList<>();
         
         for (final String entidade : entidades) {
             final String nomeTabela = mapearNomeEntidadeParaTabela(entidade);
             if (!verificarExistenciaTabela(conexao, nomeTabela)) {
                 tabelasFaltando.add(entidade);
-                logger.error("❌ Tabela '{}' não encontrada para entidade '{}'", nomeTabela, entidade);
+                logger.error("âŒ Tabela '{}' nÃ£o encontrada para entidade '{}'", nomeTabela, entidade);
             } else {
-                logger.debug("✅ Tabela '{}' existe", nomeTabela);
+                logger.debug("âœ… Tabela '{}' existe", nomeTabela);
             }
         }
         
         if (!tabelasFaltando.isEmpty()) {
             final String mensagem = String.format(
-                "As seguintes tabelas não existem: %s. Execute os scripts SQL da pasta 'database/' antes de rodar a aplicação. " +
-                "Veja database/README.md para instruções.",
+                "As seguintes tabelas nÃ£o existem: %s. Execute os scripts SQL da pasta 'database/' antes de rodar a aplicaÃ§Ã£o. " +
+                "Veja database/README.md para instruÃ§Ãµes.",
                 String.join(", ", tabelasFaltando)
             );
-            logger.error("❌ {}", mensagem);
+            logger.error("âŒ {}", mensagem);
             throw new SQLException(mensagem);
         }
         
-        logger.info("✅ Todas as tabelas verificadas e existem no banco de dados");
+        logger.info("âœ… Todas as tabelas verificadas e existem no banco de dados");
     }
     
     /**
-     * ⚠️ DEPRECATED: Use verificarTodasTabelasExistem() em vez deste método.
+     * âš ï¸ DEPRECATED: Use verificarTodasTabelasExistem() em vez deste mÃ©todo.
      * 
-     * @deprecated Em produção, as tabelas devem ser criadas via scripts SQL versionados (pasta database/).
+     * @deprecated Em produÃ§Ã£o, as tabelas devem ser criadas via scripts SQL versionados (pasta database/).
      */
     @Deprecated
     public void criarTodasTabelasSeNaoExistirem(final Connection conexao) {
         try {
             verificarTodasTabelasExistem(conexao);
         } catch (final SQLException e) {
-            logger.error("❌ Erro ao verificar tabelas: {}", e.getMessage());
-            // Não lançar exceção para manter compatibilidade com código legado
+            logger.error("âŒ Erro ao verificar tabelas: {}", e.getMessage());
+            // NÃ£o lanÃ§ar exceÃ§Ã£o para manter compatibilidade com cÃ³digo legado
         }
     }
     
@@ -329,7 +341,7 @@ public class AuditoriaValidator {
      * Mapeia o nome da entidade para o nome da tabela no banco.
      */
     private String mapearNomeEntidadeParaTabela(final String nomeEntidade) {
-        // Os nomes das entidades já correspondem aos nomes das tabelas
+        // Os nomes das entidades jÃ¡ correspondem aos nomes das tabelas
         return nomeEntidade;
     }
     
@@ -352,17 +364,17 @@ public class AuditoriaValidator {
     }
     
     /**
-     * Valida se uma coluna existe em uma tabela específica usando cache para performance.
+     * Valida se uma coluna existe em uma tabela especÃ­fica usando cache para performance.
      * 
-     * @param conexao Conexão com o banco de dados
+     * @param conexao ConexÃ£o com o banco de dados
      * @param nomeTabela Nome da tabela
      * @param nomeColuna Nome da coluna
-     * @return true se a coluna existe, false caso contrário
+     * @return true se a coluna existe, false caso contrÃ¡rio
      */
     private boolean validarColunaExiste(final Connection conexao, final String nomeTabela, final String nomeColuna) throws SQLException {
         final String chaveCache = nomeTabela + "." + nomeColuna;
         
-        // Verifica se já temos o resultado no cache
+        // Verifica se jÃ¡ temos o resultado no cache
         if (cacheValidacaoColunas.containsKey(chaveCache)) {
             final boolean existe = cacheValidacaoColunas.get(chaveCache);
             logger.debug("Cache hit para coluna {}.{}: {}", nomeTabela, nomeColuna, existe);
@@ -376,7 +388,7 @@ public class AuditoriaValidator {
             WHERE TABLE_NAME = ? AND COLUMN_NAME = ? AND TABLE_SCHEMA = 'dbo'
             """;
         
-        logger.debug("Validando existência da coluna {}.{}", nomeTabela, nomeColuna);
+        logger.debug("Validando existÃªncia da coluna {}.{}", nomeTabela, nomeColuna);
         
         try (final PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setString(1, nomeTabela);
@@ -394,11 +406,11 @@ public class AuditoriaValidator {
     }
     
     /**
-     * Conta registros por data de extração (método auxiliar para casos sem log).
+     * Conta registros por data de extraÃ§Ã£o (mÃ©todo auxiliar para casos sem log).
      * Usa CAST para garantir compatibilidade de timezone e >= < para evitar duplicatas.
      * 
-     * ⚠️ ESPECIAL: Para CONTAS_A_PAGAR, usa issue_date ao invés de data_extracao,
-     * pois a API busca por issue_date nas últimas 24h.
+     * âš ï¸ ESPECIAL: Para CONTAS_A_PAGAR, usa issue_date ao invÃ©s de data_extracao,
+     * pois a API busca por issue_date nas Ãºltimas 24h.
      */
     private long contarRegistrosPorDataExtracao(final Connection conexao, final String nomeEntidade, 
                                                final Instant dataInicio, final Instant dataFim,
@@ -406,10 +418,10 @@ public class AuditoriaValidator {
         final String nomeTabela = mapearNomeTabela(nomeEntidade);
         final String sql;
         
-        // ⚠️ CONTAS_A_PAGAR usa issue_date ao invés de data_extracao (mesma lógica da API)
+        // âš ï¸ CONTAS_A_PAGAR usa issue_date ao invÃ©s de data_extracao (mesma lÃ³gica da API)
         if (ConstantesEntidades.CONTAS_A_PAGAR.equals(nomeEntidade)) {
-            // API busca por issue_date nas últimas 24h (desde ontem até hoje)
-            // Usar CAST para garantir comparação apenas por data (sem hora)
+            // API busca por issue_date nas Ãºltimas 24h (desde ontem atÃ© hoje)
+            // Usar CAST para garantir comparaÃ§Ã£o apenas por data (sem hora)
             sql = String.format("""
                 SELECT COUNT(*)
                 FROM %s
@@ -420,7 +432,7 @@ public class AuditoriaValidator {
             logger.debug("Query executada (CONTAS_A_PAGAR usando issue_date): {}", sql);
             
             if (resultado != null) {
-                resultado.setColunaUtilizada("issue_date (contagem banco - últimas 24h)");
+                resultado.setColunaUtilizada("issue_date (contagem banco - Ãºltimas 24h)");
                 resultado.setQueryExecutada(sql);
             }
             
@@ -439,7 +451,7 @@ public class AuditoriaValidator {
                 """, nomeTabela);
             
             logger.debug("Query executada: {}", sql);
-            logger.debug("Parâmetros: dataInicio={}, dataFim={}", dataInicio, dataFim);
+            logger.debug("ParÃ¢metros: dataInicio={}, dataFim={}", dataInicio, dataFim);
             
             if (resultado != null) {
                 resultado.setColunaUtilizada("data_extracao (contagem banco)");
@@ -472,21 +484,21 @@ public class AuditoriaValidator {
             if (rs.next()) {
                 final long totalGeral = rs.getLong(1);
                 if (totalGeral == 0) {
-                    resultado.adicionarObservacao("Tabela está vazia");
-                    logger.warn("⚠️ Tabela {} está completamente vazia", nomeEntidade);
+                    resultado.adicionarObservacao("Tabela estÃ¡ vazia");
+                    logger.warn("âš ï¸ Tabela {} estÃ¡ completamente vazia", nomeEntidade);
                 } else {
-                    resultado.adicionarObservacao(String.format("Tabela tem %d registros mas nenhum no período especificado", totalGeral));
-                    logger.warn("⚠️ Tabela {} tem {} registros mas nenhum no período auditado", nomeEntidade, totalGeral);
+                    resultado.adicionarObservacao(String.format("Tabela tem %d registros mas nenhum no perÃ­odo especificado", totalGeral));
+                    logger.warn("âš ï¸ Tabela {} tem {} registros mas nenhum no perÃ­odo auditado", nomeEntidade, totalGeral);
                 }
             }
         }
     }
     
     /**
-     * Conta registros com campos críticos nulos.
+     * Conta registros com campos crÃ­ticos nulos.
      */
     private long contarRegistrosComNulos(final Connection conexao, final String nomeEntidade) throws SQLException {
-        // Verificar campos críticos específicos por entidade
+        // Verificar campos crÃ­ticos especÃ­ficos por entidade
         final Map<String, String> camposCriticos = Map.of(
             ConstantesEntidades.COTACOES, "sequence_code IS NULL OR total_value IS NULL",
             ConstantesEntidades.COLETAS, "id IS NULL",
@@ -507,12 +519,12 @@ public class AuditoriaValidator {
     }
     
     /**
-     * Obtém a data da última extração para uma entidade específica.
+     * ObtÃ©m a data da Ãºltima extraÃ§Ã£o para uma entidade especÃ­fica.
      */
     private Instant obterDataUltimaExtracao(final Connection conexao, final String nomeEntidade) throws SQLException {
         final String sql = String.format("SELECT MAX(data_extracao) FROM %s", nomeEntidade);
         
-        logger.debug("Obtendo última extração para {}: {}", nomeEntidade, sql);
+        logger.debug("Obtendo Ãºltima extraÃ§Ã£o para {}: {}", nomeEntidade, sql);
         
         try (final PreparedStatement stmt = conexao.prepareStatement(sql);
              final ResultSet rs = stmt.executeQuery()) {
@@ -520,23 +532,23 @@ public class AuditoriaValidator {
                 final Timestamp timestamp = rs.getTimestamp(1);
                 if (timestamp != null) {
                     final Instant dataUltimaExtracao = timestamp.toInstant();
-                    logger.debug("Última extração para {}: {}", nomeEntidade, dataUltimaExtracao);
+                    logger.debug("Ãšltima extraÃ§Ã£o para {}: {}", nomeEntidade, dataUltimaExtracao);
                     return dataUltimaExtracao;
                 }
             }
-            logger.debug("Nenhuma extração encontrada para {}", nomeEntidade);
+            logger.debug("Nenhuma extraÃ§Ã£o encontrada para {}", nomeEntidade);
             return null;
         }
     }
     
     /**
-     * Determina o status de validação baseado nos dados coletados e no log de extrações.
+     * Determina o status de validaÃ§Ã£o baseado nos dados coletados e no log de extraÃ§Ãµes.
      * 
-     * VERSÃO CORRIGIDA: Agora confia no log_extracoes quando status = COMPLETO.
-     * Não valida integridade banco vs log para evitar falsos-positivos.
+     * VERSÃƒO CORRIGIDA: Agora confia no log_extracoes quando status = COMPLETO.
+     * NÃ£o valida integridade banco vs log para evitar falsos-positivos.
      * 
-     * @param resultado Resultado da validação a ser analisado
-     * @param logExtracao Log da extração (pode ser null)
+     * @param resultado Resultado da validaÃ§Ã£o a ser analisado
+     * @param logExtracao Log da extraÃ§Ã£o (pode ser null)
      */
     private void determinarStatusValidacao(final ResultadoValidacaoEntidade resultado, final LogExtracaoEntity logExtracao) {
         if (resultado.getErro() != null) {
@@ -544,71 +556,80 @@ public class AuditoriaValidator {
             return;
         }
         
-        // ✅ CORREÇÃO 1: Retornar ERRO se não há log
+        // âœ… CORREÃ‡ÃƒO 1: Retornar ERRO se nÃ£o hÃ¡ log
         if (logExtracao == null) {
-            logger.error("❌ Nenhum log de extração encontrado para {}", resultado.getNomeEntidade());
+            logger.error("âŒ Nenhum log de extraÃ§Ã£o encontrado para {}", resultado.getNomeEntidade());
             resultado.setStatus(StatusValidacao.ERRO);
-            resultado.setErro("Sem registro de extração. Verifique se o Runner está executando.");
-            resultado.adicionarObservacao("Nenhum log de extração encontrado");
+            resultado.setErro("Sem registro de extraÃ§Ã£o. Verifique se o Runner estÃ¡ executando.");
+            resultado.adicionarObservacao("Nenhum log de extraÃ§Ã£o encontrado");
             return;
         }
         
-        // ✅ CORREÇÃO 2: Retornar ERRO se foi incompleto por erro de API
+        // âœ… CORREÃ‡ÃƒO 2: Retornar ERRO se foi incompleto por erro de API
         if (logExtracao.getStatusFinal() == StatusExtracao.ERRO_API) {
             resultado.setStatus(StatusValidacao.ERRO);
-            resultado.setErro("Extração falhou: " + logExtracao.getMensagem());
-            resultado.adicionarObservacao("Extração falhou: " + logExtracao.getMensagem());
+            resultado.setErro("ExtraÃ§Ã£o falhou: " + logExtracao.getMensagem());
+            resultado.adicionarObservacao("ExtraÃ§Ã£o falhou: " + logExtracao.getMensagem());
             return;
         }
         
-        // ✅ CORREÇÃO 3: Retornar ALERTA se foi incompleto por limite
+        // âœ… CORREÃ‡ÃƒO 3: Retornar ALERTA se foi incompleto por limite
         if (logExtracao.getStatusFinal() == StatusExtracao.INCOMPLETO_LIMITE) {
             resultado.setStatus(StatusValidacao.ALERTA);
-            resultado.adicionarObservacao("Extração interrompida por limite: " + logExtracao.getMensagem());
+            resultado.adicionarObservacao("ExtraÃ§Ã£o interrompida por limite: " + logExtracao.getMensagem());
             
-            // Não aplicar validações rigorosas se a extração foi interrompida
-            logger.info("🔄 Validação ajustada para extração interrompida de {}", resultado.getNomeEntidade());
+            // NÃ£o aplicar validaÃ§Ãµes rigorosas se a extraÃ§Ã£o foi interrompida
+            logger.info("ðŸ”„ ValidaÃ§Ã£o ajustada para extraÃ§Ã£o interrompida de {}", resultado.getNomeEntidade());
+            return;
+        }
+
+        if (logExtracao.getStatusFinal() == StatusExtracao.INCOMPLETO_DADOS
+            || logExtracao.getStatusFinal() == StatusExtracao.INCOMPLETO_DB
+            || logExtracao.getStatusFinal() == StatusExtracao.INCOMPLETO) {
+            resultado.setStatus(StatusValidacao.ERRO);
+            resultado.setErro("ExtraÃ§Ã£o incompleta por divergÃªncia de qualidade/persistÃªncia: " + logExtracao.getMensagem());
+            resultado.adicionarObservacao("ExtraÃ§Ã£o incompleta por dados/persistÃªncia: " + logExtracao.getMensagem());
             return;
         }
         
-        logger.info("✅ Extração de {} foi completada com sucesso", resultado.getNomeEntidade());
+        logger.info("âœ… ExtraÃ§Ã£o de {} foi completada com sucesso", resultado.getNomeEntidade());
         
-        // ✅ CORREÇÃO 4: NÃO validar integridade banco vs log quando COMPLETO
-        // Motivo: O banco pode ter dados de múltiplas extrações (acumulados)
-        // O log_extracoes é a fonte confiável para a extração atual
+        // âœ… CORREÃ‡ÃƒO 4: NÃƒO validar integridade banco vs log quando COMPLETO
+        // Motivo: O banco pode ter dados de mÃºltiplas extraÃ§Ãµes (acumulados)
+        // O log_extracoes Ã© a fonte confiÃ¡vel para a extraÃ§Ã£o atual
         
-        // Apenas verificar se a extração atual trouxe algum dado
+        // Apenas verificar se a extraÃ§Ã£o atual trouxe algum dado
         if (logExtracao.getRegistrosExtraidos() == 0) {
             resultado.setStatus(StatusValidacao.ALERTA);
-            resultado.adicionarObservacao("Nenhum registro foi extraído na última execução");
+            resultado.adicionarObservacao("Nenhum registro foi extraÃ­do na Ãºltima execuÃ§Ã£o");
             return;
         }
         
-        // Verificar se há muitos registros com nulos (baseado no total do log)
+        // Verificar se hÃ¡ muitos registros com nulos (baseado no total do log)
         if (resultado.getRegistrosComNulos() > 0) {
             final double percentualNulos = logExtracao.getRegistrosExtraidos() > 0 ? 
                 (double) resultado.getRegistrosComNulos() / logExtracao.getRegistrosExtraidos() * 100 : 0;
             
             if (percentualNulos > 10.0) {
                 resultado.setStatus(StatusValidacao.ALERTA);
-                resultado.adicionarObservacao(String.format("%.1f%% dos registros possuem campos críticos nulos", percentualNulos));
+                resultado.adicionarObservacao(String.format("%.1f%% dos registros possuem campos crÃ­ticos nulos", percentualNulos));
                 return;
             }
         }
         
-        // Verificar se a última extração é muito antiga (mais de 25 horas)
+        // Verificar se a Ãºltima extraÃ§Ã£o Ã© muito antiga (mais de 25 horas)
         if (resultado.getUltimaExtracao() != null) {
             final long horasDesdeUltimaExtracao = java.time.Duration.between(resultado.getUltimaExtracao(), Instant.now()).toHours();
             if (horasDesdeUltimaExtracao > 25) {
                 resultado.setStatus(StatusValidacao.ALERTA);
-                resultado.adicionarObservacao(String.format("Última extração há %d horas", horasDesdeUltimaExtracao));
+                resultado.adicionarObservacao(String.format("Ãšltima extraÃ§Ã£o hÃ¡ %d horas", horasDesdeUltimaExtracao));
                 return;
             }
         }
         
-        // ✅ Se chegou até aqui, extração foi completa e validação passou
+        // âœ… Se chegou atÃ© aqui, extraÃ§Ã£o foi completa e validaÃ§Ã£o passou
         resultado.setStatus(StatusValidacao.OK);
-        resultado.adicionarObservacao(String.format("Extração completa: %d registros salvos com sucesso", 
+        resultado.adicionarObservacao(String.format("ExtraÃ§Ã£o completa: %d registros salvos com sucesso", 
             logExtracao.getRegistrosExtraidos()));
     }
 

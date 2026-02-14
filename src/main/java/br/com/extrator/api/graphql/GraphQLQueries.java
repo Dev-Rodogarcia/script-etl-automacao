@@ -2,18 +2,18 @@ package br.com.extrator.api.graphql;
 
 /**
  * Classe que centraliza todas as queries GraphQL utilizadas no sistema.
- * Isso evita duplicação e facilita manutenção.
+ * Isso evita duplicaÃ§Ã£o e facilita manutenÃ§Ã£o.
  */
 public final class GraphQLQueries {
     
     private GraphQLQueries() {
-        // Construtor privado para classe utilitária
+        // Construtor privado para classe utilitÃ¡ria
     }
     
     /**
      * Query para buscar Coletas (Pick)
      * Tipo GraphQL: Pick
-     * Campo de filtro: requestDate (aceita apenas uma data específica)
+     * Campo de filtro: requestDate (aceita apenas uma data especÃ­fica)
      */
     public static final String QUERY_COLETAS = """
             query BuscarColetasExpandidaV2($params: PickInput!, $after: String) {
@@ -153,7 +153,7 @@ public final class GraphQLQueries {
     /**
      * Query para buscar Capa de Faturas (CreditCustomerBilling)
      * Tipo GraphQL: CreditCustomerBilling
-     * Campo de filtro: dueDate, issueDate ou originalDueDate (aceita apenas uma data específica)
+     * Campo de filtro: dueDate, issueDate ou originalDueDate (aceita apenas uma data especÃ­fica)
      */
     public static final String QUERY_FATURAS = """
             query ExtrairFaturas_Billing_Final($params: CreditCustomerBillingInput!, $after: String) {
@@ -252,10 +252,21 @@ public final class GraphQLQueries {
                 inputFields { name }
               }
             }""";
+
+    /**
+     * Query de introspection para descobrir campos de PickInput.
+     * Usada para decidir dinamicamente filtros vÃ¡lidos (requestDate/serviceDate).
+     */
+    public static final String INTROSPECTION_PICK_INPUT = """
+            query CamposPickInput {
+              __type(name: "PickInput") {
+                inputFields { name }
+              }
+            }""";
     
     /**
      * Query de introspection para descobrir o tipo de destroyUserId e cancellationUserId em Pick
-     * IMPORTANTE: Usar para validar se são do tipo Individual antes de fazer JOIN
+     * IMPORTANTE: Usar para validar se sÃ£o do tipo Individual antes de fazer JOIN
      */
     public static final String INTROSPECTION_PICK_FIELDS = """
             query IntrospectPickFields {
@@ -275,15 +286,15 @@ public final class GraphQLQueries {
             }""";
     
     /**
-     * Query para buscar Usuários do Sistema (Individual)
+     * Query para buscar UsuÃ¡rios do Sistema (Individual)
      * Tipo GraphQL: Individual
-     * Filtro: enabled: true (obrigatório)
-     * Paginação: cursor-based (first: 100, after: $cursor)
+     * Filtro: enabled: true (obrigatÃ³rio)
+     * PaginaÃ§Ã£o: cursor-based (first: 100, after: $cursor)
      * 
-     * ⚠️ ATENÇÃO: Esta query busca todos os usuários do tipo Individual.
-     * Validar se destroyUserId e cancellationUserId em Pick são do mesmo tipo Individual
+     * âš ï¸ ATENÃ‡ÃƒO: Esta query busca todos os usuÃ¡rios do tipo Individual.
+     * Validar se destroyUserId e cancellationUserId em Pick sÃ£o do mesmo tipo Individual
      * antes de fazer JOIN na view de coletas. Se forem de outro tipo (ex: User, Driver),
-     * o cruzamento retornará dados incorretos.
+     * o cruzamento retornarÃ¡ dados incorretos.
      */
     public static final String QUERY_USUARIOS_SISTEMA = """
             query ExtrairUsuariosSistema($params: IndividualInput!, $cursor: String) {
@@ -303,12 +314,12 @@ public final class GraphQLQueries {
     
     /**
      * Query para enriquecer Faturas por Cliente com dados financeiros.
-     * Busca N° NFS-e, Carteira e Instrução Customizada via creditCustomerBilling.
+     * Busca NÂ° NFS-e, Carteira e InstruÃ§Ã£o Customizada via creditCustomerBilling.
      * 
      * Tipo GraphQL: CreditCustomerBilling
-     * Parâmetro: id (ID da cobrança)
+     * ParÃ¢metro: id (ID da cobranÃ§a)
      * 
-     * Campos extraídos:
+     * Campos extraÃ­dos:
      * - nfse_numero: accountingCredit.document (da primeira parcela)
      * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
      * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
@@ -335,10 +346,10 @@ public final class GraphQLQueries {
             }""";
     
     /**
-     * Query para enriquecer faturas por número do documento (fallback quando billingId não está disponível).
-     * Parâmetro: document (número do documento da fatura, ex: "112025/1-3")
+     * Query para enriquecer faturas por nÃºmero do documento (fallback quando billingId nÃ£o estÃ¡ disponÃ­vel).
+     * ParÃ¢metro: document (nÃºmero do documento da fatura, ex: "112025/1-3")
      * 
-     * Campos extraídos:
+     * Campos extraÃ­dos:
      * - nfse_numero: accountingCredit.document (da primeira parcela)
      * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
      * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
@@ -365,12 +376,12 @@ public final class GraphQLQueries {
             }""";
     
     /**
-     * Query para enriquecer cobrança individual com NFS-e e ID do banco.
+     * Query para enriquecer cobranÃ§a individual com NFS-e e ID do banco.
      * Usada dentro do loop de enriquecimento para cada fatura.
      * 
-     * Parâmetro: id (ID da cobrança - creditCustomerBilling)
+     * ParÃ¢metro: id (ID da cobranÃ§a - creditCustomerBilling)
      * 
-     * Campos extraídos:
+     * Campos extraÃ­dos:
      * - ticketAccountId: ID para buscar detalhes do banco depois
      * - nfse_numero: accountingCredit.document (da primeira parcela)
      * - metodo_pagamento: installments[0].paymentMethod
@@ -395,15 +406,15 @@ public final class GraphQLQueries {
             }""";
     
     /**
-     * Query para resolver detalhes de conta bancária via ID.
+     * Query para resolver detalhes de conta bancÃ¡ria via ID.
      * Usada para buscar dados do banco de forma otimizada (cache).
      * 
-     * Parâmetro: id (ID da conta bancária - ticketAccountId)
+     * ParÃ¢metro: id (ID da conta bancÃ¡ria - ticketAccountId)
      * 
-     * Campos extraídos:
+     * Campos extraÃ­dos:
      * - bankName: Nome do banco
-     * - portfolioVariation: Carteira/Descrição (pode vir vazio se não cadastrado)
-     * - customInstruction: Instrução customizada (pode vir vazio se não cadastrado)
+     * - portfolioVariation: Carteira/DescriÃ§Ã£o (pode vir vazio se nÃ£o cadastrado)
+     * - customInstruction: InstruÃ§Ã£o customizada (pode vir vazio se nÃ£o cadastrado)
      */
     public static final String QUERY_RESOLVER_CONTA_BANCARIA = """
             query ResolverContaBancaria($id: Int!) {
@@ -419,4 +430,3 @@ public final class GraphQLQueries {
               }
             }""";
 }
-

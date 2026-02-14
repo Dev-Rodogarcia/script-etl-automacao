@@ -71,7 +71,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             "        nome_usuario = ?,",
             "        reconciliado = ?,",
             "        metadata = ?,",
-            "        data_extracao = GETDATE()",
+            "        data_extracao = ?",
             "WHEN NOT MATCHED THEN",
             "    INSERT (sequence_code, document_number, issue_date, tipo_lancamento,",
             "            valor_original, valor_juros, valor_desconto, valor_a_pagar, valor_pago,",
@@ -81,7 +81,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             "            classificacao_contabil, descricao_contabil, valor_contabil, area_lancamento,",
             "            observacoes, descricao_despesa, nome_usuario, reconciliado,",
             "            metadata, data_extracao)",
-            "    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE());"
+            "    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
         );
 
         try (PreparedStatement ps = conexao.prepareStatement(sqlMerge)) {
@@ -118,6 +118,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             setStringParameter(ps, paramIndex++, entity.getNomeUsuario());
             setBooleanParameter(ps, paramIndex++, entity.getReconciliado());
             setStringParameter(ps, paramIndex++, entity.getMetadata());
+            setDateTimeParameter(ps, paramIndex++, entity.getDataExtracao());
             
             // Parâmetros do INSERT (mesmos valores)
             ps.setLong(paramIndex++, entity.getSequenceCode());
@@ -148,6 +149,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             setStringParameter(ps, paramIndex++, entity.getNomeUsuario());
             setBooleanParameter(ps, paramIndex++, entity.getReconciliado());
             setStringParameter(ps, paramIndex++, entity.getMetadata());
+            setDateTimeParameter(ps, paramIndex++, entity.getDataExtracao());
 
             final int rowsAffected = ps.executeUpdate();
             

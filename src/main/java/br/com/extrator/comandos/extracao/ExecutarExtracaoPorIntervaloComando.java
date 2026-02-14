@@ -5,12 +5,19 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import br.com.extrator.auditoria.servicos.IntegridadeEtlValidator;
 import br.com.extrator.comandos.base.Comando;
+import br.com.extrator.db.entity.LogExtracaoEntity;
+import br.com.extrator.db.repository.LogExtracaoRepository;
 import br.com.extrator.runners.dataexport.DataExportRunner;
 import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.servicos.ValidadorLimiteExtracao;
@@ -20,8 +27,8 @@ import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
- * Comando responsável por executar extração de dados por intervalo de datas,
- * com divisão automática em blocos de 30 dias e validação de regras de limitação.
+ * Comando responsÃ¡vel por executar extraÃ§Ã£o de dados por intervalo de datas,
+ * com divisÃ£o automÃ¡tica em blocos de 30 dias e validaÃ§Ã£o de regras de limitaÃ§Ã£o.
  */
 public class ExecutarExtracaoPorIntervaloComando implements Comando {
     
@@ -29,16 +36,30 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     
     private static final int TAMANHO_BLOCO_DIAS = 30;
     private static final int NUMERO_DE_THREADS = 2;
+    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     
     @Override
     public void executar(final String[] args) throws Exception {
+        final List<String> argumentosLimpos = new ArrayList<>();
+        boolean incluirFaturasGraphQL = true;
+        for (final String arg : args) {
+            if (arg != null && FLAG_SEM_FATURAS_GRAPHQL.equalsIgnoreCase(arg.trim())) {
+                incluirFaturasGraphQL = false;
+            } else {
+                argumentosLimpos.add(arg);
+            }
+        }
+
+        final String[] argsSemFlags = argumentosLimpos.toArray(String[]::new);
+
         // Validar argumentos
-        if (args.length < 3) {
-            log.error("❌ ERRO: Argumentos insuficientes");
-            log.console("Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade]");
+        if (argsSemFlags.length < 3) {
+            log.error("âŒ ERRO: Argumentos insuficientes");
+            log.console("Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql]");
             log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31");
             log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 graphql");
             log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 dataexport manifestos");
+            log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 --sem-faturas-graphql");
             return;
         }
         
@@ -46,10 +67,10 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         final LocalDate dataInicio;
         final LocalDate dataFim;
         try {
-            dataInicio = LocalDate.parse(args[1], DateTimeFormatter.ISO_DATE);
-            dataFim = LocalDate.parse(args[2], DateTimeFormatter.ISO_DATE);
+            dataInicio = LocalDate.parse(argsSemFlags[1], DateTimeFormatter.ISO_DATE);
+            dataFim = LocalDate.parse(argsSemFlags[2], DateTimeFormatter.ISO_DATE);
         } catch (final DateTimeParseException e) {
-            log.error("❌ ERRO: Formato de data inválido. Use YYYY-MM-DD");
+            log.error("âŒ ERRO: Formato de data invÃ¡lido. Use YYYY-MM-DD");
             log.console("Exemplo: 2024-11-01 2025-03-31");
             return;
         }
@@ -57,44 +78,50 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         // Parse de API e entidade (opcionais)
         String apiEspecifica = null;
         String entidadeEspecifica = null;
-        if (args.length >= 4) {
-            final String arg3 = args[3].trim().toLowerCase();
-            // Validar se o terceiro argumento é uma API válida
+        if (argsSemFlags.length >= 4) {
+            final String arg3 = argsSemFlags[3].trim().toLowerCase(Locale.ROOT);
+            // Validar se o terceiro argumento Ã© uma API vÃ¡lida
             if ("graphql".equals(arg3) || "dataexport".equals(arg3)) {
                 apiEspecifica = arg3;
-                if (args.length >= 5) {
-                    entidadeEspecifica = args[4].trim();
+                if (argsSemFlags.length >= 5) {
+                    entidadeEspecifica = argsSemFlags[4].trim();
                 }
             } else {
-                // Se não for uma API válida, pode ser que a entidade foi passada sem a API
+                // Se nÃ£o for uma API vÃ¡lida, pode ser que a entidade foi passada sem a API
                 // Nesse caso, tentamos inferir a API baseado na entidade
-                log.warn("⚠️ Terceiro argumento '{}' não é uma API válida. Tentando inferir API pela entidade...", arg3);
-                entidadeEspecifica = args[3].trim();
+                log.warn("âš ï¸ Terceiro argumento '{}' nÃ£o Ã© uma API vÃ¡lida. Tentando inferir API pela entidade...", arg3);
+                entidadeEspecifica = argsSemFlags[3].trim();
                 
                 // Tentar inferir a API baseado na entidade
-                final String entidadeLower = entidadeEspecifica.toLowerCase();
+                final String entidadeLower = entidadeEspecifica.toLowerCase(Locale.ROOT);
                 if (entidadeLower.equals(ConstantesEntidades.COLETAS) || 
                     entidadeLower.equals(ConstantesEntidades.FRETES) || 
                     entidadeLower.equals(ConstantesEntidades.FATURAS_GRAPHQL)) {
                     apiEspecifica = "graphql";
-                    log.info("✅ API inferida: GraphQL (baseado na entidade: {})", entidadeEspecifica);
+                    log.info("âœ… API inferida: GraphQL (baseado na entidade: {})", entidadeEspecifica);
                 } else if (entidadeLower.equals(ConstantesEntidades.MANIFESTOS) ||
                           entidadeLower.equals(ConstantesEntidades.COTACOES) ||
                           entidadeLower.equals(ConstantesEntidades.LOCALIZACAO_CARGAS) ||
                           entidadeLower.equals(ConstantesEntidades.CONTAS_A_PAGAR) ||
                           entidadeLower.equals(ConstantesEntidades.FATURAS_POR_CLIENTE)) {
                     apiEspecifica = "dataexport";
-                    log.info("✅ API inferida: DataExport (baseado na entidade: {})", entidadeEspecifica);
+                    log.info("âœ… API inferida: DataExport (baseado na entidade: {})", entidadeEspecifica);
                 } else {
-                    log.error("❌ Não foi possível inferir a API para a entidade: {}. Use: --extracao-intervalo DATA_INICIO DATA_FIM [api] [entidade]", entidadeEspecifica);
+                    log.error("âŒ NÃ£o foi possÃ­vel inferir a API para a entidade: {}. Use: --extracao-intervalo DATA_INICIO DATA_FIM [api] [entidade]", entidadeEspecifica);
                     return;
                 }
             }
         }
+
+        final boolean isSomenteFaturasGraphQL = isEntidadeFaturasGraphQL(entidadeEspecifica);
+        if (!incluirFaturasGraphQL && isSomenteFaturasGraphQL) {
+            log.warn("âš ï¸ Flag {} ignorada porque a entidade solicitada Ã© explicitamente faturas_graphql.", FLAG_SEM_FATURAS_GRAPHQL);
+            incluirFaturasGraphQL = true;
+        }
         
         // Validar que dataInicio <= dataFim
         if (dataInicio.isAfter(dataFim)) {
-            log.error("❌ ERRO: Data de início ({}) não pode ser posterior à data de fim ({})", 
+            log.error("âŒ ERRO: Data de inÃ­cio ({}) nÃ£o pode ser posterior Ã  data de fim ({})", 
                      FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
             return;
         }
@@ -103,9 +130,9 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         BannerUtil.exibirBannerExtracaoCompleta();
         
         log.console("\n" + "=".repeat(60));
-        log.console("EXTRAÇÃO POR INTERVALO DE DATAS");
+        log.console("EXTRAÃ‡ÃƒO POR INTERVALO DE DATAS");
         log.console("=".repeat(60));
-        log.console("Período solicitado: {} a {}", 
+        log.console("PerÃ­odo solicitado: {} a {}", 
                    FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
         
         // Exibir filtros se especificados
@@ -120,31 +147,32 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
             log.console("API: TODAS");
             log.console("Entidade: TODAS");
         }
+        log.console("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)");
         
-        // Calcular duração do período
+        // Calcular duraÃ§Ã£o do perÃ­odo
         final ValidadorLimiteExtracao validador = new ValidadorLimiteExtracao();
         final long diasPeriodo = validador.calcularDuracaoPeriodo(dataInicio, dataFim);
-        log.console("Duração: {} dias", diasPeriodo);
+        log.console("DuraÃ§Ã£o: {} dias", diasPeriodo);
         
-        // Obter limite de horas baseado no período TOTAL (apenas informativo)
-        // NOTA: A validação real será feita por BLOCO (30 dias), não pelo período total.
-        // Cada bloco de 30 dias será tratado como "< 31 dias" (sem limite de horas).
+        // Obter limite de horas baseado no perÃ­odo TOTAL (apenas informativo)
+        // NOTA: A validaÃ§Ã£o real serÃ¡ feita por BLOCO (30 dias), nÃ£o pelo perÃ­odo total.
+        // Cada bloco de 30 dias serÃ¡ tratado como "< 31 dias" (sem limite de horas).
         final int limiteHorasPeriodoTotal = validador.obterLimiteHoras(diasPeriodo);
         if (limiteHorasPeriodoTotal == 0) {
-            log.console("Regra de limitação: SEM LIMITE (período < 31 dias)");
+            log.console("Regra de limitaÃ§Ã£o: SEM LIMITE (perÃ­odo < 31 dias)");
         } else if (limiteHorasPeriodoTotal == 1) {
-            log.console("Regra de limitação: 1 HORA entre extrações (período de 31 dias a 6 meses)");
+            log.console("Regra de limitaÃ§Ã£o: 1 HORA entre extraÃ§Ãµes (perÃ­odo de 31 dias a 6 meses)");
         } else {
-            log.console("Regra de limitação: 12 HORAS entre extrações (período > 6 meses)");
+            log.console("Regra de limitaÃ§Ã£o: 12 HORAS entre extraÃ§Ãµes (perÃ­odo > 6 meses)");
         }
-        log.console("ℹ️  Nota: Validação será feita por BLOCO (30 dias = sem limite), não pelo período total");
+        log.console("â„¹ï¸  Nota: ValidaÃ§Ã£o serÃ¡ feita por BLOCO (30 dias = sem limite), nÃ£o pelo perÃ­odo total");
         
-        // Dividir em blocos de 30 dias se necessário
+        // Dividir em blocos de 30 dias se necessÃ¡rio
         final List<BlocoPeriodo> blocos = dividirEmBlocos(dataInicio, dataFim);
         log.console("Total de blocos: {}", blocos.size());
         
         if (blocos.size() > 1) {
-            log.console("\n📦 Período será dividido em {} blocos de até {} dias:", blocos.size(), TAMANHO_BLOCO_DIAS);
+            log.console("\nðŸ“¦ PerÃ­odo serÃ¡ dividido em {} blocos de atÃ© {} dias:", blocos.size(), TAMANHO_BLOCO_DIAS);
             for (int i = 0; i < blocos.size(); i++) {
                 final BlocoPeriodo bloco = blocos.get(i);
                 log.console("  Bloco {}/{}: {} a {} ({} dias)", 
@@ -157,7 +185,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         
         log.console("=".repeat(60) + "\n");
         
-        // Executar extração para cada bloco
+        // Executar extraÃ§Ã£o para cada bloco
         final LocalDateTime inicioExecucao = LocalDateTime.now();
         int blocosCompletos = 0;
         int blocosFalhados = 0;
@@ -175,94 +203,164 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
                        FormatadorData.formatBR(bloco.dataFim));
             log.console("=".repeat(60));
             
-            // CORRIGIDO: Validar regras de limitação usando o TAMANHO DO BLOCO (30 dias), não período total
-            // Estratégia: Dividir em blocos de 30 dias para evitar a regra de 12 horas.
-            // Cada bloco de 30 dias será tratado como "< 31 dias" (sem limite de horas).
-            final boolean podeExecutar = validarLimitesParaBloco(bloco, validador, apiEspecifica, entidadeEspecifica);
+            // CORRIGIDO: Validar regras de limitaÃ§Ã£o usando o TAMANHO DO BLOCO (30 dias), nÃ£o perÃ­odo total
+            // EstratÃ©gia: Dividir em blocos de 30 dias para evitar a regra de 12 horas.
+            // Cada bloco de 30 dias serÃ¡ tratado como "< 31 dias" (sem limite de horas).
+            final boolean podeExecutar = validarLimitesParaBloco(bloco, validador, apiEspecifica, entidadeEspecifica, incluirFaturasGraphQL);
             
             if (!podeExecutar) {
-                log.warn("⏸️ Bloco {}/{} bloqueado pelas regras de limitação. Pulando...", numeroBloco, totalBlocos);
+                log.warn("â¸ï¸ Bloco {}/{} bloqueado pelas regras de limitaÃ§Ã£o. Pulando...", numeroBloco, totalBlocos);
                 blocosFalhados++;
                 blocosFalhadosLista.add("Bloco " + numeroBloco);
                 continue;
             }
-            
-            // Executar extração do bloco
-            try {
-                log.info("🔄 Iniciando extração do bloco {}/{}...", numeroBloco, totalBlocos);
-                
-                // Se API específica foi informada, executar apenas essa API
-                if (apiEspecifica != null && !apiEspecifica.isEmpty()) {
-                    if ("graphql".equals(apiEspecifica)) {
+
+            log.info("ðŸ”„ Iniciando extraÃ§Ã£o do bloco {}/{}...", numeroBloco, totalBlocos);
+            final LocalDateTime inicioExecucaoBloco = LocalDateTime.now();
+            boolean blocoComFalha = false;
+            boolean graphqlPrincipalConcluido = false;
+            final List<String> falhasBloco = new ArrayList<>();
+
+            // Se API especÃ­fica foi informada, executar apenas essa API
+            if (apiEspecifica != null && !apiEspecifica.isEmpty()) {
+                if ("graphql".equals(apiEspecifica)) {
+                    try {
                         GraphQLRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim, entidadeEspecifica);
-                    } else if ("dataexport".equals(apiEspecifica)) {
+                        graphqlPrincipalConcluido = true;
+                    } catch (final Exception e) {
+                        blocoComFalha = true;
+                        final String msg = extrairMensagemRaiz(e);
+                        falhasBloco.add("GraphQL: " + msg);
+                        log.error("âŒ Falha no GraphQLRunner do bloco {}/{}: {}", numeroBloco, totalBlocos, msg, e);
+                    }
+                } else if ("dataexport".equals(apiEspecifica)) {
+                    try {
                         DataExportRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim, entidadeEspecifica);
-                    } else {
-                        log.error("❌ API inválida: {}. Use 'graphql' ou 'dataexport'", apiEspecifica);
-                        blocosFalhados++;
-                        blocosFalhadosLista.add("Bloco " + numeroBloco);
-                        continue;
+                    } catch (final Exception e) {
+                        blocoComFalha = true;
+                        final String msg = extrairMensagemRaiz(e);
+                        falhasBloco.add("DataExport: " + msg);
+                        log.error("âŒ Falha no DataExportRunner do bloco {}/{}: {}", numeroBloco, totalBlocos, msg, e);
                     }
                 } else {
-                    // Executar ambas as APIs em paralelo
-                    final ExecutorService executor = Executors.newFixedThreadPool(NUMERO_DE_THREADS);
-                    try {
-                        final Future<?> futuroGraphQL = executor.submit(() -> {
-                            try {
-                                GraphQLRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim);
-                            } catch (final Exception e) {
-                                throw new RuntimeException("Falha no GraphQLRunner", e);
-                            }
-                        });
-                        
-                        final Future<?> futuroDataExport = executor.submit(() -> {
-                            try {
-                                DataExportRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim);
-                            } catch (final Exception e) {
-                                throw new RuntimeException("Falha no DataExportRunner", e);
-                            }
-                        });
-                        
-                        // Aguardar conclusão
-                        futuroGraphQL.get();
-                        futuroDataExport.get();
-                    } finally {
-                        executor.shutdown();
-                    }
+                    blocoComFalha = true;
+                    falhasBloco.add("API invÃ¡lida: " + apiEspecifica);
+                    log.error("âŒ API invÃ¡lida: {}. Use 'graphql' ou 'dataexport'", apiEspecifica);
                 }
-                
-                log.info("✅ Bloco {}/{} (entidades principais) concluído com sucesso!", numeroBloco, totalBlocos);
-                
-                // ========== FASE 3: EXTRAÇÃO DE FATURAS GRAPHQL POR ÚLTIMO ==========
-                // Executar faturas_graphql APÓS todas as outras entidades do bloco,
-                // EXCETO se a entidade específica for faturas_graphql (já foi executada acima)
-                final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null && 
-                    (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica) ||
-                     "faturas".equalsIgnoreCase(entidadeEspecifica) ||
-                     "faturasgraphql".equalsIgnoreCase(entidadeEspecifica));
-                
-                final boolean deveExecutarFaturasGraphQL = 
-                    (apiEspecifica == null || "graphql".equalsIgnoreCase(apiEspecifica)) &&
-                    !isSomenteFaturasGraphQL;
-                
-                if (deveExecutarFaturasGraphQL) {
-                    log.info("🔄 [FASE 3] Executando Faturas GraphQL por último para bloco {}/{}...", numeroBloco, totalBlocos);
+            } else {
+                // Executar ambas as APIs em paralelo, tratando falhas separadamente
+                final ExecutorService executor = Executors.newFixedThreadPool(NUMERO_DE_THREADS);
+                Exception erroGraphQL = null;
+                Exception erroDataExport = null;
+                try {
+                    final Future<?> futuroGraphQL = executor.submit(() -> {
+                        try {
+                            GraphQLRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim);
+                        } catch (final Exception e) {
+                            throw new RuntimeException("Falha no GraphQLRunner", e);
+                        }
+                    });
+
+                    final Future<?> futuroDataExport = executor.submit(() -> {
+                        try {
+                            DataExportRunner.executarPorIntervalo(bloco.dataInicio, bloco.dataFim);
+                        } catch (final Exception e) {
+                            throw new RuntimeException("Falha no DataExportRunner", e);
+                        }
+                    });
+
+                    try {
+                        futuroGraphQL.get();
+                        graphqlPrincipalConcluido = true;
+                    } catch (final Exception e) {
+                        erroGraphQL = e;
+                    }
+
+                    try {
+                        futuroDataExport.get();
+                    } catch (final Exception e) {
+                        erroDataExport = e;
+                    }
+                } finally {
+                    executor.shutdown();
+                }
+
+                if (erroGraphQL != null) {
+                    blocoComFalha = true;
+                    final String msg = extrairMensagemRaiz(erroGraphQL);
+                    falhasBloco.add("GraphQL: " + msg);
+                    log.error("âŒ Falha no GraphQLRunner do bloco {}/{}: {}", numeroBloco, totalBlocos, msg, erroGraphQL);
+                }
+                if (erroDataExport != null) {
+                    blocoComFalha = true;
+                    final String msg = extrairMensagemRaiz(erroDataExport);
+                    falhasBloco.add("DataExport: " + msg);
+                    log.error("âŒ Falha no DataExportRunner do bloco {}/{}: {}", numeroBloco, totalBlocos, msg, erroDataExport);
+                }
+            }
+
+            if (!blocoComFalha) {
+                log.info("âœ… Bloco {}/{} (entidades principais) concluÃ­do com sucesso!", numeroBloco, totalBlocos);
+            } else {
+                log.warn("âš ï¸ Bloco {}/{} concluiu entidades principais com falhas.", numeroBloco, totalBlocos);
+            }
+
+            // ========== FASE 3: EXTRAÃ‡ÃƒO DE FATURAS GRAPHQL POR ÃšLTIMO ==========
+            // Executar faturas_graphql APÃ“S todas as outras entidades do bloco,
+            // EXCETO se a entidade especÃ­fica for faturas_graphql (jÃ¡ foi executada acima)
+            final boolean deveExecutarFaturasGraphQL =
+                (apiEspecifica == null || "graphql".equalsIgnoreCase(apiEspecifica)) &&
+                !isSomenteFaturasGraphQL &&
+                incluirFaturasGraphQL;
+
+            if (deveExecutarFaturasGraphQL) {
+                if (!graphqlPrincipalConcluido) {
+                    blocoComFalha = true;
+                    falhasBloco.add("FaturasGraphQL: fase principal GraphQL nÃ£o concluiu");
+                    log.warn("âš ï¸ [FASE 3] Faturas GraphQL nÃ£o foi executado no bloco {}/{} pois GraphQL principal falhou.", numeroBloco, totalBlocos);
+                } else {
+                    log.info("ðŸ”„ [FASE 3] Executando Faturas GraphQL por Ãºltimo para bloco {}/{}...", numeroBloco, totalBlocos);
                     try {
                         GraphQLRunner.executarFaturasGraphQLPorIntervalo(bloco.dataInicio, bloco.dataFim);
-                        log.info("✅ Faturas GraphQL do bloco {}/{} concluídas!", numeroBloco, totalBlocos);
+                        log.info("âœ… Faturas GraphQL do bloco {}/{} concluÃ­das!", numeroBloco, totalBlocos);
                     } catch (final Exception e) {
-                        log.error("❌ Falha na extração de Faturas GraphQL do bloco {}/{}: {}. Dados das outras entidades foram preservados.", 
-                                 numeroBloco, totalBlocos, e.getMessage(), e);
-                        // Não incrementamos blocosFalhados aqui pois as outras entidades foram extraídas com sucesso
+                        blocoComFalha = true;
+                        final String msg = extrairMensagemRaiz(e);
+                        falhasBloco.add("FaturasGraphQL: " + msg);
+                        log.error("âŒ Falha na extraÃ§Ã£o de Faturas GraphQL do bloco {}/{}: {}", numeroBloco, totalBlocos, msg, e);
                     }
                 }
-                
-                blocosCompletos++;
-                
-            } catch (final Exception e) {
-                log.error("❌ Falha na extração do bloco {}/{}: {}", numeroBloco, totalBlocos, e.getMessage(), e);
+            } else if (!incluirFaturasGraphQL && (apiEspecifica == null || "graphql".equalsIgnoreCase(apiEspecifica)) && !isSomenteFaturasGraphQL) {
+                log.info("â„¹ï¸ [FASE 3] Faturas GraphQL desabilitado por opÃ§Ã£o do operador ({}).", FLAG_SEM_FATURAS_GRAPHQL);
+            }
+
+            final LocalDateTime fimExecucaoBloco = LocalDateTime.now();
+            final List<String> falhasDeVolume = validarResultadosCriticosDoBloco(
+                bloco,
+                inicioExecucaoBloco,
+                fimExecucaoBloco,
+                apiEspecifica,
+                entidadeEspecifica,
+                incluirFaturasGraphQL
+            );
+            if (!falhasDeVolume.isEmpty()) {
+                blocoComFalha = true;
+                falhasBloco.addAll(falhasDeVolume);
+                log.warn("âš ï¸ Bloco {}/{} apresentou inconsistÃªncias de volume em entidades crÃ­ticas:", numeroBloco, totalBlocos);
+                for (final String falhaVolume : falhasDeVolume) {
+                    log.warn("   â€¢ {}", falhaVolume);
+                }
+            }
+
+            if (blocoComFalha) {
                 blocosFalhados++;
-                blocosFalhadosLista.add("Bloco " + numeroBloco);
+                if (falhasBloco.isEmpty()) {
+                    blocosFalhadosLista.add("Bloco " + numeroBloco);
+                } else {
+                    blocosFalhadosLista.add("Bloco " + numeroBloco + " (" + String.join(" | ", falhasBloco) + ")");
+                }
+            } else {
+                blocosCompletos++;
             }
         }
         
@@ -271,31 +369,43 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         final long duracaoMinutos = java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes();
         
         log.console("\n" + "=".repeat(60));
-        log.console("RESUMO DA EXTRAÇÃO POR INTERVALO");
+        log.console("RESUMO DA EXTRAÃ‡ÃƒO POR INTERVALO");
         log.console("=".repeat(60));
-        log.console("Período: {} a {}", 
+        log.console("PerÃ­odo: {} a {}", 
                    FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
         log.console("Total de blocos: {}", blocos.size());
         log.console("Blocos completos: {}", blocosCompletos);
         if (blocosFalhados > 0) {
             log.warn("Blocos falhados: {} - {}", blocosFalhados, String.join(", ", blocosFalhadosLista));
         }
-        log.console("Duração total: {} minutos", duracaoMinutos);
+        log.console("DuraÃ§Ã£o total: {} minutos", duracaoMinutos);
         log.console("=".repeat(60));
         
         if (blocosFalhados == 0) {
             BannerUtil.exibirBannerSucesso();
         } else {
             BannerUtil.exibirBannerErro();
+            throw new PartialExecutionException(
+                "ExtraÃ§Ã£o por intervalo concluÃ­da com falhas parciais. Blocos falhados: "
+                    + blocosFalhados + " - " + String.join(", ", blocosFalhadosLista)
+            );
         }
+    }
+
+    private String extrairMensagemRaiz(final Throwable erro) {
+        Throwable atual = erro;
+        while (atual.getCause() != null) {
+            atual = atual.getCause();
+        }
+        return atual.getMessage() != null ? atual.getMessage() : atual.toString();
     }
     
     /**
-     * Divide o período em blocos de 30 dias.
+     * Divide o perÃ­odo em blocos de 30 dias.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
-     * @return Lista de blocos de período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
+     * @return Lista de blocos de perÃ­odo
      */
     private List<BlocoPeriodo> dividirEmBlocos(final LocalDate dataInicio, final LocalDate dataFim) {
         final List<BlocoPeriodo> blocos = new ArrayList<>();
@@ -303,13 +413,13 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         LocalDate inicioBloco = dataInicio;
         
         while (!inicioBloco.isAfter(dataFim)) {
-            // Calcular fim do bloco (início + 30 dias, ou dataFim se for menor)
+            // Calcular fim do bloco (inÃ­cio + 30 dias, ou dataFim se for menor)
             final LocalDate fimBloco = inicioBloco.plusDays(TAMANHO_BLOCO_DIAS - 1);
             final LocalDate fimReal = fimBloco.isAfter(dataFim) ? dataFim : fimBloco;
             
             blocos.add(new BlocoPeriodo(inicioBloco, fimReal));
             
-            // Próximo bloco começa no dia seguinte ao fim do bloco atual
+            // PrÃ³ximo bloco comeÃ§a no dia seguinte ao fim do bloco atual
             inicioBloco = fimReal.plusDays(1);
         }
         
@@ -317,32 +427,35 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     }
     
     /**
-     * Valida regras de limitação para as entidades do bloco.
-     * CORRIGIDO: A regra de limitação é baseada no TAMANHO DO BLOCO (30 dias), não no período total.
+     * Valida regras de limitaÃ§Ã£o para as entidades do bloco.
+     * CORRIGIDO: A regra de limitaÃ§Ã£o Ã© baseada no TAMANHO DO BLOCO (30 dias), nÃ£o no perÃ­odo total.
      * Isso permite que blocos de 30 dias usem a regra de "sem limite" em vez de 12 horas.
      * 
-     * @param bloco Bloco de período a validar
+     * @param bloco Bloco de perÃ­odo a validar
      * @param validador Validador de limites
-     * @param apiEspecifica API específica (null = todas)
-     * @param entidadeEspecifica Entidade específica (null = todas)
+     * @param apiEspecifica API especÃ­fica (null = todas)
+     * @param entidadeEspecifica Entidade especÃ­fica (null = todas)
      * @return true se pode executar, false se bloqueado
      */
     private boolean validarLimitesParaBloco(final BlocoPeriodo bloco, 
                                            final ValidadorLimiteExtracao validador,
                                            final String apiEspecifica,
-                                           final String entidadeEspecifica) {
+                                           final String entidadeEspecifica,
+                                           final boolean incluirFaturasGraphQL) {
         // Determinar quais entidades validar
         final List<String> entidadesParaValidar = new ArrayList<>();
         
         if (entidadeEspecifica != null && !entidadeEspecifica.isEmpty()) {
-            // Validar apenas a entidade específica
+            // Validar apenas a entidade especÃ­fica
             entidadesParaValidar.add(entidadeEspecifica);
         } else if (apiEspecifica != null && !apiEspecifica.isEmpty()) {
-            // Validar todas as entidades da API específica
+            // Validar todas as entidades da API especÃ­fica
             if ("graphql".equals(apiEspecifica)) {
                 entidadesParaValidar.add(ConstantesEntidades.COLETAS);
                 entidadesParaValidar.add(ConstantesEntidades.FRETES);
-                entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
+                if (incluirFaturasGraphQL) {
+                    entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
+                }
             } else if ("dataexport".equals(apiEspecifica)) {
                 entidadesParaValidar.add(ConstantesEntidades.MANIFESTOS);
                 entidadesParaValidar.add(ConstantesEntidades.COTACOES);
@@ -359,29 +472,260 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
             entidadesParaValidar.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
             entidadesParaValidar.add(ConstantesEntidades.CONTAS_A_PAGAR);
             entidadesParaValidar.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
-            entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
+            if (incluirFaturasGraphQL) {
+                entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
+            }
         }
         
         boolean todasPermitidas = true;
         
         for (final String entidade : entidadesParaValidar) {
-            // CORRIGIDO: Usa o tamanho do BLOCO (30 dias) para determinar a regra de limitação
+            // CORRIGIDO: Usa o tamanho do BLOCO (30 dias) para determinar a regra de limitaÃ§Ã£o
             // Isso permite que blocos de 30 dias usem a regra de "sem limite" em vez de 12 horas
             final ValidadorLimiteExtracao.ResultadoValidacao resultado = 
                 validador.validarLimiteExtracao(entidade, bloco.dataInicio, bloco.dataFim);
             
             if (!resultado.isPermitido()) {
-                log.warn("⏸️ {}: {}", entidade, resultado.getMotivo());
-                log.console("   ⏳ Aguarde {} hora(s) antes de tentar novamente", resultado.getHorasRestantes());
+                log.warn("â¸ï¸ {}: {}", entidade, resultado.getMotivo());
+                log.console("   â³ Aguarde {} hora(s) antes de tentar novamente", resultado.getHorasRestantes());
                 todasPermitidas = false;
             }
         }
         
         return todasPermitidas;
     }
+
+    private boolean isEntidadeFaturasGraphQL(final String entidadeEspecifica) {
+        if (entidadeEspecifica == null || entidadeEspecifica.isBlank()) {
+            return false;
+        }
+        return ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica)
+            || "faturas".equalsIgnoreCase(entidadeEspecifica)
+            || "faturasgraphql".equalsIgnoreCase(entidadeEspecifica);
+    }
+
+    /**
+     * Valida se entidades crÃ­ticas executaram com integridade no bloco atual, usando logs reais.
+     * Regra aplicada: entidade crÃ­tica sem log, status nÃ£o COMPLETO ou falha de integridade Ã© falha parcial.
+     * Volume zero isolado (origem=0, destino=0) nÃ£o Ã© tratado como falha.
+     */
+    private List<String> validarResultadosCriticosDoBloco(final BlocoPeriodo bloco,
+                                                          final LocalDateTime inicioExecucaoBloco,
+                                                          final LocalDateTime fimExecucaoBloco,
+                                                          final String apiEspecifica,
+                                                          final String entidadeEspecifica,
+                                                          final boolean incluirFaturasGraphQL) {
+        final List<String> falhas = new ArrayList<>();
+        final Set<String> entidadesObrigatorias = determinarEntidadesObrigatoriasParaVolume(
+            apiEspecifica,
+            entidadeEspecifica,
+            incluirFaturasGraphQL
+        );
+
+        if (entidadesObrigatorias.isEmpty()) {
+            return falhas;
+        }
+
+        final LogExtracaoRepository logRepository = new LogExtracaoRepository();
+        for (final String entidade : entidadesObrigatorias) {
+            final Optional<LogExtracaoEntity> logOpt = logRepository.buscarUltimoLogPorEntidadeNoIntervaloExecucao(
+                entidade,
+                inicioExecucaoBloco,
+                fimExecucaoBloco
+            );
+
+            if (logOpt.isEmpty()) {
+                falhas.add(String.format(
+                    "%s sem log no bloco %s a %s (possÃ­vel nÃ£o execuÃ§Ã£o)",
+                    entidade,
+                    bloco.dataInicio,
+                    bloco.dataFim
+                ));
+                continue;
+            }
+
+            final LogExtracaoEntity logEntidade = logOpt.get();
+            if (logEntidade.getStatusFinal() != LogExtracaoEntity.StatusExtracao.COMPLETO) {
+                falhas.add(String.format(
+                    "%s com status %s no bloco %s a %s",
+                    entidade,
+                    logEntidade.getStatusFinal(),
+                    bloco.dataInicio,
+                    bloco.dataFim
+                ));
+                continue;
+            }
+
+            final Integer registrosExtraidos = logEntidade.getRegistrosExtraidos();
+            if (registrosExtraidos == null) {
+                falhas.add(String.format(
+                    "%s sem contagem de registros no bloco %s a %s",
+                    entidade,
+                    bloco.dataInicio,
+                    bloco.dataFim
+                ));
+                continue;
+            }
+
+            if (registrosExtraidos == 0) {
+                log.info("â„¹ï¸ {} com 0 registros no bloco {} a {} (considerado vÃ¡lido quando integridade tambÃ©m estiver OK).",
+                    entidade,
+                    bloco.dataInicio,
+                    bloco.dataFim);
+            }
+        }
+
+        final Set<String> entidadesIntegridade = determinarEntidadesEsperadasParaIntegridade(
+            apiEspecifica,
+            entidadeEspecifica,
+            incluirFaturasGraphQL
+        );
+        if (!entidadesIntegridade.isEmpty()) {
+            final IntegridadeEtlValidator integridadeValidator = new IntegridadeEtlValidator();
+            final IntegridadeEtlValidator.ResultadoValidacao resultadoIntegridade =
+                integridadeValidator.validarExecucao(inicioExecucaoBloco, fimExecucaoBloco, entidadesIntegridade);
+            if (!resultadoIntegridade.isValido()) {
+                falhas.addAll(resultadoIntegridade.getFalhas());
+            }
+        }
+
+        return falhas;
+    }
+
+    /**
+     * Define quais entidades sÃ£o obrigatÃ³rias para considerar o bloco "normal".
+     * - Se entidade especÃ­fica foi informada: valida essa entidade.
+     * - Caso contrÃ¡rio: valida o conjunto crÃ­tico de negÃ³cio para evitar falso sucesso com volume zerado.
+     */
+    private Set<String> determinarEntidadesObrigatoriasParaVolume(final String apiEspecifica,
+                                                                  final String entidadeEspecifica,
+                                                                  final boolean incluirFaturasGraphQL) {
+        final Set<String> entidades = new LinkedHashSet<>();
+
+        if (entidadeEspecifica != null && !entidadeEspecifica.isBlank()) {
+            final String entidadeNormalizada = normalizarEntidade(entidadeEspecifica);
+            if (entidadeNormalizada != null) {
+                entidades.add(entidadeNormalizada);
+            }
+            return entidades;
+        }
+
+        final boolean apiTodas = apiEspecifica == null || apiEspecifica.isBlank();
+        final boolean apiGraphQL = "graphql".equalsIgnoreCase(apiEspecifica);
+        final boolean apiDataExport = "dataexport".equalsIgnoreCase(apiEspecifica);
+
+        if (apiTodas || apiGraphQL) {
+            entidades.add(ConstantesEntidades.COLETAS);
+            entidades.add(ConstantesEntidades.FRETES);
+            if (incluirFaturasGraphQL) {
+                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
+            }
+        }
+
+        if (apiTodas || apiDataExport) {
+            entidades.add(ConstantesEntidades.MANIFESTOS);
+            entidades.add(ConstantesEntidades.COTACOES);
+            entidades.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
+        }
+
+        return entidades;
+    }
+
+    private Set<String> determinarEntidadesEsperadasParaIntegridade(final String apiEspecifica,
+                                                                    final String entidadeEspecifica,
+                                                                    final boolean incluirFaturasGraphQL) {
+        final Set<String> entidades = new LinkedHashSet<>();
+
+        if (entidadeEspecifica != null && !entidadeEspecifica.isBlank()) {
+            final String entidadeNormalizada = normalizarEntidade(entidadeEspecifica);
+            if (entidadeNormalizada != null) {
+                entidades.add(entidadeNormalizada);
+                if (ConstantesEntidades.COLETAS.equals(entidadeNormalizada)) {
+                    entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
+                }
+            }
+            return entidades;
+        }
+
+        final boolean apiTodas = apiEspecifica == null || apiEspecifica.isBlank();
+        final boolean apiGraphQL = "graphql".equalsIgnoreCase(apiEspecifica);
+        final boolean apiDataExport = "dataexport".equalsIgnoreCase(apiEspecifica);
+
+        if (apiTodas || apiGraphQL) {
+            entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
+            entidades.add(ConstantesEntidades.COLETAS);
+            entidades.add(ConstantesEntidades.FRETES);
+            if (incluirFaturasGraphQL) {
+                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
+            }
+        }
+
+        if (apiTodas || apiDataExport) {
+            entidades.add(ConstantesEntidades.MANIFESTOS);
+            entidades.add(ConstantesEntidades.COTACOES);
+            entidades.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
+            entidades.add(ConstantesEntidades.CONTAS_A_PAGAR);
+            entidades.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
+        }
+
+        return entidades;
+    }
+
+    /**
+     * Normaliza alias de entidade para o nome canÃ´nico salvo em log_extracoes.
+     */
+    private String normalizarEntidade(final String entidade) {
+        if (entidade == null || entidade.isBlank()) {
+            return null;
+        }
+        final String valor = entidade.trim().toLowerCase(Locale.ROOT);
+
+        if (ConstantesEntidades.COLETAS.equals(valor)) {
+            return ConstantesEntidades.COLETAS;
+        }
+        if (ConstantesEntidades.FRETES.equals(valor)) {
+            return ConstantesEntidades.FRETES;
+        }
+        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(valor)
+            || "faturas".equals(valor)
+            || "faturasgraphql".equals(valor)) {
+            return ConstantesEntidades.FATURAS_GRAPHQL;
+        }
+        if (ConstantesEntidades.USUARIOS_SISTEMA.equals(valor)) {
+            return ConstantesEntidades.USUARIOS_SISTEMA;
+        }
+
+        if (ConstantesEntidades.MANIFESTOS.equals(valor)) {
+            return ConstantesEntidades.MANIFESTOS;
+        }
+        if (ConstantesEntidades.COTACOES.equals(valor) || "cotacao".equals(valor)) {
+            return ConstantesEntidades.COTACOES;
+        }
+        if (ConstantesEntidades.LOCALIZACAO_CARGAS.equals(valor)
+            || "localizacao_carga".equals(valor)
+            || "localizacao_de_carga".equals(valor)
+            || "localizacao-carga".equals(valor)
+            || "localizacao de carga".equals(valor)) {
+            return ConstantesEntidades.LOCALIZACAO_CARGAS;
+        }
+        if (ConstantesEntidades.CONTAS_A_PAGAR.equals(valor)
+            || "contasapagar".equals(valor)
+            || "contas a pagar".equals(valor)
+            || "contas-a-pagar".equals(valor)) {
+            return ConstantesEntidades.CONTAS_A_PAGAR;
+        }
+        if (ConstantesEntidades.FATURAS_POR_CLIENTE.equals(valor)
+            || "faturasporcliente".equals(valor)
+            || "faturas por cliente".equals(valor)
+            || "faturas-por-cliente".equals(valor)) {
+            return ConstantesEntidades.FATURAS_POR_CLIENTE;
+        }
+
+        return valor;
+    }
     
     /**
-     * Classe auxiliar para representar um bloco de período.
+     * Classe auxiliar para representar um bloco de perÃ­odo.
      */
     private static class BlocoPeriodo {
         final LocalDate dataInicio;
@@ -393,4 +737,3 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         }
     }
 }
-

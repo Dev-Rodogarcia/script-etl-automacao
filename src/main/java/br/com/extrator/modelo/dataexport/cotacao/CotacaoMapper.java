@@ -3,10 +3,10 @@ package br.com.extrator.modelo.dataexport.cotacao;
 import br.com.extrator.db.entity.CotacaoEntity;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
+import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.mapeamento.MapperUtil;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +80,10 @@ public class CotacaoMapper {
         // 2. Conversão segura de tipos de dados (String para tipos específicos)
         try {
             if (dto.getRequestedAt() != null && !dto.getRequestedAt().trim().isEmpty()) {
-                entity.setRequestedAt(OffsetDateTime.parse(dto.getRequestedAt()));
+                final OffsetDateTime requestedAt = FormatadorData.parseOffsetDateTime(dto.getRequestedAt());
+                if (requestedAt != null) {
+                    entity.setRequestedAt(requestedAt);
+                }
             }
             if (dto.getTotalValue() != null && !dto.getTotalValue().trim().isEmpty()) {
                 entity.setTotalValue(new BigDecimal(dto.getTotalValue()));
@@ -110,12 +113,18 @@ public class CotacaoMapper {
                 entity.setOtherFees(new BigDecimal(dto.getOtherFees()));
             }
             if (dto.getCteIssuedAt() != null && !dto.getCteIssuedAt().trim().isEmpty()) {
-                entity.setCteIssuedAt(OffsetDateTime.parse(dto.getCteIssuedAt()));
+                final OffsetDateTime cteIssuedAt = FormatadorData.parseOffsetDateTime(dto.getCteIssuedAt());
+                if (cteIssuedAt != null) {
+                    entity.setCteIssuedAt(cteIssuedAt);
+                }
             }
             if (dto.getNfseIssuedAt() != null && !dto.getNfseIssuedAt().trim().isEmpty()) {
-                entity.setNfseIssuedAt(OffsetDateTime.parse(dto.getNfseIssuedAt()));
+                final OffsetDateTime nfseIssuedAt = FormatadorData.parseOffsetDateTime(dto.getNfseIssuedAt());
+                if (nfseIssuedAt != null) {
+                    entity.setNfseIssuedAt(nfseIssuedAt);
+                }
             }
-        } catch (DateTimeParseException | NumberFormatException e) {
+        } catch (NumberFormatException e) {
             logger.error("❌ Erro ao converter dados para cotação {}: requestedAt='{}', totalValue='{}', taxedWeight='{}', invoicesValue='{}' - {}", 
                 dto.getSequenceCode(), dto.getRequestedAt(), dto.getTotalValue(), dto.getTaxedWeight(), dto.getInvoicesValue(), e.getMessage());
             logger.debug("Stack trace completo:", e);

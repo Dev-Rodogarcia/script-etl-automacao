@@ -3,38 +3,47 @@ package br.com.extrator.comandos.console;
 import br.com.extrator.comandos.base.Comando;
 
 /**
- * Comando responsável por exibir a ajuda do sistema.
+ * Comando responsavel por exibir a ajuda do sistema.
  */
 public class ExibirAjudaComando implements Comando {
-    
+
     @Override
     public void executar(final String[] args) throws Exception {
         System.out.println("=".repeat(80));
-        System.out.println("🚀 SISTEMA DE EXTRAÇÃO DE DADOS - ESL CLOUD");
+        System.out.println("SISTEMA DE EXTRACAO DE DADOS - ESL CLOUD");
         System.out.println("=".repeat(80));
         System.out.println();
-        System.out.println("COMANDOS DISPONÍVEIS:");
+        System.out.println("COMANDOS DISPONIVEIS:");
         System.out.println();
-        System.out.println("  (sem argumentos)     Executa extração completa de todas as APIs");
-        System.out.println("  --validar            Valida configurações e conectividade");
-        System.out.println("  --introspeccao       Realiza introspecção do schema GraphQL");
-        System.out.println("  --auditoria          Executa auditoria dos dados (últimas 24h)");
+        System.out.println("  (sem argumentos)      Executa extracao completa de todas as APIs");
+        System.out.println("                        Opcional: --sem-faturas-graphql (pula Fase 3 de enriquecimento)");
+        System.out.println("  --extracao-intervalo  Executa extracao por intervalo");
+        System.out.println("                        Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql]");
+        System.out.println("  --validar             Valida configuracoes e conectividade");
+        System.out.println("  --introspeccao        Realiza introspeccao do schema GraphQL");
+        System.out.println("  --auditoria           Executa auditoria dos dados (ultimas 24h)");
         System.out.println("  --auditoria --periodo YYYY-MM-DD YYYY-MM-DD");
-        System.out.println("                       Executa auditoria para período específico");
-        System.out.println("  --testar-api [tipo]  Testa API específica:");
-        System.out.println("                         rest      - Testa API REST");
-        System.out.println("                         graphql   - Testa API GraphQL");
-        System.out.println("                         dataexport- Testa API DataExport");
-        System.out.println("  --loop               Console de loop de extração (start/pause/resume/stop)");
-        System.out.println("  --ajuda, --help      Exibe esta mensagem de ajuda");
+        System.out.println("                        Executa auditoria para periodo especifico");
+        System.out.println("  --auditar-api         Audita estrutura das APIs e gera CSV");
+        System.out.println("  --testar-api [tipo]   Testa API especifica (rest|graphql|dataexport)");
+        System.out.println("  --loop                Console interativo de loop (legado)");
+        System.out.println("  --loop-daemon-start   Inicia loop em segundo plano");
+        System.out.println("  --loop-daemon-stop    Para loop em segundo plano");
+        System.out.println("  --loop-daemon-status  Consulta status do loop em segundo plano");
+        System.out.println("  --auth-bootstrap      Cria o primeiro usuario ADMIN");
+        System.out.println("  --auth-check ACAO     Solicita autenticacao para acao sensivel");
+        System.out.println("  --auth-create-user    Cria usuario (requer ADMIN)");
+        System.out.println("  --auth-reset-password Redefine senha de usuario (requer ADMIN)");
+        System.out.println("  --auth-disable-user   Desativa usuario (requer ADMIN)");
+        System.out.println("  --auth-info           Exibe info do banco de seguranca");
+        System.out.println("  --ajuda, --help       Exibe esta ajuda");
         System.out.println();
         System.out.println("EXEMPLOS:");
-        System.out.println("  java -jar extrator.jar");
-        System.out.println("  java -jar extrator.jar --validar");
-        System.out.println("  java -jar extrator.jar --auditoria");
-        System.out.println("  java -jar extrator.jar --auditoria --periodo 2024-01-01 2024-01-31");
-        System.out.println("  java -jar extrator.jar --testar-api rest");
-        System.out.println("  java -jar extrator.jar --loop");
+        System.out.println("  java -jar extrator.jar --auth-bootstrap");
+        System.out.println("  java -jar extrator.jar --auth-check RUN_EXTRACAO_COMPLETA");
+        System.out.println("  java -jar extrator.jar --fluxo-completo --sem-faturas-graphql");
+        System.out.println("  java -jar extrator.jar --extracao-intervalo 2026-01-01 2026-01-31 --sem-faturas-graphql");
+        System.out.println("  java -jar extrator.jar --loop-daemon-start");
         System.out.println();
         System.out.println("=".repeat(80));
     }

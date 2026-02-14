@@ -1,32 +1,47 @@
 -- ============================================
 -- Script de criação da view 'vw_dim_clientes'
 -- Execute este script UMA VEZ antes de colocar o sistema em produção
--- NOTA: Esta view depende das views principais (vw_fretes_powerbi, vw_coletas_powerbi)
--- Execute APÓS as views principais (011-018)
+-- Execute APÓS as tabelas principais
 -- 
--- IMPORTANTE: Esta view garante unicidade por ID (chave primária da dimensão)
--- Se o mesmo ID aparecer em múltiplas fontes, mantém apenas um registro (prioriza nome não-nulo)
+-- IMPORTANTE: Esta versão garante unicidade absoluta por NOME NORMALIZADO
+-- (UPPER + LTRIM + RTRIM), blindando duplicatas na dimensão de clientes.
 -- ============================================
 
-CREATE OR ALTER VIEW dbo.vw_dim_clientes AS
-WITH ClientesUnificados AS (
-    -- Clientes vindos de Fretes (Pagador)
-    SELECT [Pagador ID] AS [ID], [Pagador] AS [Nome], 'Fretes' AS Fonte
-    FROM dbo.vw_fretes_powerbi
-    WHERE [Pagador ID] IS NOT NULL
-    
-    -- NOTA: Clientes de Coletas removidos pois cliente_id foi removido da tabela coletas
-    -- Se necessário adicionar novamente, será preciso restaurar o campo cliente_id na tabela
+IF OBJECT_ID('dbo.vw_dim_clientes', 'V') IS NOT NULL
+    DROP VIEW dbo.vw_dim_clientes;
+IF OBJECT_ID('dbo.vw_dim_clientes', 'U') IS NOT NULL
+    DROP TABLE dbo.vw_dim_clientes;
+GO
+
+CREATE VIEW dbo.vw_dim_clientes AS
+WITH ClientesBrutos AS (
+    -- Fonte 1: Fretes (Remetente, Destinatario, Pagador)
+    SELECT remetente_nome AS Nome FROM dbo.fretes WHERE remetente_nome IS NOT NULL
+    UNION ALL
+    SELECT destinatario_nome FROM dbo.fretes WHERE destinatario_nome IS NOT NULL
+    UNION ALL
+    SELECT pagador_nome FROM dbo.fretes WHERE pagador_nome IS NOT NULL
+
+    UNION ALL
+
+    -- Fonte 2: Coletas (Cliente)
+    SELECT cliente_nome FROM dbo.coletas WHERE cliente_nome IS NOT NULL
+
+    UNION ALL
+
+    -- Fonte 3: Faturas por Cliente (Pagador, Remetente, Destinatario)
+    SELECT pagador_nome FROM dbo.faturas_por_cliente WHERE pagador_nome IS NOT NULL
+    UNION ALL
+    SELECT remetente_nome FROM dbo.faturas_por_cliente WHERE remetente_nome IS NOT NULL
+    UNION ALL
+    SELECT destinatario_nome FROM dbo.faturas_por_cliente WHERE destinatario_nome IS NOT NULL
 )
 SELECT 
-    [ID],
-    -- Prioriza nome não-nulo, se ambos forem não-nulos usa MAX (mais comum/consistente)
-    MAX([Nome]) AS [Nome]
-FROM ClientesUnificados
-WHERE [ID] IS NOT NULL
-GROUP BY [ID];
+    DISTINCT UPPER(LTRIM(RTRIM(Nome))) AS [Nome]
+FROM ClientesBrutos
+WHERE LTRIM(RTRIM(Nome)) <> '';
 GO
 
 PRINT 'View vw_dim_clientes criada/atualizada com sucesso!';
-PRINT 'NOTA: Garante unicidade por ID - mesmo ID em múltiplas fontes resulta em uma única linha';
+PRINT 'NOTA: Garante unicidade por Nome normalizado (UPPER + TRIM)';
 GO

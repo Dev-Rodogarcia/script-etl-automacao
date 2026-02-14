@@ -1,9 +1,10 @@
 package br.com.extrator.db.entity;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
- * Entidade para controle de status das extrações de dados
+ * Entidade para controle de status das extraÃ§Ãµes de dados
  */
 public class LogExtracaoEntity {
     
@@ -18,7 +19,10 @@ public class LogExtracaoEntity {
     
     public enum StatusExtracao {
         COMPLETO("COMPLETO"),
+        INCOMPLETO("INCOMPLETO"),
         INCOMPLETO_LIMITE("INCOMPLETO_LIMITE"),
+        INCOMPLETO_DADOS("INCOMPLETO_DADOS"),
+        INCOMPLETO_DB("INCOMPLETO_DB"),
         ERRO_API("ERRO_API");
         
         private final String valor;
@@ -32,17 +36,25 @@ public class LogExtracaoEntity {
         }
         
         public static StatusExtracao fromString(final String valor) {
-            // Mapear "INCOMPLETO" para "INCOMPLETO_LIMITE" para compatibilidade
-            if ("INCOMPLETO".equals(valor)) {
-                return INCOMPLETO_LIMITE;
+            if (valor == null || valor.isBlank()) {
+                throw new IllegalArgumentException("Status invÃ¡lido: valor nulo/vazio");
+            }
+            final String normalizado = valor.trim().toUpperCase(Locale.ROOT);
+
+            // Compatibilidade com status antigos/alternativos gravados em versÃµes anteriores
+            if ("INCOMPLETO_DADOS_INVALIDOS".equals(normalizado)) {
+                return INCOMPLETO_DADOS;
+            }
+            if ("INCOMPLETO_SALVAMENTO".equals(normalizado)) {
+                return INCOMPLETO_DB;
             }
             
             for (final StatusExtracao status : StatusExtracao.values()) {
-                if (status.valor.equals(valor)) {
+                if (status.valor.equals(normalizado)) {
                     return status;
                 }
             }
-            throw new IllegalArgumentException("Status inválido: " + valor);
+            throw new IllegalArgumentException("Status invÃ¡lido: " + valor);
         }
     }
     
@@ -155,3 +167,4 @@ public class LogExtracaoEntity {
                 '}';
     }
 }
+

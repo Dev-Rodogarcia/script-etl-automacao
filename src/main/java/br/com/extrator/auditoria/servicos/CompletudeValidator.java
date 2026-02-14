@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -147,6 +148,21 @@ public class CompletudeValidator {
         
         return Optional.of(totaisEslCloud);
     }
+
+    /**
+     * Valida completude usando exclusivamente os logs da própria execução.
+     *
+     * Esse modo evita uma segunda rodada de chamadas às APIs ao final do fluxo
+     * (que pode ser lenta), mantendo a comparação entre referência de extração
+     * (log_extracoes) e dados persistidos no banco.
+     *
+     * @param dataReferencia Data de referência da execução
+     * @return Map com status de validação por entidade
+     */
+    public Map<String, StatusValidacao> validarCompletudePorLogs(final LocalDate dataReferencia) {
+        logger.info("🔍 Iniciando validação de completude baseada em log_extracoes para data: {}", dataReferencia);
+        return validarCompletude(Collections.emptyMap(), dataReferencia);
+    }
     
     /**
      * Valida a completude dos dados comparando contagens do ESL Cloud com o banco local.
@@ -202,65 +218,45 @@ public class CompletudeValidator {
 
                     int contagemBanco;
                     if (tsInicio != null && tsFim != null) {
-                        // Para Contas a Pagar, usar issue_date (data de emissão) nas últimas 24h
-                        // porque a API busca por issue_date nas últimas 24h, então devemos contar da mesma forma
-                        if (ConstantesEntidades.CONTAS_A_PAGAR.equals(nomeEntidade)) {
-                            // API busca nas últimas 24h baseado em issue_date, então usar mesma janela
-                            final String sqlDb = String.format(
-                                "SELECT COUNT(*) FROM %s WHERE issue_date >= CAST(DATEADD(day, -1, GETDATE()) AS DATE) AND issue_date <= CAST(GETDATE() AS DATE)",
-                                nomeTabela
-                            );
-                            try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb);
-                                 ResultSet rsDb = stmtDb.executeQuery()) {
-                                if (rsDb.next()) {
-                                    contagemBanco = rsDb.getInt(1);
-                                } else {
-                                    contagemBanco = 0;
-                                }
-                            }
-                        } else {
-                            final String sqlDb = String.format(
-                                "SELECT COUNT(*) FROM %s WHERE data_extracao >= ? AND data_extracao <= ?",
-                                nomeTabela
-                            );
-                            try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb)) {
-                                stmtDb.setTimestamp(1, tsInicio);
-                                stmtDb.setTimestamp(2, tsFim);
-                                try (ResultSet rsDb = stmtDb.executeQuery()) {
-                                    rsDb.next();
-                                    contagemBanco = rsDb.getInt(1);
-                                }
-                            }
-                        }
-                    } else {
-                        // Para Contas a Pagar sem log, usar issue_date nas últimas 24h (mesma janela da API)
-                        if (ConstantesEntidades.CONTAS_A_PAGAR.equals(nomeEntidade)) {
-                            // API busca: ontem (24h atrás) até agora, baseado em issue_date
-                            // Usar CAST para garantir comparação apenas por data (sem hora)
-                            final String sqlDb = String.format(
-                                "SELECT COUNT(*) FROM %s WHERE issue_date >= CAST(DATEADD(day, -1, GETDATE()) AS DATE) AND issue_date <= CAST(GETDATE() AS DATE)",
-                                nomeTabela
-                            );
-                            try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb);
-                                 ResultSet rsDb = stmtDb.executeQuery()) {
-                                if (rsDb.next()) {
-                                    contagemBanco = rsDb.getInt(1);
-                                } else {
-                                    contagemBanco = 0;
-                                }
-                            }
-                        } else {
-                            final String sqlDb = String.format(
-                                "SELECT COUNT(*) FROM %s WHERE data_extracao >= DATEADD(hour, -24, GETDATE())",
-                                nomeTabela
-                            );
-                            try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb);
-                                 ResultSet rsDb = stmtDb.executeQuery()) {
+                        final String colunaTemporal = ConstantesEntidades.USUARIOS_SISTEMA.equals(nomeEntidade)
+                            ? "data_atualizacao"
+                            : "data_extracao";
+                        final String sqlDb = String.format(
+                            "SELECT COUNT(*) FROM %s WHERE %s >= ? AND %s <= ?",
+                            nomeTabela,
+                            colunaTemporal,
+                            colunaTemporal
+                        );
+                        try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb)) {
+                            stmtDb.setTimestamp(1, tsInicio);
+                            stmtDb.setTimestamp(2, tsFim);
+                            try (ResultSet rsDb = stmtDb.executeQuery()) {
                                 rsDb.next();
                                 contagemBanco = rsDb.getInt(1);
                             }
                         }
-                        contagemEslCloud = totaisEslCloud.getOrDefault(nomeEntidade, contagemEslCloud);
+                    } else {
+                        final Integer contagemReferencia = totaisEslCloud.get(nomeEntidade);
+                        if (contagemReferencia == null) {
+                            logger.warn("⚠️ Sem referência de contagem para '{}' (sem log COMPLETO e sem total de API).", nomeEntidade);
+                            resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
+                            continue;
+                        }
+
+                        final String colunaTemporal = ConstantesEntidades.USUARIOS_SISTEMA.equals(nomeEntidade)
+                            ? "data_atualizacao"
+                            : "data_extracao";
+                        final String sqlDb = String.format(
+                            "SELECT COUNT(*) FROM %s WHERE %s >= DATEADD(hour, -24, GETDATE())",
+                            nomeTabela,
+                            colunaTemporal
+                        );
+                        try (PreparedStatement stmtDb = conexao.prepareStatement(sqlDb);
+                             ResultSet rsDb = stmtDb.executeQuery()) {
+                            rsDb.next();
+                            contagemBanco = rsDb.getInt(1);
+                        }
+                        contagemEslCloud = contagemReferencia;
                     }
 
                     final StatusValidacao status = determinarStatusValidacao(contagemEslCloud, contagemBanco);
@@ -305,10 +301,6 @@ public class CompletudeValidator {
         if (contagemEslCloud == contagemBanco) {
             return StatusValidacao.OK;
         } else if (contagemBanco < contagemEslCloud) {
-            final double perc = contagemEslCloud == 0 ? 0.0 : (contagemBanco * 100.0) / contagemEslCloud;
-            if (perc >= 80.0) {
-                return StatusValidacao.OK;
-            }
             return StatusValidacao.INCOMPLETO;
         } else {
             return StatusValidacao.DUPLICADOS;

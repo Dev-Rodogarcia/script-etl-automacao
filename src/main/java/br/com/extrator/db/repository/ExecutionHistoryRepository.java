@@ -18,6 +18,29 @@ import br.com.extrator.util.banco.GerenciadorConexao;
 public class ExecutionHistoryRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(ExecutionHistoryRepository.class);
+    private static final String SQL_CREATE_SYS_EXECUTION_HISTORY = """
+        IF OBJECT_ID(N'dbo.sys_execution_history', N'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.sys_execution_history (
+                id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                start_time DATETIME2 NOT NULL,
+                end_time DATETIME2 NOT NULL,
+                duration_seconds INT NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                total_records INT NOT NULL DEFAULT 0,
+                error_category VARCHAR(50) NULL,
+                error_message VARCHAR(500) NULL,
+                created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+            );
+
+            CREATE INDEX IX_sys_execution_history_start_time
+                ON dbo.sys_execution_history (start_time DESC);
+        END
+        """;
+    private static final String SQL_CHECK_LOG_EXTRACOES = """
+        SELECT CASE WHEN OBJECT_ID(N'dbo.log_extracoes', N'U') IS NULL THEN 0 ELSE 1 END
+        """;
+    private static volatile boolean estruturaGarantida = false;
 
     /**
      * Inserts an execution history record.
@@ -37,6 +60,7 @@ public class ExecutionHistoryRepository {
 
         try (Connection conn = GerenciadorConexao.obterConexao();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
+            garantirEstruturaHistorico(conn);
 
             stmt.setTimestamp(1, Timestamp.valueOf(inicio));
             stmt.setTimestamp(2, Timestamp.valueOf(fim));
@@ -61,10 +85,15 @@ public class ExecutionHistoryRepository {
             SELECT COALESCE(SUM(registros_extraidos), 0) AS total
             FROM dbo.log_extracoes
             WHERE timestamp_fim >= ? AND timestamp_inicio <= ?
+              AND (status_final = 'COMPLETO' OR status_final LIKE 'INCOMPLETO%')
             """;
 
         try (Connection conn = GerenciadorConexao.obterConexao();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
+            if (!existeTabelaLogExtracoes(conn)) {
+                logger.info("Tabela dbo.log_extracoes ainda nao existe. Total de registros do historico sera 0.");
+                return 0;
+            }
 
             stmt.setTimestamp(1, Timestamp.valueOf(inicio));
             stmt.setTimestamp(2, Timestamp.valueOf(fim));
@@ -79,6 +108,34 @@ public class ExecutionHistoryRepository {
         }
 
         return 0;
+    }
+
+    private void garantirEstruturaHistorico(final Connection conn) throws SQLException {
+        if (estruturaGarantida) {
+            return;
+        }
+
+        synchronized (ExecutionHistoryRepository.class) {
+            if (estruturaGarantida) {
+                return;
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(SQL_CREATE_SYS_EXECUTION_HISTORY)) {
+                stmt.execute();
+                estruturaGarantida = true;
+            }
+        }
+    }
+
+    private boolean existeTabelaLogExtracoes(final Connection conn) {
+        try (PreparedStatement stmt = conn.prepareStatement(SQL_CHECK_LOG_EXTRACOES);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1) == 1;
+            }
+        } catch (final SQLException e) {
+            logger.warn("Falha ao verificar existencia de dbo.log_extracoes: {}", e.getMessage());
+        }
+        return false;
     }
 
     private String limitar(final String valor, final int max) {

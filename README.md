@@ -15,7 +15,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução, sistema robusto de deduplicação e validação completa de integridade dos dados.
 
-**Versão:** 2.3.2 | **Última Atualização:** 03/02/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.3 | **Última Atualização:** 14/02/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -80,6 +80,17 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **Scripts Batch**: Automação completa via scripts .bat
 
 ---
+
+## 🆕 Novidades 2.3.3 (14/02/2026)
+
+- ✅ **Esclarecimento de Integridade Referencial (Manifestos x Coletas)**:
+  - **Órfão**: manifesto com `pick_sequence_code` sem correspondência em `coletas.sequence_code`.
+  - **Regra atual**: quando dentro da tolerância configurada, gera `INTEGRIDADE_REFERENCIAL_MANIFESTOS_TOLERADO` como alerta não-bloqueante.
+  - **Sem perda de manifesto na entidade isolada**: os registros permanecem em `manifestos` e em `vw_manifestos_powerbi`.
+  - **Impacto em BI**: perda visual ocorre somente em consultas com `INNER JOIN` entre manifestos e coletas.
+  - **Modo estrito opcional**: para falhar com qualquer órfão, definir:
+    - `etl.referencial.manifestos.orfaos.quantidade.max=0`
+    - `etl.referencial.manifestos.orfaos.percentual.max=0`
 
 ## 🆕 Novidades 2.3.2 (03/02/2026)
 
@@ -746,6 +757,25 @@ Garante que nenhum registro foi criado durante a extração, o que poderia causa
 4. Reporta violações encontradas
 
 **Status:** ✅ OK (nenhum registro criado durante extração)
+
+### Alerta Tolerado de Integridade Referencial (Manifestos x Coletas)
+
+Durante a validação ETL, o sistema verifica se cada `manifesto.pick_sequence_code` existe em `coletas.sequence_code`.
+
+- **Dentro da tolerância** (quantidade E percentual): gera `INTEGRIDADE_REFERENCIAL_MANIFESTOS_TOLERADO` como **ALERTA** e a execução pode continuar com `SUCCESS`.
+- **Fora da tolerância**: vira falha de integridade do bloco.
+- **Importante**: esse alerta não significa perda de manifestos na carga isolada da entidade.
+
+Configuração padrão:
+
+- `etl.referencial.manifestos.orfaos.quantidade.max=500`
+- `etl.referencial.manifestos.orfaos.percentual.max=35.0`
+
+Impacto no Power BI:
+
+- Análise de manifestos isolada: registros permanecem disponíveis.
+- Consultas com `INNER JOIN` em coletas: órfãos podem sumir do resultado.
+- Consultas com `LEFT JOIN` a partir de manifestos: preservam os registros de manifestos.
 
 ---
 

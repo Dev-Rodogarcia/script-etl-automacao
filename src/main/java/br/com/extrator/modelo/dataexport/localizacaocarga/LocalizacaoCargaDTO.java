@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -20,6 +21,7 @@ public class LocalizacaoCargaDTO {
     
     // 1. Doc/Minuta
     @JsonProperty("corporation_sequence_number")
+    @JsonAlias("sequence_number")
     private Long sequenceNumber;
     
     // 2. Tipo
@@ -108,6 +110,7 @@ public class LocalizacaoCargaDTO {
         final Map<String, Object> allProps = new LinkedHashMap<>();
         // Adiciona todos os 17 campos explícitos ao mapa conforme documentação
         allProps.put("corporation_sequence_number", sequenceNumber);
+        allProps.put("sequence_number", sequenceNumber);
         allProps.put("type", type);
         allProps.put("service_at", serviceAt);
         allProps.put("invoices_volumes", invoicesVolumes);

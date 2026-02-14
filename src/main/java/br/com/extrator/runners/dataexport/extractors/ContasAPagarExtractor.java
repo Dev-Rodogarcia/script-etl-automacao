@@ -1,12 +1,13 @@
 package br.com.extrator.runners.dataexport.extractors;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.db.entity.ContasAPagarDataExportEntity;
+import br.com.extrator.db.repository.InvalidRecordAuditRepository;
 import br.com.extrator.db.repository.ContasAPagarRepository;
 import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.modelo.dataexport.contasapagar.ContasAPagarMapper;
@@ -14,11 +15,12 @@ import br.com.extrator.runners.common.ConstantesExtracao;
 import br.com.extrator.runners.common.DataExportEntityExtractor;
 import br.com.extrator.runners.dataexport.services.Deduplicator;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.mapeamento.MapperUtil;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Extractor para entidade Contas a Pagar (DataExport).
- * Inclui deduplicação antes de salvar.
+ * Inclui deduplicaÃ§Ã£o antes de salvar.
  */
 public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAPagarDTO> {
     
@@ -26,6 +28,7 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
     private final ContasAPagarRepository repository;
     private final ContasAPagarMapper mapper;
     private final LoggerConsole log;
+    private final InvalidRecordAuditRepository invalidRecordAuditRepository;
     
     public ContasAPagarExtractor(final ClienteApiDataExport apiClient,
                                  final ContasAPagarRepository repository,
@@ -35,11 +38,12 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
         this.repository = repository;
         this.mapper = mapper;
         this.log = log;
+        this.invalidRecordAuditRepository = new InvalidRecordAuditRepository();
     }
     
     @Override
     public ResultadoExtracao<ContasAPagarDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Usa intervalo informado quando disponível; fallback para últimas 24h
+        // Usa intervalo informado quando disponÃ­vel; fallback para Ãºltimas 24h
         if (dataInicio != null) {
             final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
             return apiClient.buscarContasAPagar(dataInicio, fim);
@@ -53,9 +57,29 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
             return new SaveResult(0, 0);
         }
         
-        final List<ContasAPagarDataExportEntity> entities = dtos.stream()
-            .map(mapper::toEntity)
-            .collect(Collectors.toList());
+        final List<ContasAPagarDataExportEntity> entities = new ArrayList<>();
+        int registrosInvalidos = 0;
+        for (final ContasAPagarDTO dto : dtos) {
+            try {
+                final ContasAPagarDataExportEntity entity = mapper.toEntity(dto);
+                if (entity != null) {
+                    entities.add(entity);
+                } else {
+                    registrosInvalidos++;
+                    auditarRegistroInvalido(dto, "MAPPER_RETORNOU_NULL", "Mapper retornou entidade nula.");
+                }
+            } catch (final RuntimeException e) {
+                registrosInvalidos++;
+                auditarRegistroInvalido(dto, "MAPEAMENTO_INVALIDO", e.getMessage());
+                log.warn("âš ï¸ Conta a pagar invÃ¡lida descartada: {}", e.getMessage());
+            }
+        }
+        if (registrosInvalidos > 0) {
+            log.warn("âš ï¸ {} registro(s) invÃ¡lido(s) descartado(s) em {}", registrosInvalidos, getEntityName());
+        }
+        if (entities.isEmpty()) {
+            return new SaveResult(0, 0, registrosInvalidos);
+        }
         
         // Deduplicar antes de salvar
         final List<ContasAPagarDataExportEntity> entitiesUnicos = Deduplicator.deduplicarFaturasAPagar(entities);
@@ -67,7 +91,7 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
         }
         
         final int registrosSalvos = repository.salvar(entitiesUnicos);
-        return new SaveResult(registrosSalvos, totalUnicos);
+        return new SaveResult(registrosSalvos, totalUnicos, registrosInvalidos);
     }
     
     @Override
@@ -84,4 +108,20 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
     public String getEmoji() {
         return ConstantesExtracao.EMOJI_CONTAS_PAGAR;
     }
+
+    private void auditarRegistroInvalido(final ContasAPagarDTO dto,
+                                         final String reasonCode,
+                                         final String detalhe) {
+        final String chaveReferencia = dto != null && dto.getSequenceCode() != null
+            ? String.valueOf(dto.getSequenceCode())
+            : null;
+        invalidRecordAuditRepository.registrarRegistroInvalido(
+            getEntityName(),
+            reasonCode,
+            detalhe,
+            chaveReferencia,
+            MapperUtil.toJson(dto)
+        );
+    }
 }
+

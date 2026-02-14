@@ -1,5 +1,6 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
+set "FLAG_FATURAS_GRAPHQL="
 
 REM ================================================================
 REM Script: 01-executar_extracao_completa.bat
@@ -23,7 +24,7 @@ echo ================================================================
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    call "%~dp0mvn.bat" -DskipTests clean package
+    call "%~dp0mvn.bat" -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -37,7 +38,7 @@ if not exist "target\extrator.jar" (
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
     ) else (
-        echo Execute primeiro: mvn clean package -DskipTests
+        echo Execute primeiro: mvn package -DskipTests
     )
     echo.
     pause
@@ -101,22 +102,46 @@ if not defined DB_PASSWORD (
     exit /b 1
 )
 
-echo Executando: java -jar "target\extrator.jar" --fluxo-completo
+call :AUTH_CHECK RUN_EXTRACAO_COMPLETA "Executar extracao completa"
+if errorlevel 1 (
+    endlocal & exit /b 1
+)
+
+call :CONFIGURAR_FATURAS_GRAPHQL "%~1"
+if errorlevel 1 (
+    endlocal & exit /b 1
+)
+
+if defined FLAG_FATURAS_GRAPHQL (
+    echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
+) else (
+    echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo
+)
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
 echo.
 
-java -jar "target\extrator.jar" --fluxo-completo
+if defined FLAG_FATURAS_GRAPHQL (
+    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
+) else (
+    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo
+)
+set "JAVA_EXIT_CODE=%ERRORLEVEL%"
 
-if %ERRORLEVEL% equ 0 (
+if "%JAVA_EXIT_CODE%"=="0" (
     echo.
     echo ================================================================
     echo EXTRACAO COMPLETA CONCLUIDA COM SUCESSO!
     echo ================================================================
+) else if "%JAVA_EXIT_CODE%"=="2" (
+    echo.
+    echo ================================================================
+    echo EXTRACAO COMPLETA CONCLUIDA COM FALHAS PARCIAIS ^(Exit Code: %JAVA_EXIT_CODE%^)
+    echo ================================================================
 ) else (
     echo.
     echo ================================================================
-    echo EXTRACAO FALHOU ^(Exit Code: %ERRORLEVEL%^)
+    echo EXTRACAO FALHOU ^(Exit Code: %JAVA_EXIT_CODE%^)
     echo ================================================================
 )
 
@@ -124,3 +149,52 @@ echo.
 echo Verifique os logs na pasta 'logs' para mais detalhes.
 echo.
 pause
+set "RET_CODE=%JAVA_EXIT_CODE%"
+endlocal & exit /b %RET_CODE%
+
+:AUTH_CHECK
+if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+echo.
+echo Autenticacao obrigatoria para executar esta acao.
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+if errorlevel 1 (
+    echo Acesso negado.
+    echo.
+    pause
+    exit /b 1
+)
+exit /b 0
+
+:CONFIGURAR_FATURAS_GRAPHQL
+set "FLAG_FATURAS_GRAPHQL="
+
+if /i "%~1"=="--sem-faturas-graphql" (
+    echo.
+    echo Faturas GraphQL: DESABILITADO por parametro informado.
+    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
+    exit /b 0
+)
+
+echo.
+echo ================================================================
+echo CONFIGURACAO DE FATURAS GRAPHQL
+echo ================================================================
+echo Esta entidade passa por enriquecimento e pode demorar bastante.
+echo.
+
+:PERGUNTAR_FATURAS
+set /p INCLUIR_FATURAS="Incluir Faturas GraphQL nesta execucao? (S/N): "
+
+if /i "%INCLUIR_FATURAS%"=="S" (
+    echo Faturas GraphQL: INCLUIDO.
+    exit /b 0
+)
+
+if /i "%INCLUIR_FATURAS%"=="N" (
+    echo Faturas GraphQL: DESABILITADO.
+    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
+    exit /b 0
+)
+
+echo Opcao invalida. Digite S ou N.
+goto :PERGUNTAR_FATURAS

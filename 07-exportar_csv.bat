@@ -18,7 +18,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto (se necessario)...
-    call "%~dp0mvn.bat" -q -DskipTests clean package
+    call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -60,6 +60,9 @@ if defined JAVA_HOME (
     )
 )
 
+call :AUTH_CHECK RUN_EXPORTAR_CSV "Exportar dados para CSV"
+if errorlevel 1 exit /b 1
+
 echo.
 echo ================================================================
 echo   MENU DE EXPORTACAO
@@ -82,7 +85,7 @@ if "%OPCAO%"=="1" (
     echo.
     echo Exportando TODAS as tabelas...
     echo.
-    java -jar "target\extrator.jar" --exportar-csv
+    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --exportar-csv
     goto :END
 )
 
@@ -133,7 +136,7 @@ if "%OPCAO%"=="2" (
     echo.
     echo Exportando tabela: !TABELA!
     echo.
-    java -jar "target\extrator.jar" --exportar-csv "!TABELA!"
+    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --exportar-csv "!TABELA!"
     goto :END
 )
 
@@ -202,3 +205,17 @@ echo Verifique a pasta 'exports' para os arquivos gerados.
 echo.
 pause
 endlocal
+exit /b 0
+
+:AUTH_CHECK
+if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+echo.
+echo Autenticacao obrigatoria para executar esta acao.
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+if errorlevel 1 (
+    echo Acesso negado.
+    echo.
+    pause
+    exit /b 1
+)
+exit /b 0

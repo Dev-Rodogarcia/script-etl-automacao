@@ -38,17 +38,20 @@ if not exist "target\extrator.jar" (
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
     ) else (
-        echo Execute primeiro: mvn clean package -DskipTests
+        echo Execute primeiro: mvn package -DskipTests
     )
     echo.
     pause
     exit /b 1
 )
 
-echo Executando: java -jar "target\extrator.jar" --validar
+call :AUTH_CHECK RUN_VALIDAR_CONFIG "Validar configuracoes"
+if errorlevel 1 exit /b 1
+
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar
 echo.
 
-java -jar "target\extrator.jar" --validar
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar
 
 if %ERRORLEVEL% equ 0 (
     echo.
@@ -64,3 +67,17 @@ if %ERRORLEVEL% equ 0 (
 
 echo.
 pause
+exit /b 0
+
+:AUTH_CHECK
+if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+echo.
+echo Autenticacao obrigatoria para executar esta acao.
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+if errorlevel 1 (
+    echo Acesso negado.
+    echo.
+    pause
+    exit /b 1
+)
+exit /b 0

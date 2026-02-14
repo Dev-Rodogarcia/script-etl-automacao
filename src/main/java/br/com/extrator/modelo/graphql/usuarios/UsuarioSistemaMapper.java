@@ -1,5 +1,7 @@
 package br.com.extrator.modelo.graphql.usuarios;
 
+import java.time.LocalDateTime;
+
 import br.com.extrator.db.entity.UsuarioSistemaEntity;
 
 /**
@@ -21,7 +23,7 @@ public class UsuarioSistemaMapper {
         final UsuarioSistemaEntity entity = new UsuarioSistemaEntity();
         entity.setUserId(dto.getId());
         entity.setNome(dto.getName());
-        // data_atualizacao será definida pelo SQL MERGE (GETDATE())
+        entity.setDataAtualizacao(LocalDateTime.now());
         return entity;
     }
 }

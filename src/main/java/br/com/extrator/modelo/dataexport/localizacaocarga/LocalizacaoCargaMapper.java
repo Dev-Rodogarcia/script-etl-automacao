@@ -3,10 +3,10 @@ package br.com.extrator.modelo.dataexport.localizacaocarga;
 import br.com.extrator.db.entity.LocalizacaoCargaEntity;
 import br.com.extrator.util.validacao.ValidadorDTO;
 import br.com.extrator.util.validacao.ValidadorDTO.ResultadoValidacao;
+import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.mapeamento.MapperUtil;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeParseException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,15 +69,21 @@ public class LocalizacaoCargaMapper {
         // 2. Conversão segura de tipos de dados
         try {
             if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
-                entity.setServiceAt(OffsetDateTime.parse(dto.getServiceAt()));
+                final OffsetDateTime serviceAt = FormatadorData.parseOffsetDateTime(dto.getServiceAt());
+                if (serviceAt != null) {
+                    entity.setServiceAt(serviceAt);
+                }
             }
             if (dto.getPredictedDeliveryAt() != null && !dto.getPredictedDeliveryAt().trim().isEmpty()) {
-                entity.setPredictedDeliveryAt(OffsetDateTime.parse(dto.getPredictedDeliveryAt()));
+                final OffsetDateTime predictedDeliveryAt = FormatadorData.parseOffsetDateTime(dto.getPredictedDeliveryAt());
+                if (predictedDeliveryAt != null) {
+                    entity.setPredictedDeliveryAt(predictedDeliveryAt);
+                }
             }
             if (dto.getTotalValue() != null && !dto.getTotalValue().trim().isEmpty()) {
                 entity.setTotalValue(new BigDecimal(dto.getTotalValue()));
             }
-        } catch (DateTimeParseException | NumberFormatException e) {
+        } catch (NumberFormatException e) {
             logger.error("❌ Erro ao converter dados para localização carga {}: serviceAt='{}', predictedDeliveryAt='{}', totalValue='{}' - {}", 
                 dto.getSequenceNumber(), dto.getServiceAt(), dto.getPredictedDeliveryAt(), dto.getTotalValue(), e.getMessage());
             logger.debug("Stack trace completo:", e);

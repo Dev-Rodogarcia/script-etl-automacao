@@ -139,7 +139,7 @@ Se houver uma injeção de SQL, o atacante **não poderá destruir sua estrutura
 
 As views de dimensão devem ter **chaves primárias únicas** para funcionar corretamente no Power BI com modelo Star Schema:
 
-- **vw_dim_clientes**: Chave = `ID` (deve ser único)
+- **vw_dim_clientes**: Chave = `Nome` normalizado (deve ser único)
 - **vw_dim_filiais**: Chave = `NomeFilial` (deve ser único)
 - **vw_dim_veiculos**: Chave = `Placa` (deve ser único)
 - **vw_dim_motoristas**: Chave = `NomeMotorista` (deve ser único)
@@ -153,7 +153,7 @@ Se uma view dimensional retornar chaves duplicadas, o Power BI **não conseguir�
 
 As views foram corrigidas para garantir unicidade:
 
-- **vw_dim_clientes**: Usa `GROUP BY ID` com `MAX(Nome)` para unificar IDs duplicados de múltiplas fontes
+- **vw_dim_clientes**: Usa `DISTINCT` com normalização `UPPER + LTRIM + RTRIM` para eliminar nomes duplicados
 - **vw_dim_filiais**: Usa `UNION` com `LTRIM(RTRIM)` para normalizar nomes
 - **vw_dim_veiculos**: Já usava `GROUP BY Placa` corretamente
 - **vw_dim_motoristas**: Usa `DISTINCT` com normalização `UPPER + LTRIM + RTRIM`

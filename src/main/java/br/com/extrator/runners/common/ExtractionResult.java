@@ -7,7 +7,7 @@ import br.com.extrator.db.entity.LogExtracaoEntity;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
- * Wrapper para resultados de extração, facilitando logging e tratamento de erros.
+ * Wrapper para resultados de extraÃ§Ã£o, facilitando logging e tratamento de erros.
  */
 public class ExtractionResult {
     private final String entityName;
@@ -15,8 +15,8 @@ public class ExtractionResult {
     private final LocalDateTime fim;
     private final String status;
     private final int registrosSalvos;
-    private final int registrosExtraidos; // Total extraído da API (antes de deduplicação)
-    private final int totalUnicos; // Total após deduplicação (para DataExport)
+    private final int registrosExtraidos; // Total extraÃ­do da API (antes de deduplicaÃ§Ã£o)
+    private final int totalUnicos; // Total apÃ³s deduplicaÃ§Ã£o (para DataExport)
     private final int paginasProcessadas;
     private final String mensagem;
     private final boolean sucesso;
@@ -42,10 +42,10 @@ public class ExtractionResult {
                                   final int registrosSalvos,
                                   final String mensagem) {
         return new Builder(entityName, inicio)
-            .status(resultado.isCompleto() ? ConstantesEntidades.STATUS_COMPLETO : ConstantesEntidades.STATUS_INCOMPLETO)
+            .status(resultado.isCompleto() ? ConstantesEntidades.STATUS_COMPLETO : ConstantesEntidades.STATUS_INCOMPLETO_LIMITE)
             .registrosSalvos(registrosSalvos)
             .registrosExtraidos(resultado.getRegistrosExtraidos())
-            .totalUnicos(resultado.getDados().size()) // Padrão: tamanho da lista
+            .totalUnicos(resultado.getDados().size()) // PadrÃ£o: tamanho da lista
             .paginasProcessadas(resultado.getPaginasProcessadas())
             .mensagem(mensagem)
             .sucesso(true);
@@ -58,7 +58,7 @@ public class ExtractionResult {
                                            final int totalUnicos,
                                            final String mensagem) {
         return new Builder(entityName, inicio)
-            .status(resultado.isCompleto() ? ConstantesEntidades.STATUS_COMPLETO : ConstantesEntidades.STATUS_INCOMPLETO)
+            .status(resultado.isCompleto() ? ConstantesEntidades.STATUS_COMPLETO : ConstantesEntidades.STATUS_INCOMPLETO_LIMITE)
             .registrosSalvos(registrosSalvos)
             .registrosExtraidos(resultado.getRegistrosExtraidos())
             .totalUnicos(totalUnicos)
@@ -70,13 +70,24 @@ public class ExtractionResult {
     public static Builder erro(final String entityName,
                                final LocalDateTime inicio,
                                final Exception erro) {
+        return erroComParcial(entityName, inicio, erro, 0, 0);
+    }
+
+    public static Builder erroComParcial(final String entityName,
+                                         final LocalDateTime inicio,
+                                         final Exception erro,
+                                         final int registrosExtraidos,
+                                         final int paginasProcessadas) {
+        final String sufixoProgresso = registrosExtraidos > 0 || paginasProcessadas > 0
+            ? String.format(" | Progresso antes da falha: %d registros da API, %d pÃ¡ginas", registrosExtraidos, paginasProcessadas)
+            : "";
         return new Builder(entityName, inicio)
             .status(ConstantesEntidades.STATUS_ERRO_API)
             .registrosSalvos(0)
-            .registrosExtraidos(0)
+            .registrosExtraidos(Math.max(0, registrosExtraidos))
             .totalUnicos(0)
-            .paginasProcessadas(0)
-            .mensagem("Erro: " + erro.getMessage())
+            .paginasProcessadas(Math.max(0, paginasProcessadas))
+            .mensagem("Erro: " + erro.getMessage() + sufixoProgresso)
             .sucesso(false)
             .erro(erro);
     }
@@ -99,7 +110,7 @@ public class ExtractionResult {
             entityName,
             inicio,
             fim != null ? fim : LocalDateTime.now(),
-            status, // String - será convertido para enum internamente
+            status, // String - serÃ¡ convertido para enum internamente
             registrosParaLog,
             paginasProcessadas,
             mensagem

@@ -26,7 +26,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto...
-    call "%~dp0mvn.bat" -q -DskipTests clean package
+    call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -40,7 +40,7 @@ if not exist "target\extrator.jar" (
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
     ) else (
-        echo Execute primeiro: mvn clean package -DskipTests
+        echo Execute primeiro: mvn package -DskipTests
     )
     echo.
     pause
@@ -69,18 +69,24 @@ if defined JAVA_HOME (
     )
 )
 
+call :AUTH_CHECK RUN_AUDITORIA_API "Auditar estrutura das APIs"
+if errorlevel 1 exit /b 1
+
 echo Executando auditor...
 echo.
 
-REM AuditorEstruturaApi tem seu proprio main, executar diretamente via JAR
-java -cp "target\extrator.jar" br.com.extrator.auditoria.validacao.AuditorEstruturaApi
-set EXITCODE=%ERRORLEVEL%
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auditar-api
+set "EXITCODE=%ERRORLEVEL%"
 
 if %EXITCODE% NEQ 0 (
     echo.
     echo ================================================================
-    echo AUDITORIA CONCLUIDA COM ERRO (Exit Code: %EXITCODE%)
+    echo AUDITORIA CONCLUIDA COM ERRO - Exit Code: %EXITCODE%
     echo ================================================================
+    echo.
+    pause
+    endlocal
+    exit /b %EXITCODE%
 ) else (
     echo.
     echo ================================================================
@@ -93,3 +99,17 @@ echo Saida em pasta 'relatorios'.
 echo.
 pause
 endlocal
+exit /b 0
+
+:AUTH_CHECK
+if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+echo.
+echo Autenticacao obrigatoria para executar esta acao.
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+if errorlevel 1 (
+    echo Acesso negado.
+    echo.
+    pause
+    exit /b 1
+)
+exit /b 0

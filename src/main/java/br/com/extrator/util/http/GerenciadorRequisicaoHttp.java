@@ -297,10 +297,17 @@ public class GerenciadorRequisicaoHttp {
                 // PROBLEMA 5: Erros de servidor (500, 502, 503, outros 5xx) - Backoff exponencial
                 else if (statusCode >= 500 && statusCode <= 599) {
                     circuitBreaker.recordFailure(); // ✅ Registrar falha
-                    
-                    logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}", 
-                               statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, 
-                               resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
+
+                    final String respostaResumida = resposta.body().length() > 200
+                        ? resposta.body().substring(0, 200) + "..."
+                        : resposta.body();
+                    if (tentativa < maxTentativas) {
+                        logger.warn("⚠️ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}",
+                            statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, respostaResumida);
+                    } else {
+                        logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa final {}/{}. Resposta: {}",
+                            statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, respostaResumida);
+                    }
                     
                     if (tentativa < maxTentativas) {
                         long delayMs = calcularDelayBackoffExponencial(tentativa);
@@ -311,9 +318,14 @@ public class GerenciadorRequisicaoHttp {
                 
             } catch (HttpTimeoutException e) {
                 circuitBreaker.recordFailure(); // ✅ Registrar falha no circuit breaker
-                
-                logger.error("✗ Timeout na requisição para {} - Tentativa {}/{}", 
-                           tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
+
+                if (tentativa < maxTentativas) {
+                    logger.warn("⚠️ Timeout na requisição para {} - Tentativa {}/{}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas);
+                } else {
+                    logger.error("✗ Timeout na requisição para {} - Tentativa final {}/{}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
+                }
                 
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
@@ -323,10 +335,15 @@ public class GerenciadorRequisicaoHttp {
                 
             } catch (IOException e) {
                 circuitBreaker.recordFailure(); // ✅ Registrar falha no circuit breaker
-                
+
                 // PROBLEMA 5: IOException deve ser retentado normalmente
-                logger.error("✗ IOException na requisição para {} - Tentativa {}/{}: {}", 
-                           tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                if (tentativa < maxTentativas) {
+                    logger.warn("⚠️ IOException na requisição para {} - Tentativa {}/{}: {}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                } else {
+                    logger.error("✗ IOException na requisição para {} - Tentativa final {}/{}: {}",
+                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                }
                 
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
@@ -405,9 +422,16 @@ public class GerenciadorRequisicaoHttp {
                     }
                 } else if (statusCode >= 500 && statusCode <= 599) {
                     circuitBreaker.recordFailure(); // ✅ Registrar falha
-                    logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}",
-                            statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas,
-                            resposta.body().length() > 200 ? resposta.body().substring(0, 200) + "..." : resposta.body());
+                    final String respostaResumida = resposta.body().length() > 200
+                        ? resposta.body().substring(0, 200) + "..."
+                        : resposta.body();
+                    if (tentativa < maxTentativas) {
+                        logger.warn("⚠️ Erro de servidor (HTTP {}) para {} - Tentativa {}/{}. Resposta: {}",
+                                statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, respostaResumida);
+                    } else {
+                        logger.error("✗ Erro de servidor (HTTP {}) para {} - Tentativa final {}/{}. Resposta: {}",
+                                statusCode, tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, respostaResumida);
+                    }
                     if (tentativa < maxTentativas) {
                         long delayMs = calcularDelayBackoffExponencial(tentativa);
                         logger.info("🕒 Aguardando {}ms antes da próxima tentativa (backoff exponencial)...", delayMs);
@@ -416,8 +440,13 @@ public class GerenciadorRequisicaoHttp {
                 }
             } catch (HttpTimeoutException e) {
                 circuitBreaker.recordFailure(); // ✅ Registrar falha
-                logger.error("✗ Timeout na requisição para {} - Tentativa {}/{}",
-                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
+                if (tentativa < maxTentativas) {
+                    logger.warn("⚠️ Timeout na requisição para {} - Tentativa {}/{}",
+                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas);
+                } else {
+                    logger.error("✗ Timeout na requisição para {} - Tentativa final {}/{}",
+                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e);
+                }
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
                     logger.info("🕒 Aguardando {}ms antes da próxima tentativa após timeout...", delayMs);
@@ -425,8 +454,13 @@ public class GerenciadorRequisicaoHttp {
                 }
             } catch (IOException e) {
                 circuitBreaker.recordFailure(); // ✅ Registrar falha
-                logger.error("✗ IOException na requisição para {} - Tentativa {}/{}: {}",
-                        tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                if (tentativa < maxTentativas) {
+                    logger.warn("⚠️ IOException na requisição para {} - Tentativa {}/{}: {}",
+                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                } else {
+                    logger.error("✗ IOException na requisição para {} - Tentativa final {}/{}: {}",
+                            tipoEntidade != null ? tipoEntidade : "API", tentativa, maxTentativas, e.getMessage());
+                }
                 if (tentativa < maxTentativas) {
                     long delayMs = calcularDelayBackoffExponencial(tentativa);
                     logger.info("🕒 Aguardando {}ms antes da próxima tentativa após IOException...", delayMs);

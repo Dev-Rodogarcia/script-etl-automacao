@@ -517,7 +517,7 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         log.info("   • Enriquecidas com sucesso: {}", totalEnriquecidas.get());
         log.info("   • Erros HTTP: {}", totalComErro.get());
         log.info("   • Duração: {} segundos", duracao.getSeconds());
-        log.info("   • Taxa: {:.2f} faturas/segundo", taxaSegundo);
+        log.info("   • Taxa: {} faturas/segundo", String.format("%.2f", taxaSegundo));
     }
     
     /**
@@ -593,9 +593,12 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         final long ultimoLog = ultimoLogTimestamp.get();
         if ((agora - ultimoLog) > (heartbeatSegundos * 1000L)) {
             if (ultimoLogTimestamp.compareAndSet(ultimoLog, agora)) {
-                log.info("💓 [Heartbeat] Enriquecimento em andamento: {}/{} ({:.1f}%)", 
-                        processadas, totalParaEnriquecer, 
-                        (100.0 * processadas / totalParaEnriquecer));
+                final double percentualHeartbeat = totalParaEnriquecer > 0
+                    ? (100.0 * processadas / totalParaEnriquecer)
+                    : 0.0;
+                log.info("💓 [Heartbeat] Enriquecimento em andamento: {}/{} ({}%)",
+                        processadas, totalParaEnriquecer,
+                        String.format("%.1f", percentualHeartbeat));
             }
         }
     }
@@ -613,10 +616,10 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         final long segundosRestantes = taxaSegundo > 0 ? (long) (restantes / taxaSegundo) : 0;
         final long minutosRestantes = segundosRestantes / 60;
         
-        log.info("📊 Progresso Enriquecimento: {}/{} ({:.1f}%) | Enriquecidas: {} | Erros: {} | Taxa: {:.2f} faturas/s | Tempo restante: ~{} min",
-                processadas, total, percentual,
+        log.info("📊 Progresso Enriquecimento: {}/{} ({}%) | Enriquecidas: {} | Erros: {} | Taxa: {} faturas/s | Tempo restante: ~{} min",
+                processadas, total, String.format("%.1f", percentual),
                 totalEnriquecidas.get(), totalComErro.get(),
-                taxaSegundo, minutosRestantes);
+                String.format("%.2f", taxaSegundo), minutosRestantes);
         
         ultimoLogTimestamp.set(System.currentTimeMillis());
     }

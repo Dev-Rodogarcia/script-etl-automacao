@@ -5,11 +5,12 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -17,12 +18,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import br.com.extrator.auditoria.servicos.CompletudeValidator;
+import br.com.extrator.auditoria.servicos.IntegridadeEtlValidator;
 import br.com.extrator.comandos.base.Comando;
 import br.com.extrator.util.console.LoggerConsole;
 import br.com.extrator.runners.dataexport.DataExportRunner;
 import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.util.console.BannerUtil;
 import br.com.extrator.util.formatacao.FormatadorData;
+import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Comando responsável por executar o fluxo completo de extração de dados
@@ -31,6 +34,7 @@ import br.com.extrator.util.formatacao.FormatadorData;
 public class ExecutarFluxoCompletoComando implements Comando {
     // PROBLEMA #9 CORRIGIDO: Usar LoggerConsole para log duplo (arquivo + console)
     private static final LoggerConsole log = LoggerConsole.getLogger(ExecutarFluxoCompletoComando.class);
+    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     
     // Constantes para gravação do timestamp de execução
     private static final String ARQUIVO_ULTIMO_RUN = "last_run.properties";
@@ -41,6 +45,8 @@ public class ExecutarFluxoCompletoComando implements Comando {
     
     @Override
     public void executar(final String[] args) throws Exception {
+        final boolean incluirFaturasGraphQL = !possuiFlag(args, FLAG_SEM_FATURAS_GRAPHQL);
+
         // Exibe banner inicial de extração completa
         BannerUtil.exibirBannerExtracaoCompleta();
         
@@ -53,12 +59,15 @@ public class ExecutarFluxoCompletoComando implements Comando {
         log.console("INICIANDO PROCESSO DE EXTRAÇÃO DE DADOS");
         log.console("=".repeat(60));
         log.console("Modo: DADOS DE HOJE");
+        log.console("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)");
         // PROBLEMA 13 CORRIGIDO: Usar FormatadorData em vez de criar formatters inline
         log.console("Data de extração: {} (dados de hoje)", FormatadorData.formatBR(dataHoje));
         log.console("Início: {}", FormatadorData.formatBR(LocalDateTime.now()));
         log.console("=".repeat(60) + "\n");
         
         final LocalDateTime inicioExecucao = LocalDateTime.now();
+        boolean validacaoFinalCompleta = true;
+        String detalheFalhaValidacao = null;
         
         // ========== EXECUÇÃO PARALELA DOS RUNNERS ==========
         log.info("🔄 Iniciando fluxo ETL em modo paralelo com {} threads", NUMERO_DE_THREADS);
@@ -124,25 +133,32 @@ public class ExecutarFluxoCompletoComando implements Comando {
             log.debug("ExecutorService encerrado");
         }
         
-        // ========== FASE 3: EXTRAÇÃO DE FATURAS GRAPHQL POR ÚLTIMO ==========
-        // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
-        // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
-        log.console("\n" + "=".repeat(60));
-        log.info("🔄 [FASE 3] EXECUTANDO FATURAS GRAPHQL POR ÚLTIMO");
-        log.console("=".repeat(60));
-        log.info("ℹ️ Todas as outras entidades já foram extraídas.");
-        log.info("ℹ️ Faturas GraphQL é executado por último devido ao processo de enriquecimento demorado.");
-        
-        try {
-            GraphQLRunner.executarFaturasGraphQLPorIntervalo(dataHoje, dataHoje);
-            log.info("✅ Faturas GraphQL concluídas com sucesso!");
-            totalSucessos++;
-        } catch (final Exception e) {
-            log.error("❌ Falha na extração de Faturas GraphQL: {}. Dados já extraídos das outras entidades foram preservados.", e.getMessage(), e);
-            totalFalhas++;
-            runnersFalhados.add("FaturasGraphQL");
+        if (incluirFaturasGraphQL) {
+            // ========== FASE 3: EXTRAÇÃO DE FATURAS GRAPHQL POR ÚLTIMO ==========
+            // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
+            // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
+            log.console("\n" + "=".repeat(60));
+            log.info("🔄 [FASE 3] EXECUTANDO FATURAS GRAPHQL POR ÚLTIMO");
+            log.console("=".repeat(60));
+            log.info("ℹ️ Todas as outras entidades já foram extraídas.");
+            log.info("ℹ️ Faturas GraphQL é executado por último devido ao processo de enriquecimento demorado.");
+            
+            try {
+                GraphQLRunner.executarFaturasGraphQLPorIntervalo(dataHoje, dataHoje);
+                log.info("✅ Faturas GraphQL concluídas com sucesso!");
+                totalSucessos++;
+            } catch (final Exception e) {
+                log.error("❌ Falha na extração de Faturas GraphQL: {}. Dados já extraídos das outras entidades foram preservados.", e.getMessage(), e);
+                totalFalhas++;
+                runnersFalhados.add("FaturasGraphQL");
+            }
+            log.console("=".repeat(60) + "\n");
+        } else {
+            log.console("\n" + "=".repeat(60));
+            log.warn("⚠️ [FASE 3] FATURAS GRAPHQL DESABILITADO POR OPÇÃO DO OPERADOR");
+            log.info("ℹ️ Flag detectada: {}", FLAG_SEM_FATURAS_GRAPHQL);
+            log.console("=".repeat(60) + "\n");
         }
-        log.console("=".repeat(60) + "\n");
 
         
         // ========== PASSO B: VALIDAÇÃO DE COMPLETUDE ==========
@@ -157,71 +173,69 @@ public class ExecutarFluxoCompletoComando implements Comando {
         try {
             final CompletudeValidator validator = new CompletudeValidator();
             
-            log.info("🔄 [1/2] Buscando totais nas APIs do ESL Cloud...");
             final LocalDate dataReferencia = LocalDate.now();
-            final Optional<Map<String, Integer>> totaisEslCloudOpt = validator.buscarTotaisEslCloud(dataReferencia);
-            
-            if (totaisEslCloudOpt.isPresent()) {
-                final Map<String, Integer> totaisEslCloud = totaisEslCloudOpt.get();
-                log.info("✅ Totais obtidos das APIs com sucesso!");
-                
-                log.info("🔄 [2/2] Validando completude dos dados extraídos...");
-                final Map<String, CompletudeValidator.StatusValidacao> resultadosValidacao = validator.validarCompletude(totaisEslCloud, dataReferencia);
-                
-                final boolean extracaoCompleta = resultadosValidacao.values().stream()
-                    .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
-                
-                boolean gapValidationOk = true;
-                boolean temporalValidationOk = true;
-                
-                if (extracaoCompleta) {
-                    log.info("🔍 [3/4] Executando validação de gaps (IDs sequenciais)...");
-                    final CompletudeValidator.StatusValidacao gapStatus = validator.validarGapsOcorrencias(dataReferencia);
-                    gapValidationOk = (gapStatus == CompletudeValidator.StatusValidacao.OK);
-                    
-                    if (gapValidationOk) {
-                        log.info("✅ Validação de gaps: OK");
-                    } else {
-                        log.warn("⚠️ Validação de gaps detectou problemas: {}", gapStatus);
-                    }
-                    
-                    log.info("🕐 [4/4] Executando validação de janela temporal...");
-                    final Map<String, CompletudeValidator.StatusValidacao> temporalResults = validator.validarJanelaTemporal(dataReferencia);
-                    temporalValidationOk = temporalResults.values().stream()
-                        .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
-                    
-                    if (temporalValidationOk) {
-                        log.info("✅ Validação temporal: OK");
-                    } else {
-                        log.error("❌ Validação temporal detectou registros criados durante extração!");
-                    }
-                }
-                
-                final boolean validacaoFinalCompleta = extracaoCompleta && gapValidationOk && temporalValidationOk;
-                
-                log.console("\n" + "=".repeat(60));
-                if (validacaoFinalCompleta) {
-                    log.info("🎉 EXTRAÇÃO 100% COMPLETA E VALIDADA!");
-                    log.info("✅ Todos os dados foram extraídos com sucesso!");
-                } else {
-                    log.error("❌ EXTRAÇÃO COM PROBLEMAS - Verificar logs");
-                    if (!extracaoCompleta) {
-                        log.warn("⚠️ Inconsistências na contagem de registros detectadas.");
-                    }
-                    if (!gapValidationOk) {
-                        log.warn("⚠️ Gaps nos IDs detectados - possível perda de registros.");
-                    }
-                    if (!temporalValidationOk) {
-                        log.error("❌ CRÍTICO: Registros criados durante extração!");
-                    }
-                }
-                log.console("=".repeat(60));
-            } else {
-                log.info("ℹ️ Continuando sem validação de completude (API indisponível)");
+            log.info("🔄 [1/2] Validando completude (contagem origem x destino) com base nos logs da execução...");
+            final Map<String, CompletudeValidator.StatusValidacao> resultadosValidacao =
+                validator.validarCompletudePorLogs(dataReferencia);
+            if (!incluirFaturasGraphQL) {
+                resultadosValidacao.remove(ConstantesEntidades.FATURAS_GRAPHQL);
+                log.info("ℹ️ Validação de completude: {} foi desconsiderada por opção do operador.", ConstantesEntidades.FATURAS_GRAPHQL);
             }
+
+            final boolean extracaoCompleta = resultadosValidacao.values().stream()
+                .allMatch(status -> status == CompletudeValidator.StatusValidacao.OK);
+
+            if (!extracaoCompleta) {
+                resultadosValidacao.forEach((entidade, status) -> {
+                    if (status != CompletudeValidator.StatusValidacao.OK) {
+                        log.error("INTEGRIDADE_ETL | resultado=FALHA | codigo=COMPLETUDE | entidade={} | status={}", entidade, status);
+                    }
+                });
+            }
+
+            log.info("🔄 [2/2] Executando validação estrita de integridade ETL...");
+            final IntegridadeEtlValidator integridadeValidator = new IntegridadeEtlValidator();
+            final Set<String> entidadesEsperadas = new LinkedHashSet<>(List.of(
+                ConstantesEntidades.USUARIOS_SISTEMA,
+                ConstantesEntidades.COLETAS,
+                ConstantesEntidades.FRETES,
+                ConstantesEntidades.MANIFESTOS,
+                ConstantesEntidades.COTACOES,
+                ConstantesEntidades.LOCALIZACAO_CARGAS,
+                ConstantesEntidades.CONTAS_A_PAGAR,
+                ConstantesEntidades.FATURAS_POR_CLIENTE,
+                ConstantesEntidades.FATURAS_GRAPHQL
+            ));
+            if (!incluirFaturasGraphQL) {
+                entidadesEsperadas.remove(ConstantesEntidades.FATURAS_GRAPHQL);
+            }
+
+            final IntegridadeEtlValidator.ResultadoValidacao resultadoIntegridade =
+                integridadeValidator.validarExecucao(inicioExecucao, LocalDateTime.now(), entidadesEsperadas);
+
+            if (!resultadoIntegridade.isValido()) {
+                resultadoIntegridade.getFalhas().forEach(falha ->
+                    log.error("INTEGRIDADE_ETL | resultado=FALHA | detalhe={}", falha)
+                );
+            }
+
+            validacaoFinalCompleta = extracaoCompleta && resultadoIntegridade.isValido();
+
+            log.console("\n" + "=".repeat(60));
+            if (validacaoFinalCompleta) {
+                log.info("🎉 EXTRAÇÃO 100% COMPLETA E VALIDADA!");
+                log.info("✅ Todos os dados foram extraídos com sucesso!");
+            } else {
+                detalheFalhaValidacao = "Validação de integridade reprovada (completude/schema/chaves/referencial).";
+                log.error("❌ EXTRAÇÃO COM PROBLEMAS - Verificar logs");
+                log.error("❌ Carga interrompida por divergência entre origem e destino.");
+            }
+            log.console("=".repeat(60));
             
         } catch (final Exception e) {
-            log.warn("⚠️ Validação de completude falhou: {} - dados foram salvos", e.getMessage());
+            validacaoFinalCompleta = false;
+            detalheFalhaValidacao = "Falha ao executar validações finais: " + e.getMessage();
+            log.error("❌ Falha na validação final de integridade: {}", e.getMessage());
             log.debug("Stack trace completo da falha na validação:", e);
         }
             
@@ -229,7 +243,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         final LocalDateTime fimExecucao = LocalDateTime.now();
         final long duracaoMinutos = java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes();
         
-        if (totalFalhas == 0) {
+        if (totalFalhas == 0 && validacaoFinalCompleta) {
             BannerUtil.exibirBannerSucesso();
             log.info("📊 RESUMO DA EXTRAÇÃO");
             log.info("Início: {} | Fim: {} | Duração: {} minutos", 
@@ -241,9 +255,23 @@ public class ExecutarFluxoCompletoComando implements Comando {
             log.warn("📊 RESUMO DA EXTRAÇÃO (com falhas)");
             log.info("Início: {} | Fim: {} | Duração: {} minutos", 
                 FormatadorData.formatBR(inicioExecucao), FormatadorData.formatBR(fimExecucao), duracaoMinutos);
-            log.warn("⚠️ Execução com falhas parciais: {}/2 runners OK, falhados: {}", 
-                totalSucessos, String.join(", ", runnersFalhados));
+            if (totalFalhas > 0) {
+                log.warn("⚠️ Execução com falhas parciais: {}/2 runners OK, falhados: {}", 
+                    totalSucessos, String.join(", ", runnersFalhados));
+            }
+            if (!validacaoFinalCompleta) {
+                log.error("❌ Validação final reprovada: {}", detalheFalhaValidacao != null ? detalheFalhaValidacao : "divergência de integridade");
+            }
             log.info("Timestamp não gravado devido a falhas parciais");
+            if (!validacaoFinalCompleta) {
+                throw new RuntimeException(
+                    "Fluxo completo interrompido por falha de integridade. " +
+                    (detalheFalhaValidacao != null ? detalheFalhaValidacao : "Verifique os logs estruturados de validação.")
+                );
+            }
+            throw new PartialExecutionException(
+                "Fluxo completo concluído com falhas parciais. Runners falhados: " + String.join(", ", runnersFalhados)
+            );
         }
     }
     
@@ -286,5 +314,17 @@ public class ExecutarFluxoCompletoComando implements Comando {
         } catch (final IOException e) {
             log.warn("Não foi possível gravar timestamp de execução: {}", e.getMessage());
         }
+    }
+
+    private boolean possuiFlag(final String[] args, final String flag) {
+        if (args == null || flag == null) {
+            return false;
+        }
+        for (final String arg : args) {
+            if (flag.equalsIgnoreCase(arg)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

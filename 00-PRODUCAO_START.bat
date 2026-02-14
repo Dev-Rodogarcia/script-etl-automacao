@@ -17,15 +17,16 @@ echo            suporte: lucasmac.dev@gmail.com
 echo            by: @valentelucass
 echo ================================================================
 echo.
-echo  1. Extracao completa (ultimas 24h)
+echo  1. Extracao completa (ultimas 24h, com escolha de Faturas GraphQL)
 echo  2. Loop de extracao 30 minutos
-echo  3. Extracao por intervalo
+echo  3. Extracao por intervalo (com escolha de Faturas GraphQL)
 echo  4. Testar API especifica
 echo  5. Validar configuracoes
 echo  6. Relatorio completo de validacao
 echo  7. Exportar CSV
 echo  8. Auditar estrutura das APIs
 echo  9. Ver ajuda de comandos
+echo 10. Gerenciar usuarios de acesso
 echo  0. Sair
 echo.
 set /p "OP=Escolha uma opcao: "
@@ -39,7 +40,8 @@ if "%OP%"=="6" goto :RUN_06
 if "%OP%"=="7" goto :RUN_07
 if "%OP%"=="8" goto :RUN_08
 if "%OP%"=="9" goto :RUN_AJUDA
-if "%OP%"=="0" goto :END
+if "%OP%"=="10" goto :RUN_09
+if "%OP%"=="0" goto :TRY_EXIT
 
 echo.
 echo Opcao invalida.
@@ -86,13 +88,39 @@ call :check_jar
 call "%~dp008-auditar_api.bat"
 goto :MENU
 
+:RUN_09
+call :check_jar
+call "%~dp009-gerenciar_usuarios.bat"
+goto :MENU
+
 :RUN_AJUDA
 call :check_jar
-echo Executando: java -jar "%JAR_PATH%" --ajuda
-java -jar "%JAR_PATH%" --ajuda
+echo.
+echo Autenticacao obrigatoria para visualizar ajuda.
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check RUN_AJUDA "Visualizar ajuda"
+if errorlevel 1 (
+    echo Acesso negado.
+    timeout /t 2 >nul
+    goto :MENU
+)
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
 echo.
 pause
 goto :MENU
+
+:TRY_EXIT
+if exist "%JAR_PATH%" (
+    echo.
+    echo Autenticacao obrigatoria para sair do menu.
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check MENU_EXIT "Sair do menu principal"
+    if errorlevel 1 (
+        echo Acesso negado.
+        timeout /t 2 >nul
+        goto :MENU
+    )
+)
+goto :END
 
 :check_jar
 if exist "%JAR_PATH%" goto :eof

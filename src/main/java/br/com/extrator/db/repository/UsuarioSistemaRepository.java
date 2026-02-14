@@ -33,22 +33,23 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
 
         final String sql = String.format("""
             MERGE dbo.%s AS T
-            USING (VALUES (?, ?)) AS S (id, nome)
+            USING (VALUES (?, ?, ?)) AS S (id, nome, data_atualizacao)
             ON T.user_id = S.id
             WHEN MATCHED THEN
-                UPDATE SET T.nome = S.nome, T.data_atualizacao = GETDATE()
+                UPDATE SET T.nome = S.nome, T.data_atualizacao = S.data_atualizacao
             WHEN NOT MATCHED THEN
                 INSERT (user_id, nome, data_atualizacao)
-                VALUES (S.id, S.nome, GETDATE());
+                VALUES (S.id, S.nome, S.data_atualizacao);
             """, NOME_TABELA);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             int paramIndex = 1;
             setLongParameter(statement, paramIndex++, usuario.getUserId());
             setStringParameter(statement, paramIndex++, usuario.getNome());
+            setDateTimeParameter(statement, paramIndex++, usuario.getDataAtualizacao());
             
-            if (paramIndex != 3) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 2, definido %d", paramIndex - 1));
+            if (paramIndex != 4) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 3, definido %d", paramIndex - 1));
             }
 
             final int rowsAffected = statement.executeUpdate();

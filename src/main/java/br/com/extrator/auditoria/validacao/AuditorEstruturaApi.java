@@ -47,6 +47,13 @@ public class AuditorEstruturaApi {
     }
 
     public static void main(final String[] args) {
+        final int exitCode = executar();
+        if (exitCode != 0) {
+            System.exit(exitCode);
+        }
+    }
+
+    public static int executar() {
         logger.info("Iniciando auditoria de estrutura da API");
         final ObjectMapper mapper = new ObjectMapper();
         final ClienteApiDataExport clienteDataExport = new ClienteApiDataExport();
@@ -59,9 +66,8 @@ public class AuditorEstruturaApi {
         try {
             Files.createDirectories(dir);
         } catch (final IOException e) {
-            logger.error("Falha ao criar diretório de relatórios: {}", e.getMessage(), e);
-            System.exit(2);
-            return;
+            logger.error("Falha ao criar diretÃ³rio de relatÃ³rios: {}", e.getMessage(), e);
+            return 2;
         }
 
         try (BufferedWriter writer = Files.newBufferedWriter(csv, StandardCharsets.UTF_8)) {
@@ -77,7 +83,7 @@ public class AuditorEstruturaApi {
                     try {
                         final JsonNode item = obterAmostraEntidade(mapper, clienteDataExport, clienteGraphQL, entidade);
                         if (item == null || item.isNull()) {
-                            logger.warn("Resposta sem item analisável para {}", entidade);
+                            logger.warn("Resposta sem item analisÃ¡vel para {}", entidade);
                             continue;
                         }
 
@@ -101,15 +107,16 @@ public class AuditorEstruturaApi {
                 }
             } catch (final SQLException e) {
                 logger.error("Erro de banco: {}", e.getMessage(), e);
-                System.exit(3);
+                return 3;
             }
 
         } catch (final IOException e) {
             logger.error("Erro de escrita CSV: {}", e.getMessage(), e);
-            System.exit(4);
+            return 4;
         }
 
-        logger.info("Auditoria concluída: {}", csv.toString());
+        logger.info("Auditoria concluÃ­da: {}", csv.toString());
+        return 0;
     }
 
     private static JsonNode obterAmostraEntidade(final ObjectMapper mapper,
@@ -245,3 +252,4 @@ public class AuditorEstruturaApi {
         return v;
     }
 }
+

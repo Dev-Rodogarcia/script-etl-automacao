@@ -691,4 +691,74 @@ public final class CarregadorConfig {
             return 10;
         }
     }
+
+    /**
+     * ObtÃ©m a quantidade mÃ¡xima de registros invÃ¡lidos tolerados por entidade
+     * antes de marcar status INCOMPLETO_DADOS.
+     *
+     * @return Limite absoluto de invÃ¡lidos tolerados (padrÃ£o: 500)
+     */
+    public static int obterMaxInvalidosToleradosPorEntidade() {
+        final String valor = obterConfiguracao("ETL_INVALIDOS_QUANTIDADE_MAX", "etl.invalidos.quantidade.max");
+        try {
+            final int limite = Integer.parseInt(valor);
+            return limite >= 0 ? limite : 500;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 500;
+        }
+    }
+
+    /**
+     * ObtÃ©m o percentual mÃ¡ximo de registros invÃ¡lidos tolerados por entidade
+     * antes de marcar status INCOMPLETO_DADOS.
+     *
+     * @return Limite percentual de invÃ¡lidos tolerados (padrÃ£o: 2.5)
+     */
+    public static double obterPercentualMaxInvalidosToleradosPorEntidade() {
+        final String valor = obterConfiguracao("ETL_INVALIDOS_PERCENTUAL_MAX", "etl.invalidos.percentual.max");
+        try {
+            final double limite = Double.parseDouble(valor);
+            return limite >= 0 ? limite : 2.5d;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 2.5d;
+        }
+    }
+
+    /**
+     * ObtÃ©m a quantidade mÃ¡xima de manifestos Ã³rfÃ£os tolerados na validaÃ§Ã£o
+     * de integridade referencial.
+     *
+     * @return Limite absoluto de Ã³rfÃ£os tolerados (padrÃ£o: 500)
+     */
+    public static int obterMaxOrfaosManifestosTolerados() {
+        final String valor = obterConfiguracao(
+            "ETL_REFERENCIAL_MANIFESTOS_ORFAOS_QUANTIDADE_MAX",
+            "etl.referencial.manifestos.orfaos.quantidade.max"
+        );
+        try {
+            final int limite = Integer.parseInt(valor);
+            return limite >= 0 ? limite : 500;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 500;
+        }
+    }
+
+    /**
+     * ObtÃ©m o percentual mÃ¡ximo de manifestos Ã³rfÃ£os tolerados na validaÃ§Ã£o
+     * de integridade referencial.
+     *
+     * @return Limite percentual de Ã³rfÃ£os tolerados (padrÃ£o: 35.0)
+     */
+    public static double obterPercentualMaxOrfaosManifestosTolerados() {
+        final String valor = obterConfiguracao(
+            "ETL_REFERENCIAL_MANIFESTOS_ORFAOS_PERCENTUAL_MAX",
+            "etl.referencial.manifestos.orfaos.percentual.max"
+        );
+        try {
+            final double limite = Double.parseDouble(valor);
+            return limite >= 0 ? limite : 35.0d;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 35.0d;
+        }
+    }
 }

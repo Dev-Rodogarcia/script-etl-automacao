@@ -3,6 +3,7 @@ package br.com.extrator.util.formatacao;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
@@ -42,6 +43,17 @@ public final class FormatadorData {
     
     /** Formato para nomes de arquivo: yyyy-MM-dd_HH-mm-ss */
     public static final DateTimeFormatter FILE_NAME = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+
+    /** Fallback para datas sem timezone explícito (padrão operacional da integração). */
+    private static final ZoneOffset OFFSET_PADRAO_SEM_TIMEZONE = ZoneOffset.of("-03:00");
+
+    /** Formatos comuns de data/hora sem timezone que já apareceram em integrações. */
+    private static final DateTimeFormatter[] FORMATOS_DATA_HORA_SEM_OFFSET = {
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+    };
     
     // ========== MÉTODOS DE PARSING ==========
     
@@ -110,8 +122,34 @@ public final class FormatadorData {
         if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
             return null;
         }
+        final String valor = dateTimeStr.trim();
+
+        // Formato ISO completo com offset (ex.: 2025-10-02T00:00:00.000-03:00)
         try {
-            return OffsetDateTime.parse(dateTimeStr.trim());
+            return OffsetDateTime.parse(valor);
+        } catch (final DateTimeParseException ignored) {
+            // Tentativas de fallback abaixo.
+        }
+
+        // ISO local sem offset (ex.: 2025-10-02T00:00:00)
+        try {
+            return LocalDateTime.parse(valor, ISO_DATE_TIME).atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
+        } catch (final DateTimeParseException ignored) {
+            // Tentativas de fallback abaixo.
+        }
+
+        // Formatos legados sem timezone (ex.: 2025-10-02 00:00:00)
+        for (final DateTimeFormatter formatter : FORMATOS_DATA_HORA_SEM_OFFSET) {
+            try {
+                return LocalDateTime.parse(valor, formatter).atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
+            } catch (final DateTimeParseException ignored) {
+                // Tenta próximo formatter
+            }
+        }
+
+        // Apenas data (ex.: 2025-10-07) -> início do dia no offset padrão
+        try {
+            return LocalDate.parse(valor, ISO_DATE).atStartOfDay().atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
         } catch (final DateTimeParseException e) {
             logger.warn("Erro ao parsear OffsetDateTime '{}': {}", dateTimeStr, e.getMessage());
             return null;

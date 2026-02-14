@@ -25,10 +25,16 @@ public interface DataExportEntityExtractor<T> extends EntityExtractor<T> {
     class SaveResult {
         private final int registrosSalvos;
         private final int totalUnicos;
+        private final int registrosInvalidos;
         
         public SaveResult(final int registrosSalvos, final int totalUnicos) {
+            this(registrosSalvos, totalUnicos, 0);
+        }
+
+        public SaveResult(final int registrosSalvos, final int totalUnicos, final int registrosInvalidos) {
             this.registrosSalvos = registrosSalvos;
             this.totalUnicos = totalUnicos;
+            this.registrosInvalidos = registrosInvalidos;
         }
         
         public int getRegistrosSalvos() {
@@ -37,6 +43,10 @@ public interface DataExportEntityExtractor<T> extends EntityExtractor<T> {
         
         public int getTotalUnicos() {
             return totalUnicos;
+        }
+
+        public int getRegistrosInvalidos() {
+            return registrosInvalidos;
         }
     }
     

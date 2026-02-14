@@ -232,8 +232,11 @@ public class ExportadorCSV {
                     
                     // Log de progresso (apenas em debug para não poluir console)
                     if (count % logInterval == 0 || count == totalNoBanco) {
-                        log.debug("    ⏳ Progresso: {}/{} registros ({:.1f}%)", 
-                                count, totalNoBanco, (count * 100.0 / totalNoBanco));
+                        final double percentual = totalNoBanco > 0
+                            ? (count * 100.0 / totalNoBanco)
+                            : 0.0;
+                        log.debug("    ⏳ Progresso: {}/{} registros ({}%)",
+                                count, totalNoBanco, String.format("%.1f", percentual));
                     }
                 }
                 

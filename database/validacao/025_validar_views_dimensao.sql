@@ -12,9 +12,9 @@ PRINT '============================================';
 PRINT '';
 
 -- ============================================
--- Validação 1: vw_dim_clientes (Chave: ID)
+-- Validação 1: vw_dim_clientes (Chave: Nome)
 -- ============================================
-PRINT '1. Validando vw_dim_clientes (Chave: ID)...';
+PRINT '1. Validando vw_dim_clientes (Chave: Nome)...';
 
 IF EXISTS (SELECT 1 FROM sys.views WHERE name = 'vw_dim_clientes' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -22,22 +22,22 @@ BEGIN
     DECLARE @ClientesDistinct INT;
     
     SELECT @ClientesTotal = COUNT(*) FROM dbo.vw_dim_clientes;
-    SELECT @ClientesDistinct = COUNT(DISTINCT [ID]) FROM dbo.vw_dim_clientes;
+    SELECT @ClientesDistinct = COUNT(DISTINCT [Nome]) FROM dbo.vw_dim_clientes;
     
     IF @ClientesTotal = @ClientesDistinct
     BEGIN
-        PRINT '   ✅ OK: vw_dim_clientes - ' + CAST(@ClientesTotal AS VARCHAR) + ' clientes únicos';
+        PRINT '   ✅ OK: vw_dim_clientes - ' + CAST(@ClientesTotal AS VARCHAR) + ' nomes únicos';
     END
     ELSE
     BEGIN
-        PRINT '   ❌ ERRO: vw_dim_clientes tem IDs duplicados!';
+        PRINT '   ❌ ERRO: vw_dim_clientes tem nomes duplicados!';
         PRINT '   Total de linhas: ' + CAST(@ClientesTotal AS VARCHAR);
-        PRINT '   IDs únicos: ' + CAST(@ClientesDistinct AS VARCHAR);
-        PRINT '   IDs duplicados encontrados:';
+        PRINT '   Nomes únicos: ' + CAST(@ClientesDistinct AS VARCHAR);
+        PRINT '   Nomes duplicados encontrados:';
         
-        SELECT [ID], COUNT(*) AS Quantidade
+        SELECT [Nome], COUNT(*) AS Quantidade
         FROM dbo.vw_dim_clientes
-        GROUP BY [ID]
+        GROUP BY [Nome]
         HAVING COUNT(*) > 1;
     END
 END

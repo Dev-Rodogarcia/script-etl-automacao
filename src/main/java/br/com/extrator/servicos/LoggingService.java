@@ -77,22 +77,41 @@ public class LoggingService {
      * Para a captura e salva os logs em arquivo
      */
     public void pararCaptura() {
+        pararCaptura("SUCCESS");
+    }
+
+    /**
+     * Para a captura e salva os logs em arquivo, exibindo status final da operação.
+     *
+     * @param statusExecucao Status final da execução (SUCCESS, PARTIAL, ERROR, etc.)
+     */
+    public void pararCaptura(final String statusExecucao) {
         if (originalOut == null || originalErr == null) {
             return; // Captura não foi iniciada
         }
         
         final LocalDateTime fimOperacao = LocalDateTime.now();
         final java.time.Duration duracao = java.time.Duration.between(inicioOperacao, fimOperacao);
+        final String statusNormalizado = statusExecucao == null ? "" : statusExecucao.trim().toUpperCase();
+        final String tituloFinal;
+        if ("SUCCESS".equals(statusNormalizado)) {
+            tituloFinal = "✅ OPERAÇÃO CONCLUÍDA";
+        } else if ("PARTIAL".equals(statusNormalizado)) {
+            tituloFinal = "⚠️ OPERAÇÃO CONCLUÍDA COM FALHAS";
+        } else {
+            tituloFinal = "❌ OPERAÇÃO FALHOU";
+        }
         
         // Rodapé melhorado
         System.out.println();
         System.out.println("─".repeat(80));
         System.out.println("╔" + "═".repeat(78) + "╗");
-        System.out.println("║" + " ".repeat(25) + "✅ OPERAÇÃO CONCLUÍDA" + " ".repeat(30) + "║");
+        System.out.println(centralizarLinha(tituloFinal));
         System.out.println("╚" + "═".repeat(78) + "╝");
         System.out.println("📋 Operação: " + nomeOperacao);
         System.out.println("⏰ Data/Hora de Fim: " + fimOperacao.format(FORMATTER_LOG));
         System.out.println("⏱️ Duração Total: " + formatarDuracao(duracao));
+        System.out.println("📌 Status final: " + (statusNormalizado.isEmpty() ? "DESCONHECIDO" : statusNormalizado));
         System.out.println();
         
         // Restaurar streams originais
@@ -121,6 +140,16 @@ public class LoggingService {
         teeErr = null;
         nomeOperacao = null;
         inicioOperacao = null;
+    }
+
+    private String centralizarLinha(final String texto) {
+        final String conteudo = texto == null ? "" : texto;
+        final int larguraInterna = 78;
+        final int tamanho = Math.min(conteudo.length(), larguraInterna);
+        final String textoLimitado = conteudo.substring(0, tamanho);
+        final int espacosAntes = Math.max(0, (larguraInterna - textoLimitado.length()) / 2);
+        final int espacosDepois = Math.max(0, larguraInterna - textoLimitado.length() - espacosAntes);
+        return "║" + " ".repeat(espacosAntes) + textoLimitado + " ".repeat(espacosDepois) + "║";
     }
     
     /**

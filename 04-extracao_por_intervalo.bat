@@ -1,6 +1,9 @@
 @echo off
 setlocal EnableDelayedExpansion
 chcp 65001 >nul
+set "FINAL_EXIT_CODE=0"
+set "FLAG_FATURAS_GRAPHQL="
+set "PARAM_FLAG_FATURAS="
 
 REM ================================================================
 REM Script: 04-extracao_por_intervalo.bat
@@ -16,11 +19,13 @@ REM   04-extracao_por_intervalo.bat
 REM   04-extracao_por_intervalo.bat YYYY-MM-DD YYYY-MM-DD
 REM   04-extracao_por_intervalo.bat YYYY-MM-DD YYYY-MM-DD api
 REM   04-extracao_por_intervalo.bat YYYY-MM-DD YYYY-MM-DD api entidade
+REM   04-extracao_por_intervalo.bat YYYY-MM-DD YYYY-MM-DD [api] [entidade] --sem-faturas-graphql
 REM
 REM Exemplos:
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport localizacao_cargas
+REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 --sem-faturas-graphql
 REM
 REM Funcionalidades:
 REM   - Aceita parametros na linha de comando OU menu interativo
@@ -31,6 +36,24 @@ REM   - Cada bloco de 30 dias e tratado como "< 31 dias" (sem limite de horas)
 REM   - Executa extracao para cada bloco sequencialmente
 REM   - Gera logs detalhados
 REM ================================================================
+
+if /i not "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" (
+    if not exist "target\extrator.jar" (
+        echo ERRO: Arquivo target\extrator.jar nao encontrado para autenticacao.
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Autenticacao obrigatoria para executar esta acao.
+    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
+    if errorlevel 1 (
+        echo Acesso negado.
+        echo.
+        pause
+        exit /b 1
+    )
+)
 
 REM Verificar se parametros foram passados na linha de comando
 if "%~1"=="" (
@@ -43,12 +66,22 @@ set "DATA_INICIO=%~1"
 set "DATA_FIM=%~2"
 set "API_ESCOLHIDA=%~3"
 set "ENTIDADE_ESCOLHIDA=%~4"
+set "PARAM_FLAG_FATURAS=%~5"
+
+if /i "%API_ESCOLHIDA%"=="--sem-faturas-graphql" (
+    set "API_ESCOLHIDA="
+    set "PARAM_FLAG_FATURAS=--sem-faturas-graphql"
+)
+if /i "%ENTIDADE_ESCOLHIDA%"=="--sem-faturas-graphql" (
+    set "ENTIDADE_ESCOLHIDA="
+    set "PARAM_FLAG_FATURAS=--sem-faturas-graphql"
+)
 
 REM Validar que pelo menos as datas foram fornecidas
 if "%DATA_INICIO%"=="" (
     echo ERRO: Data de inicio nao informada!
     echo.
-    echo Uso: 04-extracao_por_intervalo.bat [DATA_INICIO] [DATA_FIM] [API] [ENTIDADE]
+    echo Uso: 04-extracao_por_intervalo.bat [DATA_INICIO] [DATA_FIM] [API] [ENTIDADE] [--sem-faturas-graphql]
     echo Exemplo: 04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport localizacao_cargas
     pause
     exit /b 1
@@ -57,32 +90,32 @@ if "%DATA_INICIO%"=="" (
 if "%DATA_FIM%"=="" (
     echo ERRO: Data de fim nao informada!
     echo.
-    echo Uso: 04-extracao_por_intervalo.bat [DATA_INICIO] [DATA_FIM] [API] [ENTIDADE]
+    echo Uso: 04-extracao_por_intervalo.bat [DATA_INICIO] [DATA_FIM] [API] [ENTIDADE] [--sem-faturas-graphql]
     echo Exemplo: 04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport localizacao_cargas
     pause
     exit /b 1
 )
 
-REM Validar formato básico das datas
-REM Validação completa será feita pelo Java ao parsear a data
-REM Verificar se contém hífens usando substituição de string
-set "TEMP_INICIO=%DATA_INICIO:-=%"
-if "%TEMP_INICIO%"=="%DATA_INICIO%" (
+REM Validar formato basico das datas (YYYY-MM-DD)
+REM Validacao completa (data real) sera feita pelo Java ao parsear
+
+call :VALIDAR_DATA "%DATA_INICIO%"
+if errorlevel 1 (
     echo ERRO: Data de inicio deve estar no formato YYYY-MM-DD
     echo Valor recebido: %DATA_INICIO%
     pause
     exit /b 1
 )
 
-set "TEMP_FIM=%DATA_FIM:-=%"
-if "%TEMP_FIM%"=="%DATA_FIM%" (
+call :VALIDAR_DATA "%DATA_FIM%"
+if errorlevel 1 (
     echo ERRO: Data de fim deve estar no formato YYYY-MM-DD
     echo Valor recebido: %DATA_FIM%
     pause
     exit /b 1
 )
 
-REM Variáveis já estão definidas, continuar
+REM Vari??veis j?? est??o definidas, continuar
 
 REM Pular para confirmacao
 goto :CONFIRMACAO
@@ -95,7 +128,7 @@ echo.
 echo Este script permite extrair dados de um periodo especifico.
 echo O sistema dividira automaticamente em blocos de 31 dias.
 echo.
-echo Formato de data: YYYY-MM-DD (exemplo: 2024-11-01)
+echo Formato de data: YYYY-MM-DD ^(exemplo: 2024-11-01^)
 echo.
 
 REM Solicitar data de inicio
@@ -106,10 +139,11 @@ if "%DATA_INICIO%"=="" (
     exit /b 1
 )
 
-REM Validar formato basico (deve ter 10 caracteres e conter hifens)
-echo %DATA_INICIO% | findstr /R "^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$" >nul
+REM Limpar espacos acidentais e validar formato basico
+set "DATA_INICIO=%DATA_INICIO: =%"
+call :VALIDAR_DATA "%DATA_INICIO%"
 if errorlevel 1 (
-    echo ERRO: Formato de data invalido! Use YYYY-MM-DD (exemplo: 2024-11-01)
+    echo ERRO: Formato de data invalido! Use YYYY-MM-DD ^(exemplo: 2024-11-01^)
     pause
     exit /b 1
 )
@@ -122,10 +156,11 @@ if "%DATA_FIM%"=="" (
     exit /b 1
 )
 
-REM Validar formato basico
-echo %DATA_FIM% | findstr /R "^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$" >nul
+REM Limpar espacos acidentais e validar formato basico
+set "DATA_FIM=%DATA_FIM: =%"
+call :VALIDAR_DATA "%DATA_FIM%"
 if errorlevel 1 (
-    echo ERRO: Formato de data invalido! Use YYYY-MM-DD (exemplo: 2025-03-31)
+    echo ERRO: Formato de data invalido! Use YYYY-MM-DD ^(exemplo: 2025-03-31^)
     pause
     exit /b 1
 )
@@ -138,7 +173,7 @@ echo.
 echo Escolha uma opcao:
 echo.
 echo   1. Extrair TODAS as APIs e entidades
-echo   2. Extrair API especifica (GraphQL ou DataExport)
+echo   2. Extrair API especifica ^(GraphQL ou DataExport^)
 echo   0. Cancelar
 echo.
 set /p OPCAO_API="Digite o numero da opcao: "
@@ -157,8 +192,8 @@ if "%OPCAO_API%"=="2" (
     echo   ESCOLHA DA API
     echo ================================================================
     echo.
-    echo   1. GraphQL (Coletas, Fretes, Faturas GraphQL)
-    echo   2. DataExport (Manifestos, Cotacoes, Localizacao de Cargas, Contas a Pagar, Faturas por Cliente)
+    echo   1. GraphQL ^(Coletas, Fretes, Faturas GraphQL^)
+    echo   2. DataExport ^(Manifestos, Cotacoes, Localizacao de Cargas, Contas a Pagar, Faturas por Cliente^)
     echo   0. Voltar
     echo.
     set /p API_NUM="Digite o numero da API: "
@@ -241,6 +276,13 @@ if "%OPCAO_API%"=="2" (
 )
 
 :CONFIRMACAO
+call :CONFIGURAR_FATURAS_GRAPHQL
+if errorlevel 1 (
+    echo ERRO ao configurar opcao de Faturas GraphQL.
+    pause
+    exit /b 1
+)
+
 echo.
 echo ================================================================
 echo Confirmacao
@@ -257,6 +299,11 @@ if not "%API_ESCOLHIDA%"=="" (
 ) else (
     echo API: TODAS
     echo Entidade: TODAS
+)
+if defined FLAG_FATURAS_GRAPHQL (
+    echo Faturas GraphQL: DESABILITADO
+) else (
+    echo Faturas GraphQL: INCLUIDO
 )
 echo.
 
@@ -282,7 +329,7 @@ echo ================================================================
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    call "%~dp0mvn.bat" -DskipTests clean package
+    call "%~dp0mvn.bat" -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -296,7 +343,7 @@ if not exist "target\extrator.jar" (
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
     ) else (
-        echo Execute primeiro: mvn clean package -DskipTests
+        echo Execute primeiro: mvn package -DskipTests
     )
     echo.
     pause
@@ -319,13 +366,18 @@ if not "%API_ESCOLHIDA%"=="" (
     echo API: TODAS
     echo Entidade: TODAS
 )
+if defined FLAG_FATURAS_GRAPHQL (
+    echo Faturas GraphQL: DESABILITADO
+) else (
+    echo Faturas GraphQL: INCLUIDO
+)
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
-echo O sistema dividira automaticamente em blocos de 30 dias (sem limite de horas).
+echo O sistema dividira automaticamente em blocos de 30 dias ^(sem limite de horas^).
 echo.
 echo.
 
-REM Construir comando com parâmetros opcionais usando delayed expansion
+REM Construir comando com par??metros opcionais usando delayed expansion
 set "CMD_ARGS=!DATA_INICIO! !DATA_FIM!"
 if not "!API_ESCOLHIDA!"=="" (
     set "CMD_ARGS=!CMD_ARGS! !API_ESCOLHIDA!"
@@ -333,19 +385,29 @@ if not "!API_ESCOLHIDA!"=="" (
         set "CMD_ARGS=!CMD_ARGS! !ENTIDADE_ESCOLHIDA!"
     )
 )
+if defined FLAG_FATURAS_GRAPHQL (
+    set "CMD_ARGS=!CMD_ARGS! !FLAG_FATURAS_GRAPHQL!"
+)
 
 REM Executar comando
-java -jar "target\extrator.jar" --extracao-intervalo !CMD_ARGS!
+java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --extracao-intervalo !CMD_ARGS!
+set "JAVA_EXIT_CODE=%ERRORLEVEL%"
+set "FINAL_EXIT_CODE=%JAVA_EXIT_CODE%"
 
-if %ERRORLEVEL% equ 0 (
+if "%JAVA_EXIT_CODE%"=="0" (
     echo.
     echo ================================================================
     echo EXTRACAO POR INTERVALO CONCLUIDA COM SUCESSO!
     echo ================================================================
+) else if "%JAVA_EXIT_CODE%"=="2" (
+    echo.
+    echo ================================================================
+    echo EXTRACAO POR INTERVALO CONCLUIDA COM FALHAS PARCIAIS ^(Exit Code: %JAVA_EXIT_CODE%^)
+    echo ================================================================
 ) else (
     echo.
     echo ================================================================
-    echo EXTRACAO FALHOU ^(Exit Code: %ERRORLEVEL%^)
+    echo EXTRACAO FALHOU ^(Exit Code: %JAVA_EXIT_CODE%^)
     echo ================================================================
 )
 
@@ -354,4 +416,71 @@ echo.
 echo Verifique os logs na pasta 'logs' para mais detalhes.
 echo.
 pause
-endlocal
+set "RET_CODE=%FINAL_EXIT_CODE%"
+endlocal & exit /b %RET_CODE%
+
+:CONFIGURAR_FATURAS_GRAPHQL
+set "FLAG_FATURAS_GRAPHQL="
+
+if /i "%ENTIDADE_ESCOLHIDA%"=="faturas_graphql" (
+    echo.
+    echo Faturas GraphQL: INCLUIDO automaticamente ^(entidade escolhida explicitamente^).
+    exit /b 0
+)
+if /i "%ENTIDADE_ESCOLHIDA%"=="faturas" (
+    echo.
+    echo Faturas GraphQL: INCLUIDO automaticamente ^(entidade escolhida explicitamente^).
+    exit /b 0
+)
+if /i "%ENTIDADE_ESCOLHIDA%"=="faturasgraphql" (
+    echo.
+    echo Faturas GraphQL: INCLUIDO automaticamente ^(entidade escolhida explicitamente^).
+    exit /b 0
+)
+
+if /i "%API_ESCOLHIDA%"=="dataexport" (
+    echo.
+    echo Faturas GraphQL: nao se aplica ^(API DataExport selecionada^).
+    exit /b 0
+)
+
+if /i "%PARAM_FLAG_FATURAS%"=="--sem-faturas-graphql" (
+    echo.
+    echo Faturas GraphQL: DESABILITADO por parametro informado.
+    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
+    exit /b 0
+)
+
+echo.
+echo ================================================================
+echo CONFIGURACAO DE FATURAS GRAPHQL
+echo ================================================================
+echo Esta entidade usa enriquecimento e pode aumentar bastante o tempo.
+echo.
+
+:PERGUNTAR_FATURAS_GRAPHQL
+set /p INCLUIR_FATURAS_GRAPHQL="Incluir Faturas GraphQL nesta extracao? (S/N): "
+if /i "!INCLUIR_FATURAS_GRAPHQL!"=="S" (
+    set "FLAG_FATURAS_GRAPHQL="
+    echo Faturas GraphQL: INCLUIDO.
+    exit /b 0
+)
+if /i "!INCLUIR_FATURAS_GRAPHQL!"=="N" (
+    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
+    echo Faturas GraphQL: DESABILITADO.
+    exit /b 0
+)
+echo Opcao invalida. Digite S ou N.
+goto :PERGUNTAR_FATURAS_GRAPHQL
+
+:VALIDAR_DATA
+set "DATA_TESTE=%~1"
+if "%DATA_TESTE%"=="" exit /b 1
+if not "%DATA_TESTE:~4,1%"=="-" exit /b 1
+if not "%DATA_TESTE:~7,1%"=="-" exit /b 1
+if not "%DATA_TESTE:~10,1%"=="" exit /b 1
+
+set "DATA_NUMERICA=%DATA_TESTE:-=%"
+if not "%DATA_NUMERICA:~8,1%"=="" exit /b 1
+for /f "delims=0123456789" %%A in ("%DATA_NUMERICA%") do exit /b 1
+exit /b 0
