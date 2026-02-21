@@ -17,7 +17,7 @@ REM Compilar e gerar JAR antes de executar
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    echo Compilando projeto (se necessario)...
+    echo Compilando projeto ^(se necessario^)...
     call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
@@ -95,16 +95,16 @@ if "%OPCAO%"=="2" (
     echo   TABELAS DISPONIVEIS
     echo ================================================================
     echo.
-    echo   1. cotacoes              (Cotacoes)
-    echo   2. coletas               (Coletas)
-    echo   3. contas_a_pagar        (Contas a Pagar)
-    echo   4. faturas_por_cliente   (Faturas por Cliente)
-    echo   5. faturas_graphql       (Faturas GraphQL)
-    echo   6. fretes                (Fretes)
-    echo   7. manifestos            (Manifestos)
-    echo   8. localizacao_cargas    (Localizacao de Cargas)
-    echo   9. dim_usuarios          (Usuarios do Sistema - Dimensao)
-    echo  10. page_audit            (Auditoria de Paginas)
+    echo   1. cotacoes              ^(Cotacoes^)
+    echo   2. coletas               ^(Coletas^)
+    echo   3. contas_a_pagar        ^(Contas a Pagar^)
+    echo   4. faturas_por_cliente   ^(Faturas por Cliente^)
+    echo   5. faturas_graphql       ^(Faturas GraphQL^)
+    echo   6. fretes                ^(Fretes^)
+    echo   7. manifestos            ^(Manifestos^)
+    echo   8. localizacao_cargas    ^(Localizacao de Cargas^)
+    echo   9. dim_usuarios          ^(Usuarios do Sistema - Dimensao^)
+    echo  10. page_audit            ^(Auditoria de Paginas^)
     echo   0. Voltar ao menu anterior
     echo.
     set /p TABELA_NUM="Digite o numero da tabela: "

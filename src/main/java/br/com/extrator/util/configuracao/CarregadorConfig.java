@@ -761,4 +761,50 @@ public final class CarregadorConfig {
             return 35.0d;
         }
     }
+
+    /**
+     * Controls whether automatic reconciliation runs after each daemon cycle.
+     *
+     * @return true when reconciliation is enabled (default: true)
+     */
+    public static boolean isLoopReconciliacaoAtiva() {
+        final String valor = obterConfiguracao("LOOP_RECONCILIACAO_ATIVA", "loop.reconciliacao.ativa");
+        if (valor == null || valor.isBlank()) {
+            return true;
+        }
+        return Boolean.parseBoolean(valor.trim());
+    }
+
+    /**
+     * Max pending reconciliations executed in each daemon cycle.
+     *
+     * @return max reconciliations per cycle (default: 2)
+     */
+    public static int obterLoopReconciliacaoMaxPorCiclo() {
+        final String valor = obterConfiguracao("LOOP_RECONCILIACAO_MAX_POR_CICLO", "loop.reconciliacao.max_por_ciclo");
+        try {
+            final int maximo = Integer.parseInt(valor);
+            return maximo > 0 ? maximo : 2;
+        } catch (NumberFormatException | NullPointerException e) {
+            return 2;
+        }
+    }
+
+    /**
+     * Number of retroactive days added as pending when the main cycle fails.
+     *
+     * @return retroactive days to schedule (default: 1)
+     */
+    public static int obterLoopReconciliacaoDiasRetroativosFalha() {
+        final String valor = obterConfiguracao(
+            "LOOP_RECONCILIACAO_DIAS_RETROATIVOS_FALHA",
+            "loop.reconciliacao.dias_retroativos_falha"
+        );
+        try {
+            final int dias = Integer.parseInt(valor);
+            return Math.max(0, dias);
+        } catch (NumberFormatException | NullPointerException e) {
+            return 1;
+        }
+    }
 }

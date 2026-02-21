@@ -21,6 +21,8 @@ public enum AcaoSeguranca {
     LOOP_START(EnumSet.of(PerfilAcesso.ADMIN, PerfilAcesso.OPERADOR), "Iniciar loop em segundo plano"),
     LOOP_STOP(EnumSet.of(PerfilAcesso.ADMIN), "Parar loop em segundo plano"),
     LOOP_STATUS(EnumSet.of(PerfilAcesso.ADMIN, PerfilAcesso.OPERADOR, PerfilAcesso.VISUALIZADOR), "Consultar status do loop"),
+    LOOP_INTERATIVO(EnumSet.of(PerfilAcesso.ADMIN, PerfilAcesso.OPERADOR), "Executar loop interativo no console"),
+    LOOP_RECONFIG(EnumSet.of(PerfilAcesso.ADMIN), "Reconfigurar Faturas GraphQL do loop daemon"),
     LOOP_EXIT_MENU(EnumSet.of(PerfilAcesso.ADMIN, PerfilAcesso.OPERADOR, PerfilAcesso.VISUALIZADOR), "Sair do menu do loop"),
     MENU_EXIT(EnumSet.of(PerfilAcesso.ADMIN, PerfilAcesso.OPERADOR, PerfilAcesso.VISUALIZADOR), "Sair do menu principal"),
     AUTH_CREATE_USER(EnumSet.of(PerfilAcesso.ADMIN), "Criar usuario"),

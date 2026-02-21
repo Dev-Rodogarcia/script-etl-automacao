@@ -2,7 +2,7 @@
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server.
 
-**Versão:** 2.3.3 | **Última Atualização:** 03/02/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.4 | **Última Atualização:** 21/02/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -108,6 +108,7 @@ script-automacao/
 - ✅ **Validação Automática** (completude, gaps, temporal)
 - ✅ **Schema Versionado** (scripts SQL, não código Java)
 - ✅ **Logs Estruturados** (SLF4J/Logback)
+- ✅ **Reconciliação Automática no Loop** (recuperação de lacunas)
 - ✅ **Exportação CSV** automática
 
 ---
@@ -137,9 +138,14 @@ API_DATAEXPORT_URL=https://api.eslcloud.com/data-export
 |--------|-----------|
 | `01-executar_extracao_completa.bat` | Extração completa de todas as entidades |
 | `03-validar_config.bat` | Valida configuração e variáveis de ambiente |
-| `05-compilar_projeto.bat` | Compila o projeto Maven |
-| `06-exportar_csv.bat` | Exporta dados para CSV |
-| `04-executar_auditoria.bat` | Executa auditoria de dados |
+| `04-extracao_por_intervalo.bat` | Extração por período com divisão em blocos |
+| `05-loop_extracao_30min.bat` | Loop contínuo com reconciliação automática |
+| `06-relatorio-completo-validacao.bat` | Relatório unificado de validação e auditoria |
+| `07-exportar_csv.bat` | Exporta dados para CSV |
+| `08-auditar_api.bat` | Audita estrutura das APIs |
+| `09-gerenciar_usuarios.bat` | Gerencia usuários de acesso |
+| `00-PRODUCAO_START.bat` | Menu único de operação em produção |
+| `limpar_logs.bat` | Limpa apenas `.log` e preserva históricos `.csv` |
 
 ---
 
@@ -159,11 +165,21 @@ API_DATAEXPORT_URL=https://api.eslcloud.com/data-export
 Para documentação detalhada, consulte:
 - **README.md** - Documentação completa
 - **docs/README.md** - Índice da documentação
+- **docs/DER-CLASSES-JAVA-COMPLETO.md** - DER de classes Java
+- **docs/DER-COMPLETO-BANCO-DADOS.md** - DER completo de banco
+- **docs/FLUXOGRAMA-COMPLETO-SISTEMA.md** - Fluxo completo do sistema
 - **database/README.md** - Guia de scripts SQL
 
 ---
 
-## 🆕 Novidades 2.3.3 (03/02/2026)
+## 🆕 Novidades 2.3.4 (21/02/2026)
+
+- ✅ **Reconciliação Automática do Loop**: agenda diária de `D-1` e reprocessamento de pendências após falha
+- ✅ **Histórico de Reconciliação**: geração mensal em `logs/daemon/reconciliacao/reconciliacao_daemon_YYYY_MM.csv`
+- ✅ **Estado Persistente de Reconciliação**: `logs/daemon/loop_reconciliation.state`
+- ✅ **Limpeza de Logs Segura**: `limpar_logs.bat` preserva arquivos `.csv` de histórico
+
+## 🆕 Novidades 2.3.3 (14/02/2026)
 
 - ✅ **ThreadUtil**: Utilitário centralizado para pausas (substitui `Thread.sleep` direto)
 - ✅ **Validação de Completude**: Inclusão de `usuarios_sistema`/dim_usuarios na "Prova dos 9"

@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 
 echo ================================================================
-echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos - segundo plano^)
+echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos^)
 echo ================================================================
 echo.
 
@@ -45,15 +45,18 @@ if defined JAVA_HOME (
     set "PATH=%JAVA_HOME%\bin;%PATH%"
   )
 )
+set "LOOP_STATUS_AUTH_CACHE=0"
 
 :MENU
 echo.
 echo ================================================================
-echo MENU LOOP EM SEGUNDO PLANO
+echo MENU LOOP
 echo ================================================================
-echo  1. Iniciar loop daemon
-echo  2. Status do loop daemon
-echo  3. Parar loop daemon
+echo  1. Iniciar loop de extracao ^(segundo plano, continua mesmo fechando terminal^)
+echo  2. Status do loop de extracao
+echo  3. Parar loop de extracao
+echo  4. Reconfigurar Faturas GraphQL do loop ^(reinicia loop^)
+echo  5. Acompanhar logs da extracao ^(tempo real^)
 echo  0. Voltar
 echo.
 set /p OP="Escolha uma opcao: "
@@ -61,6 +64,8 @@ set /p OP="Escolha uma opcao: "
 if "%OP%"=="1" goto :START
 if "%OP%"=="2" goto :STATUS
 if "%OP%"=="3" goto :STOP
+if "%OP%"=="4" goto :RECONFIG_DAEMON
+if "%OP%"=="5" goto :TAIL_LOGS
 if "%OP%"=="0" goto :EXIT_LOOP_MENU
 
 echo Opcao invalida.
@@ -70,7 +75,16 @@ goto :MENU
 :START
 call :AUTH_CHECK LOOP_START "Iniciar loop daemon"
 if errorlevel 1 goto :MENU
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
+call :ASK_FATURAS_GRAPHQL_LOOP
+if errorlevel 1 goto :MENU
+
+if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
+  echo Iniciando loop daemon com Faturas GraphQL DESABILITADO...
+  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+) else (
+  echo Iniciando loop daemon com Faturas GraphQL INCLUIDO...
+  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
+)
 echo.
 pause
 goto :MENU
@@ -91,6 +105,45 @@ echo.
 pause
 goto :MENU
 
+:RECONFIG_DAEMON
+call :AUTH_CHECK LOOP_RECONFIG "Reconfigurar Faturas GraphQL do loop daemon"
+if errorlevel 1 goto :MENU
+call :ASK_FATURAS_GRAPHQL_LOOP
+if errorlevel 1 goto :MENU
+
+echo Reiniciando loop daemon com nova configuracao de Faturas GraphQL...
+java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-stop >nul 2>&1
+if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
+  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+) else (
+  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
+)
+echo.
+pause
+goto :MENU
+
+:TAIL_LOGS
+call :AUTH_CHECK LOOP_STATUS "Acompanhar logs do loop"
+if errorlevel 1 goto :MENU
+
+if not exist "%~dp0logs\daemon\loop_daemon_console.log" (
+  echo Arquivo de log do loop ainda nao encontrado.
+  echo Inicie o loop e tente novamente.
+  echo.
+  pause
+  goto :MENU
+)
+
+echo.
+echo Acompanhando logs em tempo real...
+echo Arquivo: %~dp0logs\daemon\loop_daemon_console.log
+echo Pressione CTRL+C para encerrar a visualizacao e voltar ao menu.
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Path '%~dp0logs\daemon\loop_daemon_console.log' -Encoding UTF8 -Tail 60 -Wait"
+echo.
+pause
+goto :MENU
+
 :EXIT_LOOP_MENU
 call :AUTH_CHECK LOOP_EXIT_MENU "Sair do menu de loop"
 if errorlevel 1 goto :MENU
@@ -98,6 +151,13 @@ goto :END
 
 :AUTH_CHECK
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
+set "AUTH_ACTION=%~1"
+if /i "%AUTH_ACTION%"=="LOOP_STATUS" (
+  if /i "%LOOP_STATUS_AUTH_CACHE%"=="1" exit /b 0
+)
+if /i "%AUTH_ACTION%"=="LOOP_EXIT_MENU" (
+  if /i "%LOOP_STATUS_AUTH_CACHE%"=="1" exit /b 0
+)
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
 java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-check %~1 "%~2"
@@ -107,7 +167,38 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+if /i "%AUTH_ACTION%"=="LOOP_START" set "LOOP_STATUS_AUTH_CACHE=1"
+if /i "%AUTH_ACTION%"=="LOOP_STATUS" set "LOOP_STATUS_AUTH_CACHE=1"
 exit /b 0
+
+:ASK_FATURAS_GRAPHQL_LOOP
+set "FLAG_FATURAS_GRAPHQL="
+echo.
+echo ================================================================
+echo CONFIGURAR FATURAS GRAPHQL NO LOOP
+echo ================================================================
+echo  1. Incluir Faturas GraphQL
+echo  2. Desabilitar Faturas GraphQL ^(--sem-faturas-graphql^)
+echo  0. Cancelar inicio do loop
+echo.
+set /p OP_FATURAS="Escolha uma opcao: "
+
+if "%OP_FATURAS%"=="1" (
+  set "FLAG_FATURAS_GRAPHQL="
+  exit /b 0
+)
+if "%OP_FATURAS%"=="2" (
+  set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
+  exit /b 0
+)
+if "%OP_FATURAS%"=="0" (
+  echo Inicio do loop cancelado.
+  exit /b 1
+)
+
+echo Opcao invalida.
+timeout /t 2 >nul
+goto :ASK_FATURAS_GRAPHQL_LOOP
 
 :END
 popd

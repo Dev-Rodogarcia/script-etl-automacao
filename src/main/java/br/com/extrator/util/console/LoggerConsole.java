@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 public final class LoggerConsole {
     
     private final Logger logger;
+    private static final boolean ESPELHAR_NO_CONSOLE =
+        !"false".equalsIgnoreCase(System.getProperty("extrator.logger.console.mirror", "true"));
     
     /**
      * Cria uma instância do LoggerConsole para a classe especificada.
@@ -41,7 +43,9 @@ public final class LoggerConsole {
      */
     public void info(final String message, final Object... args) {
         logger.info(message, args);
-        System.out.println(formatMessage(message, args));
+        if (ESPELHAR_NO_CONSOLE) {
+            System.out.println(formatMessage(message, args));
+        }
     }
     
     /**
@@ -52,7 +56,9 @@ public final class LoggerConsole {
      */
     public void warn(final String message, final Object... args) {
         logger.warn(message, args);
-        System.out.println(formatMessage(message, args));
+        if (ESPELHAR_NO_CONSOLE) {
+            System.out.println(formatMessage(message, args));
+        }
     }
     
     /**
@@ -63,7 +69,9 @@ public final class LoggerConsole {
      */
     public void error(final String message, final Object... args) {
         logger.error(message, args);
-        System.err.println(formatMessage(message, args));
+        if (ESPELHAR_NO_CONSOLE) {
+            System.err.println(formatMessage(message, args));
+        }
     }
     
     /**
@@ -138,4 +146,3 @@ public final class LoggerConsole {
     }
     
 }
-

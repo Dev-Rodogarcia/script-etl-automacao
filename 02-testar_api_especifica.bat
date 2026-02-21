@@ -97,7 +97,7 @@ if /i "%API%"=="graphql" (
     echo   3. Faturas GraphQL
     echo   4. Usuarios do Sistema
     echo.
-    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2, 3 ou 4): "
+    set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2, 3 ou 4^): "
     
     if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
     if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
@@ -121,7 +121,7 @@ if /i "%API%"=="dataexport" (
     echo   4. Contas a Pagar
     echo   5. Faturas por Cliente
     echo.
-    set /p "OPCAO_ENTIDADE=Digite sua opcao (1, 2, 3, 4 ou 5): "
+    set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2, 3, 4 ou 5^): "
     
     if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=manifestos"
     if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=cotacoes"
@@ -202,7 +202,7 @@ REM Compilar e gerar JAR antes de executar
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    echo Compilando projeto (se necessario)...
+    echo Compilando projeto ^(se necessario^)...
     call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 goto :COMPILE_FAIL
 )

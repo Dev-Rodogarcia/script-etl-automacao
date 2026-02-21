@@ -18,7 +18,7 @@ echo            by: @valentelucass
 echo ================================================================
 echo.
 echo  1. Extracao completa (ultimas 24h, com escolha de Faturas GraphQL)
-echo  2. Loop de extracao 30 minutos
+echo  2. Loop de extracao 30 minutos ^(segundo plano^)
 echo  3. Extracao por intervalo (com escolha de Faturas GraphQL)
 echo  4. Testar API especifica
 echo  5. Validar configuracoes

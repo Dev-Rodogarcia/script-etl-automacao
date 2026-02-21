@@ -44,7 +44,7 @@ REM Compilar projeto automaticamente (se necess??rio)
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    echo Compilando projeto (se necessario)...
+    echo Compilando projeto ^(se necessario^)...
     call "%~dp0mvn.bat" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
@@ -145,28 +145,28 @@ set TOTAL_ERROS=0
 if %VALIDAR_EXIT% equ 0 (
     echo    ??? Valida????o de Acesso: SUCESSO
 ) else (
-    echo    ??? Valida????o de Acesso: FALHOU (Exit Code: %VALIDAR_EXIT%^)
+    echo    ??? Valida????o de Acesso: FALHOU ^(Exit Code: %VALIDAR_EXIT%^)
     set /a TOTAL_ERROS+=1
 )
 
 if %VALIDAR_DADOS_EXIT% equ 0 (
     echo    ??? Valida????o Completa de Dados: SUCESSO
 ) else (
-    echo    ??? Valida????o Completa de Dados: FALHOU (Exit Code: %VALIDAR_DADOS_EXIT%^)
+    echo    ??? Valida????o Completa de Dados: FALHOU ^(Exit Code: %VALIDAR_DADOS_EXIT%^)
     set /a TOTAL_ERROS+=1
 )
 
 if %AUDITORIA_EXIT% equ 0 (
     echo    ??? Auditoria de Dados: SUCESSO
 ) else (
-    echo    ??? Auditoria de Dados: FALHOU (Exit Code: %AUDITORIA_EXIT%^)
+    echo    ??? Auditoria de Dados: FALHOU ^(Exit Code: %AUDITORIA_EXIT%^)
     set /a TOTAL_ERROS+=1
 )
 
 if %VALIDAR_MANIFESTOS_EXIT% equ 0 (
     echo    ??? Valida????o de Manifestos: SUCESSO
 ) else (
-    echo    ??? Valida????o de Manifestos: FALHOU (Exit Code: %VALIDAR_MANIFESTOS_EXIT%^)
+    echo    ??? Valida????o de Manifestos: FALHOU ^(Exit Code: %VALIDAR_MANIFESTOS_EXIT%^)
     set /a TOTAL_ERROS+=1
 )
 

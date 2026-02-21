@@ -13,29 +13,38 @@ import br.com.extrator.comandos.base.Comando;
 import br.com.extrator.util.console.LoggerConsole;
 
 public class LoopExtracaoComando implements Comando {
-    // PROBLEMA #9: Console interativo - usa LoggerConsole para manter log duplo
     private static final LoggerConsole log = LoggerConsole.getLogger(LoopExtracaoComando.class);
+    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
+
     private volatile boolean running = false;
     private volatile boolean paused = false;
     private volatile boolean executing = false;
+    private volatile boolean incluirFaturasGraphQL = true;
+
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> future;
     private volatile LocalDateTime nextRunAt;
     private final int intervalMinutes = 30;
 
     @Override
-    public void executar(String[] args) throws Exception {
+    public void executar(final String[] args) throws Exception {
+        incluirFaturasGraphQL = !possuiFlag(args, FLAG_SEM_FATURAS_GRAPHQL);
+
         log.console("=".repeat(80));
-        log.info("🕒 LOOP DE EXTRACAO A CADA 30 MINUTOS");
-        log.info("   Se uma tabela/entidade falhar, será reextraída na próxima execução (em 30 min).");
+        log.info("LOOP DE EXTRACAO A CADA 30 MINUTOS");
+        log.info("Se uma entidade falhar, sera reextraida no proximo ciclo.");
+        log.info("Faturas GraphQL no loop: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
         log.console("=".repeat(80));
+
         imprimirStatus();
+
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 log.console("");
-                log.console("[I] Iniciar  [P] Pausar  [R] Retomar  [S] Parar  [T] Status  [X] Sair");
-                System.out.print("Opcao: "); // System.out.print para prompt inline
-                String opcao = scanner.nextLine().trim();
+                log.console("[I] Iniciar  [N] Nova imediata  [P] Pausar  [R] Retomar  [G] Alternar Faturas GraphQL  [S] Parar  [T] Status  [X] Sair");
+                System.out.print("Opcao: ");
+
+                final String opcao = scanner.nextLine().trim();
                 if ("I".equalsIgnoreCase(opcao)) {
                     iniciar();
                 } else if ("N".equalsIgnoreCase(opcao)) {
@@ -44,6 +53,8 @@ public class LoopExtracaoComando implements Comando {
                     pausar();
                 } else if ("R".equalsIgnoreCase(opcao)) {
                     retomar();
+                } else if ("G".equalsIgnoreCase(opcao)) {
+                    alternarFaturasGraphQL();
                 } else if ("S".equalsIgnoreCase(opcao)) {
                     parar();
                 } else if ("T".equalsIgnoreCase(opcao)) {
@@ -73,7 +84,7 @@ public class LoopExtracaoComando implements Comando {
             scheduler = Executors.newSingleThreadScheduledExecutor();
             running = true;
             paused = false;
-            future = scheduler.scheduleWithFixedDelay(() -> executarCiclo(), 0, intervalMinutes, TimeUnit.MINUTES);
+            future = scheduler.scheduleWithFixedDelay(this::executarCiclo, 0, intervalMinutes, TimeUnit.MINUTES);
             log.info("Loop iniciado (intervalo: 30 minutos)");
             imprimirStatus();
         }
@@ -114,25 +125,34 @@ public class LoopExtracaoComando implements Comando {
         }
         running = false;
         paused = false;
+
         if (future != null) {
             future.cancel(true);
         }
         if (scheduler != null) {
             scheduler.shutdownNow();
         }
+
         log.info("Loop parado");
         imprimirStatus();
     }
 
+    private void alternarFaturasGraphQL() {
+        incluirFaturasGraphQL = !incluirFaturasGraphQL;
+        log.info("Faturas GraphQL agora esta {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
+    }
+
     private void imprimirStatus() {
-        String status = running ? (paused ? "PAUSADO" : "ATIVO") : "INATIVO";
+        final String status = running ? (paused ? "PAUSADO" : "ATIVO") : "INATIVO";
         log.info("Status atual: {}", status);
+        log.info("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
+
         if (nextRunAt != null) {
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-            LocalDateTime agora = LocalDateTime.now();
-            Duration restante = Duration.between(agora, nextRunAt);
-            long mm = Math.max(0, restante.toMinutes());
-            long ss = Math.max(0, restante.minusMinutes(mm).toSeconds());
+            final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            final LocalDateTime agora = LocalDateTime.now();
+            final Duration restante = Duration.between(agora, nextRunAt);
+            final long mm = Math.max(0, restante.toMinutes());
+            final long ss = Math.max(0, restante.minusMinutes(mm).toSeconds());
             log.info("Proxima execucao: {} (em {}m {}s)", nextRunAt.format(fmt), mm, ss);
         } else {
             log.info("Proxima execucao: indefinida");
@@ -147,37 +167,58 @@ public class LoopExtracaoComando implements Comando {
             log.warn("Uma extracao ja esta em execucao");
             return;
         }
+
         executing = true;
         final LocalDateTime inicio = LocalDateTime.now();
         log.info("Iniciando extracao completa...");
+
         try {
             final br.com.extrator.servicos.LoggingService ls = new br.com.extrator.servicos.LoggingService();
             ls.iniciarCaptura("extracao_dados_loop");
             String statusExecucao = "SUCCESS";
             try {
-                new ExecutarFluxoCompletoComando().executar(new String[] { "--fluxo-completo" });
-            } catch (Exception e) {
+                if (incluirFaturasGraphQL) {
+                    new ExecutarFluxoCompletoComando().executar(new String[] { "--fluxo-completo" });
+                } else {
+                    new ExecutarFluxoCompletoComando().executar(new String[] { "--fluxo-completo", FLAG_SEM_FATURAS_GRAPHQL });
+                }
+            } catch (final Exception e) {
                 statusExecucao = "ERROR";
                 throw e;
             } finally {
                 ls.pararCaptura(statusExecucao);
             }
-        } catch (Exception e) {
+        } catch (final Exception e) {
             log.error("Falha ao executar extracao: {}", e.getMessage());
         } finally {
             executing = false;
         }
-        LocalDateTime fim = LocalDateTime.now();
-        Duration duracao = Duration.between(inicio, fim);
-        long dm = Math.max(0, duracao.toMinutes());
-        long ds = Math.max(0, duracao.minusMinutes(dm).toSeconds());
+
+        final LocalDateTime fim = LocalDateTime.now();
+        final Duration duracao = Duration.between(inicio, fim);
+        final long dm = Math.max(0, duracao.toMinutes());
+        final long ds = Math.max(0, duracao.minusMinutes(dm).toSeconds());
+
         nextRunAt = fim.plusMinutes(intervalMinutes);
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-        Duration restante = Duration.between(fim, nextRunAt);
-        long mm = Math.max(0, restante.toMinutes());
-        long ss = Math.max(0, restante.minusMinutes(mm).toSeconds());
-        log.info("Extracao concluida em {} (duracao {}m {}s) | Proxima em {} (em {}m {}s)", 
+        final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        final Duration restante = Duration.between(fim, nextRunAt);
+        final long mm = Math.max(0, restante.toMinutes());
+        final long ss = Math.max(0, restante.minusMinutes(mm).toSeconds());
+
+        log.info("Extracao concluida em {} (duracao {}m {}s) | Proxima em {} (em {}m {}s)",
             fim.format(fmt), dm, ds, nextRunAt.format(fmt), mm, ss);
-        log.console("Durante a espera: [N] Nova imediata  [P] Pausar  [S] Parar  [T] Status  [X] Parar/Sair");
+        log.console("Durante a espera: [N] Nova imediata  [P] Pausar  [R] Retomar  [G] Alternar Faturas GraphQL  [S] Parar  [T] Status  [X] Parar/Sair");
+    }
+
+    private boolean possuiFlag(final String[] args, final String flag) {
+        if (args == null || flag == null) {
+            return false;
+        }
+        for (final String arg : args) {
+            if (arg != null && flag.equalsIgnoreCase(arg.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

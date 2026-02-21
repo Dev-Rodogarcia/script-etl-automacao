@@ -26,8 +26,10 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("                        Executa auditoria para periodo especifico");
         System.out.println("  --auditar-api         Audita estrutura das APIs e gera CSV");
         System.out.println("  --testar-api [tipo]   Testa API especifica (rest|graphql|dataexport)");
-        System.out.println("  --loop                Console interativo de loop (legado)");
+        System.out.println("  --loop                Console interativo de loop");
+        System.out.println("                        Opcional: --sem-faturas-graphql");
         System.out.println("  --loop-daemon-start   Inicia loop em segundo plano");
+        System.out.println("                        Opcional: --sem-faturas-graphql");
         System.out.println("  --loop-daemon-stop    Para loop em segundo plano");
         System.out.println("  --loop-daemon-status  Consulta status do loop em segundo plano");
         System.out.println("  --auth-bootstrap      Cria o primeiro usuario ADMIN");
@@ -44,6 +46,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  java -jar extrator.jar --fluxo-completo --sem-faturas-graphql");
         System.out.println("  java -jar extrator.jar --extracao-intervalo 2026-01-01 2026-01-31 --sem-faturas-graphql");
         System.out.println("  java -jar extrator.jar --loop-daemon-start");
+        System.out.println("  java -jar extrator.jar --loop-daemon-start --sem-faturas-graphql");
         System.out.println();
         System.out.println("=".repeat(80));
     }

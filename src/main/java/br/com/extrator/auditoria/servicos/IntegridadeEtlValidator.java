@@ -160,6 +160,13 @@ public class IntegridadeEtlValidator {
     public ResultadoValidacao validarExecucao(final LocalDateTime inicioExecucao,
                                               final LocalDateTime fimExecucao,
                                               final Set<String> entidadesEsperadas) {
+        return validarExecucao(inicioExecucao, fimExecucao, entidadesEsperadas, false);
+    }
+
+    public ResultadoValidacao validarExecucao(final LocalDateTime inicioExecucao,
+                                              final LocalDateTime fimExecucao,
+                                              final Set<String> entidadesEsperadas,
+                                              final boolean modoLoopDaemon) {
         final List<String> falhas = new ArrayList<>();
         final Set<String> entidades = new LinkedHashSet<>(entidadesEsperadas);
 
@@ -220,7 +227,7 @@ public class IntegridadeEtlValidator {
                 }
             }
 
-            validarIntegridadeReferencial(conexao, inicioExecucao, fimExecucao, entidades, falhas);
+            validarIntegridadeReferencial(conexao, inicioExecucao, fimExecucao, entidades, falhas, modoLoopDaemon);
         } catch (final SQLException e) {
             registrarFalha(falhas, "ERRO_SQL_VALIDACAO",
                 "Falha SQL durante validaÃ§Ã£o de integridade: " + e.getMessage());
@@ -361,7 +368,8 @@ public class IntegridadeEtlValidator {
                                                final LocalDateTime inicioExecucao,
                                                final LocalDateTime fimExecucao,
                                                final Set<String> entidades,
-                                               final List<String> falhas) throws SQLException {
+                                               final List<String> falhas,
+                                               final boolean modoLoopDaemon) throws SQLException {
         if (entidades.contains(ConstantesEntidades.MANIFESTOS) && entidades.contains(ConstantesEntidades.COLETAS)) {
             final Optional<JanelaLog> logManifestos = buscarLogDaExecucao(
                 conexao, ConstantesEntidades.MANIFESTOS, inicioExecucao, fimExecucao);
@@ -434,8 +442,14 @@ public class IntegridadeEtlValidator {
 
                 final boolean dentroDaTolerancia = orfaosManifestos <= limiteOrfaosQuantidade
                     && percentualOrfaos <= limiteOrfaosPercentual;
-                if (dentroDaTolerancia) {
-                    registrarEventoAviso(codigoFalha + "_TOLERADO", detalheReferencial);
+                if (dentroDaTolerancia || modoLoopDaemon) {
+                    final String codigoAviso = dentroDaTolerancia
+                        ? codigoFalha + "_TOLERADO"
+                        : codigoFalha + "_ALERTA_LOOP";
+                    final String detalheAviso = (!dentroDaTolerancia && modoLoopDaemon)
+                        ? detalheReferencial + " | modo_loop_daemon=true"
+                        : detalheReferencial;
+                    registrarEventoAviso(codigoAviso, detalheAviso);
                 } else {
                     registrarFalha(falhas, codigoFalha, detalheReferencial);
                 }

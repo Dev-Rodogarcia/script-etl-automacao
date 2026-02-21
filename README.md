@@ -15,7 +15,7 @@ image: public/foto1.png
 
 **Sistema de Automação ETL (Extract, Transform, Load)** desenvolvido em Java para extrair dados das APIs GraphQL e Data Export do ESL Cloud e carregá-los em SQL Server, com coleta automática de métricas de execução, sistema robusto de deduplicação e validação completa de integridade dos dados.
 
-**Versão:** 2.3.3 | **Última Atualização:** 14/02/2026 | **Status:** ✅ Estável e em Produção
+**Versão:** 2.3.4 | **Última Atualização:** 21/02/2026 | **Status:** ✅ Estável e em Produção
 
 ---
 
@@ -80,6 +80,19 @@ Automatizar a extração de dados operacionais do ESL Cloud (sistema de gestão 
 - ✅ **Scripts Batch**: Automação completa via scripts .bat
 
 ---
+
+## 🆕 Novidades 2.3.4 (21/02/2026)
+
+- ✅ **Reconciliação Automática no Loop (pós-ciclo)**:
+  - Agenda diariamente a reconciliação de `D-1` no daemon de 30 minutos.
+  - Em falha de ciclo, cria pendências retroativas configuráveis para reprocessar lacunas.
+  - Processa pendências com limite por ciclo para evitar impacto no throughput normal.
+- ✅ **Histórico de Reconciliação Persistente**:
+  - Estado salvo em `logs/daemon/loop_reconciliation.state`.
+  - Histórico mensal em `logs/daemon/reconciliacao/reconciliacao_daemon_YYYY_MM.csv`.
+- ✅ **Limpeza de Logs Sem Perder Histórico CSV**:
+  - `limpar_logs.bat` remove apenas arquivos `.log`.
+  - Arquivos `.csv` de `logs/history/` e `logs/daemon/reconciliacao/` são preservados.
 
 ## 🆕 Novidades 2.3.3 (14/02/2026)
 
@@ -1243,55 +1256,15 @@ O projeto inclui scripts batch (.bat) para facilitar a execução:
 02-testar_api_especifica.bat
 ```
 
-#### 3. `03-loop_extracao_30min.bat`
-**Finalidade:** Executa extração em loop a cada 30 minutos.
+#### 3. `03-validar_config.bat`
+**Finalidade:** Valida configuração, variáveis de ambiente e conectividade.
 
 **Uso:**
 ```batch
-03-loop_extracao_30min.bat
+03-validar_config.bat
 ```
 
-#### 4. `04-executar_auditoria.bat`
-**Finalidade:** Executa auditoria completa dos dados.
-
-**Uso:**
-```batch
-04-executar_auditoria.bat
-```
-
-#### 5. `05-compilar_projeto.bat`
-**Finalidade:** Compila o projeto sem executar.
-
-**Uso:**
-```batch
-05-compilar_projeto.bat
-```
-
-#### 6. `06-exportar_csv.bat`
-**Finalidade:** Exporta todos os dados para CSV.
-
-**Uso:**
-```batch
-06-exportar_csv.bat
-```
-
-#### 7. `07-validar-manifestos.bat`
-**Finalidade:** Valida integridade de manifestos.
-
-**Uso:**
-```batch
-07-validar-manifestos.bat
-```
-
-#### 8. `08-auditar_api.bat`
-**Finalidade:** Audita APIs específicas.
-
-**Uso:**
-```batch
-08-auditar_api.bat
-```
-
-#### 9. `04-extracao_por_intervalo.bat`
+#### 4. `04-extracao_por_intervalo.bat`
 **Finalidade:** Executa extração por intervalo de datas com divisão automática em blocos.
 
 **Características:**
@@ -1316,7 +1289,68 @@ O projeto inclui scripts batch (.bat) para facilitar a execução:
 
 **Nota:** Para períodos grandes, o sistema divide automaticamente em blocos de 30 dias e executa sequencialmente sem esperas, respeitando as regras de limitação da API ESL.
 
-#### 10. `mvn.bat`
+#### 5. `05-loop_extracao_30min.bat`
+**Finalidade:** Executa o daemon de extração contínua (a cada 30 minutos).
+
+**Destaques:**
+- Mantém execução contínua com histórico mensal de ciclos.
+- Integra reconciliação automática pós-ciclo para recuperar janelas com falha.
+- Gera histórico de reconciliação em CSV para rastreabilidade.
+
+**Uso:**
+```batch
+05-loop_extracao_30min.bat
+```
+
+#### 6. `06-relatorio-completo-validacao.bat`
+**Finalidade:** Executa relatório completo de validação e auditoria.
+
+**Uso:**
+```batch
+06-relatorio-completo-validacao.bat
+```
+
+#### 7. `07-exportar_csv.bat`
+**Finalidade:** Exporta todos os dados para CSV.
+
+**Uso:**
+```batch
+07-exportar_csv.bat
+```
+
+#### 8. `08-auditar_api.bat`
+**Finalidade:** Audita estrutura das APIs.
+
+**Uso:**
+```batch
+08-auditar_api.bat
+```
+
+#### 9. `09-gerenciar_usuarios.bat`
+**Finalidade:** Gerencia usuários de acesso do sistema.
+
+**Uso:**
+```batch
+09-gerenciar_usuarios.bat
+```
+
+#### 10. `00-PRODUCAO_START.bat`
+**Finalidade:** Menu único de operação para produção.
+
+**Uso:**
+```batch
+00-PRODUCAO_START.bat
+```
+
+#### 11. `limpar_logs.bat`
+**Finalidade:** Limpa somente arquivos `.log`, preservando históricos `.csv`.
+
+**Uso:**
+```batch
+limpar_logs.bat
+```
+
+#### 12. `mvn.bat`
 **Finalidade:** Wrapper do Maven com detecção automática de Java e Maven.
 
 **Funcionalidades:**
@@ -1402,14 +1436,6 @@ Este script verifica se todas as variáveis necessárias estão configuradas.
 
 ### 1. Compilar o Projeto
 
-#### Opção 1: Usando Script Batch (Recomendado)
-
-```batch
-05-compilar_projeto.bat
-```
-
-#### Opção 2: Usando Maven Diretamente
-
 ```bash
 mvn clean package -DskipTests
 ```
@@ -1424,17 +1450,23 @@ mvn clean package -DskipTests
 # Extração completa (todas as APIs) com validação automática
 01-executar_extracao_completa.bat
 
+# Validação de configuração
+03-validar_config.bat
+
 # Testar API específica
 02-testar_api_especifica.bat
 
-# Validar manifestos
-07-validar-manifestos.bat
+# Loop de 30 min com reconciliação automática
+05-loop_extracao_30min.bat
 
 # Exportar CSV
-06-exportar_csv.bat
+07-exportar_csv.bat
 
 # Executar auditoria
 06-relatorio-completo-validacao.bat
+
+# Auditar estrutura das APIs
+08-auditar_api.bat
 ```
 
 #### Opção 2: Linha de Comando
@@ -1695,20 +1727,21 @@ script-automacao/
 │       └── java/                                # Testes unitários
 ├── docs/                                        # Documentação completa
 ├── logs/                                        # Logs de execução
+├── logs/daemon/reconciliacao/                   # Histórico CSV das reconciliações
 ├── exports/                                     # CSVs exportados
 ├── relatorios/                                  # Relatórios de auditoria
 ├── backups/                                     # Backups do projeto
-├── scripts/                                      # Scripts auxiliares
+├── 00-PRODUCAO_START.bat                        # Menu único de produção
 ├── 01-executar_extracao_completa.bat           # Script principal
 ├── 02-testar_api_especifica.bat
-├── 03-loop_extracao_30min.bat
 ├── 03-validar_config.bat
-├── 06-relatorio-completo-validacao.bat
-├── 05-compilar_projeto.bat
-├── 06-exportar_csv.bat
-├── 07-validar-manifestos.bat
-├── 08-auditar_api.bat
 ├── 04-extracao_por_intervalo.bat
+├── 05-loop_extracao_30min.bat
+├── 06-relatorio-completo-validacao.bat
+├── 07-exportar_csv.bat
+├── 08-auditar_api.bat
+├── 09-gerenciar_usuarios.bat
+├── limpar_logs.bat
 ├── mvn.bat                                      # Wrapper Maven
 ├── pom.xml                                      # Configuração Maven
 └── README.md                                    # Este arquivo
@@ -1792,6 +1825,20 @@ script-automacao/
 ---
 
 ## 📝 Changelog
+
+### v2.3.4 (21/02/2026)
+
+- Reconciliação automática do loop daemon implementada (`D-1` diário + pendências retroativas em falha)
+- Persistência de estado da reconciliação em `logs/daemon/loop_reconciliation.state`
+- Histórico mensal de reconciliação em `logs/daemon/reconciliacao/reconciliacao_daemon_YYYY_MM.csv`
+- Ajuste de `limpar_logs.bat` para remover apenas `.log` e preservar históricos `.csv`
+- Documentação atualizada para scripts atuais de operação
+
+### v2.3.3 (14/02/2026)
+
+- Esclarecimento de integridade referencial Manifestos x Coletas e modo estrito opcional
+- Regras de tolerância operacional documentadas em `config.properties`
+- Refinos de documentação e alinhamento de terminologia operacional
 
 ### v2.3.0 (14/01/2026)
 - Sistema de logging completamente reformulado com métricas detalhadas e resumos consolidados
@@ -1907,6 +1954,8 @@ script-automacao/
 O sistema gera métricas automáticas e logs detalhados:
 
 - **Logs de Execução**: `logs/extracao_dados_YYYY-MM-DD_HH-MM-SS.log`
+- **Histórico de Loop**: `logs/history/execucao_YYYY_MM.csv`
+- **Histórico de Reconciliação**: `logs/daemon/reconciliacao/reconciliacao_daemon_YYYY_MM.csv`
 - **Métricas**: Coleta automática de performance e estatísticas
 - **Validação**: Relatórios de completude, gaps e janela temporal
 - **Auditoria**: Comandos dedicados para auditoria completa
@@ -1919,7 +1968,7 @@ Para problemas ou dúvidas:
 
 1. **Verifique os logs** em `logs/`
 2. **Consulte a documentação** em `docs/`
-3. **Execute validação**: `07-validar-manifestos.bat` ou `03-validar_config.bat`
+3. **Execute validação**: `06-relatorio-completo-validacao.bat` ou `03-validar_config.bat`
 4. **Use os scripts .bat** para operações padronizadas
 5. **Monitore as métricas** para identificar problemas
 6. **Verifique variáveis de ambiente** com `03-validar_config.bat`
@@ -1935,6 +1984,10 @@ A documentação completa está em `docs/`:
 - **[🔌 APIs](docs/02-apis/)** - Documentação completa das APIs
 - **[⚙️ Configuração](docs/03-configuracao/)** - Guias de configuração
 - **[📋 Especificações Técnicas](docs/04-especificacoes-tecnicas/)** - Detalhes técnicos
+- **[DER Java](docs/DER-CLASSES-JAVA-COMPLETO.md)** - Modelo de classes Java
+- **[DER Banco](docs/DER-COMPLETO-BANCO-DADOS.md)** - Modelo completo do banco
+- **[Fluxograma Sistema](docs/FLUXOGRAMA-COMPLETO-SISTEMA.md)** - Visão macro do fluxo
+- **[Fluxograma Miro](docs/FLUXOGRAMA-ESTRUTURADO-MIRO.md)** - Fluxo estruturado para desenho/validação
 
 ---
 
@@ -1955,6 +2008,6 @@ Este projeto é interno e proprietário. Todos os direitos reservados.
 
 ---
 
-**Última Atualização:** 14/01/2026  
-**Versão:** 2.3.0  
+**Última Atualização:** 21/02/2026  
+**Versão:** 2.3.4  
 **Status:** ✅ Estável e em Produção

@@ -1,0 +1,75 @@
+package br.com.extrator.comandos.extracao;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import br.com.extrator.comandos.extracao.reconciliacao.LoopReconciliationService;
+import br.com.extrator.comandos.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
+
+class LoopDaemonComandoReconciliacaoHistoryTest {
+
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void deveRegistrarHistoricoCsvDeReconciliacao() throws Exception {
+        final LocalDateTime inicio = LocalDateTime.of(2026, 2, 20, 11, 0);
+        final LocalDateTime fimExtracao = LocalDateTime.of(2026, 2, 20, 11, 30);
+
+        final Path pastaReconciliacao = Path.of("logs", "daemon", "reconciliacao");
+        Files.createDirectories(pastaReconciliacao);
+        final Path csvEsperado = pastaReconciliacao.resolve("reconciliacao_daemon_2026_02.csv");
+        Files.deleteIfExists(csvEsperado);
+
+        final Path cicloLog = tempDir.resolve("ciclo.log");
+        Files.writeString(cicloLog, "log-ciclo-teste", StandardCharsets.UTF_8);
+
+        final LoopReconciliationService service = new LoopReconciliationService(
+            tempDir.resolve("state.properties"),
+            Clock.fixed(inicio.atZone(ZoneId.systemDefault()).toInstant(), ZoneId.systemDefault()),
+            true,
+            2,
+            0,
+            (data, incluirFaturasGraphQL) -> {
+                // no-op
+            }
+        );
+        final ReconciliationSummary resumo = service.processarPosCiclo(inicio, fimExtracao, true, true);
+
+        final LoopDaemonComando comando = new LoopDaemonComando(LoopDaemonComando.Modo.STATUS);
+        final Method registrar = LoopDaemonComando.class.getDeclaredMethod(
+            "registrarHistoricoReconciliacao",
+            LocalDateTime.class,
+            LocalDateTime.class,
+            boolean.class,
+            ReconciliationSummary.class,
+            Path.class
+        );
+        registrar.setAccessible(true);
+        registrar.invoke(comando, inicio, fimExtracao, true, resumo, cicloLog);
+
+        assertTrue(Files.exists(csvEsperado), "CSV de reconciliacao deve ser criado");
+        final List<String> linhas = Files.readAllLines(csvEsperado, StandardCharsets.UTF_8);
+        assertFalse(linhas.isEmpty(), "CSV deve conter pelo menos cabecalho");
+        assertTrue(
+            linhas.stream().anyMatch(l -> l.contains("STATUS_RECONCILIACAO") && l.contains("EXECUTADAS")),
+            "CSV deve conter cabecalho de reconciliacao"
+        );
+        assertTrue(
+            linhas.stream().anyMatch(l -> l.contains(";EXECUTADA;") && l.contains(";true;")),
+            "CSV deve conter registro com status da reconciliacao executada"
+        );
+    }
+}
