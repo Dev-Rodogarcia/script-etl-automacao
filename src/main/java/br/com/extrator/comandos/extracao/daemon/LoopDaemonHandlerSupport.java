@@ -1,3 +1,31 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/daemon/LoopDaemonHandlerSupport.java
+Classe  : LoopDaemonHandlerSupport (class)
+Pacote  : br.com.extrator.comandos.extracao.daemon
+Modulo  : Comando CLI (daemon)
+Papel   : Centraliza utilitarios e constantes compartilhadas do loop daemon.
+
+Conecta com:
+- DaemonStateStore
+- DaemonHistoryWriter
+- DaemonPaths
+
+Fluxo geral:
+1) Fornece constantes de controle do modo daemon.
+2) Garante estrutura de diretorios e logs.
+3) Expoe utilitarios de normalizacao e classificacao de falhas.
+
+Estrutura interna:
+Metodos principais:
+- garantirDiretorioLogs(...2 args): prepara diretorios necessarios.
+- descreverModoFaturas(...1 args): descreve modo com/sem faturas.
+- ehFalhaIntegridadeOperacional(...1 args): detecta falha de integridade no encadeamento.
+Atributos-chave:
+- FLAG_SEM_FATURAS_GRAPHQL: flag CLI para desabilitar faturas.
+- FLAG_MODO_LOOP_DAEMON: flag interna para modo daemon.
+- INTERVALO_MINUTOS_PADRAO: intervalo padrao entre ciclos.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao.daemon;
 
 import java.io.IOException;

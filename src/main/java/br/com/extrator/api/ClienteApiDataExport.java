@@ -92,6 +92,7 @@ import br.com.extrator.util.validacao.ConstantesEntidades;
 import br.com.extrator.util.formatacao.FormatadorData;
 import br.com.extrator.util.http.GerenciadorRequisicaoHttp;
 import br.com.extrator.util.mapeamento.MapperUtil;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.db.entity.PageAuditEntity;
 import br.com.extrator.db.repository.PageAuditRepository;
 
@@ -172,7 +173,7 @@ public class ClienteApiDataExport {
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ManifestoDTO> buscarManifestos() {
-        final LocalDate hoje = LocalDate.now();
+        final LocalDate hoje = RelogioSistema.hoje();
         final LocalDate ontem = hoje.minusDays(1);
         return buscarManifestos(ontem, hoje);
     }
@@ -184,7 +185,7 @@ public class ClienteApiDataExport {
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<CotacaoDTO> buscarCotacoes() {
-        final LocalDate hoje = LocalDate.now();
+        final LocalDate hoje = RelogioSistema.hoje();
         final LocalDate ontem = hoje.minusDays(1);
         return buscarCotacoes(ontem, hoje);
     }
@@ -196,7 +197,7 @@ public class ClienteApiDataExport {
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga() {
-        final LocalDate hoje = LocalDate.now();
+        final LocalDate hoje = RelogioSistema.hoje();
         final LocalDate ontem = hoje.minusDays(1);
         return buscarLocalizacaoCarga(ontem, hoje);
     }
@@ -206,7 +207,7 @@ public class ClienteApiDataExport {
      * Método de conveniência que delega para buscarContasAPagar(dataInicio, dataFim).
      */
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar() {
-        final LocalDate hoje = LocalDate.now();
+        final LocalDate hoje = RelogioSistema.hoje();
         final LocalDate ontem = hoje.minusDays(1);
         return buscarContasAPagar(ontem, hoje);
     }
@@ -216,7 +217,7 @@ public class ClienteApiDataExport {
      * Método de conveniência que delega para buscarFaturasPorCliente(dataInicio, dataFim).
      */
     public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente() {
-        final LocalDate hoje = LocalDate.now();
+        final LocalDate hoje = RelogioSistema.hoje();
         final LocalDate ontem = hoje.minusDays(1);
         return buscarFaturasPorCliente(ontem, hoje);
     }
@@ -488,7 +489,7 @@ public class ClienteApiDataExport {
 
                 // Executar requisição com medição de tempo
                 final long tempoInicio = System.currentTimeMillis();
-                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, 
+                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoEstrita(this.httpClient, requisicao, 
                         "DataExport-Template-" + templateId + "-Page-" + paginaAtual);
                 final long duracaoMs = System.currentTimeMillis() - tempoInicio;
 
@@ -889,7 +890,7 @@ public class ClienteApiDataExport {
                     .build();
 
             final long inicioMs = System.currentTimeMillis();
-            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoComCharset(
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoComCharsetEstrita(
                     this.httpClient, requisicao, "contagem-csv-" + tipoAmigavel.replace(" ", "-"), StandardCharsets.ISO_8859_1);
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
 

@@ -46,10 +46,14 @@ import java.time.LocalDateTime;
 import java.util.OptionalLong;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Gerencia arquivos de estado/controle do loop daemon.
  */
 public final class DaemonStateStore {
+    private static final Logger logger = LoggerFactory.getLogger(DaemonStateStore.class);
     private final Path daemonDir;
     private final Path stateFile;
     private final Path pidFile;
@@ -129,6 +133,7 @@ public final class DaemonStateStore {
             }
             return OptionalLong.of(Long.parseLong(conteudo));
         } catch (final Exception e) {
+            logger.warn("Falha ao ler PID file '{}': {}", pidFile, e.getMessage());
             return OptionalLong.empty();
         }
     }
@@ -154,7 +159,7 @@ public final class DaemonStateStore {
         try (var in = Files.newInputStream(stateFile)) {
             properties.load(in);
         } catch (final IOException ignored) {
-            // Mantem estado vazio em caso de falha de leitura.
+            logger.warn("Falha ao ler state file '{}': {}. Estado vazio sera utilizado.", stateFile, ignored.getMessage());
         }
         return properties;
     }
@@ -191,7 +196,7 @@ public final class DaemonStateStore {
         try {
             Files.writeString(pidFile, String.valueOf(pid), StandardCharsets.UTF_8);
         } catch (final IOException ignored) {
-            // Falha ao sincronizar PID nao deve interromper fluxo principal.
+            logger.warn("Falha ao sincronizar PID file '{}': {}", pidFile, ignored.getMessage());
         }
     }
 }

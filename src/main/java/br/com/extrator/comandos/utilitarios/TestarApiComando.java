@@ -53,6 +53,7 @@ import br.com.extrator.db.repository.LogExtracaoRepository;
 import br.com.extrator.runners.dataexport.DataExportRunner;
 import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.util.console.BannerUtil;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -83,7 +84,7 @@ public class TestarApiComando implements Comando {
         }
 
         // Janela padrao de teste: ultimas 24h (ontem -> hoje), igual ao fluxo completo.
-        final LocalDate dataFim = LocalDate.now();
+        final LocalDate dataFim = RelogioSistema.hoje();
         final LocalDate dataInicio = dataFim.minusDays(1);
 
         switch (tipoApi.toLowerCase()) {

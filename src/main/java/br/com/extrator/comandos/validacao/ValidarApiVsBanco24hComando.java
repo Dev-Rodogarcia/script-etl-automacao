@@ -47,6 +47,7 @@ import br.com.extrator.auditoria.servicos.CompletudeValidator;
 import br.com.extrator.comandos.base.Comando;
 import br.com.extrator.util.banco.GerenciadorConexao;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -80,7 +81,7 @@ public class ValidarApiVsBanco24hComando implements Comando {
     @Override
     public void executar(final String[] args) throws Exception {
         final boolean incluirFaturasGraphQL = !possuiFlag(args, "--sem-faturas-graphql");
-        final LocalDate dataReferenciaSistema = LocalDate.now();
+        final LocalDate dataReferenciaSistema = RelogioSistema.hoje();
         final LocalDate dataReferencia;
         final LocalDate dataInicio;
         final LocalDate dataFim;

@@ -1,3 +1,33 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/daemon/LoopDaemonRunHandler.java
+Classe  : LoopDaemonRunHandler (class)
+Pacote  : br.com.extrator.comandos.extracao.daemon
+Modulo  : Comando CLI (daemon)
+Papel   : Executa o ciclo continuo do loop daemon e reconciliacao pos-ciclo.
+
+Conecta com:
+- ExecutarFluxoCompletoComando (comandos.extracao)
+- LoopReconciliationService (comandos.extracao.reconciliacao)
+- DaemonStateStore
+- DaemonHistoryWriter
+
+Fluxo geral:
+1) Inicializa estado runtime do daemon.
+2) Executa ciclo de extracao em loop com controle de parada/forca.
+3) Persiste historico e agenda proximo ciclo.
+
+Estrutura interna:
+Metodos principais:
+- executar(...1 args): loop principal do daemon.
+- executarFluxoCompletoPadrao(...1 args): executa fluxo ETL padrao.
+- aguardarProximoCicloPadrao(...2 args): aguarda gatilho do proximo ciclo.
+Atributos-chave:
+- stateStore: estado/persistencia do daemon.
+- historyWriter: escrita de historico operacional.
+- fluxoExecutor: callback do fluxo de extracao.
+- reconciliationProcessor: callback de reconciliacao.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao.daemon;
 
 import java.io.FileOutputStream;

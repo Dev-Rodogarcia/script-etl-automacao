@@ -33,6 +33,11 @@ Atributos-chave:
 
 package br.com.extrator;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -49,12 +54,16 @@ import br.com.extrator.comandos.console.ExibirAjudaComando;
 import br.com.extrator.comandos.extracao.PartialExecutionException;
 import br.com.extrator.db.repository.ExecutionHistoryRepository;
 import br.com.extrator.servicos.LoggingService;
+import br.com.extrator.util.tempo.RelogioSistema;
 
 /**
  * Orquestrador principal dos comandos do extrator.
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final int HISTORICO_MAX_TENTATIVAS = 2;
+    private static final long HISTORICO_RETRY_DELAY_MS = 750L;
+    private static final Path ARQUIVO_FALLBACK_HISTORICO = Path.of("logs", "execution_history_fallback.ndjson");
 
     private static final Map<String, Comando> COMANDOS = CommandRegistry.criarMapaComandos();
 
@@ -68,7 +77,7 @@ public class Main {
         final boolean registrarHistorico = !comandoLongaDuracao && !comandoSilencioso;
 
         final LoggingService loggingService = capturarLogOperacao ? new LoggingService() : null;
-        final LocalDateTime inicioExecucao = LocalDateTime.now();
+        final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final AtomicReference<String> statusRef = new AtomicReference<>("SUCCESS");
         final AtomicReference<String> errorMessageRef = new AtomicReference<>(null);
         final AtomicReference<String> errorCategoryRef = new AtomicReference<>(null);
@@ -80,7 +89,7 @@ public class Main {
                 return;
             }
 
-            final LocalDateTime fimExecucao = LocalDateTime.now();
+            final LocalDateTime fimExecucao = RelogioSistema.agora();
             final long duracaoSegundos = Duration.between(inicioExecucao, fimExecucao).getSeconds();
             final int duracaoSegundosInt = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, duracaoSegundos));
             int totalRecords = 0;
@@ -101,19 +110,66 @@ public class Main {
                 errorMessageRef.get()
             );
 
-            try {
-                final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
-                repo.inserirHistorico(
+            RuntimeException ultimoErroPersistencia = null;
+            boolean historicoPersistidoNoBanco = false;
+
+            for (int tentativa = 1; tentativa <= HISTORICO_MAX_TENTATIVAS; tentativa++) {
+                try {
+                    final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
+                    repo.inserirHistorico(
+                        inicioExecucao,
+                        fimExecucao,
+                        duracaoSegundosInt,
+                        statusRef.get(),
+                        totalRecords,
+                        errorCategoryRef.get(),
+                        errorMessageRef.get()
+                    );
+                    logger.info(
+                        "EVT_EXEC_HISTORY_DB_SAVE_OK tentativa={} status={} tipo_execucao={} inicio={} fim={} total_records={}",
+                        tentativa,
+                        statusRef.get(),
+                        tipoExecucao,
+                        inicioExecucao,
+                        fimExecucao,
+                        totalRecords
+                    );
+                    historicoPersistidoNoBanco = true;
+                    break;
+                } catch (final RuntimeException t) {
+                    ultimoErroPersistencia = t;
+                    logger.warn(
+                        "EVT_EXEC_HISTORY_DB_SAVE_FAIL tentativa={} status={} tipo_execucao={} erro={}",
+                        tentativa,
+                        statusRef.get(),
+                        tipoExecucao,
+                        t.getMessage()
+                    );
+
+                    if (tentativa < HISTORICO_MAX_TENTATIVAS) {
+                        try {
+                            Thread.sleep(HISTORICO_RETRY_DELAY_MS);
+                        } catch (final InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            logger.warn("Retry de persistencia de historico interrompido: {}", ie.getMessage());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!historicoPersistidoNoBanco) {
+                registrarFallbackHistorico(
                     inicioExecucao,
                     fimExecucao,
                     duracaoSegundosInt,
                     statusRef.get(),
                     totalRecords,
+                    tipoExecucao,
                     errorCategoryRef.get(),
-                    errorMessageRef.get()
+                    errorMessageRef.get(),
+                    ultimoErroPersistencia
                 );
-            } catch (final RuntimeException t) {
-                logger.warn("Falha ao gravar historico de execucao no banco: {}", t.getMessage());
             }
         };
 
@@ -206,5 +262,70 @@ public class Main {
 
     private static boolean isErroEsperado(final Exception e) {
         return e instanceof IllegalArgumentException || e instanceof IllegalStateException;
+    }
+
+    private static void registrarFallbackHistorico(final LocalDateTime inicioExecucao,
+                                                   final LocalDateTime fimExecucao,
+                                                   final int duracaoSegundos,
+                                                   final String status,
+                                                   final int totalRecords,
+                                                   final String tipoExecucao,
+                                                   final String categoriaErro,
+                                                   final String mensagemErro,
+                                                   final RuntimeException erroPersistencia) {
+        final String linhaJson = "{"
+            + "\"event_code\":\"EVT_EXEC_HISTORY_DB_FALLBACK\","
+            + "\"timestamp\":\"" + escapeJson(RelogioSistema.agora().toString()) + "\","
+            + "\"inicio_execucao\":\"" + escapeJson(String.valueOf(inicioExecucao)) + "\","
+            + "\"fim_execucao\":\"" + escapeJson(String.valueOf(fimExecucao)) + "\","
+            + "\"duracao_segundos\":" + duracaoSegundos + ","
+            + "\"status\":\"" + escapeJson(status) + "\","
+            + "\"total_records\":" + totalRecords + ","
+            + "\"tipo_execucao\":\"" + escapeJson(tipoExecucao) + "\","
+            + "\"categoria_erro\":\"" + escapeJson(categoriaErro) + "\","
+            + "\"mensagem_erro\":\"" + escapeJson(mensagemErro) + "\","
+            + "\"erro_persistencia\":\"" + escapeJson(erroPersistencia == null ? null : erroPersistencia.getMessage()) + "\""
+            + "}"
+            + System.lineSeparator();
+
+        try {
+            final Path diretorio = ARQUIVO_FALLBACK_HISTORICO.getParent();
+            if (diretorio != null) {
+                Files.createDirectories(diretorio);
+            }
+            Files.writeString(
+                ARQUIVO_FALLBACK_HISTORICO,
+                linhaJson,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND
+            );
+            logger.error(
+                "EVT_EXEC_HISTORY_DB_FALLBACK_WRITTEN arquivo={} status={} tipo_execucao={} erro={}",
+                ARQUIVO_FALLBACK_HISTORICO.toAbsolutePath(),
+                status,
+                tipoExecucao,
+                erroPersistencia == null ? "<desconhecido>" : erroPersistencia.getMessage()
+            );
+        } catch (final IOException io) {
+            logger.error(
+                "EVT_EXEC_HISTORY_DB_FALLBACK_WRITE_FAIL arquivo={} erro_original={} erro_fallback={}",
+                ARQUIVO_FALLBACK_HISTORICO.toAbsolutePath(),
+                erroPersistencia == null ? "<desconhecido>" : erroPersistencia.getMessage(),
+                io.getMessage(),
+                io
+            );
+        }
+    }
+
+    private static String escapeJson(final String valor) {
+        if (valor == null) {
+            return "";
+        }
+        return valor
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n");
     }
 }

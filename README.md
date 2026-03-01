@@ -37,7 +37,7 @@ copy .env.example .env
 2. Preencha os valores obrigatorios no `.env`:
 - `DB_URL`, `DB_USER`, `DB_PASSWORD`
 - `API_GRAPHQL_TOKEN`, `API_DATAEXPORT_TOKEN`
-- `API_BASE_URL`
+- `API_BASEURL` (alias temporario aceito: `API_BASE_URL`)
 
 3. Crie as tabelas e views no banco usando scripts em `database/`.
 

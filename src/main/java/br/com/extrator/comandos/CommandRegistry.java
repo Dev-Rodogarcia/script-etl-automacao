@@ -33,6 +33,10 @@ package br.com.extrator.comandos;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ServiceLoader;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import br.com.extrator.comandos.auditoria.AuditarEstruturaApiComando;
 import br.com.extrator.comandos.auditoria.ExecutarAuditoriaComando;
@@ -59,13 +63,22 @@ import br.com.extrator.comandos.validacao.ValidarDadosCompletoComando;
 import br.com.extrator.comandos.validacao.ValidarManifestosComando;
 import br.com.extrator.comandos.validacao.VerificarTimestampsComando;
 import br.com.extrator.comandos.validacao.VerificarTimezoneComando;
+import br.com.extrator.comandos.spi.ComandoProvider;
 
 public final class CommandRegistry {
+    private static final Logger logger = LoggerFactory.getLogger(CommandRegistry.class);
+
     private CommandRegistry() {
     }
 
     public static Map<String, Comando> criarMapaComandos() {
         final Map<String, Comando> comandos = new HashMap<>();
+        registrarComandosPadrao(comandos);
+        registrarComandosViaSpi(comandos);
+        return Collections.unmodifiableMap(comandos);
+    }
+
+    private static void registrarComandosPadrao(final Map<String, Comando> comandos) {
         comandos.put("--fluxo-completo", new ExecutarFluxoCompletoComando());
         comandos.put("--extracao-intervalo", new ExecutarExtracaoPorIntervaloComando());
         comandos.put("--loop", new LoopExtracaoComando());
@@ -96,6 +109,55 @@ public final class CommandRegistry {
         comandos.put("--loop-daemon-stop", new LoopDaemonComando(LoopDaemonComando.Modo.STOP));
         comandos.put("--loop-daemon-status", new LoopDaemonComando(LoopDaemonComando.Modo.STATUS));
         comandos.put("--loop-daemon-run", new LoopDaemonComando(LoopDaemonComando.Modo.RUN));
-        return Collections.unmodifiableMap(comandos);
+    }
+
+    private static void registrarComandosViaSpi(final Map<String, Comando> comandos) {
+        final ServiceLoader<ComandoProvider> loader = ServiceLoader.load(ComandoProvider.class);
+
+        for (final ComandoProvider provider : loader) {
+            final Map<String, Comando> extras = provider.comandos();
+            if (extras == null || extras.isEmpty()) {
+                continue;
+            }
+
+            for (final Map.Entry<String, Comando> entry : extras.entrySet()) {
+                final String nomeComando = entry.getKey();
+                final Comando comando = entry.getValue();
+
+                if (nomeComando == null || nomeComando.isBlank() || comando == null) {
+                    logger.warn(
+                        "Comando ignorado de provider {} por chave/valor invalido (comando='{}').",
+                        provider.getClass().getName(),
+                        nomeComando
+                    );
+                    continue;
+                }
+
+                if (!nomeComando.startsWith("--")) {
+                    logger.warn(
+                        "Comando ignorado de provider {} por formato invalido ('{}'). Use prefixo '--'.",
+                        provider.getClass().getName(),
+                        nomeComando
+                    );
+                    continue;
+                }
+
+                final Comando anterior = comandos.putIfAbsent(nomeComando, comando);
+                if (anterior != null) {
+                    logger.warn(
+                        "Comando '{}' de provider {} ignorado por conflito com comando ja registrado.",
+                        nomeComando,
+                        provider.getClass().getName()
+                    );
+                    continue;
+                }
+
+                logger.info(
+                    "Comando '{}' registrado via ServiceLoader pelo provider {}.",
+                    nomeComando,
+                    provider.getClass().getName()
+                );
+            }
+        }
     }
 }

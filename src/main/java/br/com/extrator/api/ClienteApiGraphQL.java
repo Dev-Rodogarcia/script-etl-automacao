@@ -177,12 +177,12 @@ public class ClienteApiGraphQL {
                         janelaInicio = d;
                         janelaFim = d;
                     } catch (final RuntimeException ignored) {
-                        // no-op
+                        logger.debug("Nao foi possivel parsear data de janela '{}' para auditoria: {}", dataStr, ignored.getMessage());
                     }
                 }
             }
         } catch (final RuntimeException ignored) {
-            // no-op
+            logger.debug("Falha ao inferir janela de auditoria da query GraphQL: {}", ignored.getMessage());
         }
 
         while (hasNextPage) {
@@ -252,7 +252,7 @@ public class ClienteApiGraphQL {
                                     maxNum = (maxNum == null || idVal > maxNum) ? idVal : maxNum;
                                 }
                             } catch (final RuntimeException ignored) {
-                                // no-op
+                                logger.debug("Falha ao extrair id de item de fatura para page audit: {}", ignored.getMessage());
                             }
                         }
                     }
@@ -506,7 +506,11 @@ public class ClienteApiGraphQL {
                     .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
                     .timeout(this.timeoutRequisicao)
                     .build();
-            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-Introspection-PickInput");
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoEstrita(
+                this.clienteHttp,
+                requisicao,
+                "GraphQL-Introspection-PickInput"
+            );
             final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
             final JsonNode fields = respostaJson.path("data").path("__type").path("inputFields");
             if (fields.isArray()) {
@@ -734,7 +738,11 @@ public class ClienteApiGraphQL {
                     .POST(HttpRequest.BodyPublishers.ofString(corpoRequisicao))
                     .timeout(this.timeoutRequisicao)
                     .build();
-            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(this.clienteHttp, requisicao, "GraphQL-Introspection");
+            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoEstrita(
+                this.clienteHttp,
+                requisicao,
+                "GraphQL-Introspection"
+            );
             final JsonNode respostaJson = mapeadorJson.readTree(resposta.body());
             final List<String> campos = new ArrayList<>();
             final JsonNode fields = respostaJson.path("data").path("__type").path("inputFields");
@@ -813,7 +821,7 @@ public class ClienteApiGraphQL {
                     .timeout(this.timeoutRequisicao)
                     .build();
 
-                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicao(
+                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoEstrita(
                     this.clienteHttp,
                     requisicao,
                     "GraphQL-" + nomeEntidade

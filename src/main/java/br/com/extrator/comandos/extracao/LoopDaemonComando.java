@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/LoopDaemonComando.java
+Classe  : LoopDaemonComando (class)
+Pacote  : br.com.extrator.comandos.extracao
+Modulo  : Comando CLI (daemon)
+Papel   : Faz dispatch do modo de operacao do loop daemon.
+
+Conecta com:
+- Comando (comandos.base)
+- LoopDaemonModeHandler (comandos.extracao.daemon)
+- DaemonStateStore (comandos.extracao.daemon)
+- DaemonLifecycleService (comandos.extracao.daemon)
+- DaemonHistoryWriter (comandos.extracao.daemon)
+
+Fluxo geral:
+1) Resolve modo solicitado (start/stop/status/run).
+2) Inicializa handlers padrao quando necessario.
+3) Encaminha execucao para o handler correspondente.
+
+Estrutura interna:
+Metodos principais:
+- executar(...1 args): dispara modo selecionado.
+- criarHandlersPadrao(): cria dependencias para handlers.
+- criarHandlers(...3 args): monta mapa de handlers por modo.
+Atributos-chave:
+- modo: modo atual de operacao.
+- handlers: mapa de modo para handler especializado.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao;
 
 import java.util.EnumMap;

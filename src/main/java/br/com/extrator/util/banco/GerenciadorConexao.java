@@ -109,7 +109,11 @@ public final class GerenciadorConexao {
 
         // Configurações do pool
         config.setMaximumPoolSize(obterConfigInt("DB_POOL_MAX_SIZE", "db.pool.maximum_size", POOL_MAX_SIZE_DEFAULT));
-        config.setMinimumIdle(obterConfigInt("DB_POOL_MIN_IDLE", "db.pool.minimum_idle", POOL_MIN_IDLE_DEFAULT));
+        config.setMinimumIdle(obterConfigInt(
+            new String[] { "DB_POOL_MIN_IDLE", "DB_POOL_MIN_SIZE" },
+            "db.pool.minimum_idle",
+            POOL_MIN_IDLE_DEFAULT
+        ));
         config.setIdleTimeout(obterConfigLong("DB_POOL_IDLE_TIMEOUT", "db.pool.idle_timeout_ms", POOL_IDLE_TIMEOUT_DEFAULT));
         config.setConnectionTimeout(obterConfigLong("DB_POOL_CONN_TIMEOUT", "db.pool.connection_timeout_ms", POOL_CONNECTION_TIMEOUT_DEFAULT));
         config.setMaxLifetime(obterConfigLong("DB_POOL_MAX_LIFETIME", "db.pool.max_lifetime_ms", POOL_MAX_LIFETIME_DEFAULT));
@@ -225,15 +229,31 @@ public final class GerenciadorConexao {
      * Obtém configuração int com fallback.
      */
     private static int obterConfigInt(final String envVar, final String propKey, final int defaultValue) {
-        final String envValue = System.getenv(envVar);
-        if (envValue != null && !envValue.isEmpty()) {
-            try {
-                return Integer.parseInt(envValue);
-            } catch (final NumberFormatException e) {
-                logger.warn("Valor inválido para {}: '{}', usando padrão: {}", envVar, envValue, defaultValue);
+        return obterConfigInt(new String[] { envVar }, propKey, defaultValue);
+    }
+
+    private static int obterConfigInt(final String[] envVars, final String propKey, final int defaultValue) {
+        if (envVars != null) {
+            for (int i = 0; i < envVars.length; i++) {
+                final String envVar = envVars[i];
+                if (envVar == null || envVar.isBlank()) {
+                    continue;
+                }
+
+                final String envValue = System.getenv(envVar);
+                if (envValue != null && !envValue.isEmpty()) {
+                    try {
+                        if (i > 0) {
+                            logger.warn("Usando alias de variavel '{}'. Prefira '{}'.", envVar, envVars[0]);
+                        }
+                        return Integer.parseInt(envValue);
+                    } catch (final NumberFormatException e) {
+                        logger.warn("Valor inválido para {}: '{}', usando padrão: {}", envVar, envValue, defaultValue);
+                    }
+                }
             }
         }
-        
+
         try {
             final String propValue = CarregadorConfig.obterPropriedade(propKey);
             if (propValue != null && !propValue.isEmpty()) {
@@ -242,7 +262,7 @@ public final class GerenciadorConexao {
         } catch (final Exception e) {
             // Ignora e usa padrão
         }
-        
+
         return defaultValue;
     }
 

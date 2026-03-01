@@ -1,3 +1,28 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/auditoria/relatorios/AuditoriaRelatorio.java
+Classe  : AuditoriaRelatorio (class)
+Pacote  : br.com.extrator.auditoria.relatorios
+Modulo  : Modulo de auditoria
+Papel   : Gera relatorio textual consolidado da auditoria.
+
+Conecta com:
+- ResultadoAuditoria (auditoria.modelos)
+- ResultadoValidacaoEntidade (auditoria.modelos)
+
+Fluxo geral:
+1) Recebe resultado da auditoria.
+2) Monta conteudo markdown consolidado.
+3) Persiste arquivo em disco na pasta de relatorios.
+
+Estrutura interna:
+Metodos principais:
+- gerarRelatorio(...1 args): escreve relatorio final no disco.
+- montarConteudo(...1 args): monta texto detalhado do relatorio.
+Atributos-chave:
+- logger: logger da classe para diagnostico.
+- NOME_ARQUIVO_FMT: formato de timestamp para nome de arquivo.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.auditoria.relatorios;
 
 import java.io.IOException;

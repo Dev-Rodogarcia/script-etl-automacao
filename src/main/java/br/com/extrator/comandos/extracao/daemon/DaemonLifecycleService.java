@@ -53,12 +53,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import br.com.extrator.Main;
 
 /**
  * Gerencia operacoes de ciclo de vida do processo daemon.
  */
 public final class DaemonLifecycleService {
+    private static final Logger logger = LoggerFactory.getLogger(DaemonLifecycleService.class);
     private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     private static final String FLAG_LOOP_DAEMON_RUN = "--loop-daemon-run";
     private static final String RUNTIME_JAR_PREFIX = "extrator-daemon-runtime";
@@ -252,11 +256,11 @@ public final class DaemonLifecycleService {
                 try {
                     Files.deleteIfExists(candidato);
                 } catch (final IOException ignored) {
-                    // Falha de limpeza nao impede inicializacao do daemon.
+                    logger.warn("Falha ao remover runtime antigo '{}': {}", candidato, ignored.getMessage());
                 }
             }
         } catch (final IOException ignored) {
-            // Falha de limpeza nao impede inicializacao do daemon.
+            logger.warn("Falha ao listar runtimes antigos em '{}': {}", runtimeDir, ignored.getMessage());
         }
     }
 
@@ -269,6 +273,7 @@ public final class DaemonLifecycleService {
         try {
             return Files.getLastModifiedTime(caminho).toMillis();
         } catch (final IOException ignored) {
+            logger.debug("Falha ao obter ultima modificacao de '{}': {}", caminho, ignored.getMessage());
             return Long.MIN_VALUE;
         }
     }

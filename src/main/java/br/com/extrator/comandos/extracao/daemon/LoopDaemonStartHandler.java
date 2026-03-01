@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/daemon/LoopDaemonStartHandler.java
+Classe  : LoopDaemonStartHandler
+Pacote  : br.com.extrator.comandos.extracao.daemon
+Modulo  : Comando CLI (daemon)
+Papel   : Inicia o loop daemon ou solicita execucao imediata se ja estiver ativo.
+
+Conecta com:
+- DaemonStateStore
+- DaemonLifecycleService
+- DaemonHistoryWriter
+- LoopDaemonHandlerSupport
+- DaemonPaths
+
+Fluxo geral:
+1) Garante estrutura de logs e estado.
+2) Detecta daemon ativo e solicita ciclo imediato quando aplicavel.
+3) Inicia processo filho em modo daemon quando nao ha instancia ativa.
+4) Atualiza estado/PID e valida se o processo subiu corretamente.
+
+Estrutura interna:
+Metodos principais:
+- executar(...1 args): inicia processo daemon ou reaproveita o ativo.
+Atributos-chave:
+- stateStore: persiste estado e arquivos de controle.
+- lifecycleService: gerencia descoberta e start de processos.
+- historyWriter: dependencia de suporte para historico/log estrutural.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao.daemon;
 
 import java.util.List;

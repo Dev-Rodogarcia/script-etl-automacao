@@ -288,11 +288,32 @@ public final class CarregadorConfig {
      *         properties)
      */
     private static String obterConfiguracao(final String nomeVariavelAmbiente, final String nomeChaveProperties) {
-        // Tenta primeiro obter da variavel de ambiente
-        final String valorAmbiente = System.getenv(nomeVariavelAmbiente);
-        if (valorAmbiente != null && !valorAmbiente.trim().isEmpty()) {
-            logger.debug("Configuracao '{}' obtida da variavel de ambiente", nomeVariavelAmbiente);
-            return valorAmbiente;
+        return obterConfiguracao(new String[] { nomeVariavelAmbiente }, nomeChaveProperties);
+    }
+
+    private static String obterConfiguracao(final String[] nomesVariaveisAmbiente, final String nomeChaveProperties) {
+        if (nomesVariaveisAmbiente != null) {
+            for (int i = 0; i < nomesVariaveisAmbiente.length; i++) {
+                final String nomeVariavelAmbiente = nomesVariaveisAmbiente[i];
+                if (nomeVariavelAmbiente == null || nomeVariavelAmbiente.isBlank()) {
+                    continue;
+                }
+
+                final String valorAmbiente = System.getenv(nomeVariavelAmbiente);
+                if (valorAmbiente != null && !valorAmbiente.trim().isEmpty()) {
+                    if (i > 0) {
+                        logger.warn(
+                            "Configuracao '{}' obtida por alias de variavel de ambiente '{}'. Prefira '{}'.",
+                            nomeChaveProperties,
+                            nomeVariavelAmbiente,
+                            nomesVariaveisAmbiente[0]
+                        );
+                    } else {
+                        logger.debug("Configuracao '{}' obtida da variavel de ambiente", nomeVariavelAmbiente);
+                    }
+                    return valorAmbiente;
+                }
+            }
         }
 
         // Fallback para o arquivo config.properties
@@ -300,8 +321,11 @@ public final class CarregadorConfig {
         final String valorProperties = props.getProperty(nomeChaveProperties);
         if (valorProperties == null) {
             logger.warn(
-                    "Configuracao '{}' nao encontrada nem em variavel de ambiente '{}' nem no arquivo de configuracao '{}'",
-                    nomeChaveProperties, nomeVariavelAmbiente, nomeChaveProperties);
+                "Configuracao '{}' nao encontrada em variavel de ambiente ({}) nem no arquivo de configuracao '{}'",
+                nomeChaveProperties,
+                nomesVariaveisAmbiente == null ? "<nenhuma>" : String.join(", ", nomesVariaveisAmbiente),
+                nomeChaveProperties
+            );
         } else {
             logger.debug("Configuracao '{}' obtida do arquivo config.properties", nomeChaveProperties);
         }
@@ -329,7 +353,7 @@ public final class CarregadorConfig {
      * @return URL base da API
      */
     public static String obterUrlBaseApi() {
-        return obterConfiguracao("API_BASEURL", "api.baseurl");
+        return obterConfiguracao(new String[] { "API_BASEURL", "API_BASE_URL" }, "api.baseurl");
     }
 
     /**

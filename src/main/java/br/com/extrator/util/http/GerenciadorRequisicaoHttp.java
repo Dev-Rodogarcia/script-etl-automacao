@@ -50,6 +50,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -406,6 +408,27 @@ public class GerenciadorRequisicaoHttp {
     }
 
     /**
+     * Variante estrita: exige status 2xx (ou status explicitamente permitido).
+     */
+    public HttpResponse<String> executarRequisicaoEstrita(final HttpClient cliente,
+                                                          final HttpRequest requisicao,
+                                                          final String tipoEntidade) {
+        return executarRequisicaoEstrita(cliente, requisicao, tipoEntidade, Collections.emptySet());
+    }
+
+    /**
+     * Variante estrita com whitelist de status não-2xx tolerados pelo chamador.
+     */
+    public HttpResponse<String> executarRequisicaoEstrita(final HttpClient cliente,
+                                                          final HttpRequest requisicao,
+                                                          final String tipoEntidade,
+                                                          final Set<Integer> statusPermitidos) {
+        final HttpResponse<String> resposta = executarRequisicao(cliente, requisicao, tipoEntidade);
+        validarRespostaEstrita(resposta, tipoEntidade, statusPermitidos);
+        return resposta;
+    }
+
+    /**
      * Variante que permite especificar o charset da resposta como texto.
      * Útil para downloads CSV que podem vir em ISO-8859-1/Windows-1252.
      * 
@@ -516,6 +539,35 @@ public class GerenciadorRequisicaoHttp {
         logger.error(mensagemFalha);
         throw new RuntimeException(mensagemFalha);
     }
+
+    /**
+     * Variante estrita da requisição com charset: exige status 2xx (ou status permitido).
+     */
+    public HttpResponse<String> executarRequisicaoComCharsetEstrita(final HttpClient cliente,
+                                                                    final HttpRequest requisicao,
+                                                                    final String tipoEntidade,
+                                                                    final Charset charset) {
+        return executarRequisicaoComCharsetEstrita(
+            cliente,
+            requisicao,
+            tipoEntidade,
+            charset,
+            Collections.emptySet()
+        );
+    }
+
+    /**
+     * Variante estrita da requisição com charset com whitelist de status tolerados.
+     */
+    public HttpResponse<String> executarRequisicaoComCharsetEstrita(final HttpClient cliente,
+                                                                    final HttpRequest requisicao,
+                                                                    final String tipoEntidade,
+                                                                    final Charset charset,
+                                                                    final Set<Integer> statusPermitidos) {
+        final HttpResponse<String> resposta = executarRequisicaoComCharset(cliente, requisicao, tipoEntidade, charset);
+        validarRespostaEstrita(resposta, tipoEntidade, statusPermitidos);
+        return resposta;
+    }
     
     /**
      * Aplica throttling GLOBAL para respeitar o rate limit da API.
@@ -561,5 +613,46 @@ public class GerenciadorRequisicaoHttp {
         // Fórmula: delayBase * (multiplicador ^ (tentativa - 1))
         double delay = delayBaseMs * Math.pow(multiplicador, tentativa - 1);
         return Math.round(delay);
+    }
+
+    private void validarRespostaEstrita(final HttpResponse<String> resposta,
+                                        final String tipoEntidade,
+                                        final Set<Integer> statusPermitidos) {
+        if (resposta == null) {
+            final String mensagem = String.format(
+                "Resposta HTTP nula para %s.",
+                tipoEntidade != null ? tipoEntidade : "API"
+            );
+            logger.error(mensagem);
+            throw new IllegalStateException(mensagem);
+        }
+
+        final int statusCode = resposta.statusCode();
+        if (statusCode >= 200 && statusCode < 300) {
+            return;
+        }
+
+        final Set<Integer> permitidos = statusPermitidos == null ? Collections.emptySet() : statusPermitidos;
+        if (permitidos.contains(statusCode)) {
+            logger.debug("Status HTTP {} permitido explicitamente para {}.", statusCode, tipoEntidade);
+            return;
+        }
+
+        final String mensagem = String.format(
+            "Erro HTTP nao-sucesso para %s: status=%d, resposta=%s",
+            tipoEntidade != null ? tipoEntidade : "API",
+            statusCode,
+            resumirResposta(resposta)
+        );
+        logger.error(mensagem);
+        throw new IllegalStateException(mensagem);
+    }
+
+    private String resumirResposta(final HttpResponse<String> resposta) {
+        if (resposta == null || resposta.body() == null) {
+            return "<sem-corpo>";
+        }
+        final String corpo = resposta.body();
+        return corpo.length() > 200 ? corpo.substring(0, 200) + "..." : corpo;
     }
 }

@@ -90,6 +90,7 @@ import br.com.extrator.modelo.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.runners.dataexport.services.Deduplicator;
 import br.com.extrator.util.banco.GerenciadorConexao;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.mapeamento.MapperUtil;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
@@ -135,7 +136,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
     @Override
     public void executar(final String[] args) throws Exception {
         final boolean incluirFaturasGraphQL = !possuiFlag(args, "--sem-faturas-graphql");
-        final LocalDate dataReferenciaSistema = LocalDate.now();
+        final LocalDate dataReferenciaSistema = RelogioSistema.hoje();
 
         final ClienteApiDataExport clienteDataExport = new ClienteApiDataExport();
         final ClienteApiGraphQL clienteGraphQL = new ClienteApiGraphQL();

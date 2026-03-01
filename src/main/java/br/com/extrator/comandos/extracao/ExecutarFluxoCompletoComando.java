@@ -64,6 +64,7 @@ import br.com.extrator.runners.graphql.GraphQLRunner;
 import br.com.extrator.util.console.BannerUtil;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.formatacao.FormatadorData;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -92,7 +93,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         BannerUtil.exibirBannerExtracaoCompleta();
         
         // Janela padrão da extração completa: últimas 24h (ontem -> hoje)
-        final LocalDate dataFim = LocalDate.now();
+        final LocalDate dataFim = RelogioSistema.hoje();
         final LocalDate dataInicio = dataFim.minusDays(1);
         
         // PROBLEMA #9 CORRIGIDO: Usar LoggerConsole para log duplo
@@ -492,4 +493,3 @@ public class ExecutarFluxoCompletoComando implements Comando {
         }
     }
 }
-

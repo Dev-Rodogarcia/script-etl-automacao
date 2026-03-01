@@ -24,7 +24,7 @@ setlocal
 REM ============================================
 REM Executar todos os scripts SQL do banco de dados
 REM Usa sqlcmd + config.bat (sem precisar do SSMS)
-REM Inclui: tabelas, indices, views, views-dimensao, seguranca e validacao
+REM Inclui: tabelas, migrations, indices, views, views-dimensao, seguranca e validacao
 REM ============================================
 
 cd /d "%~dp0"
@@ -91,7 +91,7 @@ if "%DB_USER%"=="" (
 echo Servidor: %DB_SERVER%  ^|  Banco: %DB_NAME%
 echo.
 
-REM --- 6. Executar scripts na ordem (tabelas, indices, views, views-dimensao, seguranca, validacao) ---
+REM --- 6. Executar scripts na ordem (tabelas, migrations, indices, views, views-dimensao, seguranca, validacao) ---
 for %%F in (
     "tabelas\001_criar_tabela_coletas.sql"
     "tabelas\002_criar_tabela_fretes.sql"
@@ -106,6 +106,8 @@ for %%F in (
     "tabelas\011_criar_tabela_dim_usuarios.sql"
     "tabelas\012_criar_tabela_sys_execution_history.sql"
     "tabelas\013_criar_tabela_sys_auditoria_temp.sql"
+    "migrations\001_criar_tabela_schema_migrations.sql"
+    "migrations\002_corrigir_constraint_manifestos.sql"
     "indices\001_criar_indices_performance.sql"
     "views\011_criar_view_faturas_por_cliente_powerbi.sql"
     "views\012_criar_view_fretes_powerbi.sql"
@@ -130,7 +132,8 @@ for %%F in (
     "validacao\029_verificar_duplicacao_faturas.sql"
 ) do (
     if not exist %%F (
-        echo [AVISO] Ignorado - nao encontrado: %%F
+        echo [ERRO] Script obrigatorio nao encontrado: %%F
+        goto :err
     ) else (
         set "CURRENT_SCRIPT=%%F"
         echo [EXEC] %%F

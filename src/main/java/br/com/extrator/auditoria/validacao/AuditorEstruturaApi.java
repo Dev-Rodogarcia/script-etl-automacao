@@ -43,6 +43,7 @@ import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ClienteApiGraphQL;
 import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.util.configuracao.CarregadorConfig;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 import java.io.BufferedWriter;
@@ -56,9 +57,6 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -91,7 +89,7 @@ public class AuditorEstruturaApi {
         final ClienteApiDataExport clienteDataExport = new ClienteApiDataExport();
         final ClienteApiGraphQL clienteGraphQL = new ClienteApiGraphQL();
 
-        final String ts = LocalDateTime.now(ZoneId.systemDefault()).format(NOME_ARQUIVO_FMT);
+        final String ts = RelogioSistema.agora().format(NOME_ARQUIVO_FMT);
         final Path dir = Paths.get("relatorios");
         final Path csv = dir.resolve("auditoria_api_" + ts + ".csv");
 
@@ -182,12 +180,12 @@ public class AuditorEstruturaApi {
                 yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
             }
             case ConstantesEntidades.FRETES -> {
-                final ResultadoExtracao<br.com.extrator.modelo.graphql.fretes.FreteNodeDTO> r = clienteGraphQL.buscarFretes(LocalDate.now());
+                final ResultadoExtracao<br.com.extrator.modelo.graphql.fretes.FreteNodeDTO> r = clienteGraphQL.buscarFretes(RelogioSistema.hoje());
                 final java.util.List<br.com.extrator.modelo.graphql.fretes.FreteNodeDTO> l = r.getDados();
                 yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
             }
             case ConstantesEntidades.COLETAS -> {
-                final ResultadoExtracao<br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO> r = clienteGraphQL.buscarColetas(LocalDate.now());
+                final ResultadoExtracao<br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO> r = clienteGraphQL.buscarColetas(RelogioSistema.hoje());
                 final java.util.List<br.com.extrator.modelo.graphql.coletas.ColetaNodeDTO> l = r.getDados();
                 yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
             }
@@ -284,4 +282,3 @@ public class AuditorEstruturaApi {
         return v;
     }
 }
-

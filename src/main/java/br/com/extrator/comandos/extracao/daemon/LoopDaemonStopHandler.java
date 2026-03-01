@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/daemon/LoopDaemonStopHandler.java
+Classe  : LoopDaemonStopHandler
+Pacote  : br.com.extrator.comandos.extracao.daemon
+Modulo  : Comando CLI (daemon)
+Papel   : Solicita parada do loop daemon e garante encerramento dos processos alvo.
+
+Conecta com:
+- DaemonStateStore
+- DaemonLifecycleService
+- DaemonHistoryWriter
+- LoopDaemonHandlerSupport
+
+Fluxo geral:
+1) Garante estrutura de logs e estado.
+2) Localiza processos alvo do daemon.
+3) Solicita parada graciosa e aguarda encerramento.
+4) Escala para destroy/destroyForcibly quando necessario.
+5) Atualiza estado final e limpa arquivos de controle.
+
+Estrutura interna:
+Metodos principais:
+- executar(...1 args): coordena parada do daemon com fallback forcado.
+Atributos-chave:
+- stateStore: persiste estado e controla arquivos PID/stop/force-run.
+- lifecycleService: localiza processos e coordena espera de encerramento.
+- historyWriter: dependencia de suporte para historico/log estrutural.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao.daemon;
 
 import java.util.List;

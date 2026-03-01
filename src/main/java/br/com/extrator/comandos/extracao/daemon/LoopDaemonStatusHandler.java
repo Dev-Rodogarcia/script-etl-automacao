@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/extracao/daemon/LoopDaemonStatusHandler.java
+Classe  : LoopDaemonStatusHandler
+Pacote  : br.com.extrator.comandos.extracao.daemon
+Modulo  : Comando CLI (daemon)
+Papel   : Consulta e exibe o estado operacional atual do loop daemon.
+
+Conecta com:
+- DaemonStateStore
+- DaemonLifecycleService
+- DaemonHistoryWriter
+- LoopDaemonHandlerSupport
+- DaemonPaths
+
+Fluxo geral:
+1) Garante estrutura de logs e estado.
+2) Sincroniza PID ativo encontrado no sistema.
+3) Le estado persistido e imprime status consolidado no console.
+4) Corrige estado para STOPPED quando PID em arquivo nao esta mais ativo.
+
+Estrutura interna:
+Metodos principais:
+- executar(...1 args): consulta estado e apresenta diagnostico do daemon.
+Atributos-chave:
+- stateStore: origem do estado persistido e arquivos de controle.
+- lifecycleService: detecta processo daemon em execucao.
+- historyWriter: dependencia de suporte para historico/log estrutural.
+[DOC-FILE-END]============================================================== */
+
 package br.com.extrator.comandos.extracao.daemon;
 
 import java.util.OptionalLong;
