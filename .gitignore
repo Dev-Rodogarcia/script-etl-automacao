@@ -33,7 +33,7 @@ temp/
 
 # Saidas geradas pelo projeto
 exports/
-relatorios/
+/relatorios/
 backups/
 
 # Bancos/arquivos locais
