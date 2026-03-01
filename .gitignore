@@ -1,0 +1,76 @@
+# Ambiente e segredos locais
+.env
+.env.*
+!.env.example
+last_run.properties
+last_successful_run.properties
+docs/08-arquivos-secretos/
+database/config.bat
+
+# Build e artefatos
+target/
+build/
+out/
+dist/
+coverage/
+*.class
+*.jar
+*.war
+*.ear
+
+# Logs e temporarios
+logs/
+tmp/
+temp/
+*.log
+*.out
+*.err
+*.tmp
+*.temp
+*.pid
+*.state
+*~
+
+# Saidas geradas pelo projeto
+exports/
+relatorios/
+backups/
+
+# Bancos/arquivos locais
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.backup
+*.dump
+
+# IDE/editor
+.idea/
+.vscode/
+.settings/
+*.iml
+.classpath
+.project
+
+# Python local
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+
+# Node local
+node_modules/
+dashboard-monitoramento/build/
+dashboard-monitoramento/dist/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+Desktop.ini
