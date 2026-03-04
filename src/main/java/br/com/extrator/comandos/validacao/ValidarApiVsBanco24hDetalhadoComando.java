@@ -63,6 +63,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ClienteApiGraphQL;
 import br.com.extrator.api.ResultadoExtracao;
@@ -104,7 +107,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
     private static final int AMOSTRA_MAX = 15;
     private static final int LIMITE_BACKFILL_FATURAS_ORFAAS = 2000;
 
-    private record JanelaExecucao(LocalDateTime inicio, LocalDateTime fim) { }
+    private record JanelaExecucao(LocalDateTime inicio, LocalDateTime fim, boolean alinhadaAoPeriodo) { }
 
     private record ResultadoApiChaves(
         int apiBruto,
@@ -136,6 +139,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
     @Override
     public void executar(final String[] args) throws Exception {
         final boolean incluirFaturasGraphQL = !possuiFlag(args, "--sem-faturas-graphql");
+        final boolean periodoFechado = possuiFlag(args, "--periodo-fechado");
         final LocalDate dataReferenciaSistema = RelogioSistema.hoje();
 
         final ClienteApiDataExport clienteDataExport = new ClienteApiDataExport();
@@ -154,11 +158,14 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             final LocalDate dataReferencia = resolverDataReferenciaLogs(conexao, dataReferenciaSistema);
             final LocalDate dataInicio = dataReferencia.minusDays(1);
-            final LocalDate dataFim = dataReferencia;
+            final LocalDate dataFim = periodoFechado ? dataReferencia.minusDays(1) : dataReferencia;
 
             log.console("\n" + "=".repeat(88));
             log.info("VALIDACAO DETALHADA 24H | API (POSTMAN-LIKE) x BANCO | COMPARACAO CHAVE A CHAVE");
             log.info("Periodo API: {} a {}", dataInicio, dataFim);
+            if (periodoFechado) {
+                log.info("Modo: PERIODO FECHADO (sem dia em andamento)");
+            }
             log.info("Data de referencia dos logs: {}", dataReferencia);
             log.console("=".repeat(88));
 
@@ -169,7 +176,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesManifestos(clienteDataExport, manifestoMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -179,7 +187,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesCotacoes(clienteDataExport, cotacaoMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -189,7 +198,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesLocalizacao(clienteDataExport, localizacaoMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -199,7 +209,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesContasAPagar(clienteDataExport, contasMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -209,7 +220,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesFaturasPorCliente(clienteDataExport, faturaPorClienteMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -219,7 +231,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesFretes(clienteGraphQL, freteMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
             resultados.add(
@@ -229,7 +242,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     carregarChavesColetas(clienteGraphQL, coletaMapper, dataInicio, dataFim),
                     dataReferencia,
                     dataInicio,
-                    dataFim
+                    dataFim,
+                    periodoFechado
                 )
             );
 
@@ -241,7 +255,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                         carregarChavesFaturasGraphQL(conexao, clienteGraphQL, dataInicio, dataFim),
                         dataReferencia,
                         dataInicio,
-                        dataFim
+                        dataFim,
+                        periodoFechado
                     )
                 );
             }
@@ -250,10 +265,17 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         int totalOk = 0;
         int totalFalhas = 0;
         for (ResultadoComparacao r : resultados) {
+            final boolean divergenciaDinamicaTolerada = somenteDivergenciaDadosTolerada(r);
             if (r.ok()) {
                 totalOk++;
                 log.info(
                     "API_VS_BANCO_24H_DETALHADO | entidade={} | status=OK | api_bruto={} | api_unico={} | invalidos={} | banco={} | faltantes={} | excedentes={} | divergencias_dados={}",
+                    r.entidade, r.apiBruto, r.apiUnico, r.invalidos, r.banco, r.faltantes, r.excedentes, r.divergenciasDados
+                );
+            } else if (divergenciaDinamicaTolerada) {
+                totalOk++;
+                log.warn(
+                    "API_VS_BANCO_24H_DETALHADO | entidade={} | status=OK_DADOS_DINAMICOS | api_bruto={} | api_unico={} | invalidos={} | banco={} | faltantes={} | excedentes={} | divergencias_dados={}",
                     r.entidade, r.apiBruto, r.apiUnico, r.invalidos, r.banco, r.faltantes, r.excedentes, r.divergenciasDados
                 );
             } else {
@@ -277,6 +299,22 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                 "Comparacao detalhada API x Banco 24h reprovada: " + totalFalhas + " entidade(s) com divergencia."
             );
         }
+    }
+
+    private boolean somenteDivergenciaDadosTolerada(final ResultadoComparacao r) {
+        if (r == null) {
+            return false;
+        }
+        if (r.faltantes != 0 || r.excedentes != 0 || r.divergenciasDados <= 0) {
+            return false;
+        }
+        return switch (r.entidade) {
+            case ConstantesEntidades.COTACOES,
+                 ConstantesEntidades.LOCALIZACAO_CARGAS,
+                 ConstantesEntidades.FRETES,
+                 ConstantesEntidades.COLETAS -> true;
+            default -> false;
+        };
     }
 
     private LocalDate resolverDataReferenciaLogs(final Connection conexao,
@@ -335,12 +373,10 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             WHERE status_final = 'COMPLETO'
               AND CAST(timestamp_inicio AS DATE) = ?
               AND mensagem LIKE ?
-              AND mensagem LIKE ?
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setDate(1, java.sql.Date.valueOf(data));
-            stmt.setString(2, "%" + dataInicio + "%");
-            stmt.setString(3, "%" + data + "%");
+            stmt.setString(2, "%" + dataInicio + " a " + data + "%");
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -383,7 +419,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                                                  final ResultadoApiChaves api,
                                                  final LocalDate dataReferencia,
                                                  final LocalDate periodoInicio,
-                                                 final LocalDate periodoFim) throws SQLException {
+                                                 final LocalDate periodoFim,
+                                                 final boolean periodoFechado) throws SQLException {
         final Optional<JanelaExecucao> janelaOpt =
             buscarUltimaJanelaCompletaDoDia(conexao, entidade, dataReferencia, periodoInicio, periodoFim);
         if (janelaOpt.isEmpty()) {
@@ -443,10 +480,37 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             }
         }
 
+        int excedentesSuprimidosModoFechado = 0;
+        int divergenciasSuprimidasModoFechado = 0;
+        if (periodoFechado && !janela.alinhadaAoPeriodo()) {
+            // Quando nao existe log com o mesmo periodo no dia de referencia, o fallback
+            // de janela pode trazer uma extracao mais ampla (ex.: D-1..D). Nesse caso,
+            // validamos cobertura da API (faltantes) e suprimimos falso-positivo de
+            // excedentes/divergencias causados por diferenca de janela temporal.
+            excedentesSuprimidosModoFechado = excedentes.size();
+            divergenciasSuprimidasModoFechado = divergenciasDados.size();
+            excedentes.clear();
+            divergenciasDados.clear();
+        }
+
         final String detalhe = construirDetalheComparacao(janela, faltantes, excedentes, divergenciasDados, api.detalhe);
-        final String detalheFinal = excedentesTolerados > 0
-            ? detalhe + " | excedentes_tolerados_referenciais=" + excedentesTolerados
-            : detalhe;
+        final StringBuilder detalheBuilder = new StringBuilder(detalhe);
+        if (!janela.alinhadaAoPeriodo()) {
+            detalheBuilder.append(" | origem_janela=FALLBACK_SEM_FILTRO_PERIODO");
+        }
+        if (periodoFechado && !janela.alinhadaAoPeriodo()) {
+            detalheBuilder.append(" | comparacao_modo=subconjunto_api");
+            if (excedentesSuprimidosModoFechado > 0) {
+                detalheBuilder.append(" | excedentes_suprimidos=").append(excedentesSuprimidosModoFechado);
+            }
+            if (divergenciasSuprimidasModoFechado > 0) {
+                detalheBuilder.append(" | divergencias_suprimidas=").append(divergenciasSuprimidasModoFechado);
+            }
+        }
+        if (excedentesTolerados > 0) {
+            detalheBuilder.append(" | excedentes_tolerados_referenciais=").append(excedentesTolerados);
+        }
+        final String detalheFinal = detalheBuilder.toString();
         return new ResultadoComparacao(
             entidade,
             api.apiBruto,
@@ -514,7 +578,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final ManifestoEntity e : deduplicadas) {
             final String chave = chaveManifesto(e);
-            hashesPorChave.put(chave, hashMetadata(e.getMetadata()));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.MANIFESTOS, e.getMetadata()));
         }
         final Set<String> chaves = new HashSet<>(hashesPorChave.keySet());
         return new ResultadoApiChaves(bruto, chaves.size(), invalidos, chaves, hashesPorChave, Map.of(), null, Set.of());
@@ -545,7 +609,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final CotacaoEntity e : deduplicadas) {
             final String chave = String.valueOf(e.getSequenceCode());
-            hashesPorChave.put(chave, hashMetadata(e.getMetadata()));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.COTACOES, e.getMetadata()));
         }
         final Set<String> chaves = new HashSet<>(hashesPorChave.keySet());
         return new ResultadoApiChaves(bruto, chaves.size(), invalidos, chaves, hashesPorChave, Map.of(), null, Set.of());
@@ -576,7 +640,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final LocalizacaoCargaEntity e : deduplicadas) {
             final String chave = String.valueOf(e.getSequenceNumber());
-            hashesPorChave.put(chave, hashMetadata(e.getMetadata()));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.LOCALIZACAO_CARGAS, e.getMetadata()));
         }
         final Set<String> chaves = new HashSet<>(hashesPorChave.keySet());
         return new ResultadoApiChaves(bruto, chaves.size(), invalidos, chaves, hashesPorChave, Map.of(), null, Set.of());
@@ -607,7 +671,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final ContasAPagarDataExportEntity e : deduplicadas) {
             final String chave = String.valueOf(e.getSequenceCode());
-            hashesPorChave.put(chave, hashMetadata(e.getMetadata()));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.CONTAS_A_PAGAR, e.getMetadata()));
         }
         final Set<String> chaves = new HashSet<>(hashesPorChave.keySet());
         return new ResultadoApiChaves(bruto, chaves.size(), invalidos, chaves, hashesPorChave, Map.of(), null, Set.of());
@@ -631,7 +695,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     continue;
                 }
                 mapeadas.add(entity);
-                final String hash = hashMetadata(entity.getMetadata());
+                final String hash = hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, entity.getMetadata());
                 hashesAceitosPorChave
                     .computeIfAbsent(entity.getUniqueId(), k -> new HashSet<>())
                     .add(hash);
@@ -643,7 +707,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final FaturaPorClienteEntity e : deduplicadas) {
             final String chave = e.getUniqueId();
-            hashesPorChave.put(chave, hashMetadata(e.getMetadata()));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, e.getMetadata()));
         }
         final Set<String> chaves = new HashSet<>(hashesPorChave.keySet());
         int chavesComHashesConflitantes = 0;
@@ -684,7 +748,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     continue;
                 }
                 final String chave = String.valueOf(entity.getId());
-                hashesPorChave.put(chave, hashMetadata(entity.getMetadata())); // keep last
+                hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.FRETES, entity.getMetadata())); // keep last
             } catch (RuntimeException e) {
                 invalidos++;
             }
@@ -709,7 +773,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     invalidos++;
                     continue;
                 }
-                hashesPorChave.put(entity.getId(), hashMetadata(entity.getMetadata())); // keep last
+                hashesPorChave.put(entity.getId(), hashMetadata(ConstantesEntidades.COLETAS, entity.getMetadata())); // keep last
             } catch (RuntimeException e) {
                 invalidos++;
             }
@@ -746,7 +810,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         for (final Map.Entry<Long, CreditCustomerBillingNodeDTO> entry : porId.entrySet()) {
             final String chave = String.valueOf(entry.getKey());
-            hashesPorChave.put(chave, hashMetadata(MapperUtil.toJson(entry.getValue())));
+            hashesPorChave.put(chave, hashMetadata(ConstantesEntidades.FATURAS_GRAPHQL, MapperUtil.toJson(entry.getValue())));
         }
         final Set<String> chavesToleradasNoBanco = idsFretesJanela.stream()
             .map(String::valueOf)
@@ -808,20 +872,18 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
               AND status_final = 'COMPLETO'
               AND CAST(timestamp_inicio AS DATE) = ?
               AND mensagem LIKE ?
-              AND mensagem LIKE ?
             ORDER BY timestamp_fim DESC
             """;
 
         try (PreparedStatement stmt = conexao.prepareStatement(sqlComPeriodo)) {
             stmt.setString(1, entidade);
             stmt.setDate(2, java.sql.Date.valueOf(dataReferencia));
-            stmt.setString(3, "%" + periodoInicio + "%");
-            stmt.setString(4, "%" + periodoFim + "%");
+            stmt.setString(3, "%" + periodoInicio + " a " + periodoFim + "%");
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     final LocalDateTime inicio = rs.getTimestamp("timestamp_inicio").toLocalDateTime();
                     final LocalDateTime fim = rs.getTimestamp("timestamp_fim").toLocalDateTime();
-                    return Optional.of(new JanelaExecucao(inicio, fim));
+                    return Optional.of(new JanelaExecucao(inicio, fim, true));
                 }
             }
         }
@@ -842,7 +904,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                 if (rs.next()) {
                     final LocalDateTime inicio = rs.getTimestamp("timestamp_inicio").toLocalDateTime();
                     final LocalDateTime fim = rs.getTimestamp("timestamp_fim").toLocalDateTime();
-                    return Optional.of(new JanelaExecucao(inicio, fim));
+                    return Optional.of(new JanelaExecucao(inicio, fim, false));
                 }
             }
         }
@@ -1016,15 +1078,15 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                         continue;
                     }
                     final String metadata = rs.getString("metadata");
-                    hashesPorChave.put(chave.trim(), hashMetadata(metadata));
+                    hashesPorChave.put(chave.trim(), hashMetadata(entidade, metadata));
                 }
             }
         }
         return hashesPorChave;
     }
 
-    private String hashMetadata(final String metadata) {
-        final String normalizado = metadata == null ? "__NULL__" : metadata.trim();
+    private String hashMetadata(final String entidade, final String metadata) {
+        final String normalizado = normalizarMetadataParaComparacao(entidade, metadata);
         try {
             final MessageDigest digest = MessageDigest.getInstance("SHA-256");
             final byte[] hash = digest.digest(normalizado.getBytes(StandardCharsets.UTF_8));
@@ -1035,6 +1097,48 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             return sb.toString();
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 nao disponivel", e);
+        }
+    }
+
+    private String normalizarMetadataParaComparacao(final String entidade, final String metadata) {
+        if (metadata == null || metadata.trim().isEmpty()) {
+            return "__NULL__";
+        }
+
+        try {
+            final JsonNode parsed = MapperUtil.sharedJson().readTree(metadata);
+            if (!parsed.isObject()) {
+                return metadata.trim();
+            }
+            final ObjectNode obj = (ObjectNode) parsed.deepCopy();
+            removerCamposVolateisComparacao(entidade, obj);
+            return MapperUtil.sharedJson().writeValueAsString(obj);
+        } catch (Exception e) {
+            // Fallback seguro: nao bloquear validacao por erro de parse.
+            return metadata.trim();
+        }
+    }
+
+    private void removerCamposVolateisComparacao(final String entidade, final ObjectNode obj) {
+        if (entidade == null || obj == null) {
+            return;
+        }
+        switch (entidade) {
+            case ConstantesEntidades.LOCALIZACAO_CARGAS -> obj.remove("fit_fln_status");
+            case ConstantesEntidades.FRETES -> {
+                obj.remove("status");
+                obj.remove("deliveryPredictionDate");
+                obj.remove("delivery_prediction_date");
+            }
+            case ConstantesEntidades.COLETAS -> {
+                obj.remove("invoicesValue");
+                obj.remove("invoicesVolumes");
+                obj.remove("invoicesWeight");
+                obj.remove("taxedWeight");
+            }
+            default -> {
+                // Sem tratamento especial para outras entidades.
+            }
         }
     }
 

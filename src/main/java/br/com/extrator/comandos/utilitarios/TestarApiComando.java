@@ -113,7 +113,7 @@ public class TestarApiComando implements Comando {
         System.out.println();
 
         try {
-            final LocalDateTime inicioExecucao = LocalDateTime.now();
+            final LocalDateTime inicioExecucao = RelogioSistema.agora();
             switch (tipoApi.toLowerCase()) {
                 case "graphql" -> executarGraphQL(dataInicio, dataFim, entidade, incluirFaturasGraphQL, somenteFaturasGraphQL);
                 case "dataexport" -> executarDataExport(dataInicio, dataFim, entidade, incluirFaturasGraphQL);
@@ -229,7 +229,7 @@ public class TestarApiComando implements Comando {
 
         final LogExtracaoRepository repository = new LogExtracaoRepository();
         final LocalDateTime inicioJanela = inicioExecucao.minusSeconds(5);
-        final LocalDateTime fimJanela = LocalDateTime.now().plusSeconds(5);
+        final LocalDateTime fimJanela = RelogioSistema.agora().plusSeconds(5);
         final List<String> semLog = new ArrayList<>();
         final List<String> naoCompletas = new ArrayList<>();
 

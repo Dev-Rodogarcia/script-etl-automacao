@@ -88,9 +88,10 @@ public class FaturaPorClienteMapper {
             entity.setUniqueId(uniqueId);
 
             // 2. Documentos fiscais (NFS-e tem prioridade)
-            final boolean isNfse = dto.getNfseNumber() != null;
+            final Long nfseNumber = dto.getNfseNumberEfetivo();
+            final boolean isNfse = nfseNumber != null;
             if (isNfse) {
-                entity.setNumeroNfse(dto.getNfseNumber());
+                entity.setNumeroNfse(nfseNumber);
                 entity.setNumeroCte(null);
                 entity.setChaveCte(null);
                 entity.setStatusCte(null);
@@ -176,8 +177,9 @@ public class FaturaPorClienteMapper {
             throw new IllegalArgumentException("DTO nao pode ser null ao calcular unique_id");
         }
 
-        if (dto.getNfseNumber() != null) {
-            return "NFSE-" + dto.getNfseNumber();
+        final Long nfseNumber = dto.getNfseNumberEfetivo();
+        if (nfseNumber != null) {
+            return "NFSE-" + nfseNumber;
         }
 
         if (dto.getCteKey() != null && !dto.getCteKey().trim().isEmpty()) {
@@ -211,7 +213,7 @@ public class FaturaPorClienteMapper {
 
     private String montarRepresentacaoCanonica(final FaturaPorClienteDTO dto) {
         final StringBuilder sb = new StringBuilder(512);
-        appendCampo(sb, "nfse", dto.getNfseNumber() != null ? String.valueOf(dto.getNfseNumber()) : null);
+        appendCampo(sb, "nfse", dto.getNfseNumberEfetivo() != null ? String.valueOf(dto.getNfseNumberEfetivo()) : null);
         appendCampo(sb, "cteNumber", dto.getCteNumber() != null ? String.valueOf(dto.getCteNumber()) : null);
         appendCampo(sb, "cteKey", dto.getCteKey());
         appendCampo(sb, "cteIssuedAt", dto.getCteIssuedAt());

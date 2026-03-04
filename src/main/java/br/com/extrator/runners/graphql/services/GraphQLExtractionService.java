@@ -69,6 +69,7 @@ import br.com.extrator.runners.graphql.extractors.FaturaGraphQLExtractor;
 import br.com.extrator.runners.graphql.extractors.UsuarioSistemaExtractor;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -103,7 +104,7 @@ public class GraphQLExtractionService {
     
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
         this.entidadeEspecifica = entidade;
-        final LocalDateTime inicioExecucao = LocalDateTime.now();
+        final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
         
         log.info("");
@@ -134,7 +135,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         } else if (executarUsuariosSistema) {
@@ -145,7 +146,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -158,7 +159,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Coletas: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.COLETAS, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.COLETAS, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -171,7 +172,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Fretes: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.FRETES, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.FRETES, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -200,7 +201,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Faturas GraphQL: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.FATURAS_GRAPHQL, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.FATURAS_GRAPHQL, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         } else if (executarFaturasGraphql) {
@@ -306,7 +307,7 @@ public class GraphQLExtractionService {
      * Exibe resumo consolidado de todas as extrações GraphQL executadas.
      */
     private void exibirResumoConsolidado(final List<ExtractionResult> resultados, final LocalDateTime inicioExecucao) {
-        final LocalDateTime fimExecucao = LocalDateTime.now();
+        final LocalDateTime fimExecucao = RelogioSistema.agora();
         final Duration duracaoTotal = Duration.between(inicioExecucao, fimExecucao);
         
         log.info("");

@@ -108,7 +108,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         log.console("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)");
         // PROBLEMA 13 CORRIGIDO: Usar FormatadorData em vez de criar formatters inline
         log.console("Periodo de extração: {} a {}", FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
-        log.console("Início: {}", FormatadorData.formatBR(LocalDateTime.now()));
+        log.console("Início: {}", FormatadorData.formatBR(RelogioSistema.agora()));
         log.console("=".repeat(60) + "\n");
         
         // Mitigacao referencial: preenche coletas de dias retroativos para reduzir
@@ -116,7 +116,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         // janela oficial de validacao desta execucao.
         executarPreBackfillReferencialColetas(dataInicio, modoLoopDaemon);
         
-        final LocalDateTime inicioExecucao = LocalDateTime.now();
+        final LocalDateTime inicioExecucao = RelogioSistema.agora();
         boolean validacaoFinalCompleta = true;
         String detalheFalhaValidacao = null;
         int completudeEntidadesTotal = -1;
@@ -275,7 +275,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
             }
 
             final IntegridadeEtlValidator.ResultadoValidacao resultadoIntegridade =
-                integridadeValidator.validarExecucao(inicioExecucao, LocalDateTime.now(), entidadesEsperadas, modoLoopDaemon);
+                integridadeValidator.validarExecucao(inicioExecucao, RelogioSistema.agora(), entidadesEsperadas, modoLoopDaemon);
 
             if (!resultadoIntegridade.isValido()) {
                 if (modoLoopDaemon) {
@@ -316,7 +316,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
         }
             
         // Exibe resumo final
-        final LocalDateTime fimExecucao = LocalDateTime.now();
+        final LocalDateTime fimExecucao = RelogioSistema.agora();
         final long duracaoMinutos = java.time.Duration.between(inicioExecucao, fimExecucao).toMinutes();
         final long duracaoSegundos = java.time.Duration.between(inicioExecucao, fimExecucao).getSeconds();
         final boolean falhaSomenteValidacao = totalFalhas == 0 && !validacaoFinalCompleta;
@@ -413,7 +413,7 @@ public class ExecutarFluxoCompletoComando implements Comando {
     private void gravarDataExecucao() {
         try {
             final Properties props = new Properties();
-            props.setProperty(PROPRIEDADE_ULTIMO_RUN, LocalDateTime.now().toString());
+            props.setProperty(PROPRIEDADE_ULTIMO_RUN, RelogioSistema.agora().toString());
             
             try (final FileOutputStream fos = new FileOutputStream(ARQUIVO_ULTIMO_RUN)) {
                 props.store(fos, "Última execução bem-sucedida do sistema de extração");

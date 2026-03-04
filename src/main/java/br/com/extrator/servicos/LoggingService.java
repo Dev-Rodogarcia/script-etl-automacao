@@ -61,6 +61,8 @@ import java.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.util.tempo.RelogioSistema;
+
 /**
  * Serviço responsável por capturar e salvar logs do terminal em arquivos
  */
@@ -90,7 +92,7 @@ public class LoggingService {
      */
     public void iniciarCaptura(final String nomeOperacao) {
         this.nomeOperacao = nomeOperacao;
-        this.inicioOperacao = LocalDateTime.now();
+        this.inicioOperacao = RelogioSistema.agora();
         
         // Salvar referências originais
         originalOut = System.out;
@@ -137,7 +139,7 @@ public class LoggingService {
             return; // Captura não foi iniciada
         }
         
-        final LocalDateTime fimOperacao = LocalDateTime.now();
+        final LocalDateTime fimOperacao = RelogioSistema.agora();
         final java.time.Duration duracao = java.time.Duration.between(inicioOperacao, fimOperacao);
         final String statusNormalizado = statusExecucao == null ? "" : statusExecucao.trim().toUpperCase();
         final String tituloFinal;
@@ -282,7 +284,8 @@ public class LoggingService {
      * Formata duração em formato legível
      */
     private String formatarDuracao(final java.time.Duration duracao) {
-        final long segundos = duracao.getSeconds();
+        final long duracaoMillis = Math.max(0L, duracao.toMillis());
+        final long segundos = duracaoMillis == 0L ? 0L : (duracaoMillis + 999L) / 1000L;
         final long minutos = segundos / 60;
         final long horas = minutos / 60;
         

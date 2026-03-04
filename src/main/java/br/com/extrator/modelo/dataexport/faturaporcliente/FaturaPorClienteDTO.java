@@ -55,7 +55,6 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -70,8 +69,12 @@ public class FaturaPorClienteDTO {
 
     // Documentos Fiscais
     @JsonProperty("fit_nse_number")
-    @JsonAlias({"nfse_number"})
     private Long nfseNumber;
+
+    // Alguns tenants retornam o mesmo dado em alias textual.
+    // Mantemos ambos para preservar 100% do payload em metadata.
+    @JsonProperty("nfse_number")
+    private String nfseNumberRaw;
 
     @JsonProperty("fit_fhe_cte_number")
     private Long cteNumber;
@@ -169,6 +172,31 @@ public class FaturaPorClienteDTO {
 
     public void setNfseNumber(final Long nfseNumber) {
         this.nfseNumber = nfseNumber;
+    }
+
+    public String getNfseNumberRaw() {
+        return nfseNumberRaw;
+    }
+
+    public void setNfseNumberRaw(final String nfseNumberRaw) {
+        this.nfseNumberRaw = nfseNumberRaw;
+    }
+
+    /**
+     * Retorna NFS-e efetivo priorizando fit_nse_number e com fallback para nfse_number.
+     */
+    public Long getNfseNumberEfetivo() {
+        if (nfseNumber != null) {
+            return nfseNumber;
+        }
+        if (nfseNumberRaw == null || nfseNumberRaw.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(nfseNumberRaw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public Long getCteNumber() {

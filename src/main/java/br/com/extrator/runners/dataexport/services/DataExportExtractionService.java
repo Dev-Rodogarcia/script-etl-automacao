@@ -70,6 +70,7 @@ import br.com.extrator.runners.dataexport.extractors.LocalizacaoCargaExtractor;
 import br.com.extrator.runners.dataexport.extractors.ManifestoExtractor;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -100,7 +101,7 @@ public class DataExportExtractionService {
      * @throws RuntimeException Se houver falha crítica na extração
      */
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
-        final LocalDateTime inicioExecucao = LocalDateTime.now();
+        final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
         
         log.info("");
@@ -136,7 +137,7 @@ public class DataExportExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Manifestos: {}", e.getMessage());
-                resultados.add(ExtractionResult.erro("manifestos", LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro("manifestos", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -149,7 +150,7 @@ public class DataExportExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Cotações: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.COTACOES, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.COTACOES, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -162,7 +163,7 @@ public class DataExportExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Localização de Cargas: {}", e.getMessage());
-                resultados.add(ExtractionResult.erro("localizacao_cargas", LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro("localizacao_cargas", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -175,7 +176,7 @@ public class DataExportExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Contas a Pagar: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
-                resultados.add(ExtractionResult.erro(ConstantesEntidades.CONTAS_A_PAGAR, LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro(ConstantesEntidades.CONTAS_A_PAGAR, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -188,7 +189,7 @@ public class DataExportExtractionService {
                 }
             } catch (final Exception e) {
                 log.error("❌ Erro ao extrair Faturas por Cliente: {}", e.getMessage());
-                resultados.add(ExtractionResult.erro("faturas_por_cliente", LocalDateTime.now(), e).build());
+                resultados.add(ExtractionResult.erro("faturas_por_cliente", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -301,7 +302,7 @@ public class DataExportExtractionService {
      * Exibe resumo consolidado de todas as extrações DataExport executadas.
      */
     private void exibirResumoConsolidado(final List<ExtractionResult> resultados, final LocalDateTime inicioExecucao) {
-        final LocalDateTime fimExecucao = LocalDateTime.now();
+        final LocalDateTime fimExecucao = RelogioSistema.agora();
         final Duration duracaoTotal = Duration.between(inicioExecucao, fimExecucao);
         
         log.info("");

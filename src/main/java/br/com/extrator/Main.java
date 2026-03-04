@@ -90,8 +90,9 @@ public class Main {
             }
 
             final LocalDateTime fimExecucao = RelogioSistema.agora();
-            final long duracaoSegundos = Duration.between(inicioExecucao, fimExecucao).getSeconds();
-            final int duracaoSegundosInt = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, duracaoSegundos));
+            final long duracaoMillis = Math.max(0L, Duration.between(inicioExecucao, fimExecucao).toMillis());
+            final long duracaoSegundos = duracaoMillis == 0L ? 0L : (duracaoMillis + 999L) / 1000L;
+            final int duracaoSegundosInt = (int) Math.min(Integer.MAX_VALUE, duracaoSegundos);
             int totalRecords = 0;
 
             try {

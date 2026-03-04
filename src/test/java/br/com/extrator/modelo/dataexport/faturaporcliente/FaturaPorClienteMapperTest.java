@@ -50,6 +50,21 @@ class FaturaPorClienteMapperTest {
     }
 
     @Test
+    void deveUsarNfseRawQuandoFitNseNaoDisponivel() {
+        final FaturaPorClienteDTO dto = new FaturaPorClienteDTO();
+        dto.setNfseNumber(null);
+        dto.setNfseNumberRaw("123456");
+        dto.setCteKey("35100000000000000000000000000000000000000000");
+
+        final String uniqueId = mapper.calcularIdentificadorUnico(dto);
+        final var entity = mapper.toEntity(dto);
+
+        assertEquals("NFSE-123456", uniqueId);
+        assertEquals(123456L, entity.getNumeroNfse());
+        assertTrue(entity.getMetadata().contains("\"nfse_number\":\"123456\""));
+    }
+
+    @Test
     void deveUsarChaveCteQuandoNaoHaNfse() {
         final FaturaPorClienteDTO dto = new FaturaPorClienteDTO();
         dto.setCteKey("35100000000000000000000000000000000000000000");

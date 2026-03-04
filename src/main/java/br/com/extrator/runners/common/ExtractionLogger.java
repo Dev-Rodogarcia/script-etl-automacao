@@ -48,6 +48,7 @@ import br.com.extrator.api.ResultadoExtracao;
 import br.com.extrator.runners.common.DataExportEntityExtractor;
 import br.com.extrator.util.configuracao.CarregadorConfig;
 import br.com.extrator.util.console.LoggerConsole;
+import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
@@ -81,7 +82,7 @@ public class ExtractionLogger {
             final LocalDate dataFim,
             final String emoji) {
         
-        final LocalDateTime inicio = LocalDateTime.now();
+        final LocalDateTime inicio = RelogioSistema.agora();
         final String entityName = extractor.getEntityName();
         final String displayEmoji = emoji != null ? emoji : extractor.getEmoji();
         
@@ -89,9 +90,7 @@ public class ExtractionLogger {
         log.info("{}", "=".repeat(80));
         log.info("{} {} INICIANDO EXTRAÇÃO: {}", displayEmoji, displayEmoji, entityName.toUpperCase());
         log.info("{}", "=".repeat(80));
-        log.info("📅 Período: {} a {}", 
-            formatarPeriodo(dataInicio, dataFim), 
-            dataFim != null && !dataInicio.equals(dataFim) ? dataFim : dataInicio);
+        log.info("📅 Período: {}", formatarPeriodo(dataInicio, dataFim));
         log.info("⏰ Início: {}", inicio.format(TIME_FORMATTER));
         log.info("{}", "-".repeat(80));
 
@@ -99,9 +98,9 @@ public class ExtractionLogger {
         int paginasProcessadasAteFalha = 0;
         
         try {
-            final LocalDateTime inicioExtracao = LocalDateTime.now();
+            final LocalDateTime inicioExtracao = RelogioSistema.agora();
             final ResultadoExtracao<T> resultado = extractor.extract(dataInicio, dataFim);
-            final LocalDateTime fimExtracao = LocalDateTime.now();
+            final LocalDateTime fimExtracao = RelogioSistema.agora();
             final Duration duracaoExtracao = Duration.between(inicioExtracao, fimExtracao);
             
             final List<T> dtos = resultado.getDados();
@@ -130,7 +129,7 @@ public class ExtractionLogger {
             int registrosSalvos = 0;
             int totalUnicos = dtos.size(); // Padrão para GraphQL
             int registrosInvalidos = 0;
-            final LocalDateTime inicioSalvamento = LocalDateTime.now();
+            final LocalDateTime inicioSalvamento = RelogioSistema.agora();
             
             if (!dtos.isEmpty()) {
                 try {
@@ -139,7 +138,7 @@ public class ExtractionLogger {
                     totalUnicos = saveMetrics.getTotalUnicos();
                     registrosInvalidos = saveMetrics.getRegistrosInvalidos();
 
-                    final LocalDateTime fimSalvamento = LocalDateTime.now();
+                    final LocalDateTime fimSalvamento = RelogioSistema.agora();
                     final Duration duracaoSalvamento = Duration.between(inicioSalvamento, fimSalvamento);
                     final boolean isDataExportExtractor = extractor instanceof DataExportEntityExtractor;
 
@@ -180,7 +179,7 @@ public class ExtractionLogger {
             
             totalUnicos = ajustarTotalUnicosAposSalvamento(entityName, totalUnicos, registrosSalvos);
 
-            final LocalDateTime fim = LocalDateTime.now();
+            final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
             final int totalRecebido = dtos.size();
             final int deltaIgnorados = Math.max(0, totalUnicos - registrosSalvos);
@@ -266,7 +265,7 @@ public class ExtractionLogger {
             }
                 
         } catch (final Exception e) {
-            final LocalDateTime fim = LocalDateTime.now();
+            final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
             log.error("{}", "=".repeat(80));
             log.error("❌ ERRO NA EXTRAÇÃO: {}", entityName.toUpperCase());
