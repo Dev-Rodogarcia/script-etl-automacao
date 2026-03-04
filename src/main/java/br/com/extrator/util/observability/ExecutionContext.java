@@ -39,27 +39,20 @@ public final class ExecutionContext {
 
         final Map<String, String> capturedContext = MDC.getCopyOfContextMap();
         return () -> {
-            final Map<String, String> previous = MDC.getCopyOfContextMap();
+            MDC.clear();
             try {
-                if (capturedContext == null) {
-                    MDC.clear();
-                } else {
+                if (capturedContext != null) {
                     MDC.setContextMap(capturedContext);
                 }
                 delegate.run();
             } finally {
-                if (previous == null) {
-                    MDC.clear();
-                } else {
-                    MDC.setContextMap(previous);
-                }
+                MDC.clear();
             }
         };
     }
 
     public static void clear() {
-        MDC.remove(MDC_EXECUTION_ID);
-        MDC.remove(MDC_COMMAND);
+        MDC.clear();
     }
 
     private static String sanitizeCommand(final String commandName) {

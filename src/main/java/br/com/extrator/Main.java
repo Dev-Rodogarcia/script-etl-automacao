@@ -53,6 +53,7 @@ import br.com.extrator.comandos.base.Comando;
 import br.com.extrator.comandos.console.ExibirAjudaComando;
 import br.com.extrator.comandos.extracao.PartialExecutionException;
 import br.com.extrator.db.repository.ExecutionHistoryRepository;
+import br.com.extrator.db.repository.HistoryPersistenceInterruptedException;
 import br.com.extrator.servicos.LoggingService;
 import br.com.extrator.util.log.SensitiveDataSanitizer;
 import br.com.extrator.util.observability.ExecutionContext;
@@ -63,8 +64,6 @@ import br.com.extrator.util.tempo.RelogioSistema;
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final int HISTORICO_MAX_TENTATIVAS = 2;
-    private static final long HISTORICO_RETRY_DELAY_MS = 750L;
     private static final Path ARQUIVO_FALLBACK_HISTORICO = Path.of("logs", "execution_history_fallback.ndjson");
 
     private static final Map<String, Comando> COMANDOS = CommandRegistry.criarMapaComandos();
@@ -118,49 +117,37 @@ public class Main {
             RuntimeException ultimoErroPersistencia = null;
             boolean historicoPersistidoNoBanco = false;
 
-            for (int tentativa = 1; tentativa <= HISTORICO_MAX_TENTATIVAS; tentativa++) {
-                try {
-                    final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
-                    repo.inserirHistorico(
-                        inicioExecucao,
-                        fimExecucao,
-                        duracaoSegundosInt,
-                        statusRef.get(),
-                        totalRecords,
-                        errorCategoryRef.get(),
-                        errorMessageRef.get()
-                    );
-                    logger.info(
-                        "EVT_EXEC_HISTORY_DB_SAVE_OK tentativa={} status={} tipo_execucao={} inicio={} fim={} total_records={}",
-                        tentativa,
-                        statusRef.get(),
-                        tipoExecucao,
-                        inicioExecucao,
-                        fimExecucao,
-                        totalRecords
-                    );
-                    historicoPersistidoNoBanco = true;
-                    break;
-                } catch (final RuntimeException t) {
-                    ultimoErroPersistencia = t;
-                    logger.warn(
-                        "EVT_EXEC_HISTORY_DB_SAVE_FAIL tentativa={} status={} tipo_execucao={} erro={}",
-                        tentativa,
-                        statusRef.get(),
-                        tipoExecucao,
-                        sanitizeMessage(t.getMessage())
-                    );
-
-                    if (tentativa < HISTORICO_MAX_TENTATIVAS) {
-                        try {
-                            Thread.sleep(HISTORICO_RETRY_DELAY_MS);
-                        } catch (final InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            logger.warn("Retry de persistencia de historico interrompido: {}", ie.getMessage());
-                            break;
-                        }
-                    }
+            try {
+                final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
+                repo.inserirHistorico(
+                    inicioExecucao,
+                    fimExecucao,
+                    duracaoSegundosInt,
+                    statusRef.get(),
+                    totalRecords,
+                    errorCategoryRef.get(),
+                    errorMessageRef.get()
+                );
+                logger.info(
+                    "EVT_EXEC_HISTORY_DB_SAVE_OK status={} tipo_execucao={} inicio={} fim={} total_records={}",
+                    statusRef.get(),
+                    tipoExecucao,
+                    inicioExecucao,
+                    fimExecucao,
+                    totalRecords
+                );
+                historicoPersistidoNoBanco = true;
+            } catch (final RuntimeException t) {
+                ultimoErroPersistencia = t;
+                if (t instanceof HistoryPersistenceInterruptedException) {
+                    Thread.currentThread().interrupt();
                 }
+                logger.warn(
+                    "EVT_EXEC_HISTORY_DB_SAVE_FAIL status={} tipo_execucao={} erro={}",
+                    statusRef.get(),
+                    tipoExecucao,
+                    sanitizeMessage(t.getMessage())
+                );
             }
 
             if (!historicoPersistidoNoBanco) {

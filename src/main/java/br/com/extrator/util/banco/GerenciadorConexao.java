@@ -192,9 +192,16 @@ public final class GerenciadorConexao {
      */
     public static boolean isPoolSaudavel() {
         try {
-            return !DataSourceHolder.INSTANCE.isClosed() && 
-                   DataSourceHolder.INSTANCE.getHikariPoolMXBean().getTotalConnections() > 0;
-        } catch (final Exception e) {
+            final HikariDataSource ds = DataSourceHolder.INSTANCE;
+            if (ds.isClosed()) {
+                return false;
+            }
+            try (Connection ignored = ds.getConnection()) {
+                return true;
+            }
+        } catch (final SQLException e) {
+            return false;
+        } catch (final RuntimeException e) {
             return false;
         }
     }

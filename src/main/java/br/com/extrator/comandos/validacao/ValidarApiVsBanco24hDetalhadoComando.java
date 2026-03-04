@@ -1145,7 +1145,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             removerCamposVolateisComparacao(entidade, obj);
             return MapperUtil.sharedJson().writeValueAsString(obj);
         } catch (JsonProcessingException e) {
-            // Fallback seguro: nao bloquear validacao por erro de parse.
+            log.debug("Fallback de normalizacao de metadata por erro de parse JSON | entidade={} | erro={}", entidade, e.getOriginalMessage());
             return metadata.trim();
         }
     }

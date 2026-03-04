@@ -34,6 +34,7 @@ import java.sql.SQLException;
 import java.sql.SQLTransientException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -261,7 +262,9 @@ public class ExecutionHistoryRepository {
 
     private long calcularBackoff(final int tentativa) {
         final int fator = Math.max(1, tentativa);
-        return BASE_RETRY_DELAY_MS * fator * fator;
+        final long atrasoBase = BASE_RETRY_DELAY_MS * fator * fator;
+        final long jitter = ThreadLocalRandom.current().nextLong(0L, BASE_RETRY_DELAY_MS + 1L);
+        return atrasoBase + jitter;
     }
 
     private void aguardarRetry(final long delayMs) {
@@ -269,7 +272,7 @@ public class ExecutionHistoryRepository {
             ThreadUtil.aguardar(delayMs);
         } catch (final InterruptedException ie) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Retry de historico interrompido.", ie);
+            throw new HistoryPersistenceInterruptedException("Retry de historico interrompido.", ie);
         }
     }
 
