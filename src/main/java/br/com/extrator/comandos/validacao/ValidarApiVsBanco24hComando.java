@@ -81,6 +81,7 @@ public class ValidarApiVsBanco24hComando implements Comando {
     @Override
     public void executar(final String[] args) throws Exception {
         final boolean incluirFaturasGraphQL = !possuiFlag(args, "--sem-faturas-graphql");
+        final boolean permitirFallbackJanela = possuiFlag(args, "--permitir-fallback-janela");
         final LocalDate dataReferenciaSistema = RelogioSistema.hoje();
         final LocalDate dataReferencia;
         final LocalDate dataInicio;
@@ -95,6 +96,7 @@ public class ValidarApiVsBanco24hComando implements Comando {
         log.console("\n" + "=".repeat(72));
         log.info("VALIDACAO EXTREMA 24H | API (POSTMAN-LIKE) x BANCO");
         log.info("Data de referencia: {}", dataReferencia);
+        log.info("Fallback de janela sem periodo: {}", permitirFallbackJanela ? "ATIVADO" : "DESATIVADO");
         log.console("=".repeat(72));
 
         final CompletudeValidator validator = new CompletudeValidator();
@@ -119,12 +121,20 @@ public class ValidarApiVsBanco24hComando implements Comando {
 
                 final int apiCount = totaisApi.get(entidade);
                 final Optional<JanelaExecucao> janelaOpt =
-                    buscarUltimaJanelaCompletaDoDia(conexao, entidade, dataReferencia, dataInicio, dataFim);
+                    buscarUltimaJanelaCompletaDoDia(
+                        conexao,
+                        entidade,
+                        dataReferencia,
+                        dataInicio,
+                        dataFim,
+                        permitirFallbackJanela
+                    );
                 if (janelaOpt.isEmpty()) {
                     totalFalhas++;
-                    log.error(
-                        "API_VS_BANCO_24H | entidade={} | status=FALHA | detalhe=Sem log COMPLETO no dia para comparar.",
-                        entidade
+                    log.warn(
+                        "API_VS_BANCO_24H | entidade={} | status=INCONCLUSIVO | detalhe=Sem janela COMPLETA compatível para comparação{}.",
+                        entidade,
+                        permitirFallbackJanela ? " mesmo com fallback" : " (use --permitir-fallback-janela para liberar fallback aberto)"
                     );
                     continue;
                 }
@@ -283,7 +293,8 @@ public class ValidarApiVsBanco24hComando implements Comando {
                                                                       final String entidade,
                                                                       final LocalDate dataReferencia,
                                                                       final LocalDate periodoInicio,
-                                                                      final LocalDate periodoFim) throws SQLException {
+                                                                      final LocalDate periodoFim,
+                                                                      final boolean permitirFallbackJanela) throws SQLException {
         final String sqlComPeriodo = """
             SELECT TOP 1 timestamp_inicio, timestamp_fim, registros_extraidos, mensagem
             FROM dbo.log_extracoes
@@ -311,6 +322,10 @@ public class ValidarApiVsBanco24hComando implements Comando {
                     return Optional.of(new JanelaExecucao(inicio, fim, registrosExtraidos, apiCount, uniqueCount));
                 }
             }
+        }
+
+        if (!permitirFallbackJanela) {
+            return Optional.empty();
         }
 
         final String sqlFallback = """

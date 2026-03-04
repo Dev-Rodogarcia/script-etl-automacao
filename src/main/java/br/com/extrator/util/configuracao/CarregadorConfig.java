@@ -60,6 +60,11 @@ public final class CarregadorConfig {
     private static final Logger logger = LoggerFactory.getLogger(CarregadorConfig.class);
     private static final String ARQUIVO_CONFIG = "config.properties";
 
+    public enum EtlIntegridadeModo {
+        OPERACIONAL,
+        STRICT_INTEGRITY
+    }
+
     /**
      * Holder pattern para carregamento lazy e thread-safe das propriedades.
      * A JVM garante que a classe interna so sera carregada quando acessada,
@@ -467,6 +472,24 @@ public final class CarregadorConfig {
     }
 
     /**
+     * Obtem o numero maximo de tentativas de retry por dia no helper de intervalo GraphQL.
+     *
+     * @return Numero maximo de tentativas (padrao: valor global de retry)
+     */
+    public static int obterMaxTentativasRetryGraphQLPorDia() {
+        final String valor = obterConfiguracao(
+            "API_GRAPHQL_RETRY_MAX_TENTATIVAS_DIA",
+            "api.graphql.retry.max_tentativas_dia"
+        );
+        try {
+            final int tentativas = Integer.parseInt(valor);
+            return Math.max(1, tentativas);
+        } catch (NumberFormatException | NullPointerException e) {
+            return Math.max(1, obterMaxTentativasRetry());
+        }
+    }
+
+    /**
      * Obtem o tempo de espera base (em milissegundos) para a logica de retry.
      * 
      * @return O tempo de delay base em ms.
@@ -605,6 +628,24 @@ public final class CarregadorConfig {
     }
 
     /**
+     * Obtem o limite de paginas para um template DataExport especifico.
+     * Permite calibracao por entidade via:
+     * - env: API_DATAEXPORT_MAX_PAGINAS_TEMPLATE_{templateId}
+     * - property: api.dataexport.max.paginas.template.{templateId}
+     */
+    public static int obterLimitePaginasApiDataExportPorTemplate(final int templateId) {
+        final String env = "API_DATAEXPORT_MAX_PAGINAS_TEMPLATE_" + templateId;
+        final String prop = "api.dataexport.max.paginas.template." + templateId;
+        final String valor = obterConfiguracao(env, prop);
+        try {
+            final int limite = Integer.parseInt(valor);
+            return limite > 0 ? limite : obterLimitePaginasApiDataExport();
+        } catch (NumberFormatException | NullPointerException e) {
+            return obterLimitePaginasApiDataExport();
+        }
+    }
+
+    /**
      * Obtem o limite maximo de REGISTROS por execucao para API GraphQL.
      * PROBLEMA #7 CORRIGIDO: Valor agora configuravel em vez de hardcoded.
      * 
@@ -634,6 +675,56 @@ public final class CarregadorConfig {
             logger.debug("Propriedade 'api.dataexport.max.registros.execucao' nao encontrada. Usando padrao: 10000");
             return 10000;
         }
+    }
+
+    /**
+     * Obtem o limite de registros para um template DataExport especifico.
+     * Permite calibracao por entidade via:
+     * - env: API_DATAEXPORT_MAX_REGISTROS_TEMPLATE_{templateId}
+     * - property: api.dataexport.max.registros.template.{templateId}
+     */
+    public static int obterMaxRegistrosDataExportPorTemplate(final int templateId) {
+        final String env = "API_DATAEXPORT_MAX_REGISTROS_TEMPLATE_" + templateId;
+        final String prop = "api.dataexport.max.registros.template." + templateId;
+        final String valor = obterConfiguracao(env, prop);
+        try {
+            final int limite = Integer.parseInt(valor);
+            return limite > 0 ? limite : obterMaxRegistrosDataExport();
+        } catch (NumberFormatException | NullPointerException e) {
+            return obterMaxRegistrosDataExport();
+        }
+    }
+
+    /**
+     * Habilita particionamento automatico da janela DataExport em sub-janelas diarias.
+     * Reduz risco de truncamento silencioso em periodos longos/pico de volume.
+     */
+    public static boolean isParticionamentoJanelaDataExportAtivo() {
+        final String valor = obterConfiguracao(
+            "API_DATAEXPORT_PARTICIONAR_JANELA_AUTOMATICA",
+            "api.dataexport.partitionar.janela.automatica"
+        );
+        if (valor == null || valor.isBlank()) {
+            return true;
+        }
+        return Boolean.parseBoolean(valor.trim());
+    }
+
+    /**
+     * Metodo HTTP preferencial para chamadas DataExport que enviam payload JSON.
+     * Valores validos: POST, GET (padrao: POST).
+     */
+    public static String obterMetodoHttpDataExportPreferencial() {
+        final String valor = obterConfiguracao("API_DATAEXPORT_HTTP_METHOD", "api.dataexport.http.method");
+        if (valor == null || valor.isBlank()) {
+            return "POST";
+        }
+        final String normalizado = valor.trim().toUpperCase();
+        if ("POST".equals(normalizado) || "GET".equals(normalizado)) {
+            return normalizado;
+        }
+        logger.warn("Metodo HTTP DataExport invalido '{}'. Usando POST.", valor);
+        return "POST";
     }
 
     // ========== CONFIGURACOES DE BANCO DE DADOS ==========
@@ -809,6 +900,28 @@ public final class CarregadorConfig {
         } catch (NumberFormatException | NullPointerException e) {
             return 2.5d;
         }
+    }
+
+    /**
+     * Define o modo operacional de integridade da execucao ETL.
+     * OPERACIONAL = tolera nao-conformidades de dados/volume sem derrubar o ciclo.
+     * STRICT_INTEGRITY = qualquer entidade nao COMPLETA reprova o ciclo.
+     */
+    public static EtlIntegridadeModo obterModoIntegridadeEtl() {
+        final String valor = obterConfiguracao("ETL_INTEGRIDADE_MODO", "etl.integridade.modo");
+        if (valor == null || valor.isBlank()) {
+            return EtlIntegridadeModo.STRICT_INTEGRITY;
+        }
+        try {
+            return EtlIntegridadeModo.valueOf(valor.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Modo de integridade ETL invalido '{}'. Usando STRICT_INTEGRITY.", valor);
+            return EtlIntegridadeModo.STRICT_INTEGRITY;
+        }
+    }
+
+    public static boolean isModoIntegridadeEstrito() {
+        return EtlIntegridadeModo.STRICT_INTEGRITY.equals(obterModoIntegridadeEtl());
     }
 
     /**

@@ -140,6 +140,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
     public void executar(final String[] args) throws Exception {
         final boolean incluirFaturasGraphQL = !possuiFlag(args, "--sem-faturas-graphql");
         final boolean periodoFechado = possuiFlag(args, "--periodo-fechado");
+        final boolean permitirFallbackJanela = possuiFlag(args, "--permitir-fallback-janela");
         final LocalDate dataReferenciaSistema = RelogioSistema.hoje();
 
         final ClienteApiDataExport clienteDataExport = new ClienteApiDataExport();
@@ -166,6 +167,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             if (periodoFechado) {
                 log.info("Modo: PERIODO FECHADO (sem dia em andamento)");
             }
+            log.info("Fallback de janela sem periodo: {}", permitirFallbackJanela ? "ATIVADO" : "DESATIVADO");
             log.info("Data de referencia dos logs: {}", dataReferencia);
             log.console("=".repeat(88));
 
@@ -177,7 +179,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -188,7 +191,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -199,7 +203,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -210,7 +215,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -221,7 +227,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -232,7 +239,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
             resultados.add(
@@ -243,7 +251,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     dataReferencia,
                     dataInicio,
                     dataFim,
-                    periodoFechado
+                    periodoFechado,
+                    permitirFallbackJanela
                 )
             );
 
@@ -256,7 +265,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                         dataReferencia,
                         dataInicio,
                         dataFim,
-                        periodoFechado
+                        periodoFechado,
+                        permitirFallbackJanela
                     )
                 );
             }
@@ -266,7 +276,14 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
         int totalFalhas = 0;
         for (ResultadoComparacao r : resultados) {
             final boolean divergenciaDinamicaTolerada = somenteDivergenciaDadosTolerada(r);
-            if (r.ok()) {
+            final boolean inconclusivo = r.detalhe != null && r.detalhe.startsWith("INCONCLUSIVO:");
+            if (inconclusivo) {
+                totalFalhas++;
+                log.warn(
+                    "API_VS_BANCO_24H_DETALHADO | entidade={} | status=INCONCLUSIVO | api_bruto={} | api_unico={} | invalidos={} | banco={} | faltantes={} | excedentes={} | divergencias_dados={}",
+                    r.entidade, r.apiBruto, r.apiUnico, r.invalidos, r.banco, r.faltantes, r.excedentes, r.divergenciasDados
+                );
+            } else if (r.ok()) {
                 totalOk++;
                 log.info(
                     "API_VS_BANCO_24H_DETALHADO | entidade={} | status=OK | api_bruto={} | api_unico={} | invalidos={} | banco={} | faltantes={} | excedentes={} | divergencias_dados={}",
@@ -420,9 +437,17 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                                                  final LocalDate dataReferencia,
                                                  final LocalDate periodoInicio,
                                                  final LocalDate periodoFim,
-                                                 final boolean periodoFechado) throws SQLException {
+                                                 final boolean periodoFechado,
+                                                 final boolean permitirFallbackJanela) throws SQLException {
         final Optional<JanelaExecucao> janelaOpt =
-            buscarUltimaJanelaCompletaDoDia(conexao, entidade, dataReferencia, periodoInicio, periodoFim);
+            buscarUltimaJanelaCompletaDoDia(
+                conexao,
+                entidade,
+                dataReferencia,
+                periodoInicio,
+                periodoFim,
+                permitirFallbackJanela
+            );
         if (janelaOpt.isEmpty()) {
             final int faltantes = api.apiUnico;
             return new ResultadoComparacao(
@@ -434,7 +459,7 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                 faltantes,
                 0,
                 0,
-                "Sem log COMPLETO no dia para comparar."
+                "INCONCLUSIVO: sem janela COMPLETA compativel para comparar"
             );
         }
 
@@ -864,7 +889,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                                                                       final String entidade,
                                                                       final LocalDate dataReferencia,
                                                                       final LocalDate periodoInicio,
-                                                                      final LocalDate periodoFim) throws SQLException {
+                                                                      final LocalDate periodoFim,
+                                                                      final boolean permitirFallbackJanela) throws SQLException {
         final String sqlComPeriodo = """
             SELECT TOP 1 timestamp_inicio, timestamp_fim
             FROM dbo.log_extracoes
@@ -886,6 +912,10 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                     return Optional.of(new JanelaExecucao(inicio, fim, true));
                 }
             }
+        }
+
+        if (!permitirFallbackJanela) {
+            return Optional.empty();
         }
 
         final String sqlFallback = """

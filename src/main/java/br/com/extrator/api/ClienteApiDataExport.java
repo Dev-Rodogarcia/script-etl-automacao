@@ -97,9 +97,9 @@ import br.com.extrator.db.entity.PageAuditEntity;
 import br.com.extrator.db.repository.PageAuditRepository;
 
 /**
- * Cliente para extração de dados da API Data Export do ESL Cloud.
+ * Cliente para extraÃ§Ã£o de dados da API Data Export do ESL Cloud.
  * 
- * @author Sistema de Extração ESL Cloud
+ * @author Sistema de ExtraÃ§Ã£o ESL Cloud
  * @version 2.0
  */
 public class ClienteApiDataExport {
@@ -114,9 +114,9 @@ public class ClienteApiDataExport {
     private final PageAuditRepository pageAuditRepository;
     private String executionUuid;
 
-    // PROTEÇÕES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
+    // PROTEÃ‡Ã•ES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
     // PROBLEMA #7 CORRIGIDO: Valor agora obtido de CarregadorConfig
-    private static final int INTERVALO_LOG_PROGRESSO = 10; // A cada 10 páginas
+    private static final int INTERVALO_LOG_PROGRESSO = 10; // A cada 10 pÃ¡ginas
 
     // CIRCUIT BREAKER
     private final Map<String, Integer> contadorFalhasConsecutivas = new HashMap<>();
@@ -128,7 +128,7 @@ public class ClienteApiDataExport {
 
     /**
      * Construtor que inicializa o cliente da API Data Export.
-     * Carrega as configurações necessárias e inicializa os componentes HTTP.
+     * Carrega as configuraÃ§Ãµes necessÃ¡rias e inicializa os componentes HTTP.
      */
     public ClienteApiDataExport() {
         logger.info("Inicializando cliente da API Data Export");
@@ -138,23 +138,23 @@ public class ClienteApiDataExport {
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
 
-        // Carrega configurações usando CarregadorConfig
+        // Carrega configuraÃ§Ãµes usando CarregadorConfig
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.token = CarregadorConfig.obterTokenApiDataExport();
         this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
 
-        // Valida configurações obrigatórias
+        // Valida configuraÃ§Ãµes obrigatÃ³rias
         if (urlBase == null || urlBase.trim().isEmpty()) {
-            throw new IllegalStateException("URL base da API não configurada");
+            throw new IllegalStateException("URL base da API nÃ£o configurada");
         }
         if (token == null || token.trim().isEmpty()) {
-            throw new IllegalStateException("Token da API Data Export não configurado");
+            throw new IllegalStateException("Token da API Data Export nÃ£o configurado");
         }
 
-        // Template IDs agora são obtidos de ConstantesApiDataExport.obterConfiguracao(entidade)
+        // Template IDs agora sÃ£o obtidos de ConstantesApiDataExport.obterConfiguracao(entidade)
         logger.debug("Template IDs configurados via ConstantesApiDataExport");
 
-        // Inicializa o gerenciador de requisições HTTP (Singleton - throttling GLOBAL)
+        // Inicializa o gerenciador de requisiÃ§Ãµes HTTP (Singleton - throttling GLOBAL)
         this.gerenciadorRequisicao = GerenciadorRequisicaoHttp.getInstance();
         this.pageAuditRepository = new PageAuditRepository();
 
@@ -167,8 +167,8 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de manifestos da API Data Export (últimas 24h).
-     * Método de conveniência que delega para buscarManifestos(dataInicio, dataFim).
+     * Busca dados de manifestos da API Data Export (Ãºltimas 24h).
+     * MÃ©todo de conveniÃªncia que delega para buscarManifestos(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
@@ -179,8 +179,8 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de cotações da API Data Export (últimas 24h).
-     * Método de conveniência que delega para buscarCotacoes(dataInicio, dataFim).
+     * Busca dados de cotaÃ§Ãµes da API Data Export (Ãºltimas 24h).
+     * MÃ©todo de conveniÃªncia que delega para buscarCotacoes(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
@@ -191,8 +191,8 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de localização de carga da API Data Export (últimas 24h).
-     * Método de conveniência que delega para buscarLocalizacaoCarga(dataInicio, dataFim).
+     * Busca dados de localizaÃ§Ã£o de carga da API Data Export (Ãºltimas 24h).
+     * MÃ©todo de conveniÃªncia que delega para buscarLocalizacaoCarga(dataInicio, dataFim).
      * 
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
@@ -203,8 +203,8 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export (últimas 24h).
-     * Método de conveniência que delega para buscarContasAPagar(dataInicio, dataFim).
+     * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export (Ãºltimas 24h).
+     * MÃ©todo de conveniÃªncia que delega para buscarContasAPagar(dataInicio, dataFim).
      */
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar() {
         final LocalDate hoje = RelogioSistema.hoje();
@@ -213,8 +213,8 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de Faturas por Cliente da API Data Export (últimas 24h).
-     * Método de conveniência que delega para buscarFaturasPorCliente(dataInicio, dataFim).
+     * Busca dados de Faturas por Cliente da API Data Export (Ãºltimas 24h).
+     * MÃ©todo de conveniÃªncia que delega para buscarFaturasPorCliente(dataInicio, dataFim).
      */
     public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente() {
         final LocalDate hoje = RelogioSistema.hoje();
@@ -225,12 +225,12 @@ public class ClienteApiDataExport {
     /**
      * Busca dados de manifestos da API Data Export para um intervalo de datas.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ManifestoDTO> buscarManifestos(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
-        logger.info("Buscando manifestos da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        logger.info("Buscando manifestos da API DataExport - PerÃ­odo: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
         final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
         final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
@@ -239,14 +239,14 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de cotações da API Data Export para um intervalo de datas.
+     * Busca dados de cotaÃ§Ãµes da API Data Export para um intervalo de datas.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<CotacaoDTO> buscarCotacoes(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
-        logger.info("Buscando cotações da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        logger.info("Buscando cotaÃ§Ãµes da API DataExport - PerÃ­odo: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.COTACOES);
         final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
         final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
@@ -255,14 +255,14 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Busca dados de localização de carga da API Data Export para um intervalo de datas.
+     * Busca dados de localizaÃ§Ã£o de carga da API Data Export para um intervalo de datas.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
-        logger.info("Buscando localização de carga da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        logger.info("Buscando localizaÃ§Ã£o de carga da API DataExport - PerÃ­odo: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.LOCALIZACAO_CARGAS);
         final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
         final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
@@ -273,12 +273,12 @@ public class ClienteApiDataExport {
     /**
      * Busca dados de Faturas a Pagar (Contas a Pagar) da API Data Export para um intervalo de datas.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
-        logger.info("Buscando Faturas a Pagar da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        logger.info("Buscando Faturas a Pagar da API DataExport - PerÃ­odo: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
         final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
         final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
@@ -347,12 +347,12 @@ public class ClienteApiDataExport {
     /**
      * Busca dados de Faturas por Cliente da API Data Export para um intervalo de datas.
      * 
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     public ResultadoExtracao<br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente(final java.time.LocalDate dataInicio, final java.time.LocalDate dataFim) {
-        logger.info("Buscando Faturas por Cliente da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        logger.info("Buscando Faturas por Cliente da API DataExport - PerÃ­odo: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.FATURAS_POR_CLIENTE);
         final Instant inicio = dataInicio.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
         final Instant fim = dataFim.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
@@ -368,23 +368,29 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Método genérico para buscar dados de qualquer template da API Data Export
-     * com proteções contra loops infinitos e circuit breaker.
+     * MÃ©todo genÃ©rico para buscar dados de qualquer template da API Data Export
+     * com proteÃ§Ãµes contra loops infinitos e circuit breaker.
      * 
      * @param templateId   ID do template na API Data Export
      * @param nomeTabela   Nome da tabela para filtros
      * @param campoData    Campo de data para filtros
-     * @param typeReference Referência de tipo para desserialização
-     * @param dataInicio   Data de início do período
-     * @param dataFim      Data de fim do período
-     * @param config       Configuração da entidade (de ConstantesApiDataExport)
+     * @param typeReference ReferÃªncia de tipo para desserializaÃ§Ã£o
+     * @param dataInicio   Data de inÃ­cio do perÃ­odo
+     * @param dataFim      Data de fim do perÃ­odo
+     * @param config       ConfiguraÃ§Ã£o da entidade (de ConstantesApiDataExport)
      * @return ResultadoExtracao indicando se a busca foi completa ou interrompida
      */
     private <T> ResultadoExtracao<T> buscarDadosGenericos(final int templateId, final String nomeTabela, final String campoData,
             final TypeReference<List<T>> typeReference, final Instant dataInicio, final Instant dataFim, 
             final ConfiguracaoEntidade config) {
+        return buscarDadosGenericos(templateId, nomeTabela, campoData, typeReference, dataInicio, dataFim, config, true);
+    }
+
+    private <T> ResultadoExtracao<T> buscarDadosGenericos(final int templateId, final String nomeTabela, final String campoData,
+            final TypeReference<List<T>> typeReference, final Instant dataInicio, final Instant dataFim,
+            final ConfiguracaoEntidade config, final boolean permitirParticionamento) {
         
-        // Determina o nome amigável do tipo de dados baseado na tabela
+        // Determina o nome amigÃ¡vel do tipo de dados baseado na tabela
         final String tipoAmigavel = obterNomeAmigavelTipo(nomeTabela);
         final String chaveTemplate = "Template-" + templateId;
         if (this.executionUuid == null || this.executionUuid.isEmpty()) {
@@ -392,14 +398,14 @@ public class ClienteApiDataExport {
         }
         final String runUuid = UUID.randomUUID().toString();
         
-        // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
+        // CIRCUIT BREAKER - Verificar se o template estÃ¡ com circuit aberto
         if (templatesComCircuitAberto.contains(chaveTemplate)) {
-            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado devido a falhas consecutivas", 
+            logger.warn("âš ï¸ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado devido a falhas consecutivas", 
                     templateId, tipoAmigavel);
             return ResultadoExtracao.incompleto(new ArrayList<>(), ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER, 0, 0);
         }
         
-        // Obter valor de 'per' e timeout da configuração
+        // Obter valor de 'per' e timeout da configuraÃ§Ã£o
         final String valorPer = config.valorPer();
         final Duration timeout = config.timeout();
         int perInt;
@@ -410,15 +416,74 @@ public class ClienteApiDataExport {
         }
         final LocalDate janelaInicio = dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate();
         final LocalDate janelaFim = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate();
+
+        if (permitirParticionamento
+            && CarregadorConfig.isParticionamentoJanelaDataExportAtivo()
+            && janelaInicio.isBefore(janelaFim)) {
+            logger.info(
+                "Particionamento automatico DataExport ativo para template {} ({}): {} ate {} (sub-janelas diarias)",
+                templateId,
+                tipoAmigavel,
+                janelaInicio,
+                janelaFim
+            );
+
+            final List<T> consolidados = new ArrayList<>();
+            int paginasConsolidadas = 0;
+            String motivoInterrupcaoConsolidado = null;
+            boolean completo = true;
+
+            LocalDate dia = janelaInicio;
+            while (!dia.isAfter(janelaFim)) {
+                final Instant inicioDia = dia.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
+                final Instant fimDia = dia.atTime(23, 59, 59).atZone(java.time.ZoneOffset.UTC).toInstant();
+
+                final ResultadoExtracao<T> resultadoDia = buscarDadosGenericos(
+                    templateId,
+                    nomeTabela,
+                    campoData,
+                    typeReference,
+                    inicioDia,
+                    fimDia,
+                    config,
+                    false
+                );
+                consolidados.addAll(resultadoDia.getDados());
+                paginasConsolidadas += resultadoDia.getPaginasProcessadas();
+
+                if (!resultadoDia.isCompleto()) {
+                    completo = false;
+                    motivoInterrupcaoConsolidado = selecionarMotivoInterrupcao(
+                        motivoInterrupcaoConsolidado,
+                        resultadoDia.getMotivoInterrupcao()
+                    );
+                }
+
+                dia = dia.plusDays(1);
+            }
+
+            if (completo) {
+                return ResultadoExtracao.completo(consolidados, paginasConsolidadas, consolidados.size());
+            }
+
+            return ResultadoExtracao.incompleto(
+                consolidados,
+                motivoInterrupcaoConsolidado != null
+                    ? motivoInterrupcaoConsolidado
+                    : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
+                paginasConsolidadas,
+                consolidados.size()
+            );
+        }
         
-        logger.info("═══════════════════════════════════════════════════════");
-        logger.info("INICIANDO EXTRAÇÃO: Template {} - {}", templateId, tipoAmigavel);
-        logger.info("Período: {} até {}", 
+        logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        logger.info("INICIANDO EXTRAÃ‡ÃƒO: Template {} - {}", templateId, tipoAmigavel);
+        logger.info("PerÃ­odo: {} atÃ© {}", 
                 dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate(), 
                 dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate());
         logger.info("Valor 'per': {}", valorPer);
         logger.info("Timeout: {} segundos", timeout.getSeconds());
-        logger.info("═══════════════════════════════════════════════════════");
+        logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
         final List<T> resultadosFinais = new ArrayList<>();
         int paginaAtual = 1;
@@ -427,45 +492,38 @@ public class ClienteApiDataExport {
         boolean interrompido = false;
         ResultadoExtracao.MotivoInterrupcao motivoInterrupcao = null;
         
-        // Limites específicos por template (para templates com muitos dados)
-        final int limitePaginasBase = CarregadorConfig.obterLimitePaginasApiDataExport();
-        final int maxRegistrosBase = CarregadorConfig.obterMaxRegistrosDataExport();
-        
-        // Aumentar limites para templates que têm muitos dados em períodos longos
-        // Template 4924 = FATURAS_POR_CLIENTE, Template 8656 = LOCALIZACAO_CARGAS
-        final boolean templateComMuitosDados = templateId == 4924 || templateId == 8656;
-        
-        final int limitePaginas = templateComMuitosDados ? limitePaginasBase * 2 : limitePaginasBase; // Dobrar limite de páginas (1000)
-        final int maxRegistros = templateComMuitosDados ? maxRegistrosBase * 10 : maxRegistrosBase; // 10x mais registros (100.000)
+        // Limites calibrados por template com fallback global.
+        final int limitePaginas = CarregadorConfig.obterLimitePaginasApiDataExportPorTemplate(templateId);
+        final int maxRegistros = CarregadorConfig.obterMaxRegistrosDataExportPorTemplate(templateId);
 
         try {
             while (true) {
-                // PROTEÇÃO 1: Limite máximo de páginas
+                // PROTEÃ‡ÃƒO 1: Limite mÃ¡ximo de pÃ¡ginas
                 if (paginaAtual > limitePaginas) {
-                    logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} páginas atingido. Interrompendo busca para evitar loop infinito.", 
+                    logger.warn("ðŸš¨ PROTEÃ‡ÃƒO ATIVADA - Template {} ({}): Limite de {} pÃ¡ginas atingido. Interrompendo busca para evitar loop infinito.", 
                             templateId, tipoAmigavel, limitePaginas);
                     interrompido = true;
                     motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
                     break;
                 }
 
-                // PROTEÇÃO 2: Limite máximo de registros
+                // PROTEÃ‡ÃƒO 2: Limite mÃ¡ximo de registros
                 // PROBLEMA #7 CORRIGIDO: Usar valor de CarregadorConfig em vez de constante hardcoded
                 if (totalRegistrosProcessados >= maxRegistros) {
-                    logger.warn("🚨 PROTEÇÃO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
+                    logger.warn("ðŸš¨ PROTEÃ‡ÃƒO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
                             templateId, tipoAmigavel, maxRegistros);
                     interrompido = true;
                     motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_REGISTROS;
                     break;
                 }
 
-                // Log início da página
-                logger.info("→ Requisitando página {}...", paginaAtual);
+                // Log inÃ­cio da pÃ¡gina
+                logger.info("â†’ Requisitando pÃ¡gina {}...", paginaAtual);
 
-                // URL base limpa sem parâmetros de query (filtros e paginação vão no corpo JSON)
+                // URL base limpa sem parÃ¢metros de query (filtros e paginaÃ§Ã£o vÃ£o no corpo JSON)
                 final String url = urlBase + ConstantesApiDataExport.formatarEndpoint(templateId);
 
-                // Constrói o corpo JSON com search, page, per conforme formato do Postman
+                // ConstrÃ³i o corpo JSON com search, page, per conforme formato do Postman
                 final String corpoJson = construirCorpoRequisicao(nomeTabela, campoData, dataInicio, dataFim, paginaAtual, config);
 
                 logger.debug("URL: {} | Corpo: {}", url, corpoJson);
@@ -479,28 +537,23 @@ public class ClienteApiDataExport {
                     reqHash = "";
                 }
 
-                final HttpRequest requisicao = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .header("Authorization", "Bearer " + token)
-                        .header("Content-Type", "application/json")
-                        .timeout(timeout) // Timeout específico por template
-                        .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson))
-                        .build();
-
-                // Executar requisição com medição de tempo
                 final long tempoInicio = System.currentTimeMillis();
-                final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoEstrita(this.httpClient, requisicao, 
-                        "DataExport-Template-" + templateId + "-Page-" + paginaAtual);
+                final HttpResponse<String> resposta = executarRequisicaoDataExportJson(
+                    url,
+                    corpoJson,
+                    timeout,
+                    "DataExport-Template-" + templateId + "-Page-" + paginaAtual
+                );
                 final long duracaoMs = System.currentTimeMillis() - tempoInicio;
 
                 // Verificar resposta
                 if (resposta == null) {
-                    logger.error("❌ Erro: resposta nula na página {}", paginaAtual);
+                    logger.error("âŒ Erro: resposta nula na pÃ¡gina {}", paginaAtual);
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                    throw new RuntimeException("Resposta nula na paginação - página " + paginaAtual);
+                    throw new RuntimeException("Resposta nula na paginaÃ§Ã£o - pÃ¡gina " + paginaAtual);
                 }
 
-                logger.info("← Resposta recebida: Status {}, Tempo: {}ms", resposta.statusCode(), duracaoMs);
+                logger.info("â† Resposta recebida: Status {}, Tempo: {}ms", resposta.statusCode(), duracaoMs);
                 String respHash;
                 try {
                     final byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(resposta.body().getBytes(StandardCharsets.UTF_8));
@@ -512,10 +565,10 @@ public class ClienteApiDataExport {
                 }
 
                 if (resposta.statusCode() != 200) {
-                    logger.error("❌ Erro HTTP {} na página {}: {}", 
+                    logger.error("âŒ Erro HTTP {} na pÃ¡gina {}: {}", 
                             resposta.statusCode(), paginaAtual, resposta.body());
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                    throw new RuntimeException("Erro HTTP " + resposta.statusCode() + " na página " + paginaAtual);
+                    throw new RuntimeException("Erro HTTP " + resposta.statusCode() + " na pÃ¡gina " + paginaAtual);
                 }
 
                 // Parse da resposta
@@ -523,7 +576,7 @@ public class ClienteApiDataExport {
                 try {
                     final JsonNode raizJson = MapperUtil.sharedJson().readTree(resposta.body());
                     final JsonNode dadosNode = raizJson.has("data") ? raizJson.get("data") : raizJson;
-                    // Obtém o campo de ID primário do orderBy da configuração
+                    // ObtÃ©m o campo de ID primÃ¡rio do orderBy da configuraÃ§Ã£o
                     final String idKey = ConstantesApiDataExport.obterCampoIdPrimario(config);
 
                     if (dadosNode != null && dadosNode.isArray()) {
@@ -543,7 +596,7 @@ public class ClienteApiDataExport {
                             audit.setStatusCode(resposta.statusCode());
                             audit.setDuracaoMs((int) duracaoMs);
                             pageAuditRepository.inserir(audit);
-                            logger.info("■ Fim da paginação (página vazia)");
+                            logger.info("â–  Fim da paginaÃ§Ã£o (pÃ¡gina vazia)");
                             totalPaginas = paginaAtual - 1;
                             break;
                         }
@@ -601,17 +654,31 @@ public class ClienteApiDataExport {
                         audit.setStatusCode(resposta.statusCode());
                         audit.setDuracaoMs((int) duracaoMs);
                         pageAuditRepository.inserir(audit);
-                        logger.warn("⚠️ Resposta não é um array válido na página {}. Tratando como vazio.", paginaAtual);
-                        totalPaginas = paginaAtual - 1;
-                        break;
+                        final String tipoPayload = dadosNode == null ? "null" : dadosNode.getNodeType().name();
+                        final String amostraPayload = extrairAmostraPayload(resposta.body(), 400);
+                        logger.error(
+                            "âŒ Payload invÃ¡lido na pÃ¡gina {}: esperado array em 'data', recebido tipo={} | resp_hash={} | amostra={}",
+                            paginaAtual,
+                            tipoPayload,
+                            respHash,
+                            amostraPayload
+                        );
+                        throw new IllegalStateException(
+                            "Payload invÃ¡lido na pagina " + paginaAtual
+                                + ": esperado array, recebido " + tipoPayload
+                                + " | resp_hash=" + respHash
+                        );
                     }
                 } catch (final Exception e) {
-                    logger.error("❌ Erro ao parsear JSON da página {}: {}", paginaAtual, e.getMessage());
+                    if (e instanceof IllegalStateException) {
+                        throw (IllegalStateException) e;
+                    }
+                    logger.error("âŒ Erro ao parsear JSON da pÃ¡gina {}: {}", paginaAtual, e.getMessage());
                     incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-                    throw new RuntimeException("Erro ao parsear página " + paginaAtual, e);
+                    throw new RuntimeException("Erro ao parsear pÃ¡gina " + paginaAtual, e);
                 }
 
-                logger.info("✓ Página {}: {} registros parseados", paginaAtual, registrosPagina.size());
+                logger.info("âœ“ PÃ¡gina {}: {} registros parseados", paginaAtual, registrosPagina.size());
 
                 
 
@@ -622,29 +689,29 @@ public class ClienteApiDataExport {
                 // Reset do contador de falhas em caso de sucesso
                 contadorFalhasConsecutivas.put(chaveTemplate, 0);
                 
-                logger.info("↑ Total acumulado: {} registros", totalRegistrosProcessados);
+                logger.info("â†‘ Total acumulado: {} registros", totalRegistrosProcessados);
 
                 // Log de progresso a cada intervalo definido
                 if (paginaAtual % INTERVALO_LOG_PROGRESSO == 0) {
-                    logger.info("⏳ Progresso: {} páginas processadas, {} registros", 
+                    logger.info("â³ Progresso: {} pÃ¡ginas processadas, {} registros", 
                             paginaAtual, totalRegistrosProcessados);
                 }
 
-                // Próxima página
+                // PrÃ³xima pÃ¡gina
                 paginaAtual++;
             }
 
             // Reset circuit breaker em caso de sucesso
             contadorFalhasConsecutivas.put(chaveTemplate, 0);
 
-            logger.info("═══════════════════════════════════════════════════════");
-            logger.info("✅ EXTRAÇÃO CONCLUÍDA: {} registros em {} páginas", 
+            logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+            logger.info("âœ… EXTRAÃ‡ÃƒO CONCLUÃDA: {} registros em {} pÃ¡ginas", 
                     totalRegistrosProcessados, totalPaginas > 0 ? totalPaginas : (paginaAtual - 1));
-            logger.info("═══════════════════════════════════════════════════════");
+            logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
             // Retornar ResultadoExtracao
             if (interrompido) {
-                // Usar o motivo correto da interrupção (LIMITE_PAGINAS ou LIMITE_REGISTROS)
+                // Usar o motivo correto da interrupÃ§Ã£o (LIMITE_PAGINAS ou LIMITE_REGISTROS)
                 final ResultadoExtracao.MotivoInterrupcao motivo = motivoInterrupcao != null 
                         ? motivoInterrupcao 
                         : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS; // Fallback
@@ -656,17 +723,17 @@ public class ClienteApiDataExport {
             }
 
         } catch (final RuntimeException e) {
-            logger.error("❌ ERRO CRÍTICO na extração de {}: {}", tipoAmigavel, e.getMessage(), e);
+            logger.error("âŒ ERRO CRÃTICO na extraÃ§Ã£o de {}: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-            throw new RuntimeException("Falha na extração de " + tipoAmigavel, e);
+            throw new RuntimeException("Falha na extraÃ§Ã£o de " + tipoAmigavel, e);
         }
     }
 
     /**
-     * Incrementa o contador de falhas consecutivas e ativa o circuit breaker se necessário.
+     * Incrementa o contador de falhas consecutivas e ativa o circuit breaker se necessÃ¡rio.
      * 
      * @param chaveTemplate Chave identificadora do template
-     * @param tipoAmigavel Nome amigável do tipo para logs
+     * @param tipoAmigavel Nome amigÃ¡vel do tipo para logs
      */
     private void incrementarContadorFalhas(final String chaveTemplate, final String tipoAmigavel) {
         final int falhas = contadorFalhasConsecutivas.getOrDefault(chaveTemplate, 0) + 1;
@@ -674,10 +741,10 @@ public class ClienteApiDataExport {
         
         if (falhas >= MAX_FALHAS_CONSECUTIVAS) {
             templatesComCircuitAberto.add(chaveTemplate);
-            logger.error("🚨 CIRCUIT BREAKER ATIVADO - Template {} ({}): {} falhas consecutivas. Template temporariamente desabilitado.", 
+            logger.error("ðŸš¨ CIRCUIT BREAKER ATIVADO - Template {} ({}): {} falhas consecutivas. Template temporariamente desabilitado.", 
                     chaveTemplate, tipoAmigavel, falhas);
         } else {
-            logger.warn("⚠️ Falha {}/{} para template {} ({})", falhas, MAX_FALHAS_CONSECUTIVAS, chaveTemplate, tipoAmigavel);
+            logger.warn("âš ï¸ Falha {}/{} para template {} ({})", falhas, MAX_FALHAS_CONSECUTIVAS, chaveTemplate, tipoAmigavel);
         }
     }
 
@@ -701,32 +768,175 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Determina o nome amigável do tipo de dados baseado no nome da tabela da API.
+     * Determina o nome amigÃ¡vel do tipo de dados baseado no nome da tabela da API.
      * 
      * @param nomeTabela Nome da tabela da API
-     * @return Nome amigável para logs
+     * @return Nome amigÃ¡vel para logs
      */
     private String obterNomeAmigavelTipo(final String nomeTabela) {
         return switch (nomeTabela) {
             case "manifests" -> "Manifestos";
-            case "quotes" -> "Cotações";
-            case "freights" -> "Localizações de Carga / Fretes";
+            case "quotes" -> "CotaÃ§Ãµes";
+            case "freights" -> "LocalizaÃ§Ãµes de Carga / Fretes";
             case "accounting_debits" -> "Contas a Pagar";
             default -> "Dados";
         };
     }
 
+    private String selecionarMotivoInterrupcao(final String atual, final String candidato) {
+        if (candidato == null || candidato.isBlank()) {
+            return atual;
+        }
+        if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(candidato)) {
+            return candidato;
+        }
+        if (atual == null || atual.isBlank()) {
+            return candidato;
+        }
+        return atual;
+    }
+
+    private HttpResponse<String> executarRequisicaoDataExportJson(final String url,
+                                                                   final String corpoJson,
+                                                                   final Duration timeout,
+                                                                   final String requestKey) {
+        final String metodoPreferencial = CarregadorConfig.obterMetodoHttpDataExportPreferencial();
+        HttpResponse<String> resposta = executarRequisicaoDataExportJsonComMetodo(
+            url,
+            corpoJson,
+            timeout,
+            requestKey,
+            metodoPreferencial
+        );
+
+        if (deveTentarFallbackMetodo(resposta)) {
+            final String metodoFallback = "POST".equalsIgnoreCase(metodoPreferencial) ? "GET" : "POST";
+            logger.warn(
+                "DataExport respondeu HTTP {} com metodo {} em {}. Tentando fallback {}.",
+                resposta.statusCode(),
+                metodoPreferencial,
+                requestKey,
+                metodoFallback
+            );
+            resposta = executarRequisicaoDataExportJsonComMetodo(
+                url,
+                corpoJson,
+                timeout,
+                requestKey + "-fallback-" + metodoFallback.toLowerCase(Locale.ROOT),
+                metodoFallback
+            );
+        }
+        return resposta;
+    }
+
+    private HttpResponse<String> executarRequisicaoDataExportJsonComMetodo(final String url,
+                                                                            final String corpoJson,
+                                                                            final Duration timeout,
+                                                                            final String requestKey,
+                                                                            final String metodoHttp) {
+        final HttpRequest requisicao = construirRequisicaoDataExport(url, corpoJson, timeout, metodoHttp, null);
+        return gerenciadorRequisicao.executarRequisicaoEstrita(this.httpClient, requisicao, requestKey + "-" + metodoHttp);
+    }
+
+    private HttpResponse<String> executarRequisicaoDataExportCsv(final String url,
+                                                                 final String corpoJson,
+                                                                 final Duration timeout,
+                                                                 final String requestKey) {
+        final String metodoPreferencial = CarregadorConfig.obterMetodoHttpDataExportPreferencial();
+        HttpResponse<String> resposta = executarRequisicaoDataExportCsvComMetodo(
+            url,
+            corpoJson,
+            timeout,
+            requestKey,
+            metodoPreferencial
+        );
+
+        if (deveTentarFallbackMetodo(resposta)) {
+            final String metodoFallback = "POST".equalsIgnoreCase(metodoPreferencial) ? "GET" : "POST";
+            logger.warn(
+                "DataExport CSV respondeu HTTP {} com metodo {} em {}. Tentando fallback {}.",
+                resposta.statusCode(),
+                metodoPreferencial,
+                requestKey,
+                metodoFallback
+            );
+            resposta = executarRequisicaoDataExportCsvComMetodo(
+                url,
+                corpoJson,
+                timeout,
+                requestKey + "-fallback-" + metodoFallback.toLowerCase(Locale.ROOT),
+                metodoFallback
+            );
+        }
+        return resposta;
+    }
+
+    private HttpResponse<String> executarRequisicaoDataExportCsvComMetodo(final String url,
+                                                                           final String corpoJson,
+                                                                           final Duration timeout,
+                                                                           final String requestKey,
+                                                                           final String metodoHttp) {
+        final HttpRequest requisicao = construirRequisicaoDataExport(url, corpoJson, timeout, metodoHttp, "text/csv");
+        return gerenciadorRequisicao.executarRequisicaoComCharsetEstrita(
+            this.httpClient,
+            requisicao,
+            requestKey + "-" + metodoHttp,
+            StandardCharsets.ISO_8859_1
+        );
+    }
+
+    private HttpRequest construirRequisicaoDataExport(final String url,
+                                                      final String corpoJson,
+                                                      final Duration timeout,
+                                                      final String metodoHttp,
+                                                      final String acceptHeader) {
+        final String metodo = metodoHttp == null ? "POST" : metodoHttp.trim().toUpperCase(Locale.ROOT);
+        final HttpRequest.Builder builder = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json")
+            .timeout(timeout);
+        if (acceptHeader != null && !acceptHeader.isBlank()) {
+            builder.header("Accept", acceptHeader);
+        }
+
+        return switch (metodo) {
+            case "POST" -> builder.POST(HttpRequest.BodyPublishers.ofString(corpoJson)).build();
+            case "GET" -> builder.method("GET", HttpRequest.BodyPublishers.ofString(corpoJson)).build();
+            default -> throw new IllegalArgumentException("Metodo HTTP DataExport nao suportado: " + metodo);
+        };
+    }
+
+    private boolean deveTentarFallbackMetodo(final HttpResponse<String> resposta) {
+        if (resposta == null) {
+            return false;
+        }
+        final int status = resposta.statusCode();
+        return status == 404 || status == 405 || status == 415 || status == 501;
+    }
+    private String extrairAmostraPayload(final String payload, final int limite) {
+        if (payload == null || payload.isBlank()) {
+            return "<vazio>";
+        }
+        final String normalizado = payload.replace('\n', ' ').replace('\r', ' ').trim();
+        if (normalizado.length() <= limite) {
+            return normalizado;
+        }
+        return normalizado.substring(0, Math.max(0, limite)) + "...";
+    }
+
     /**
-     * Constrói o corpo JSON da requisição conforme formato esperado pela API DataExport.
+     * ConstrÃ³i o corpo JSON da requisiÃ§Ã£o conforme formato esperado pela API DataExport.
      * Formato: {"search": {"nomeTabela": {"campoData": "yyyy-MM-dd - yyyy-MM-dd"}}, "page": "1", "per": "1000|10000"}
      * 
      * @param nomeTabela Nome da tabela para o campo search
-     * @param campoData Nome do campo de data específico do template
-     * @param dataInicio Data de início do filtro
+     * @param campoData Nome do campo de data especÃ­fico do template
+     * @param dataInicio Data de inÃ­cio do filtro
      * @param dataFim Data de fim do filtro
-     * @param pagina Número da página atual
-     * @param config Configuração da entidade (de ConstantesApiDataExport)
-     * @return String JSON formatada para o corpo da requisição
+     * @param pagina NÃºmero da pÃ¡gina atual
+     * @param config ConfiguraÃ§Ã£o da entidade (de ConstantesApiDataExport)
+     * @return String JSON formatada para o corpo da requisiÃ§Ã£o
      */
     private String construirCorpoRequisicao(final String nomeTabela, final String campoData, 
             final Instant dataInicio, final Instant dataFim, final int pagina, final ConfiguracaoEntidade config) {
@@ -741,7 +951,7 @@ public class ClienteApiDataExport {
             final String dataFimStr = dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate().format(FormatadorData.ISO_DATE);
             final String range = dataInicioStr + " - " + dataFimStr;
 
-            // Constrói a estrutura JSON conforme formato do Postman
+            // ConstrÃ³i a estrutura JSON conforme formato do Postman
             // Usa config.usaSearchNested() para determinar estrutura
             if (config.usaSearchNested()) {
                 final ObjectNode searchNested = MapperUtil.sharedJson().createObjectNode();
@@ -759,21 +969,25 @@ public class ClienteApiDataExport {
             corpo.put("order_by", config.orderBy());
 
             final String corpoJson = MapperUtil.toJson(corpo);
-            logger.debug("Corpo JSON construído: {}", corpoJson);
+            logger.debug("Corpo JSON construÃ­do: {}", corpoJson);
             return corpoJson;
             
         } catch (final Exception e) {
-            logger.error("Erro ao construir corpo da requisição: {}", e.getMessage(), e);
-            return "{}";
+            logger.error("Erro ao construir corpo da requisiÃ§Ã£o: {}", e.getMessage(), e);
+            throw new IllegalStateException(
+                "Falha ao construir corpo da requisiÃ§Ã£o DataExport para tabela " + nomeTabela
+                    + ", campo " + campoData + ", pÃ¡gina " + pagina,
+                e
+            );
         }
     }
 
     /**
-     * Obtém a contagem total de manifestos para uma data de referência específica
+     * ObtÃ©m a contagem total de manifestos para uma data de referÃªncia especÃ­fica
      * Baixa o CSV e conta as linhas de forma eficiente usando NIO
      * 
-     * @param dataReferencia Data de referência para filtrar os manifestos
-     * @return Número total de manifestos encontrados
+     * @param dataReferencia Data de referÃªncia para filtrar os manifestos
+     * @return NÃºmero total de manifestos encontrados
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemManifestos(final LocalDate dataReferencia) {
@@ -788,11 +1002,11 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Obtém a contagem total de cotações para uma data de referência específica
+     * ObtÃ©m a contagem total de cotaÃ§Ãµes para uma data de referÃªncia especÃ­fica
      * Baixa o CSV e conta as linhas de forma eficiente usando NIO
      * 
-     * @param dataReferencia Data de referência para filtrar as cotações
-     * @return Número total de cotações encontradas
+     * @param dataReferencia Data de referÃªncia para filtrar as cotaÃ§Ãµes
+     * @return NÃºmero total de cotaÃ§Ãµes encontradas
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemCotacoes(final LocalDate dataReferencia) {
@@ -802,16 +1016,16 @@ public class ClienteApiDataExport {
             config.tabelaApi(), 
             config.campoData(), 
             dataReferencia, 
-            "cotações"
+            "cotaÃ§Ãµes"
         );
     }
 
     /**
-     * Obtém a contagem total de localizações de carga para uma data de referência específica
+     * ObtÃ©m a contagem total de localizaÃ§Ãµes de carga para uma data de referÃªncia especÃ­fica
      * Baixa o CSV e conta as linhas de forma eficiente usando NIO
      * 
-     * @param dataReferencia Data de referência para filtrar as localizações
-     * @return Número total de localizações de carga encontradas
+     * @param dataReferencia Data de referÃªncia para filtrar as localizaÃ§Ãµes
+     * @return NÃºmero total de localizaÃ§Ãµes de carga encontradas
      * @throws RuntimeException se houver erro no download ou processamento do CSV
      */
     public int obterContagemLocalizacoesCarga(final LocalDate dataReferencia) {
@@ -821,12 +1035,12 @@ public class ClienteApiDataExport {
             config.tabelaApi(), 
             config.campoData(), 
             dataReferencia, 
-            "localizações de carga"
+            "localizaÃ§Ãµes de carga"
         );
     }
 
     /**
-     * Obtém contagem via CSV para Faturas a Pagar.
+     * ObtÃ©m contagem via CSV para Faturas a Pagar.
      */
     public int obterContagemContasAPagar(final LocalDate dataReferencia) {
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
@@ -840,15 +1054,15 @@ public class ClienteApiDataExport {
     }
 
     /**
-     * Método genérico para obter contagem de registros via download e contagem de CSV
-     * Implementa a estratégia recomendada na documentação: baixar CSV e contar linhas
+     * MÃ©todo genÃ©rico para obter contagem de registros via download e contagem de CSV
+     * Implementa a estratÃ©gia recomendada na documentaÃ§Ã£o: baixar CSV e contar linhas
      * 
-     * @param templateId ID do template para a requisição
+     * @param templateId ID do template para a requisiÃ§Ã£o
      * @param nomeTabela Nome da tabela para filtros
      * @param campoData Campo de data para filtros
-     * @param dataReferencia Data de referência para filtros
-     * @param tipoAmigavel Nome amigável do tipo de dados para logs
-     * @return Número total de registros encontrados
+     * @param dataReferencia Data de referÃªncia para filtros
+     * @param tipoAmigavel Nome amigÃ¡vel do tipo de dados para logs
+     * @return NÃºmero total de registros encontrados
      * @throws RuntimeException se houver erro no download ou processamento
      */
     private int obterContagemGenericaCsv(final int templateId, final String nomeTabela, final String campoData, 
@@ -856,47 +1070,42 @@ public class ClienteApiDataExport {
         
         final String chaveTemplate = "Template-" + templateId;
         
-        // CIRCUIT BREAKER - Verificar se o template está com circuit aberto
+        // CIRCUIT BREAKER - Verificar se o template estÃ¡ com circuit aberto
         if (templatesComCircuitAberto.contains(chaveTemplate)) {
-            logger.warn("⚠️ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado para contagem", 
+            logger.warn("âš ï¸ CIRCUIT BREAKER ATIVO - Template {} ({}) temporariamente desabilitado para contagem", 
                     templateId, tipoAmigavel);
             return 0;
         }
 
-        logger.info("🔢 Obtendo contagem de {} via CSV - Template: {}, Data: {}", 
+        logger.info("ðŸ”¢ Obtendo contagem de {} via CSV - Template: {}, Data: {}", 
                 tipoAmigavel, templateId, dataReferencia);
 
         final Path arquivoTemporario = null;
         try {
-            // Converter LocalDate para Instant (início e fim do dia)
+            // Converter LocalDate para Instant (inÃ­cio e fim do dia)
             final Instant dataInicio = dataReferencia.atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
             final Instant dataFim = dataReferencia.plusDays(1).atStartOfDay().atZone(java.time.ZoneOffset.UTC).toInstant();
 
             // URL para download do CSV
             final String url = urlBase + ConstantesApiDataExport.formatarEndpoint(templateId);
 
-            // Construir corpo da requisição com per=1 para otimização (apenas primeira página)
+            // Construir corpo da requisiÃ§Ã£o com per=1 para otimizaÃ§Ã£o (apenas primeira pÃ¡gina)
             final String corpoJson = construirCorpoRequisicaoCsv(nomeTabela, campoData, dataInicio, dataFim);
 
             logger.debug("Baixando CSV para contagem via URL: {} com corpo: {}", url, corpoJson);
 
-            final HttpRequest requisicao = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "text/csv") // Solicitar formato CSV
-                    .timeout(this.timeoutRequisicao)
-                    .method("GET", HttpRequest.BodyPublishers.ofString(corpoJson))
-                    .build();
-
             final long inicioMs = System.currentTimeMillis();
-            final HttpResponse<String> resposta = gerenciadorRequisicao.executarRequisicaoComCharsetEstrita(
-                    this.httpClient, requisicao, "contagem-csv-" + tipoAmigavel.replace(" ", "-"), StandardCharsets.ISO_8859_1);
+            final HttpResponse<String> resposta = executarRequisicaoDataExportCsv(
+                    url,
+                    corpoJson,
+                    this.timeoutRequisicao,
+                    "contagem-csv-" + tipoAmigavel.replace(" ", "-")
+            );
             final long duracaoMs = System.currentTimeMillis() - inicioMs;
 
             if (resposta == null) {
                 logger.error("Erro: resposta nula ao baixar CSV para contagem de {}", tipoAmigavel);
-                throw new RuntimeException("Falha na requisição CSV: resposta é null");
+                throw new RuntimeException("Falha na requisiÃ§Ã£o CSV: resposta Ã© null");
             }
 
             if (resposta.statusCode() != 200) {
@@ -911,12 +1120,12 @@ public class ClienteApiDataExport {
             final String conteudoCsv = resposta.body();
             final long totalLinhas = conteudoCsv.lines().count();
 
-            // Subtrair 1 para desconsiderar o cabeçalho
+            // Subtrair 1 para desconsiderar o cabeÃ§alho
             final int contagem = Math.max(0, (int) (totalLinhas - 1));
 
             contadorFalhasConsecutivas.put(chaveTemplate, 0);
 
-            logger.info("✅ Contagem de {} obtida com sucesso via CSV: {} registros ({} ms)", 
+            logger.info("âœ… Contagem de {} obtida com sucesso via CSV: {} registros ({} ms)", 
                     tipoAmigavel, contagem, duracaoMs);
 
             return contagem;
@@ -924,40 +1133,40 @@ public class ClienteApiDataExport {
         } catch (final RuntimeException e) {
             logger.error("Erro de runtime ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
-            throw e; // Re-lançar RuntimeException sem encapsular
+            throw e; // Re-lanÃ§ar RuntimeException sem encapsular
         } catch (final Exception e) {
             logger.error("Erro inesperado ao obter contagem de {} via CSV: {}", tipoAmigavel, e.getMessage(), e);
             incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
             throw new RuntimeException("Erro inesperado ao processar contagem de " + tipoAmigavel + " via CSV", e);
         } finally {
-            // Garantir que o arquivo temporário seja deletado
+            // Garantir que o arquivo temporÃ¡rio seja deletado
             if (arquivoTemporario != null) {
                 try {
                     Files.deleteIfExists(arquivoTemporario);
-                    logger.debug("Arquivo temporário deletado: {}", arquivoTemporario);
+                    logger.debug("Arquivo temporÃ¡rio deletado: {}", arquivoTemporario);
                 } catch (final IOException e) {
-                    logger.warn("Não foi possível deletar arquivo temporário {}: {}", 
+                    logger.warn("NÃ£o foi possÃ­vel deletar arquivo temporÃ¡rio {}: {}", 
                             arquivoTemporario, e.getMessage());
                 } catch (final SecurityException e) {
-                    logger.warn("Sem permissão para deletar arquivo temporário {}: {}", 
+                    logger.warn("Sem permissÃ£o para deletar arquivo temporÃ¡rio {}: {}", 
                             arquivoTemporario, e.getMessage());
                 }
             }
         }
     }
 
-    // NOTA: Métodos obterValorPerPorTemplate() e obterTimeoutPorTemplate() foram removidos.
+    // NOTA: MÃ©todos obterValorPerPorTemplate() e obterTimeoutPorTemplate() foram removidos.
     // Agora usar config.valorPer() e config.timeout() de ConstantesApiDataExport.
 
     /**
-     * Constrói o corpo da requisição JSON para contagem via CSV
-     * Similar ao método original, mas otimizado para contagem
+     * ConstrÃ³i o corpo da requisiÃ§Ã£o JSON para contagem via CSV
+     * Similar ao mÃ©todo original, mas otimizado para contagem
      * 
      * @param nomeTabela Nome da tabela para filtros
      * @param campoData Campo de data para filtros
-     * @param dataInicio Data de início do período
-     * @param dataFim Data de fim do período
-     * @return String JSON do corpo da requisição
+     * @param dataInicio Data de inÃ­cio do perÃ­odo
+     * @param dataFim Data de fim do perÃ­odo
+     * @return String JSON do corpo da requisiÃ§Ã£o
      */
     private String construirCorpoRequisicaoCsv(final String nomeTabela, final String campoData, 
             final Instant dataInicio, final Instant dataFim) {
@@ -982,14 +1191,20 @@ public class ClienteApiDataExport {
             corpo.put("order_by", "sequence_code asc");
 
             final String corpoJson = MapperUtil.toJson(corpo);
-            logger.debug("Corpo JSON para contagem CSV construído: {}", corpoJson);
+            logger.debug("Corpo JSON para contagem CSV construÃ­do: {}", corpoJson);
             return corpoJson;
             
         } catch (final Exception e) {
-            logger.error("Erro ao construir corpo da requisição para contagem CSV: {}", e.getMessage(), e);
-            return "{}";
+            logger.error("Erro ao construir corpo da requisiÃ§Ã£o para contagem CSV: {}", e.getMessage(), e);
+            throw new IllegalStateException(
+                "Falha ao construir corpo da requisiÃ§Ã£o de contagem CSV para tabela "
+                    + nomeTabela + ", campo " + campoData,
+                e
+            );
         }
     }
 
 }
+
+
 

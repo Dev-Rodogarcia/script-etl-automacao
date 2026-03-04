@@ -51,9 +51,10 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("                        Uso: --testar-api [tipo] [entidade] [--sem-faturas-graphql]");
         System.out.println("  --validar-api-banco-24h");
         System.out.println("                        Compara API ao vivo x banco (janela da ultima extracao COMPLETA)");
+        System.out.println("                        Opcional: --permitir-fallback-janela");
         System.out.println("  --validar-api-banco-24h-detalhado");
         System.out.println("                        Compara chave a chave por entidade (API x banco na janela da ultima extracao)");
-        System.out.println("                        Opcional: --sem-faturas-graphql | --periodo-fechado");
+        System.out.println("                        Opcional: --sem-faturas-graphql | --periodo-fechado | --permitir-fallback-janela");
         System.out.println("  --loop                Console interativo de loop");
         System.out.println("                        Opcional: --sem-faturas-graphql");
         System.out.println("  --loop-daemon-start   Inicia loop em segundo plano");

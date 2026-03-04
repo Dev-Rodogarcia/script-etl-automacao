@@ -171,29 +171,35 @@ public class ContasAPagarMapper {
      * e não como separador de milhar (evitando que 179.0 vire 1790.00).
      */
     private BigDecimal parseBigDecimal(String valor) {
-        if (valor == null || valor.trim().isEmpty()) {
-            return BigDecimal.ZERO; // Retorna Zero para evitar NULL em somas no banco
+        if (valor == null) {
+            return null;
         }
-        
+
+        valor = valor.trim();
+        if (valor.isEmpty()) {
+            return null;
+        }
+
         try {
             // Limpeza preventiva de símbolos de moeda se houver
-            String limpo = valor.trim().replace("R$", "").trim();
+            final String limpo = valor.replace("R$", "").trim();
             
             // CRÍTICO: Configura formatador US (Padrão 123.45)
             // Isso força o Java a entender o ponto como separador decimal
-            java.text.DecimalFormat nf = (java.text.DecimalFormat) java.text.NumberFormat.getInstance(java.util.Locale.US);
+            final java.text.DecimalFormat nf =
+                (java.text.DecimalFormat) java.text.NumberFormat.getInstance(java.util.Locale.US);
             nf.setParseBigDecimal(true);
             
             return (BigDecimal) nf.parse(limpo);
             
-        } catch (java.text.ParseException e) {
+        } catch (final java.text.ParseException e) {
             logger.warn("Falha ao converter valor monetário '{}' usando Locale.US. Tentando fallback simples.", valor);
             try {
                 // Fallback para o construtor padrão se o formato US falhar
-                return new BigDecimal(valor.trim());
-            } catch (Exception ex) {
-                logger.error("Erro irrecuperável na conversão de valor: {}", valor);
-                return BigDecimal.ZERO;
+                return new BigDecimal(valor);
+            } catch (final Exception ex) {
+                logger.warn("Valor monetário inválido recebido da API e descartado: '{}'", valor);
+                return null;
             }
         }
     }

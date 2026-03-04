@@ -95,7 +95,7 @@ public class ExtractionResult {
             .totalUnicos(resultado.getDados().size()) // Padrão: tamanho da lista
             .paginasProcessadas(resultado.getPaginasProcessadas())
             .mensagem(mensagem)
-            .sucesso(true);
+            .sucesso(resultado.isCompleto());
     }
     
     public static Builder sucessoComUnicos(final String entityName,
@@ -111,7 +111,7 @@ public class ExtractionResult {
             .totalUnicos(totalUnicos)
             .paginasProcessadas(resultado.getPaginasProcessadas())
             .mensagem(mensagem)
-            .sucesso(true);
+            .sucesso(resultado.isCompleto());
     }
     
     public static Builder erro(final String entityName,

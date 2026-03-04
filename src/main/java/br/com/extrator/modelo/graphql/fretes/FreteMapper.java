@@ -247,30 +247,32 @@ public class FreteMapper {
             entity.setCteId(dto.getCte().getId());
         }
 
-        // 2. Conversão segura de tipos de data e hora
-        try {
-            if (dto.getServiceAt() != null && !dto.getServiceAt().trim().isEmpty()) {
-                entity.setServicoEm(OffsetDateTime.parse(dto.getServiceAt()));
+        // 2. Conversão segura de tipos de data e hora (isolada por campo)
+        final OffsetDateTime serviceAt = parseOffsetDateTimeCampo(dto.getServiceAt(), "serviceAt", dto.getId());
+        if (serviceAt != null) {
+            entity.setServicoEm(serviceAt);
+        }
+        final OffsetDateTime createdAt = parseOffsetDateTimeCampo(dto.getCreatedAt(), "createdAt", dto.getId());
+        if (createdAt != null) {
+            entity.setCriadoEm(createdAt);
+        }
+        if (dto.getCte() != null) {
+            final OffsetDateTime cteIssuedAt = parseOffsetDateTimeCampo(dto.getCte().getIssuedAt(), "cte.issuedAt", dto.getId());
+            if (cteIssuedAt != null) {
+                entity.setCteIssuedAt(cteIssuedAt);
             }
-            if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
-                entity.setCriadoEm(OffsetDateTime.parse(dto.getCreatedAt()));
+            final OffsetDateTime cteCreatedAt = parseOffsetDateTimeCampo(dto.getCte().getCreatedAt(), "cte.createdAt", dto.getId());
+            if (cteCreatedAt != null) {
+                entity.setCteCreatedAt(cteCreatedAt);
             }
-            if (dto.getCte() != null && dto.getCte().getIssuedAt() != null && !dto.getCte().getIssuedAt().trim().isEmpty()) {
-                entity.setCteIssuedAt(OffsetDateTime.parse(dto.getCte().getIssuedAt()));
-            }
-            if (dto.getCte() != null && dto.getCte().getCreatedAt() != null && !dto.getCte().getCreatedAt().trim().isEmpty()) {
-                entity.setCteCreatedAt(OffsetDateTime.parse(dto.getCte().getCreatedAt()));
-            }
-            if (dto.getDeliveryPredictionDate() != null && !dto.getDeliveryPredictionDate().trim().isEmpty()) {
-                entity.setDataPrevisaoEntrega(LocalDate.parse(dto.getDeliveryPredictionDate()));
-            }
-            if (dto.getServiceDate() != null && !dto.getServiceDate().trim().isEmpty()) {
-                entity.setServiceDate(LocalDate.parse(dto.getServiceDate()));
-            }
-        } catch (final DateTimeParseException e) {
-            logger.error("❌ Erro ao converter data para frete ID {}: serviceAt='{}', createdAt='{}', deliveryPredictionDate='{}', serviceDate='{}' - {}", 
-                dto.getId(), dto.getServiceAt(), dto.getCreatedAt(), dto.getDeliveryPredictionDate(), dto.getServiceDate(), e.getMessage());
-            logger.debug("Stack trace completo:", e);
+        }
+        final LocalDate deliveryPredictionDate = parseLocalDateCampo(dto.getDeliveryPredictionDate(), "deliveryPredictionDate", dto.getId());
+        if (deliveryPredictionDate != null) {
+            entity.setDataPrevisaoEntrega(deliveryPredictionDate);
+        }
+        final LocalDate serviceDate = parseLocalDateCampo(dto.getServiceDate(), "serviceDate", dto.getId());
+        if (serviceDate != null) {
+            entity.setServiceDate(serviceDate);
         }
 
         // 3. Empacotamento de todos os metadados
@@ -278,5 +280,29 @@ public class FreteMapper {
         entity.setMetadata(metadata);
 
         return entity;
+    }
+
+    private OffsetDateTime parseOffsetDateTimeCampo(final String valor, final String campo, final Long freteId) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(valor);
+        } catch (final DateTimeParseException e) {
+            logger.warn("Falha ao converter {} para frete ID {}: valor='{}' | erro={}", campo, freteId, valor, e.getMessage());
+            return null;
+        }
+    }
+
+    private LocalDate parseLocalDateCampo(final String valor, final String campo, final Long freteId) {
+        if (valor == null || valor.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(valor);
+        } catch (final DateTimeParseException e) {
+            logger.warn("Falha ao converter {} para frete ID {}: valor='{}' | erro={}", campo, freteId, valor, e.getMessage());
+            return null;
+        }
     }
 }

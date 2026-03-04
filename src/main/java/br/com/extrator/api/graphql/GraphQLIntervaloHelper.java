@@ -162,8 +162,7 @@ public final class GraphQLIntervaloHelper {
             final String nomeEntidade,
             final int diaAtual,
             final long totalDias) {
-        final int tentativasConfiguradas = Math.max(1, CarregadorConfig.obterMaxTentativasRetry());
-        final int maxTentativas = Math.min(3, tentativasConfiguradas);
+        final int maxTentativas = Math.max(1, CarregadorConfig.obterMaxTentativasRetryGraphQLPorDia());
         final long delayBaseMs = Math.max(500L, CarregadorConfig.obterDelayBaseRetry());
         final double multiplicador = Math.max(1.0d, CarregadorConfig.obterMultiplicadorRetry());
         ResultadoExtracao<T> ultimoResultado = null;

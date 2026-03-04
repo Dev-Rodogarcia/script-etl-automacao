@@ -31,6 +31,8 @@ Atributos-chave:
 package br.com.extrator.runners.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -49,6 +51,7 @@ class ExtractionLoggerTest {
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_COMPLETO, result.getStatus());
+        assertTrue(result.isSucesso());
     }
 
     @Test
@@ -58,6 +61,7 @@ class ExtractionLoggerTest {
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_INCOMPLETO_DADOS, result.getStatus());
+        assertFalse(result.isSucesso());
     }
 
     @Test
@@ -67,6 +71,7 @@ class ExtractionLoggerTest {
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_INCOMPLETO_DB, result.getStatus());
+        assertFalse(result.isSucesso());
     }
 
     @Test
@@ -76,6 +81,7 @@ class ExtractionLoggerTest {
 
         assertEquals(ConstantesEntidades.STATUS_COMPLETO, result.getStatus());
         assertEquals(5, result.getTotalUnicos());
+        assertTrue(result.isSucesso());
     }
 
     @Test
@@ -90,6 +96,7 @@ class ExtractionLoggerTest {
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_ERRO_API, result.getStatus());
+        assertFalse(result.isSucesso());
     }
 
     @Test
@@ -104,6 +111,7 @@ class ExtractionLoggerTest {
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_INCOMPLETO_LIMITE, result.getStatus());
+        assertFalse(result.isSucesso());
     }
 
     private ExtractionResult executar(final ResultadoExtracao<String> resultadoExtracao,

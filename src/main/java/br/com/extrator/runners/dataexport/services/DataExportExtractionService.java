@@ -59,7 +59,6 @@ import br.com.extrator.modelo.dataexport.cotacao.CotacaoMapper;
 import br.com.extrator.modelo.dataexport.faturaporcliente.FaturaPorClienteMapper;
 import br.com.extrator.modelo.dataexport.localizacaocarga.LocalizacaoCargaMapper;
 import br.com.extrator.modelo.dataexport.manifestos.ManifestoMapper;
-import br.com.extrator.runners.common.ConstantesExtracao;
 import br.com.extrator.runners.common.ExtractionHelper;
 import br.com.extrator.runners.common.ExtractionLogger;
 import br.com.extrator.runners.common.ExtractionResult;
@@ -111,6 +110,7 @@ public class DataExportExtractionService {
         log.info("📅 Período: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
         log.info("⏰ Início: {}", inicioExecucao);
         log.info("🎯 Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
+        log.info("🛡️ Modo de integridade: {}", CarregadorConfig.obterModoIntegridadeEtl());
         log.info("");
         
         CarregadorConfig.validarConexaoBancoDados();
@@ -198,9 +198,12 @@ public class DataExportExtractionService {
         exibirResumoConsolidado(resultados, inicioExecucao);
 
         // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+        final boolean modoEstrito = CarregadorConfig.isModoIntegridadeEstrito();
         final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> !r.isSucesso())
-            .map(ExtractionResult::getEntityName)
+            .filter(r -> modoEstrito
+                ? !ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())
+                : ConstantesEntidades.STATUS_ERRO_API.equals(r.getStatus()))
+            .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
             .toList();
         if (!entidadesComFalha.isEmpty()) {
             throw new RuntimeException("Extração DataExport com falhas: " + String.join(", ", entidadesComFalha)
@@ -218,11 +221,6 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "manifestos"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -236,11 +234,6 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "cotações"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -254,11 +247,6 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "localização de cargas"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -272,11 +260,6 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "faturas a pagar"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -290,11 +273,6 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "faturas por cliente"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -320,13 +298,12 @@ public class DataExportExtractionService {
         int totalPaginas = 0;
         
         for (final ExtractionResult result : resultados) {
-            if (result.isSucesso()) {
+            if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
                 entidadesComSucesso++;
-                if (!ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
-                    entidadesIncompletas++;
-                }
-            } else {
+            } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
                 entidadesComErro++;
+            } else {
+                entidadesIncompletas++;
             }
             totalRegistrosExtraidos += result.getRegistrosExtraidos();
             totalRegistrosSalvos += result.getRegistrosSalvos();
@@ -367,9 +344,14 @@ public class DataExportExtractionService {
         log.info("📋 Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
-            final String statusIcon = result.isSucesso()
-                ? (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus()) ? "✅" : "⚠️")
-                : "❌";
+            final String statusIcon;
+            if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
+                statusIcon = "✅";
+            } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
+                statusIcon = "❌";
+            } else {
+                statusIcon = "⚠️";
+            }
             log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
                 i + 1,
                 statusIcon,
@@ -382,8 +364,9 @@ public class DataExportExtractionService {
         // EVENTOS / OBSERVAÇÕES: timeouts, entidades com erro (ficam gravados no log)
         final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
         for (final ExtractionResult r : resultados) {
-            if (!r.isSucesso()) {
-                eventos.add("Entidade " + r.getEntityName() + " falhou. Será reextraída na próxima execução.");
+            if (!ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())) {
+                eventos.add("Entidade " + r.getEntityName() + " não concluiu como COMPLETO (status="
+                    + r.getStatus() + "). Será reextraída na próxima execução.");
             }
         }
         if (!eventos.isEmpty()) {
@@ -397,8 +380,11 @@ public class DataExportExtractionService {
         log.info("");
         log.info("⏰ Fim: {}", fimExecucao);
         log.info("╔" + "═".repeat(78) + "╗");
-        if (entidadesComErro > 0) {
-            log.info("║" + " ".repeat(14) + "⚠️ EXTRAÇÕES DATAEXPORT CONCLUÍDAS COM FALHAS (" + entidadesComErro + ")" + " ".repeat(10) + "║");
+        if (entidadesComErro > 0 || entidadesIncompletas > 0) {
+            final String resumoFalhas = "⚠️ EXTRAÇÕES DATAEXPORT COM NÃO CONFORMIDADES "
+                + "(incompletas=" + entidadesIncompletas + ", erros=" + entidadesComErro + ")";
+            final int padding = Math.max(0, 78 - resumoFalhas.length());
+            log.info("║" + resumoFalhas + " ".repeat(padding) + "║");
         } else {
             log.info("║" + " ".repeat(18) + "✅ EXTRAÇÕES DATAEXPORT CONCLUÍDAS" + " ".repeat(26) + "║");
         }

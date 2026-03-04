@@ -114,6 +114,7 @@ public class GraphQLExtractionService {
         log.info("📅 Período: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
         log.info("⏰ Início: {}", inicioExecucao);
         log.info("🎯 Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
+        log.info("🛡️ Modo de integridade: {}", CarregadorConfig.obterModoIntegridadeEtl());
         log.info("");
         
         CarregadorConfig.validarConexaoBancoDados();
@@ -213,9 +214,12 @@ public class GraphQLExtractionService {
         exibirResumoConsolidado(resultados, inicioExecucao);
 
         // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+        final boolean modoEstrito = CarregadorConfig.isModoIntegridadeEstrito();
         final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> !r.isSucesso())
-            .map(ExtractionResult::getEntityName)
+            .filter(r -> modoEstrito
+                ? !ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())
+                : ConstantesEntidades.STATUS_ERRO_API.equals(r.getStatus()))
+            .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
             .toList();
         if (!entidadesComFalha.isEmpty()) {
             throw new RuntimeException("Extração GraphQL com falhas: " + String.join(", ", entidadesComFalha)
@@ -251,7 +255,7 @@ public class GraphQLExtractionService {
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
         
-        if (!result.isSucesso() && throwOnError) {
+        if (throwOnError && ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
             throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "usuários do sistema"), result.getErro());
         }
         
@@ -280,11 +284,6 @@ public class GraphQLExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
-        
-        if (!result.isSucesso()) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "fretes"), result.getErro());
-        }
-        
         return result;
     }
     
@@ -324,13 +323,12 @@ public class GraphQLExtractionService {
         int totalPaginas = 0;
         
         for (final ExtractionResult result : resultados) {
-            if (result.isSucesso()) {
+            if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
                 entidadesComSucesso++;
-                if (!ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
-                    entidadesIncompletas++;
-                }
-            } else {
+            } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
                 entidadesComErro++;
+            } else {
+                entidadesIncompletas++;
             }
             totalRegistrosExtraidos += result.getRegistrosExtraidos();
             totalRegistrosSalvos += result.getRegistrosSalvos();
@@ -364,9 +362,14 @@ public class GraphQLExtractionService {
         log.info("📋 Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
-            final String statusIcon = result.isSucesso()
-                ? (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus()) ? "✅" : "⚠️")
-                : "❌";
+            final String statusIcon;
+            if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
+                statusIcon = "✅";
+            } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
+                statusIcon = "❌";
+            } else {
+                statusIcon = "⚠️";
+            }
             log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
                 i + 1,
                 statusIcon,
@@ -379,8 +382,9 @@ public class GraphQLExtractionService {
         // EVENTOS / OBSERVAÇÕES: timeouts, entidades com erro (ficam gravados no log)
         final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
         for (final ExtractionResult r : resultados) {
-            if (!r.isSucesso()) {
-                eventos.add("Entidade " + r.getEntityName() + " falhou. Será reextraída na próxima execução.");
+            if (!ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())) {
+                eventos.add("Entidade " + r.getEntityName() + " não concluiu como COMPLETO (status="
+                    + r.getStatus() + "). Será reextraída na próxima execução.");
             }
         }
         if (!eventos.isEmpty()) {
@@ -394,7 +398,14 @@ public class GraphQLExtractionService {
         log.info("");
         log.info("⏰ Fim: {}", fimExecucao);
         log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(20) + "✅ EXTRAÇÕES GRAPHQL CONCLUÍDAS" + " ".repeat(26) + "║");
+        if (entidadesComErro > 0 || entidadesIncompletas > 0) {
+            final String resumoFalhas = "⚠️ EXTRAÇÕES GRAPHQL COM NÃO CONFORMIDADES "
+                + "(incompletas=" + entidadesIncompletas + ", erros=" + entidadesComErro + ")";
+            final int padding = Math.max(0, 78 - resumoFalhas.length());
+            log.info("║" + resumoFalhas + " ".repeat(padding) + "║");
+        } else {
+            log.info("║" + " ".repeat(20) + "✅ EXTRAÇÕES GRAPHQL CONCLUÍDAS" + " ".repeat(26) + "║");
+        }
         log.info("╚" + "═".repeat(78) + "╝");
         log.info("");
     }

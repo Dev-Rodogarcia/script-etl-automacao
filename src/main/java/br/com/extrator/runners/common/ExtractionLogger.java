@@ -257,10 +257,12 @@ public class ExtractionLogger {
             if (usarUnicos) {
                 return ExtractionResult.sucessoComUnicos(entityName, inicio, resultado, registrosSalvos, totalUnicos, mensagem)
                     .status(statusFinal)
+                    .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             } else {
                 return ExtractionResult.sucesso(entityName, inicio, resultado, registrosSalvos, mensagem)
                     .status(statusFinal)
+                    .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             }
                 
@@ -387,6 +389,10 @@ public class ExtractionLogger {
     private boolean isInvalidosDentroTolerancia(final int registrosInvalidos, final int totalRecebido) {
         if (registrosInvalidos <= 0) {
             return true;
+        }
+
+        if (CarregadorConfig.isModoIntegridadeEstrito()) {
+            return false;
         }
 
         final int limiteAbsoluto = CarregadorConfig.obterMaxInvalidosToleradosPorEntidade();
