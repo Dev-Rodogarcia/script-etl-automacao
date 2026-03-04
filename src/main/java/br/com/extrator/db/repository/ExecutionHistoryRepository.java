@@ -29,14 +29,18 @@ package br.com.extrator.db.repository;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLRecoverableException;
 import java.sql.SQLException;
+import java.sql.SQLTransientException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.util.ThreadUtil;
 import br.com.extrator.util.banco.GerenciadorConexao;
+import br.com.extrator.util.log.SensitiveDataSanitizer;
 
 /**
  * Repository for sys_execution_history.
@@ -44,6 +48,11 @@ import br.com.extrator.util.banco.GerenciadorConexao;
 public class ExecutionHistoryRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(ExecutionHistoryRepository.class);
+    private static final int MAX_INSERT_ATTEMPTS = 3;
+    private static final long BASE_RETRY_DELAY_MS = 300L;
+    private static final int MAX_STATUS_SIZE = 20;
+    private static final int MAX_ERROR_CATEGORY_SIZE = 50;
+    private static final int MAX_ERROR_MESSAGE_SIZE = 500;
     private static final String SQL_CREATE_SYS_EXECUTION_HISTORY = """
         IF OBJECT_ID(N'dbo.sys_execution_history', N'U') IS NULL
         BEGIN
@@ -78,28 +87,88 @@ public class ExecutionHistoryRepository {
                                  final int totalRecords,
                                  final String errorCategory,
                                  final String errorMessage) {
+        SQLException ultimoErro = null;
+        for (int tentativa = 1; tentativa <= MAX_INSERT_ATTEMPTS; tentativa++) {
+            try {
+                inserirHistoricoUmaTentativa(
+                    inicio,
+                    fim,
+                    durationSeconds,
+                    status,
+                    totalRecords,
+                    errorCategory,
+                    errorMessage
+                );
+                return;
+            } catch (final SQLException e) {
+                ultimoErro = e;
+                if (!isRetryable(e) || tentativa >= MAX_INSERT_ATTEMPTS) {
+                    logger.error(
+                        "Falha ao inserir sys_execution_history apos {} tentativa(s): {}",
+                        tentativa,
+                        sanitize(e.getMessage()),
+                        e
+                    );
+                    throw new RuntimeException("Falha ao inserir sys_execution_history", e);
+                }
+
+                final long delayMs = calcularBackoff(tentativa);
+                logger.warn(
+                    "Falha transiente ao inserir sys_execution_history (tentativa {}/{}). Novo retry em {}ms. erro={}",
+                    tentativa,
+                    MAX_INSERT_ATTEMPTS,
+                    delayMs,
+                    sanitize(e.getMessage())
+                );
+                aguardarRetry(delayMs);
+            }
+        }
+
+        throw new RuntimeException("Falha ao inserir sys_execution_history", ultimoErro);
+    }
+
+    private void inserirHistoricoUmaTentativa(final LocalDateTime inicio,
+                                              final LocalDateTime fim,
+                                              final int durationSeconds,
+                                              final String status,
+                                              final int totalRecords,
+                                              final String errorCategory,
+                                              final String errorMessage) throws SQLException {
         final String sql = """
             INSERT INTO dbo.sys_execution_history
             (start_time, end_time, duration_seconds, status, total_records, error_category, error_message)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """;
 
-        try (Connection conn = GerenciadorConexao.obterConexao();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            garantirEstruturaHistorico(conn);
+        try (Connection conn = GerenciadorConexao.obterConexao()) {
+            final boolean autoCommitOriginal = conn.getAutoCommit();
+            conn.setAutoCommit(false);
 
-            stmt.setTimestamp(1, Timestamp.valueOf(inicio));
-            stmt.setTimestamp(2, Timestamp.valueOf(fim));
-            stmt.setInt(3, durationSeconds);
-            stmt.setString(4, limitar(status, 20));
-            stmt.setInt(5, totalRecords);
-            stmt.setString(6, limitar(errorCategory, 50));
-            stmt.setString(7, limitar(errorMessage, 500));
+            try {
+                garantirEstruturaHistorico(conn);
 
-            stmt.executeUpdate();
-        } catch (final SQLException e) {
-            logger.error("Falha ao inserir sys_execution_history: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha ao inserir sys_execution_history", e);
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setTimestamp(1, Timestamp.valueOf(inicio));
+                    stmt.setTimestamp(2, Timestamp.valueOf(fim));
+                    stmt.setInt(3, durationSeconds);
+                    stmt.setString(4, limitar(status, MAX_STATUS_SIZE));
+                    stmt.setInt(5, totalRecords);
+                    stmt.setString(6, limitar(errorCategory, MAX_ERROR_CATEGORY_SIZE));
+                    stmt.setString(7, limitar(errorMessage, MAX_ERROR_MESSAGE_SIZE));
+                    stmt.executeUpdate();
+                }
+
+                conn.commit();
+            } catch (final SQLException e) {
+                rollbackSilencioso(conn);
+                throw e;
+            } finally {
+                try {
+                    conn.setAutoCommit(autoCommitOriginal);
+                } catch (final SQLException e) {
+                    logger.warn("Falha ao restaurar auto-commit da conexao de historico: {}", sanitize(e.getMessage()));
+                }
+            }
         }
     }
 
@@ -130,7 +199,7 @@ public class ExecutionHistoryRepository {
                 }
             }
         } catch (final SQLException e) {
-            logger.warn("Falha ao calcular total de registros: {}", e.getMessage());
+            logger.warn("Falha ao calcular total de registros: {}", sanitize(e.getMessage()));
         }
 
         return 0;
@@ -159,7 +228,7 @@ public class ExecutionHistoryRepository {
                 return rs.getInt(1) == 1;
             }
         } catch (final SQLException e) {
-            logger.warn("Falha ao verificar existencia de dbo.log_extracoes: {}", e.getMessage());
+            logger.warn("Falha ao verificar existencia de dbo.log_extracoes: {}", sanitize(e.getMessage()));
         }
         return false;
     }
@@ -168,10 +237,51 @@ public class ExecutionHistoryRepository {
         if (valor == null) {
             return null;
         }
-        String texto = valor.trim();
+        String texto = sanitize(valor).trim();
         if (texto.length() > max) {
             texto = texto.substring(0, max);
         }
         return texto;
+    }
+
+    private boolean isRetryable(final SQLException e) {
+        if (e instanceof SQLTransientException || e instanceof SQLRecoverableException) {
+            return true;
+        }
+        final String mensagem = e.getMessage();
+        if (mensagem == null) {
+            return false;
+        }
+        final String lower = mensagem.toLowerCase();
+        return lower.contains("timeout")
+            || lower.contains("temporarily")
+            || lower.contains("deadlock")
+            || lower.contains("could not open connection");
+    }
+
+    private long calcularBackoff(final int tentativa) {
+        final int fator = Math.max(1, tentativa);
+        return BASE_RETRY_DELAY_MS * fator * fator;
+    }
+
+    private void aguardarRetry(final long delayMs) {
+        try {
+            ThreadUtil.aguardar(delayMs);
+        } catch (final InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Retry de historico interrompido.", ie);
+        }
+    }
+
+    private void rollbackSilencioso(final Connection conn) {
+        try {
+            conn.rollback();
+        } catch (final SQLException e) {
+            logger.warn("Falha no rollback de sys_execution_history: {}", sanitize(e.getMessage()));
+        }
+    }
+
+    private String sanitize(final String value) {
+        return SensitiveDataSanitizer.sanitize(value);
     }
 }

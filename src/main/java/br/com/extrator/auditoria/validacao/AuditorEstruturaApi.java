@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.api.ClienteApiDataExport;
 import br.com.extrator.api.ClienteApiGraphQL;
 import br.com.extrator.api.ResultadoExtracao;
-import br.com.extrator.util.configuracao.CarregadorConfig;
+import br.com.extrator.util.banco.GerenciadorConexao;
 import br.com.extrator.util.tempo.RelogioSistema;
 import br.com.extrator.util.validacao.ConstantesEntidades;
 
@@ -53,7 +53,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -103,7 +102,7 @@ public class AuditorEstruturaApi {
         try (BufferedWriter writer = Files.newBufferedWriter(csv, StandardCharsets.UTF_8)) {
             writer.write("Entidade;Nome_Campo_API;Exemplo_Valor\n");
 
-            try (Connection conn = conectar()) {
+            try (Connection conn = GerenciadorConexao.obterConexao()) {
                 prepararTabelaTemp(conn);
                 limparTabelaTemp(conn);
 
@@ -191,13 +190,6 @@ public class AuditorEstruturaApi {
             }
             default -> null;
         };
-    }
-
-    private static Connection conectar() throws SQLException {
-        final String url = CarregadorConfig.obterUrlBancoDados();
-        final String user = CarregadorConfig.obterUsuarioBancoDados();
-        final String pass = CarregadorConfig.obterSenhaBancoDados();
-        return DriverManager.getConnection(url, user, pass);
     }
 
     private static void prepararTabelaTemp(final Connection conn) throws SQLException {

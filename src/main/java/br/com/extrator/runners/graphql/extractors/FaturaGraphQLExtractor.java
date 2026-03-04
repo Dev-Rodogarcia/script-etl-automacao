@@ -55,6 +55,7 @@ package br.com.extrator.runners.graphql.extractors;
 import java.time.LocalDate;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -235,7 +236,6 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         totalComErro.set(0);
         errosConsecutivos.set(0);
         ultimoLogTimestamp.set(System.currentTimeMillis());
-        
         final int totalParaEnriquecer = faturasParaEnriquecer.size();
         final Instant inicioEnriquecimento = Instant.now();
         
@@ -267,13 +267,12 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                     cacheBanco.put(idBanco, dadosBancoOpt.get());
                     totalBancosBuscados++;
                 }
-            } catch (final Exception e) {
+            } catch (final RuntimeException e) {
                 log.warn("⚠️ Erro ao buscar detalhes do banco ID {}: {}", idBanco, e.getMessage());
             }
         }
 
         log.info("✓ Cache bancário preenchido: {} bancos buscados com sucesso", totalBancosBuscados);
-        
         // PASSO 5: MERGE FINAL
         for (final Map.Entry<Long, FaturaGraphQLEntity> entry : faturasUnicas.entrySet()) {
             final Long faturaId = entry.getKey();
@@ -319,7 +318,6 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         
         return salvos;
     }
-    
     /**
      * Mapeia um DTO de fatura GraphQL para uma Entity.
      * Extrai todos os campos básicos (sem enriquecimento via queries adicionais).
@@ -330,23 +328,11 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         entity.setDocument(dto.getDocument());
         
         // Datas
-        try {
-            entity.setIssueDate(dto.getIssueDate() != null ? LocalDate.parse(dto.getIssueDate()) : null);
-        } catch (final Exception ignored) {
-            // Ignorar erros de parsing
-        }
-        try {
-            entity.setDueDate(dto.getDueDate() != null ? LocalDate.parse(dto.getDueDate()) : null);
-        } catch (final Exception ignored) {
-            // Ignorar erros de parsing
-        }
-        try {
-            if (dto.getInstallments() != null && !dto.getInstallments().isEmpty()) {
-                final String originalDueDate = dto.getInstallments().get(0).getOriginalDueDate();
-                entity.setOriginalDueDate(originalDueDate != null ? LocalDate.parse(originalDueDate) : null);
-            }
-        } catch (final Exception ignored) {
-            // Ignorar erros de parsing
+        entity.setIssueDate(parseLocalDateOrNull(dto.getIssueDate()));
+        entity.setDueDate(parseLocalDateOrNull(dto.getDueDate()));
+        if (dto.getInstallments() != null && !dto.getInstallments().isEmpty()) {
+            final String originalDueDate = dto.getInstallments().get(0).getOriginalDueDate();
+            entity.setOriginalDueDate(parseLocalDateOrNull(originalDueDate));
         }
         
         // Valores
@@ -371,16 +357,8 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         
         // Corporation
         if (dto.getCorporation() != null) {
-            try {
-                if (dto.getCorporation().getId() != null) {
-                    try {
-                        entity.setCorporationId(Long.valueOf(dto.getCorporation().getId()));
-                    } catch (final NumberFormatException ex) {
-                        entity.setCorporationId(null);
-                    }
-                }
-            } catch (final Exception ignored) {
-                // Ignorar erros
+            if (dto.getCorporation().getId() != null) {
+                entity.setCorporationId(parseLongOrNull(dto.getCorporation().getId()));
             }
             
             if (dto.getCorporation().getPerson() != null) {
@@ -475,7 +453,11 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                         // Reset do contador de erros consecutivos em caso de sucesso
                         errosConsecutivos.set(0);
                         
-                    } catch (final Exception e) {
+                    } catch (final InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Thread produtora interrompida durante enfileiramento da fatura {}", faturaId);
+                        break;
+                    } catch (final RuntimeException e) {
                         log.warn("⚠️ Erro HTTP ao buscar dados de cobrança para fatura {}: {}", faturaId, e.getMessage());
                         
                         // Incrementa contador de erros consecutivos
@@ -543,9 +525,12 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
                             heartbeatSegundos
                         );
                         
-                    } catch (InterruptedException e) {
+                    } catch (final InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
+                    } catch (final RuntimeException e) {
+                        totalComErro.incrementAndGet();
+                        log.warn("⚠️ Falha ao processar task de enriquecimento: {}", e.getMessage());
                     }
                 }
             });
@@ -766,7 +751,6 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
         return Optional.empty();
     }
 
-
     /**
      * FASE 4: Log de progresso detalhado.
      */
@@ -796,5 +780,21 @@ public class FaturaGraphQLExtractor implements EntityExtractor<CreditCustomerBil
     @Override
     public String getEmoji() {
         return ConstantesExtracao.EMOJI_FATURAS;
+    }
+
+    private LocalDate parseLocalDateOrNull(final String value) {
+        try {
+            return value == null || value.isBlank() ? null : LocalDate.parse(value);
+        } catch (final DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    private Long parseLongOrNull(final String value) {
+        try {
+            return value == null || value.isBlank() ? null : Long.valueOf(value);
+        } catch (final NumberFormatException e) {
+            return null;
+        }
     }
 }

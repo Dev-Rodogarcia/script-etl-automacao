@@ -35,6 +35,8 @@ package br.com.extrator.util.console;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.util.log.SensitiveDataSanitizer;
+
 /**
  * Utilitário para logging duplo: Logger (arquivo) + Console (visual).
  * Mantém o feedback visual para scripts .bat enquanto grava logs estruturados.
@@ -74,9 +76,10 @@ public final class LoggerConsole {
      * @param args Argumentos para os placeholders
      */
     public void info(final String message, final Object... args) {
-        logger.info(message, args);
+        final String sanitized = sanitizeMessage(formatMessage(message, args));
+        logInfo(sanitized, args);
         if (ESPELHAR_NO_CONSOLE) {
-            System.out.println(formatMessage(message, args));
+            System.out.println(sanitized);
         }
     }
     
@@ -87,9 +90,10 @@ public final class LoggerConsole {
      * @param args Argumentos para os placeholders
      */
     public void warn(final String message, final Object... args) {
-        logger.warn(message, args);
+        final String sanitized = sanitizeMessage(formatMessage(message, args));
+        logWarn(sanitized, args);
         if (ESPELHAR_NO_CONSOLE) {
-            System.out.println(formatMessage(message, args));
+            System.out.println(sanitized);
         }
     }
     
@@ -100,9 +104,10 @@ public final class LoggerConsole {
      * @param args Argumentos para os placeholders
      */
     public void error(final String message, final Object... args) {
-        logger.error(message, args);
+        final String sanitized = sanitizeMessage(formatMessage(message, args));
+        logError(sanitized, args);
         if (ESPELHAR_NO_CONSOLE) {
-            System.err.println(formatMessage(message, args));
+            System.err.println(sanitized);
         }
     }
     
@@ -113,7 +118,8 @@ public final class LoggerConsole {
      * @param args Argumentos para os placeholders
      */
     public void debug(final String message, final Object... args) {
-        logger.debug(message, args);
+        final String sanitized = sanitizeMessage(formatMessage(message, args));
+        logDebug(sanitized, args);
     }
     
     /**
@@ -123,7 +129,8 @@ public final class LoggerConsole {
      * @param args Argumentos para os placeholders
      */
     public void trace(final String message, final Object... args) {
-        logger.trace(message, args);
+        final String sanitized = sanitizeMessage(formatMessage(message, args));
+        logTrace(sanitized, args);
     }
     
     /**
@@ -133,7 +140,7 @@ public final class LoggerConsole {
      * @param message Mensagem
      */
     public void console(final String message) {
-        System.out.println(message);
+        System.out.println(sanitizeMessage(message));
     }
     
     /**
@@ -143,7 +150,7 @@ public final class LoggerConsole {
      * @param args Argumentos
      */
     public void console(final String message, final Object... args) {
-        System.out.println(formatMessage(message, args));
+        System.out.println(sanitizeMessage(formatMessage(message, args)));
     }
     
     /**
@@ -175,6 +182,63 @@ public final class LoggerConsole {
             }
         }
         return result;
+    }
+
+    private String sanitizeMessage(final String message) {
+        return SensitiveDataSanitizer.sanitize(message);
+    }
+
+    private Throwable extractThrowable(final Object... args) {
+        if (args == null || args.length == 0) {
+            return null;
+        }
+        final Object lastArg = args[args.length - 1];
+        return lastArg instanceof Throwable ? (Throwable) lastArg : null;
+    }
+
+    private void logInfo(final String sanitized, final Object... args) {
+        final Throwable throwable = extractThrowable(args);
+        if (throwable == null) {
+            logger.info("{}", sanitized);
+        } else {
+            logger.info(sanitized, throwable);
+        }
+    }
+
+    private void logWarn(final String sanitized, final Object... args) {
+        final Throwable throwable = extractThrowable(args);
+        if (throwable == null) {
+            logger.warn("{}", sanitized);
+        } else {
+            logger.warn(sanitized, throwable);
+        }
+    }
+
+    private void logError(final String sanitized, final Object... args) {
+        final Throwable throwable = extractThrowable(args);
+        if (throwable == null) {
+            logger.error("{}", sanitized);
+        } else {
+            logger.error(sanitized, throwable);
+        }
+    }
+
+    private void logDebug(final String sanitized, final Object... args) {
+        final Throwable throwable = extractThrowable(args);
+        if (throwable == null) {
+            logger.debug("{}", sanitized);
+        } else {
+            logger.debug(sanitized, throwable);
+        }
+    }
+
+    private void logTrace(final String sanitized, final Object... args) {
+        final Throwable throwable = extractThrowable(args);
+        if (throwable == null) {
+            logger.trace("{}", sanitized);
+        } else {
+            logger.trace(sanitized, throwable);
+        }
     }
     
 }

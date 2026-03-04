@@ -61,14 +61,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import br.com.extrator.auditoria.execucao.ExecutionAuditor;
 import br.com.extrator.comandos.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
 import br.com.extrator.db.repository.ExecutionHistoryRepository;
+import br.com.extrator.util.log.SensitiveDataSanitizer;
 
 /**
  * Consolida escrita de logs e historicos do loop daemon.
  */
 public final class DaemonHistoryWriter {
+    private static final Logger logger = LoggerFactory.getLogger(DaemonHistoryWriter.class);
     private static final DateTimeFormatter CYCLE_LOG_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter HISTORY_MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy_MM");
     private static final DateTimeFormatter HISTORY_LINE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -173,8 +178,8 @@ public final class DaemonHistoryWriter {
                     resumoFinalSucesso = true;
                 }
             }
-        } catch (final IOException ignored) {
-            // Em caso de falha de leitura, o resumo segue com valores default.
+        } catch (final IOException e) {
+            logger.warn("Falha ao ler log do ciclo para resumo: {}", sanitize(e.getMessage()));
         }
 
         final long duracaoSegundos = Math.max(0L, Duration.between(inicio, fim).getSeconds());
@@ -219,8 +224,8 @@ public final class DaemonHistoryWriter {
         linhas.add("============================================================");
         try {
             Files.write(cicloLog, linhas, StandardCharsets.UTF_8, StandardOpenOption.APPEND);
-        } catch (final IOException ignored) {
-            // Falha ao anexar resumo nao deve interromper o loop.
+        } catch (final IOException e) {
+            logger.warn("Falha ao anexar resumo no log do ciclo {}: {}", cicloLog, sanitize(e.getMessage()));
         }
     }
 
@@ -231,6 +236,7 @@ public final class DaemonHistoryWriter {
         try {
             escreverHeader = !Files.exists(arquivoCsv) || Files.size(arquivoCsv) == 0L;
         } catch (final IOException e) {
+            logger.warn("Falha ao preparar historico de ciclo {}: {}", arquivoCsv, sanitize(e.getMessage()));
             return;
         }
 
@@ -259,8 +265,8 @@ public final class DaemonHistoryWriter {
             );
             writer.write(linha);
             writer.newLine();
-        } catch (final IOException ignored) {
-            // Falha de historico nao interrompe o daemon.
+        } catch (final IOException e) {
+            logger.warn("Falha ao registrar historico de ciclo {}: {}", arquivoCsv, sanitize(e.getMessage()));
         }
     }
 
@@ -286,6 +292,7 @@ public final class DaemonHistoryWriter {
         try {
             escreverHeader = !Files.exists(arquivoCsv) || Files.size(arquivoCsv) == 0L;
         } catch (final IOException e) {
+            logger.warn("Falha ao preparar historico de reconciliacao {}: {}", arquivoCsv, sanitize(e.getMessage()));
             return;
         }
 
@@ -326,8 +333,8 @@ public final class DaemonHistoryWriter {
             );
             writer.write(linha);
             writer.newLine();
-        } catch (final IOException ignored) {
-            // Falha no historico de reconciliacao nao interrompe o daemon.
+        } catch (final IOException e) {
+            logger.warn("Falha ao registrar historico de reconciliacao {}: {}", arquivoCsv, sanitize(e.getMessage()));
         }
     }
 
@@ -345,8 +352,8 @@ public final class DaemonHistoryWriter {
         }
         try (var stream = Files.list(cyclesDir)) {
             stream.filter(Files::isRegularFile).forEach(this::moverCicloLegadoParaPastaData);
-        } catch (final IOException ignored) {
-            // Se a organizacao falhar, nao interrompe o daemon.
+        } catch (final IOException e) {
+            logger.warn("Falha ao organizar ciclos legados em {}: {}", cyclesDir, sanitize(e.getMessage()));
         }
     }
 
@@ -364,8 +371,8 @@ public final class DaemonHistoryWriter {
                 Files.createDirectories(destinoDir);
             }
             Files.move(arquivo, destino, StandardCopyOption.REPLACE_EXISTING);
-        } catch (final IOException ignored) {
-            // Mantem arquivo no local atual em caso de falha de movimentacao.
+        } catch (final IOException e) {
+            logger.warn("Falha ao mover ciclo legado {} para {}: {}", arquivo, destino, sanitize(e.getMessage()));
         }
     }
 
@@ -373,7 +380,8 @@ public final class DaemonHistoryWriter {
         try {
             final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
             return repo.calcularTotalRegistros(inicio, fim);
-        } catch (final Exception ignored) {
+        } catch (final RuntimeException e) {
+            logger.warn("Falha ao calcular total de registros para ciclo daemon: {}", sanitize(e.getMessage()));
             return 0;
         }
     }
@@ -456,7 +464,7 @@ public final class DaemonHistoryWriter {
         if (valor == null) {
             return "";
         }
-        return valor.replace("\r", " ").replace("\n", " ").replace(";", ",").trim();
+        return sanitize(valor).replace("\r", " ").replace("\n", " ").replace(";", ",").trim();
     }
 
     private Path resolveReconciliationHistoryDir() {
@@ -465,6 +473,10 @@ public final class DaemonHistoryWriter {
             return Path.of(override.trim());
         }
         return reconciliacaoHistoryDirDefault;
+    }
+
+    private String sanitize(final String value) {
+        return SensitiveDataSanitizer.sanitize(value);
     }
 
     public static final class CycleSummary {

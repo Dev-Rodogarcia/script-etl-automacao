@@ -54,6 +54,8 @@ import br.com.extrator.comandos.console.ExibirAjudaComando;
 import br.com.extrator.comandos.extracao.PartialExecutionException;
 import br.com.extrator.db.repository.ExecutionHistoryRepository;
 import br.com.extrator.servicos.LoggingService;
+import br.com.extrator.util.log.SensitiveDataSanitizer;
+import br.com.extrator.util.observability.ExecutionContext;
 import br.com.extrator.util.tempo.RelogioSistema;
 
 /**
@@ -70,6 +72,8 @@ public class Main {
     public static void main(final String[] args) {
         final String nomeComando = (args.length == 0) ? "--fluxo-completo" : args[0].toLowerCase();
         final String tipoExecucao = nomeComando.startsWith("--") ? nomeComando.substring(2) : nomeComando;
+        final String executionId = ExecutionContext.initialize(nomeComando);
+        logger.info("Iniciando execucao | comando={} | execution_id={}", nomeComando, executionId);
 
         final boolean comandoLongaDuracao = isComandoLongaDuracao(nomeComando);
         final boolean comandoSilencioso = isComandoSilencioso(nomeComando);
@@ -99,7 +103,7 @@ public class Main {
                 final ExecutionHistoryRepository repo = new ExecutionHistoryRepository();
                 totalRecords = repo.calcularTotalRegistros(inicioExecucao, fimExecucao);
             } catch (final RuntimeException t) {
-                logger.warn("Falha ao calcular total de registros: {}", t.getMessage());
+                logger.warn("Falha ao calcular total de registros: {}", sanitizeMessage(t.getMessage()));
             }
 
             ExecutionAuditor.registrarCsv(
@@ -144,7 +148,7 @@ public class Main {
                         tentativa,
                         statusRef.get(),
                         tipoExecucao,
-                        t.getMessage()
+                        sanitizeMessage(t.getMessage())
                     );
 
                     if (tentativa < HISTORICO_MAX_TENTATIVAS) {
@@ -176,11 +180,16 @@ public class Main {
 
         if (loggingService != null) {
             loggingService.iniciarCaptura("extracao_dados");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> loggingService.pararCaptura(statusRef.get())));
+            Runtime.getRuntime().addShutdownHook(
+                new Thread(
+                    ExecutionContext.wrapRunnable(() -> loggingService.pararCaptura(statusRef.get())),
+                    "logging-shutdown-hook"
+                )
+            );
         }
 
         if (registrarHistorico) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            Runtime.getRuntime().addShutdownHook(new Thread(ExecutionContext.wrapRunnable(() -> {
                 if (!finalizadoNormalmente.get()) {
                     statusRef.compareAndSet("SUCCESS", "INTERRUPTED");
                     if (errorCategoryRef.get() == null) {
@@ -191,7 +200,7 @@ public class Main {
                     }
                 }
                 persistirHistoricoExecucao.run();
-            }, "execution-history-shutdown-hook"));
+            }), "execution-history-shutdown-hook"));
         }
 
         if (capturarLogOperacao) {
@@ -209,18 +218,19 @@ public class Main {
             comando.executar(args);
         } catch (final PartialExecutionException e) {
             statusRef.set("PARTIAL");
-            errorMessageRef.set(e.getMessage());
+            final String mensagem = sanitizeMessage(e.getMessage());
+            errorMessageRef.set(mensagem);
             errorCategoryRef.set(e.getClass().getSimpleName());
             exitCode = 2;
-            logger.warn("Execucao concluida com falhas parciais: {}", e.getMessage());
-            System.err.println("Execucao parcial: " + e.getMessage());
+            logger.warn("Execucao concluida com falhas parciais: {}", mensagem);
+            System.err.println("Execucao parcial: " + mensagem);
         } catch (final Error e) {
             logger.error("Erro irrecuperavel durante execucao: {}", e.getMessage(), e);
             throw e;
         } catch (final Exception e) {
             final String mensagem = (e.getMessage() == null || e.getMessage().isBlank())
                 ? e.getClass().getSimpleName()
-                : e.getMessage();
+                : sanitizeMessage(e.getMessage());
             statusRef.set("ERROR");
             errorMessageRef.set(mensagem);
             errorCategoryRef.set(e.getClass().getSimpleName());
@@ -236,6 +246,7 @@ public class Main {
             if (loggingService != null) {
                 loggingService.pararCaptura(statusRef.get());
             }
+            ExecutionContext.clear();
         }
 
         if (exitCode != 0) {
@@ -285,7 +296,9 @@ public class Main {
             + "\"tipo_execucao\":\"" + escapeJson(tipoExecucao) + "\","
             + "\"categoria_erro\":\"" + escapeJson(categoriaErro) + "\","
             + "\"mensagem_erro\":\"" + escapeJson(mensagemErro) + "\","
-            + "\"erro_persistencia\":\"" + escapeJson(erroPersistencia == null ? null : erroPersistencia.getMessage()) + "\""
+            + "\"erro_persistencia\":\""
+            + escapeJson(erroPersistencia == null ? null : sanitizeMessage(erroPersistencia.getMessage()))
+            + "\""
             + "}"
             + System.lineSeparator();
 
@@ -306,14 +319,14 @@ public class Main {
                 ARQUIVO_FALLBACK_HISTORICO.toAbsolutePath(),
                 status,
                 tipoExecucao,
-                erroPersistencia == null ? "<desconhecido>" : erroPersistencia.getMessage()
+                erroPersistencia == null ? "<desconhecido>" : sanitizeMessage(erroPersistencia.getMessage())
             );
         } catch (final IOException io) {
             logger.error(
                 "EVT_EXEC_HISTORY_DB_FALLBACK_WRITE_FAIL arquivo={} erro_original={} erro_fallback={}",
                 ARQUIVO_FALLBACK_HISTORICO.toAbsolutePath(),
-                erroPersistencia == null ? "<desconhecido>" : erroPersistencia.getMessage(),
-                io.getMessage(),
+                erroPersistencia == null ? "<desconhecido>" : sanitizeMessage(erroPersistencia.getMessage()),
+                sanitizeMessage(io.getMessage()),
                 io
             );
         }
@@ -328,5 +341,9 @@ public class Main {
             .replace("\"", "\\\"")
             .replace("\r", "\\r")
             .replace("\n", "\\n");
+    }
+
+    private static String sanitizeMessage(final String mensagem) {
+        return SensitiveDataSanitizer.sanitize(mensagem);
     }
 }
