@@ -113,6 +113,7 @@ public class ClienteApiDataExport {
     private final Duration timeoutRequisicao;
     private final PageAuditRepository pageAuditRepository;
     private String executionUuid;
+    private volatile String metodoDataExportEfetivo;
 
     // PROTEÃ‡Ã•ES CONTRA LOOPS INFINITOS - Replicadas do ClienteApiRest
     // PROBLEMA #7 CORRIGIDO: Valor agora obtido de CarregadorConfig
@@ -142,6 +143,7 @@ public class ClienteApiDataExport {
         this.urlBase = CarregadorConfig.obterUrlBaseApi();
         this.token = CarregadorConfig.obterTokenApiDataExport();
         this.timeoutRequisicao = CarregadorConfig.obterTimeoutApiRest();
+        this.metodoDataExportEfetivo = CarregadorConfig.obterMetodoHttpDataExportPreferencial();
 
         // Valida configuraÃ§Ãµes obrigatÃ³rias
         if (urlBase == null || urlBase.trim().isEmpty()) {
@@ -477,7 +479,7 @@ public class ClienteApiDataExport {
         }
         
         logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-        logger.info("INICIANDO EXTRAÃ‡ÃƒO: Template {} - {}", templateId, tipoAmigavel);
+        logger.info("INICIANDO EXTRACAO: Template {} - {}", templateId, tipoAmigavel);
         logger.info("PerÃ­odo: {} atÃ© {}", 
                 dataInicio.atZone(java.time.ZoneOffset.UTC).toLocalDate(), 
                 dataFim.atZone(java.time.ZoneOffset.UTC).toLocalDate());
@@ -498,19 +500,19 @@ public class ClienteApiDataExport {
 
         try {
             while (true) {
-                // PROTEÃ‡ÃƒO 1: Limite mÃ¡ximo de pÃ¡ginas
+                // PROTECAO 1: Limite mÃ¡ximo de pÃ¡ginas
                 if (paginaAtual > limitePaginas) {
-                    logger.warn("ðŸš¨ PROTEÃ‡ÃƒO ATIVADA - Template {} ({}): Limite de {} pÃ¡ginas atingido. Interrompendo busca para evitar loop infinito.", 
+                    logger.warn("ðŸš¨ PROTECAO ATIVADA - Template {} ({}): Limite de {} pÃ¡ginas atingido. Interrompendo busca para evitar loop infinito.", 
                             templateId, tipoAmigavel, limitePaginas);
                     interrompido = true;
                     motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
                     break;
                 }
 
-                // PROTEÃ‡ÃƒO 2: Limite mÃ¡ximo de registros
+                // PROTECAO 2: Limite mÃ¡ximo de registros
                 // PROBLEMA #7 CORRIGIDO: Usar valor de CarregadorConfig em vez de constante hardcoded
                 if (totalRegistrosProcessados >= maxRegistros) {
-                    logger.warn("ðŸš¨ PROTEÃ‡ÃƒO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
+                    logger.warn("ðŸš¨ PROTECAO ATIVADA - Template {} ({}): Limite de {} registros atingido. Interrompendo busca para evitar sobrecarga.", 
                             templateId, tipoAmigavel, maxRegistros);
                     interrompido = true;
                     motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_REGISTROS;
@@ -520,7 +522,7 @@ public class ClienteApiDataExport {
                 // Log inÃ­cio da pÃ¡gina
                 logger.info("â†’ Requisitando pÃ¡gina {}...", paginaAtual);
 
-                // URL base limpa sem parÃ¢metros de query (filtros e paginaÃ§Ã£o vÃ£o no corpo JSON)
+                // URL base limpa sem parametros de query (filtros e paginacao vao no corpo JSON)
                 final String url = urlBase + ConstantesApiDataExport.formatarEndpoint(templateId);
 
                 // ConstrÃ³i o corpo JSON com search, page, per conforme formato do Postman
@@ -705,7 +707,7 @@ public class ClienteApiDataExport {
             contadorFalhasConsecutivas.put(chaveTemplate, 0);
 
             logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-            logger.info("âœ… EXTRAÃ‡ÃƒO CONCLUÃDA: {} registros em {} pÃ¡ginas", 
+            logger.info("âœ… EXTRACAO CONCLUIDA: {} registros em {} pÃ¡ginas", 
                     totalRegistrosProcessados, totalPaginas > 0 ? totalPaginas : (paginaAtual - 1));
             logger.info("â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
@@ -801,7 +803,8 @@ public class ClienteApiDataExport {
                                                                    final String corpoJson,
                                                                    final Duration timeout,
                                                                    final String requestKey) {
-        final String metodoPreferencial = CarregadorConfig.obterMetodoHttpDataExportPreferencial();
+        final String metodoPreferencial = metodoDataExportEfetivo;
+        String metodoUsado = metodoPreferencial;
         HttpResponse<String> resposta = executarRequisicaoDataExportJsonComMetodo(
             url,
             corpoJson,
@@ -826,7 +829,9 @@ public class ClienteApiDataExport {
                 requestKey + "-fallback-" + metodoFallback.toLowerCase(Locale.ROOT),
                 metodoFallback
             );
+            metodoUsado = metodoFallback;
         }
+        atualizarMetodoEfetivoSeNecessario(metodoUsado, resposta);
         return resposta;
     }
 
@@ -836,14 +841,15 @@ public class ClienteApiDataExport {
                                                                             final String requestKey,
                                                                             final String metodoHttp) {
         final HttpRequest requisicao = construirRequisicaoDataExport(url, corpoJson, timeout, metodoHttp, null);
-        return gerenciadorRequisicao.executarRequisicaoEstrita(this.httpClient, requisicao, requestKey + "-" + metodoHttp);
+        return gerenciadorRequisicao.executarRequisicao(this.httpClient, requisicao, requestKey + "-" + metodoHttp);
     }
 
     private HttpResponse<String> executarRequisicaoDataExportCsv(final String url,
                                                                  final String corpoJson,
                                                                  final Duration timeout,
                                                                  final String requestKey) {
-        final String metodoPreferencial = CarregadorConfig.obterMetodoHttpDataExportPreferencial();
+        final String metodoPreferencial = metodoDataExportEfetivo;
+        String metodoUsado = metodoPreferencial;
         HttpResponse<String> resposta = executarRequisicaoDataExportCsvComMetodo(
             url,
             corpoJson,
@@ -868,7 +874,9 @@ public class ClienteApiDataExport {
                 requestKey + "-fallback-" + metodoFallback.toLowerCase(Locale.ROOT),
                 metodoFallback
             );
+            metodoUsado = metodoFallback;
         }
+        atualizarMetodoEfetivoSeNecessario(metodoUsado, resposta);
         return resposta;
     }
 
@@ -878,12 +886,28 @@ public class ClienteApiDataExport {
                                                                            final String requestKey,
                                                                            final String metodoHttp) {
         final HttpRequest requisicao = construirRequisicaoDataExport(url, corpoJson, timeout, metodoHttp, "text/csv");
-        return gerenciadorRequisicao.executarRequisicaoComCharsetEstrita(
+        return gerenciadorRequisicao.executarRequisicaoComCharset(
             this.httpClient,
             requisicao,
             requestKey + "-" + metodoHttp,
             StandardCharsets.ISO_8859_1
         );
+    }
+
+    private void atualizarMetodoEfetivoSeNecessario(final String metodoUsado,
+                                                    final HttpResponse<String> resposta) {
+        if (resposta == null || resposta.statusCode() < 200 || resposta.statusCode() >= 300) {
+            return;
+        }
+        final String metodoNovo = "GET".equalsIgnoreCase(metodoUsado) ? "GET" : "POST";
+        if (!metodoNovo.equalsIgnoreCase(metodoDataExportEfetivo)) {
+            logger.info(
+                "Metodo HTTP DataExport ajustado automaticamente de {} para {} apos resposta bem-sucedida.",
+                metodoDataExportEfetivo,
+                metodoNovo
+            );
+            metodoDataExportEfetivo = metodoNovo;
+        }
     }
 
     private HttpRequest construirRequisicaoDataExport(final String url,

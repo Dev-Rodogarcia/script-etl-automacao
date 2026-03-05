@@ -96,11 +96,15 @@ public class ValidarApiVsBanco24hComando implements Comando {
         log.console("\n" + "=".repeat(72));
         log.info("VALIDACAO EXTREMA 24H | API (POSTMAN-LIKE) x BANCO");
         log.info("Data de referencia: {}", dataReferencia);
+        log.info("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (--sem-faturas-graphql)");
         log.info("Fallback de janela sem periodo: {}", permitirFallbackJanela ? "ATIVADO" : "DESATIVADO");
         log.console("=".repeat(72));
 
         final CompletudeValidator validator = new CompletudeValidator();
-        final Optional<Map<String, Integer>> totaisApiOpt = validator.buscarTotaisEslCloud(dataReferencia);
+        final Optional<Map<String, Integer>> totaisApiOpt = validator.buscarTotaisEslCloud(
+            dataReferencia,
+            incluirFaturasGraphQL
+        );
         if (totaisApiOpt.isEmpty()) {
             throw new RuntimeException("Nao foi possivel obter totais da API em tempo real.");
         }

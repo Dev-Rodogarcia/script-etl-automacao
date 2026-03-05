@@ -1,4 +1,4 @@
-/* ==[DOC-FILE]===============================================================
+﻿/* ==[DOC-FILE]===============================================================
 Arquivo : src/main/java/br/com/extrator/auditoria/servicos/CompletudeValidator.java
 Classe  : CompletudeValidator (class)
 Pacote  : br.com.extrator.auditoria.servicos
@@ -65,14 +65,14 @@ import br.com.extrator.util.validacao.ConstantesEntidades;
 
 /**
  * Motor central da auditoria comparativa que orquestra a busca de contagens
- * e a comparação com o banco de dados.
+ * e a comparaÃ§Ã£o com o banco de dados.
  * 
- * Esta classe implementa o Tópico 2 da documentação, sendo responsável por:
+ * Esta classe implementa o TÃ³pico 2 da documentaÃ§Ã£o, sendo responsÃ¡vel por:
  * - Orquestrar chamadas aos clientes de API para obter contagens do ESL Cloud
  * - Comparar essas contagens com os dados armazenados no banco de dados local
- * - Gerar relatórios de completude com status claros (✅ OK, ❌ INCOMPLETO, ⚠️ DUPLICADOS)
+ * - Gerar relatÃ³rios de completude com status claros (âœ… OK, âŒ INCOMPLETO, âš ï¸ DUPLICADOS)
  * 
- * @author Sistema de Extração ESL Cloud
+ * @author Sistema de ExtraÃ§Ã£o ESL Cloud
  * @version 1.0
  */
 public class CompletudeValidator {
@@ -97,8 +97,8 @@ public class CompletudeValidator {
     );
     
     /**
-     * Construtor que inicializa os clientes de API necessários.
-     * Utiliza injeção de dependência para facilitar testes e manutenção.
+     * Construtor que inicializa os clientes de API necessÃ¡rios.
+     * Utiliza injeÃ§Ã£o de dependÃªncia para facilitar testes e manutenÃ§Ã£o.
      */
     public CompletudeValidator() {
         this.clienteApiGraphQL = new ClienteApiGraphQL();
@@ -108,7 +108,7 @@ public class CompletudeValidator {
     }
     
     /**
-     * Construtor alternativo para injeção de dependência (útil para testes).
+     * Construtor alternativo para injeÃ§Ã£o de dependÃªncia (Ãºtil para testes).
      * 
      * @param clienteApiRest Cliente da API REST
      * @param clienteApiGraphQL Cliente da API GraphQL
@@ -125,72 +125,79 @@ public class CompletudeValidator {
     /**
      * Orquestrador principal que busca totais de todas as entidades do ESL Cloud.
      * 
-     * Este método é o coração do Tópico 1, coordenando chamadas sequenciais para:
-     * - ClienteApiRest: ocorrências, faturas a receber, faturas a pagar
+     * Este mÃ©todo Ã© o coraÃ§Ã£o do TÃ³pico 1, coordenando chamadas sequenciais para:
+     * - ClienteApiRest: ocorrÃªncias, faturas a receber, faturas a pagar
      * - ClienteApiGraphQL: fretes, coletas  
-     * - ClienteApiDataExport: manifestos, cotações, localizações de carga
+     * - ClienteApiDataExport: manifestos, cotaÃ§Ãµes, localizaÃ§Ãµes de carga
      * 
-     * @param dataReferencia Data de referência para buscar as contagens
+     * @param dataReferencia Data de referÃªncia para buscar as contagens
      * @return Optional com Map contendo chave=nome_entidade e valor=contagem_esl_cloud, ou Optional.empty() se falhar
      */
     public Optional<Map<String, Integer>> buscarTotaisEslCloud(final LocalDate dataReferencia) {
-        logger.info("🔍 Iniciando busca de totais do ESL Cloud para data: {}", dataReferencia);
+        return buscarTotaisEslCloud(dataReferencia, true);
+    }
+
+    public Optional<Map<String, Integer>> buscarTotaisEslCloud(final LocalDate dataReferencia,
+                                                                final boolean incluirFaturasGraphQL) {
+        logger.info("ðŸ” Iniciando busca de totais do ESL Cloud para data: {}", dataReferencia);
         
         final Map<String, Integer> totaisEslCloud = new HashMap<>();
         
         try {
-        // Contagens via APIs disponíveis
+        // Contagens via APIs disponÃ­veis
             
             // === API GraphQL - Fretes, Coletas e Faturas GraphQL ===
-            logger.info("📊 Buscando contagens via API GraphQL...");
+            logger.info("ðŸ“Š Buscando contagens via API GraphQL...");
             
             final var resFretes = clienteApiGraphQL.buscarFretes(dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.FRETES, resFretes.getRegistrosExtraidos());
-            logger.info("✅ Fretes: {} registros", resFretes.getRegistrosExtraidos());
+            logger.info("âœ… Fretes: {} registros", resFretes.getRegistrosExtraidos());
             
             final var resColetas = clienteApiGraphQL.buscarColetas(dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.COLETAS, resColetas.getRegistrosExtraidos());
-            logger.info("✅ Coletas: {} registros", resColetas.getRegistrosExtraidos());
-            
-            final var resFaturasGraphQL = clienteApiGraphQL.buscarCapaFaturas(dataReferencia);
-            totaisEslCloud.put(ConstantesEntidades.FATURAS_GRAPHQL, resFaturasGraphQL.getRegistrosExtraidos());
-            logger.info("✅ Faturas GraphQL: {} registros", resFaturasGraphQL.getRegistrosExtraidos());
-            
-            // === API DataExport - Manifestos, Cotações, Localizações, Contas a Pagar, Faturas/Cliente ===
-            logger.info("📊 Buscando contagens via API DataExport (últimas 24h)...");
+            logger.info("âœ… Coletas: {} registros", resColetas.getRegistrosExtraidos());
+            if (incluirFaturasGraphQL) {
+                final var resFaturasGraphQL = clienteApiGraphQL.buscarCapaFaturas(dataReferencia);
+                totaisEslCloud.put(ConstantesEntidades.FATURAS_GRAPHQL, resFaturasGraphQL.getRegistrosExtraidos());
+                logger.info("✅ Faturas GraphQL: {} registros", resFaturasGraphQL.getRegistrosExtraidos());
+            } else {
+                logger.info("Faturas GraphQL ignoradas na busca de totais (flag --sem-faturas-graphql).");
+            }            
+            // === API DataExport - Manifestos, CotaÃ§Ãµes, LocalizaÃ§Ãµes, Contas a Pagar, Faturas/Cliente ===
+            logger.info("ðŸ“Š Buscando contagens via API DataExport (Ãºltimas 24h)...");
 
             final LocalDate dataInicioDataExport = dataReferencia.minusDays(1);
             final var resManifestos = clienteApiDataExport.buscarManifestos(dataInicioDataExport, dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.MANIFESTOS, resManifestos.getRegistrosExtraidos());
-            logger.info("✅ Manifestos: {} registros", resManifestos.getRegistrosExtraidos());
+            logger.info("âœ… Manifestos: {} registros", resManifestos.getRegistrosExtraidos());
 
             final var resCotacoes = clienteApiDataExport.buscarCotacoes(dataInicioDataExport, dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.COTACOES, resCotacoes.getRegistrosExtraidos());
-            logger.info("✅ Cotações: {} registros", resCotacoes.getRegistrosExtraidos());
+            logger.info("âœ… CotaÃ§Ãµes: {} registros", resCotacoes.getRegistrosExtraidos());
 
             final var resLocalizacoes = clienteApiDataExport.buscarLocalizacaoCarga(dataInicioDataExport, dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.LOCALIZACAO_CARGAS, resLocalizacoes.getRegistrosExtraidos());
-            logger.info("✅ Localizações de Carga: {} registros", resLocalizacoes.getRegistrosExtraidos());
+            logger.info("âœ… LocalizaÃ§Ãµes de Carga: {} registros", resLocalizacoes.getRegistrosExtraidos());
 
             final var resContasAPagar = clienteApiDataExport.buscarContasAPagar(dataInicioDataExport, dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.CONTAS_A_PAGAR, resContasAPagar.getRegistrosExtraidos());
-            logger.info("✅ Contas a Pagar: {} registros", resContasAPagar.getRegistrosExtraidos());
+            logger.info("âœ… Contas a Pagar: {} registros", resContasAPagar.getRegistrosExtraidos());
 
             final var resFaturasPorCliente = clienteApiDataExport.buscarFaturasPorCliente(dataInicioDataExport, dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.FATURAS_POR_CLIENTE, resFaturasPorCliente.getRegistrosExtraidos());
-            logger.info("✅ Faturas por Cliente: {} registros", resFaturasPorCliente.getRegistrosExtraidos());
+            logger.info("âœ… Faturas por Cliente: {} registros", resFaturasPorCliente.getRegistrosExtraidos());
             
             // Log do resumo final
             final int totalGeralRegistros = totaisEslCloud.values().stream()
                 .filter(v -> v >= 0)
                 .mapToInt(Integer::intValue)
                 .sum();
-            logger.info("🎯 Busca de totais ESL Cloud concluída: {} entidades, {} registros totais", 
+            logger.info("ðŸŽ¯ Busca de totais ESL Cloud concluÃ­da: {} entidades, {} registros totais", 
                     totaisEslCloud.size(), totalGeralRegistros);
             
         } catch (final Exception e) {
-            logger.warn("❌ Todas as 3 tentativas falharam ao buscar totais da API");
-            logger.debug("Última exceção capturada:", e);
+            logger.warn("âŒ Todas as 3 tentativas falharam ao buscar totais da API");
+            logger.debug("Ãšltima exceÃ§Ã£o capturada:", e);
             return Optional.empty();
         }
         
@@ -198,38 +205,38 @@ public class CompletudeValidator {
     }
 
     /**
-     * Valida completude usando exclusivamente os logs da própria execução.
+     * Valida completude usando exclusivamente os logs da prÃ³pria execuÃ§Ã£o.
      *
-     * Esse modo evita uma segunda rodada de chamadas às APIs ao final do fluxo
-     * (que pode ser lenta), mantendo a comparação entre referência de extração
+     * Esse modo evita uma segunda rodada de chamadas Ã s APIs ao final do fluxo
+     * (que pode ser lenta), mantendo a comparaÃ§Ã£o entre referÃªncia de extraÃ§Ã£o
      * (log_extracoes) e dados persistidos no banco.
      *
-     * @param dataReferencia Data de referência da execução
-     * @return Map com status de validação por entidade
+     * @param dataReferencia Data de referÃªncia da execuÃ§Ã£o
+     * @return Map com status de validaÃ§Ã£o por entidade
      */
     public Map<String, StatusValidacao> validarCompletudePorLogs(final LocalDate dataReferencia) {
-        logger.info("🔍 Iniciando validação de completude baseada em log_extracoes para data: {}", dataReferencia);
+        logger.info("ðŸ” Iniciando validaÃ§Ã£o de completude baseada em log_extracoes para data: {}", dataReferencia);
         return validarCompletude(Collections.emptyMap(), dataReferencia);
     }
     
     /**
      * Valida a completude dos dados comparando contagens do ESL Cloud com o banco local.
      * 
-     * Implementa a lógica de comparação usando queries SQL eficientes com String.format
-     * (seguro pois os nomes das tabelas vêm de fonte controlada - as chaves do Map).
+     * Implementa a lÃ³gica de comparaÃ§Ã£o usando queries SQL eficientes com String.format
+     * (seguro pois os nomes das tabelas vÃªm de fonte controlada - as chaves do Map).
      * 
      * Gera logs com status claros:
-     * - ✅ OK: contagens coincidem
-     * - ❌ INCOMPLETO: banco tem menos registros que ESL Cloud  
-     * - ⚠️ DUPLICADOS: banco tem mais registros que ESL Cloud
+     * - âœ… OK: contagens coincidem
+     * - âŒ INCOMPLETO: banco tem menos registros que ESL Cloud  
+     * - âš ï¸ DUPLICADOS: banco tem mais registros que ESL Cloud
      * 
      * @param totaisEslCloud Map com contagens obtidas do ESL Cloud
-     * @param dataReferencia Data de referência para filtrar consultas no banco
-     * @return Map com resultado da validação por entidade
+     * @param dataReferencia Data de referÃªncia para filtrar consultas no banco
+     * @return Map com resultado da validaÃ§Ã£o por entidade
      */
     public Map<String, StatusValidacao> validarCompletude(final Map<String, Integer> totaisEslCloud, 
                                                          final LocalDate dataReferencia) {
-        logger.info("🔍 Iniciando validação de completude para {} entidades na data: {}", 
+        logger.info("ðŸ” Iniciando validaÃ§Ã£o de completude para {} entidades na data: {}", 
                 MAPEAMENTO_ENTIDADES_TABELAS.size(), dataReferencia);
         
         final Map<String, StatusValidacao> resultadosValidacao = new HashMap<>();
@@ -295,7 +302,7 @@ public class CompletudeValidator {
                     } else {
                         final Integer contagemReferencia = totaisEslCloud.get(nomeEntidade);
                         if (contagemReferencia == null) {
-                            logger.warn("⚠️ Sem referência de contagem para '{}' (sem log COMPLETO e sem total de API).", nomeEntidade);
+                            logger.warn("âš ï¸ Sem referÃªncia de contagem para '{}' (sem log COMPLETO e sem total de API).", nomeEntidade);
                             resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
                             continue;
                         }
@@ -321,7 +328,7 @@ public class CompletudeValidator {
                     final String iconeStatus = obterIconeStatus(status);
                     logger.info("{} {}: ESL Cloud={}, Banco={}", iconeStatus, nomeEntidade, contagemEslCloud, contagemBanco);
                 } catch (final SQLException e) {
-                    logger.error("❌ Erro SQL ao validar entidade '{}': {}", nomeEntidade, e.getMessage(), e);
+                    logger.error("âŒ Erro SQL ao validar entidade '{}': {}", nomeEntidade, e.getMessage(), e);
                     resultadosValidacao.put(nomeEntidade, StatusValidacao.ERRO);
                 }
             }
@@ -336,12 +343,12 @@ public class CompletudeValidator {
             final long totalErros = resultadosValidacao.values().stream()
                     .filter(status -> status == StatusValidacao.ERRO).count();
             
-            logger.info("📊 Validação de completude concluída: ✅ {} OK, ❌ {} INCOMPLETO, ⚠️ {} DUPLICADOS, 💥 {} ERROS", 
+            logger.info("ðŸ“Š ValidaÃ§Ã£o de completude concluÃ­da: âœ… {} OK, âŒ {} INCOMPLETO, âš ï¸ {} DUPLICADOS, ðŸ’¥ {} ERROS", 
                     totalOk, totalIncompleto, totalDuplicados, totalErros);
             
         } catch (final SQLException e) {
-            logger.error("❌ Erro ao conectar com banco de dados para validação: {}", e.getMessage(), e);
-            throw new RuntimeException("Falha na conexão com banco de dados", e);
+            logger.error("âŒ Erro ao conectar com banco de dados para validaÃ§Ã£o: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha na conexÃ£o com banco de dados", e);
         }
         
         return resultadosValidacao;
@@ -358,17 +365,17 @@ public class CompletudeValidator {
         try {
             return OptionalInt.of(Integer.parseInt(matcher.group(1)));
         } catch (final NumberFormatException e) {
-            logger.debug("Nao foi possivel converter metrica numérica de '{}': {}", mensagem, e.getMessage());
+            logger.debug("Nao foi possivel converter metrica numÃ©rica de '{}': {}", mensagem, e.getMessage());
             return OptionalInt.empty();
         }
     }
     
     /**
-     * Determina o status de validação baseado na comparação entre contagens.
+     * Determina o status de validaÃ§Ã£o baseado na comparaÃ§Ã£o entre contagens.
      * 
      * @param contagemEslCloud Contagem obtida do ESL Cloud
      * @param contagemBanco Contagem obtida do banco local
-     * @return Status da validação
+     * @return Status da validaÃ§Ã£o
      */
     private StatusValidacao determinarStatusValidacao(final int contagemEslCloud, final int contagemBanco) {
         if (contagemEslCloud == contagemBanco) {
@@ -381,31 +388,31 @@ public class CompletudeValidator {
     }
     
     /**
-     * Obtém o ícone visual correspondente ao status de validação.
+     * ObtÃ©m o Ã­cone visual correspondente ao status de validaÃ§Ã£o.
      * 
-     * @param status Status da validação
-     * @return String com ícone visual
+     * @param status Status da validaÃ§Ã£o
+     * @return String com Ã­cone visual
      */
     private String obterIconeStatus(final StatusValidacao status) {
         return switch (status) {
-            case OK -> "✅ OK";
-            case INCOMPLETO -> "❌ INCOMPLETO";
-            case DUPLICADOS -> "⚠️ DUPLICADOS";
-            case ERRO -> "💥 ERRO";
+            case OK -> "âœ… OK";
+            case INCOMPLETO -> "âŒ INCOMPLETO";
+            case DUPLICADOS -> "âš ï¸ DUPLICADOS";
+            case ERRO -> "ðŸ’¥ ERRO";
         };
     }
     
     /**
-     * TÓPICO 4: Validação de Gaps - Verifica se os IDs das ocorrências são sequenciais
+     * TÃ“PICO 4: ValidaÃ§Ã£o de Gaps - Verifica se os IDs das ocorrÃªncias sÃ£o sequenciais
      * 
-     * Pré-requisito: Esta validação só deve ser executada se os IDs forem realmente sequenciais.
-     * Caso contrário, a estratégia de detecção de gaps não funcionará.
+     * PrÃ©-requisito: Esta validaÃ§Ã£o sÃ³ deve ser executada se os IDs forem realmente sequenciais.
+     * Caso contrÃ¡rio, a estratÃ©gia de detecÃ§Ã£o de gaps nÃ£o funcionarÃ¡.
      * 
-     * @param dataReferencia Data de referência para análise
-     * @return StatusValidacao indicando se há gaps nos IDs
+     * @param dataReferencia Data de referÃªncia para anÃ¡lise
+     * @return StatusValidacao indicando se hÃ¡ gaps nos IDs
      */
     public StatusValidacao validarGapsOcorrencias(final LocalDate dataReferencia) {
-        logger.info("🔍 Iniciando validação de gaps para ocorrências...");
+        logger.info("ðŸ” Iniciando validaÃ§Ã£o de gaps para ocorrÃªncias...");
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             final String sqlExisteTabela = """
@@ -416,39 +423,39 @@ public class CompletudeValidator {
             try (PreparedStatement stmt = conexao.prepareStatement(sqlExisteTabela);
                  ResultSet rs = stmt.executeQuery()) {
                 if (rs.next() && rs.getInt(1) == 0) {
-                    logger.warn("⚠️ Tabela 'ocorrencias' não encontrada - validação de gaps ignorada");
+                    logger.warn("âš ï¸ Tabela 'ocorrencias' nÃ£o encontrada - validaÃ§Ã£o de gaps ignorada");
                     return StatusValidacao.OK;
                 }
             }
             
-            // Primeiro, verificar se os IDs são sequenciais
+            // Primeiro, verificar se os IDs sÃ£o sequenciais
             if (!verificarIdsSequenciais(conexao, "ocorrencias")) {
-                logger.warn("⚠️ IDs das ocorrências não são sequenciais - validação de gaps não aplicável");
-                return StatusValidacao.OK; // Não é erro, apenas não aplicável
+                logger.warn("âš ï¸ IDs das ocorrÃªncias nÃ£o sÃ£o sequenciais - validaÃ§Ã£o de gaps nÃ£o aplicÃ¡vel");
+                return StatusValidacao.OK; // NÃ£o Ã© erro, apenas nÃ£o aplicÃ¡vel
             }
             
-            // Se são sequenciais, verificar gaps
+            // Se sÃ£o sequenciais, verificar gaps
             return detectarGapsSequenciais(conexao, "ocorrencias", dataReferencia);
             
         } catch (final SQLException e) {
-            logger.error("❌ Erro ao validar gaps nas ocorrências: {}", e.getMessage(), e);
+            logger.error("âŒ Erro ao validar gaps nas ocorrÃªncias: {}", e.getMessage(), e);
             return StatusValidacao.ERRO;
         }
     }
     
     /**
-     * Verifica se os IDs de uma tabela são sequenciais (sem pulos).
+     * Verifica se os IDs de uma tabela sÃ£o sequenciais (sem pulos).
      * 
-     * @param conexao Conexão com o banco de dados
+     * @param conexao ConexÃ£o com o banco de dados
      * @param nomeTabela Nome da tabela a verificar
-     * @return true se os IDs são sequenciais, false caso contrário
+     * @return true se os IDs sÃ£o sequenciais, false caso contrÃ¡rio
      */
     private boolean verificarIdsSequenciais(final Connection conexao, final String nomeTabela) throws SQLException {
         final String sql = """
             WITH ids_ordenados AS (
                 SELECT id, ROW_NUMBER() OVER (ORDER BY id) as posicao
                 FROM %s
-                WHERE data_extracao >= DATEADD(day, -7, GETDATE()) -- Últimos 7 dias para análise
+                WHERE data_extracao >= DATEADD(day, -7, GETDATE()) -- Ãšltimos 7 dias para anÃ¡lise
             ),
             gaps AS (
                 SELECT COUNT(*) as total_gaps
@@ -464,8 +471,8 @@ public class CompletudeValidator {
             
             if (rs.next()) {
                 final boolean sequencial = rs.getInt("ids_sequenciais") == 1;
-                logger.info("📊 Análise de sequencialidade para {}: {}", nomeTabela, 
-                    sequencial ? "IDs são sequenciais" : "IDs têm gaps/pulos");
+                logger.info("ðŸ“Š AnÃ¡lise de sequencialidade para {}: {}", nomeTabela, 
+                    sequencial ? "IDs sÃ£o sequenciais" : "IDs tÃªm gaps/pulos");
                 return sequencial;
             }
             return false;
@@ -473,12 +480,12 @@ public class CompletudeValidator {
     }
     
     /**
-     * Detecta gaps em IDs sequenciais usando a estratégia WITH ids_esperados.
+     * Detecta gaps em IDs sequenciais usando a estratÃ©gia WITH ids_esperados.
      * 
-     * @param conexao Conexão com o banco de dados
+     * @param conexao ConexÃ£o com o banco de dados
      * @param nomeTabela Nome da tabela a verificar
-     * @param dataReferencia Data de referência para análise
-     * @return StatusValidacao indicando se há gaps
+     * @param dataReferencia Data de referÃªncia para anÃ¡lise
+     * @return StatusValidacao indicando se hÃ¡ gaps
      */
     private StatusValidacao detectarGapsSequenciais(final Connection conexao, final String nomeTabela, final LocalDate dataReferencia) throws SQLException {
         final String sql = """
@@ -511,10 +518,10 @@ public class CompletudeValidator {
                     final int totalGaps = rs.getInt("total_gaps");
                     
                     if (totalGaps == 0) {
-                        logger.info("✅ Nenhum gap detectado nos IDs de {}", nomeTabela);
+                        logger.info("âœ… Nenhum gap detectado nos IDs de {}", nomeTabela);
                         return StatusValidacao.OK;
                     } else {
-                        logger.warn("⚠️ Detectados {} gaps nos IDs de {} - possível perda de dados", totalGaps, nomeTabela);
+                        logger.warn("âš ï¸ Detectados {} gaps nos IDs de {} - possÃ­vel perda de dados", totalGaps, nomeTabela);
                         return StatusValidacao.INCOMPLETO;
                     }
                 }
@@ -524,21 +531,21 @@ public class CompletudeValidator {
     }
     
     /**
-     * TÓPICO 4: Validação da Janela Temporal - Detecta registros criados durante a extração
+     * TÃ“PICO 4: ValidaÃ§Ã£o da Janela Temporal - Detecta registros criados durante a extraÃ§Ã£o
      * 
-     * Esta é a validação mais complexa. Verifica se há registros criados entre o início
-     * e fim da extração que podem ter sido perdidos devido a problemas de paginação da API.
+     * Esta Ã© a validaÃ§Ã£o mais complexa. Verifica se hÃ¡ registros criados entre o inÃ­cio
+     * e fim da extraÃ§Ã£o que podem ter sido perdidos devido a problemas de paginaÃ§Ã£o da API.
      * 
-     * @param dataReferencia Data de referência para análise
-     * @return Map com status de validação por entidade
+     * @param dataReferencia Data de referÃªncia para anÃ¡lise
+     * @return Map com status de validaÃ§Ã£o por entidade
      */
     public Map<String, StatusValidacao> validarJanelaTemporal(final LocalDate dataReferencia) {
-        logger.info("🕐 Iniciando validação de janela temporal para data: {}", dataReferencia);
+        logger.info("ðŸ• Iniciando validaÃ§Ã£o de janela temporal para data: {}", dataReferencia);
         
         final Map<String, StatusValidacao> resultados = new HashMap<>();
         
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
-            // Buscar timestamps de extração do log
+            // Buscar timestamps de extraÃ§Ã£o do log
             final Map<String, TimestampsExtracao> timestampsExtracao = buscarTimestampsExtracao(conexao, dataReferencia);
             
             // Validar cada entidade
@@ -546,7 +553,7 @@ public class CompletudeValidator {
                 final TimestampsExtracao timestamps = timestampsExtracao.get(entidade);
                 
                 if (timestamps == null) {
-                    logger.warn("⚠️ Nenhum log de extração encontrado para {} na data {}", entidade, dataReferencia);
+                    logger.warn("âš ï¸ Nenhum log de extraÃ§Ã£o encontrado para {} na data {}", entidade, dataReferencia);
                     resultados.put(entidade, StatusValidacao.ERRO);
                     continue;
                 }
@@ -556,7 +563,7 @@ public class CompletudeValidator {
             }
             
         } catch (final SQLException e) {
-            logger.error("❌ Erro ao validar janela temporal: {}", e.getMessage(), e);
+            logger.error("âŒ Erro ao validar janela temporal: {}", e.getMessage(), e);
             // Marcar todas as entidades como erro
             for (final String entidade : MAPEAMENTO_ENTIDADES_TABELAS.keySet()) {
                 resultados.put(entidade, StatusValidacao.ERRO);
@@ -567,10 +574,10 @@ public class CompletudeValidator {
     }
     
     /**
-     * Busca os timestamps de início e fim das extrações do log_extracoes.
+     * Busca os timestamps de inÃ­cio e fim das extraÃ§Ãµes do log_extracoes.
      * 
-     * @param conexao Conexão com o banco de dados
-     * @param dataReferencia Data de referência
+     * @param conexao ConexÃ£o com o banco de dados
+     * @param dataReferencia Data de referÃªncia
      * @return Map com timestamps por entidade
      */
     private Map<String, TimestampsExtracao> buscarTimestampsExtracao(final Connection conexao, final LocalDate dataReferencia) throws SQLException {
@@ -598,55 +605,55 @@ public class CompletudeValidator {
             }
         }
         
-        logger.info("📊 Encontrados timestamps para {} entidades na data {}", timestamps.size(), dataReferencia);
+        logger.info("ðŸ“Š Encontrados timestamps para {} entidades na data {}", timestamps.size(), dataReferencia);
         return timestamps;
     }
     
     /**
-     * Valida a janela temporal para uma entidade específica.
+     * Valida a janela temporal para uma entidade especÃ­fica.
      * 
      * @param entidade Nome da entidade
-     * @param timestamps Timestamps de início e fim da extração
-     * @param dataReferencia Data de referência
+     * @param timestamps Timestamps de inÃ­cio e fim da extraÃ§Ã£o
+     * @param dataReferencia Data de referÃªncia
      * @return StatusValidacao da janela temporal
      */
     private StatusValidacao validarJanelaTemporalEntidade(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
         try {
-            // Fazer chamada à API para contar registros criados durante a janela de extração
+            // Fazer chamada Ã  API para contar registros criados durante a janela de extraÃ§Ã£o
             final int registrosDuranteExtracao = contarRegistrosDuranteJanela(entidade, timestamps, dataReferencia);
             
             if (registrosDuranteExtracao == 0) {
-                logger.info("✅ Nenhum registro criado durante extração de {} - janela temporal OK", entidade);
+                logger.info("âœ… Nenhum registro criado durante extraÃ§Ã£o de {} - janela temporal OK", entidade);
                 return StatusValidacao.OK;
             } else {
-                logger.error("❌ CRÍTICO: {} registros de {} foram criados durante a extração! Risco de perda de dados devido a falha na paginação da API", 
+                logger.error("âŒ CRÃTICO: {} registros de {} foram criados durante a extraÃ§Ã£o! Risco de perda de dados devido a falha na paginaÃ§Ã£o da API", 
                     registrosDuranteExtracao, entidade);
                 return StatusValidacao.INCOMPLETO;
             }
             
         } catch (final Exception e) {
-            logger.error("❌ Erro ao validar janela temporal para {}: {}", entidade, e.getMessage(), e);
+            logger.error("âŒ Erro ao validar janela temporal para {}: {}", entidade, e.getMessage(), e);
             return StatusValidacao.ERRO;
         }
     }
     
     /**
-     * Conta registros criados durante a janela de extração via API.
+     * Conta registros criados durante a janela de extraÃ§Ã£o via API.
      * 
      * @param entidade Nome da entidade
-     * @param timestamps Timestamps da extração
-     * @param dataReferencia Data de referência
-     * @return Número de registros criados durante a extração
+     * @param timestamps Timestamps da extraÃ§Ã£o
+     * @param dataReferencia Data de referÃªncia
+     * @return NÃºmero de registros criados durante a extraÃ§Ã£o
      */
     private int contarRegistrosDuranteJanela(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
-        // Implementar chamadas específicas para cada tipo de API
+        // Implementar chamadas especÃ­ficas para cada tipo de API
         return switch (entidade) {
             case ConstantesEntidades.FRETES, ConstantesEntidades.COLETAS, ConstantesEntidades.FATURAS_GRAPHQL ->
                 contarRegistrosApiGraphQL(entidade, timestamps, dataReferencia);
             case ConstantesEntidades.MANIFESTOS, ConstantesEntidades.COTACOES, ConstantesEntidades.LOCALIZACAO_CARGAS, ConstantesEntidades.CONTAS_A_PAGAR, ConstantesEntidades.FATURAS_POR_CLIENTE ->
                 contarRegistrosApiDataExport(entidade, timestamps, dataReferencia);
             default -> {
-                logger.warn("⚠️ Entidade {} não mapeada para validação temporal", entidade);
+                logger.warn("âš ï¸ Entidade {} nÃ£o mapeada para validaÃ§Ã£o temporal", entidade);
                 yield 0;
             }
         };
@@ -657,14 +664,14 @@ public class CompletudeValidator {
      * Conta registros via API GraphQL durante janela temporal.
      * 
      * @param entidade Nome da entidade a ser consultada
-     * @param timestamps Janela temporal da extração (será usado na implementação futura)
-     * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
-     * @return Número de registros encontrados na janela temporal
+     * @param timestamps Janela temporal da extraÃ§Ã£o (serÃ¡ usado na implementaÃ§Ã£o futura)
+     * @param dataReferencia Data de referÃªncia para filtros (serÃ¡ usado na implementaÃ§Ã£o futura)
+     * @return NÃºmero de registros encontrados na janela temporal
      */
     private int contarRegistrosApiGraphQL(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
-        // Implementação específica para API GraphQL
-        // Por enquanto, retorna 0 (implementação futura)
-        logger.debug("🔄 Contagem temporal via API GraphQL para {} ainda não implementada (janela: {} - {}, data: {})", 
+        // ImplementaÃ§Ã£o especÃ­fica para API GraphQL
+        // Por enquanto, retorna 0 (implementaÃ§Ã£o futura)
+        logger.debug("ðŸ”„ Contagem temporal via API GraphQL para {} ainda nÃ£o implementada (janela: {} - {}, data: {})", 
                     entidade, timestamps.getInicio(), timestamps.getFim(), dataReferencia);
         return 0;
     }
@@ -673,20 +680,20 @@ public class CompletudeValidator {
      * Conta registros via API Data Export durante janela temporal.
      * 
      * @param entidade Nome da entidade a ser consultada
-     * @param timestamps Janela temporal da extração (será usado na implementação futura)
-     * @param dataReferencia Data de referência para filtros (será usado na implementação futura)
-     * @return Número de registros encontrados na janela temporal
+     * @param timestamps Janela temporal da extraÃ§Ã£o (serÃ¡ usado na implementaÃ§Ã£o futura)
+     * @param dataReferencia Data de referÃªncia para filtros (serÃ¡ usado na implementaÃ§Ã£o futura)
+     * @return NÃºmero de registros encontrados na janela temporal
      */
     private int contarRegistrosApiDataExport(final String entidade, final TimestampsExtracao timestamps, final LocalDate dataReferencia) {
-        // Implementação específica para API Data Export
-        // Por enquanto, retorna 0 (implementação futura)
-        logger.debug("🔄 Contagem temporal via API Data Export para {} ainda não implementada (janela: {} - {}, data: {})", 
+        // ImplementaÃ§Ã£o especÃ­fica para API Data Export
+        // Por enquanto, retorna 0 (implementaÃ§Ã£o futura)
+        logger.debug("ðŸ”„ Contagem temporal via API Data Export para {} ainda nÃ£o implementada (janela: {} - {}, data: {})", 
                     entidade, timestamps.getInicio(), timestamps.getFim(), dataReferencia);
         return 0;
     }
     
     /**
-     * Classe auxiliar para armazenar timestamps de extração.
+     * Classe auxiliar para armazenar timestamps de extraÃ§Ã£o.
      */
     private static class TimestampsExtracao {
         private final java.sql.Timestamp inicio;
@@ -703,16 +710,17 @@ public class CompletudeValidator {
     }
     
     /**
-     * Enum para representar os possíveis status de validação de completude.
+     * Enum para representar os possÃ­veis status de validaÃ§Ã£o de completude.
      */
     public enum StatusValidacao {
         /** Contagens coincidem - dados completos */
         OK,
         /** Banco tem menos registros que ESL Cloud - dados incompletos */
         INCOMPLETO,
-        /** Banco tem mais registros que ESL Cloud - possíveis duplicados */
+        /** Banco tem mais registros que ESL Cloud - possÃ­veis duplicados */
         DUPLICADOS,
-        /** Erro durante a validação */
+        /** Erro durante a validaÃ§Ã£o */
         ERRO
     }
 }
+
