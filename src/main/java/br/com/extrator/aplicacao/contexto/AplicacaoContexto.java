@@ -1,3 +1,35 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/contexto/AplicacaoContexto.java
+Classe  : AplicacaoContexto (class)
+Pacote  : br.com.extrator.aplicacao.contexto
+Modulo  : Contexto DI - Aplicacao
+
+Papel   : Registro estatico e centralizador de portas (interfaces) da aplicacao.
+
+Conecta com:
+- PipelineOrchestratorFactory
+- PipelineStepsFactory
+- GraphQLGateway
+- DataExportGateway
+- ExtractionLogQueryPort
+- CompletudePort
+- IntegridadeEtlPort
+
+Fluxo geral:
+1) Use cases e componentes chamam getters staticos para obter portas.
+2) Bootstrap (PipelineCompositionRoot) registra implementacoes via setters.
+3) Context fornece fallback no-op ou lanca IllegalStateException se ausente.
+
+Estrutura interna:
+Metodos principais:
+- registrar(): sobrecargado para cada tipo de porta (acumula nas vars static).
+- orchestratorFactory(), stepsFactory(), etc.: getters com lazy fallback/exception.
+Atributos-chave:
+- orchestratorFactory: PipelineOrchestratorFactory (volatile).
+- stepsFactory: PipelineStepsFactory (volatile).
+- graphQLGateway, dataExportGateway: portas de integracao HTTP (volatile).
+- completudePort, integridadeEtlPort: portas de validacao (volatile).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.contexto;
 
 import br.com.extrator.aplicacao.portas.CompletudePort;

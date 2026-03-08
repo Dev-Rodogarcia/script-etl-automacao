@@ -1,3 +1,27 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/portas/IntegridadeEtlPort.java
+Classe  : IntegridadeEtlPort (interface)
+Pacote  : br.com.extrator.aplicacao.portas
+Modulo  : Porta (Interface)
+
+Papel   : Porta para validacao de integridade ETL apos execucao de pipeline (schema, chaves, referencial).
+
+Conecta com:
+- IntegridadeEtlPortAdapter (implementacao em observabilidade/adaptador)
+- FluxoCompletoUseCase, ExtracaoPorIntervaloUseCase (consomem)
+
+Fluxo geral:
+1) validarExecucao(inicioExecucao, fimExecucao, entidades, modoLoopDaemon).
+2) Retorna ResultadoIntegridade (valido, falhas).
+3) Valida schema, chaves estrangeiras, referencial (origin x destino).
+
+Estrutura interna:
+Inner class ResultadoIntegridade:
+- valido: boolean.
+- falhas: List<String> imutavel (detalhe de cada validacao falhada).
+Metodos principais:
+- validarExecucao(): retorna ResultadoIntegridade.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.portas;
 
 import java.time.LocalDateTime;

@@ -1,3 +1,36 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/ExtracaoPorIntervaloUseCase.java
+Classe  : ExtracaoPorIntervaloUseCase (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Orquestra extracao de dados em intervalo de datas, dividindo em blocos de 30 dias.
+
+Conecta com:
+- PreBackfillReferencialColetasUseCase (executa pre-backfill)
+- PlanejadorEscopoExtracaoIntervalo (planeja steps)
+- PipelineOrchestrator (executa pipeline)
+- IntegridadeEtlPort (valida integridade)
+- AplicacaoContexto (obtem portas)
+
+Fluxo geral:
+1) executar() recebe request (datas, filtros, flags).
+2) Valida limites de extracao por entidade e divide periodo em blocos (30 dias).
+3) Para cada bloco: cria steps, orquestra pipeline, valida volume e integridade.
+4) Coleta falhas e lanca PartialExecutionException se houver falhas parciais.
+
+Estrutura interna:
+Metodos principais:
+- executar(ExtracaoPorIntervaloRequest): ponto de entrada, orquestra blocos.
+- dividirEmBlocos(): subdivide intervalo em blocos de ate 30 dias.
+- validarLimitesParaBloco(): verifica limite de extracao (horas) por entidade.
+- registrarResultadosBloco(): coleta status e falhas do pipeline.
+- validarResultadosCriticosDoBloco(): valida volume e integridade apos execucao.
+Atributos-chave:
+- TAMANHO_BLOCO_DIAS: constante 30 (tamanho de bloco).
+- preBackfillReferencialColetasUseCase: executa backfill de orfaos.
+- planejadorEscopo: planeja steps conforme filtros de requisicao.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.LocalDate;

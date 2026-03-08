@@ -1,3 +1,29 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/RecoveryUseCase.java
+Classe  : RecoveryUseCase (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Executa recovery/replay de extracao em intervalo com politica de idempotencia (365 dias).
+
+Conecta com:
+- ExtracaoPorIntervaloUseCase (delegacao via composicao)
+- IdempotencyPolicy (valida janela de reexecucao)
+
+Fluxo geral:
+1) executarReplay() monta chave de idempotencia baseada em (data_inicio, data_fim, api, entidade, modo).
+2) Valida janela de 365 dias para permitir replay.
+3) Monta ExtracaoPorIntervaloRequest (modoLoopDaemon = false).
+4) Delega a ExtracaoPorIntervaloUseCase para execucao completa.
+
+Estrutura interna:
+Metodos principais:
+- executarReplay(LocalDate, LocalDate, String, String, boolean): executa replay com idempotencia.
+- executarBackfillHistorico(LocalDate, LocalDate, boolean): wrapper sem filtro de API/entidade.
+Atributos-chave:
+- idempotencyPolicy: IdempotencyPolicy com duracao de 365 dias.
+- extracaoPorIntervaloUseCase: delegacao para fluxo de intervalo.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.Duration;

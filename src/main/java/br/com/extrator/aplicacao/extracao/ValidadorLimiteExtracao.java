@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/ValidadorLimiteExtracao.java
+Classe  : ValidadorLimiteExtracao (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Valida regras de limitacao de frequencia de extracao por periodo (31d=1h, 180d=12h, <31d=sem limite).
+
+Conecta com:
+- ExtractionLogQueryPort (consulta ultima extracao do periodo)
+
+Fluxo geral:
+1) validarLimiteExtracao() calcula duracao do periodo e obtém limite.
+2) Se < 31 dias: sem limite (DIAS_31 = 31).
+3) Se 31-180 dias: limite 1 hora entre execucoes.
+4) Se > 180 dias: limite 12 horas entre execucoes.
+5) Consulta log da ultima extracao e valida tempo decorrido.
+6) Retorna ResultadoValidacao (permitido | bloqueado com motivo e horas restantes).
+
+Estrutura interna:
+Inner class ResultadoValidacao:
+- permitido: boolean.
+- motivo: String descritivo.
+- horasRestantes, limiteHoras: para feedback ao usuario.
+Metodos principais:
+- validarLimiteExtracao(String, LocalDate, LocalDate): valida limite por entidade.
+- calcularDuracaoPeriodo(LocalDate, LocalDate): calcula dias (inclusive).
+- obterLimiteHoras(long diasPeriodo): retorna limite conforme regra.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.Duration;

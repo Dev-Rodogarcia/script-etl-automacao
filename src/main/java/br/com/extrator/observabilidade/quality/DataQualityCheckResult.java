@@ -1,5 +1,20 @@
 package br.com.extrator.observabilidade.quality;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/observabilidade/quality/DataQualityCheckResult.java
+Classe  : DataQualityCheckResult (class)
+Pacote  : br.com.extrator.observabilidade.quality
+Modulo  : Observabilidade - Quality
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 public final class DataQualityCheckResult {
     private final String entidade;
     private final String checkName;

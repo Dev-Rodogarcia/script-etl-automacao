@@ -1,5 +1,20 @@
 package br.com.extrator.integracao;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/integracao/GraphQLHttpExecutor.java
+Classe  :  (class)
+Pacote  : br.com.extrator.integracao
+Modulo  : Integracao HTTP
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;

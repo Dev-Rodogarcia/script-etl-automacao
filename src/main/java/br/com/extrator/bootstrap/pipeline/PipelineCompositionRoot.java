@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/bootstrap/pipeline/PipelineCompositionRoot.java
+Classe  : PipelineCompositionRoot (class)
+Pacote  : br.com.extrator.bootstrap.pipeline
+Modulo  : Bootstrap - Wiring
+
+Papel   : Composicao root de dependency injection: wires politicas, adapters, factory methods para PipelineOrchestrator.
+
+Conecta com:
+- AplicacaoContexto (registra factories e adapters)
+- PipelineOrchestrator, ExtractorRegistry (cria instancias)
+- DataQualityService, CircuitBreaker, RetryPolicy, FailurePolicy (compoe)
+
+Fluxo geral:
+1) inicializarContexto() static: bootstrap entry point (chamado em Main.java).
+2) Cria adapters (GraphQL, DataExport, gateways, repositories).
+3) Registra factories em AplicacaoContexto.
+4) criarOrquestrador(): fabrica orchestrator com politicas.
+5) criarStepsFluxoCompleto(): ordena steps (graphql, dataexport, quality).
+
+Estrutura interna:
+Factory methods:
+- criarOrquestrador(): PipelineOrchestrator com retry, failure, circuit breaker.
+- criarStepsFluxoCompleto(), criarRegistryFluxoCompleto(): ExtractorRegistry.
+- criarDataQualityService(): DataQualityService com 5 checks.
+- criarPoliticaFalhaPorEntidade(): Map de failure modes.
+Atributos-chave:
+- config, clock, extractionLogger, metrics: portas de suporte.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.bootstrap.pipeline;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;

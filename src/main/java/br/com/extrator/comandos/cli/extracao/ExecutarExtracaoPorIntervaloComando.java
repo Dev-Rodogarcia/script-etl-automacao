@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/ExecutarExtracaoPorIntervaloComando.java
+Classe  : ExecutarExtracaoPorIntervaloComando (public class)
+Pacote  : br.com.extrator.comandos.cli.extracao
+Modulo  : Comando CLI - Extracao
+
+Papel   : Comando CLI para extracao em intervalo (data inicio, data fim, com filtros opcionais de API/entidade).
+
+Conecta com:
+- ExtracaoPorIntervaloUseCase (aplicacao.extracao) - delegacao
+- LoggerConsole (suporte.console)
+- FormatadorData (suporte.formatacao)
+- ConstantesEntidades (suporte.validacao)
+
+Fluxo geral:
+1) executar(String[] args) extrai datas, flags (--sem-faturas-graphql, --modo-loop-daemon), API/entidade.
+2) Validacao: datas ISO-8601, API vs entidade inference.
+3) Delega a ExtracaoPorIntervaloUseCase com ExtracaoPorIntervaloRequest.
+
+Estrutura interna:
+Atributos-chave:
+- extracaoPorIntervaloUseCase: delegate para use case.
+Inner record ParametrosParseados: wrapper para ExtracaoPorIntervaloRequest.
+Metodos principais:
+- executar(String[]): parser principal (delegacao).
+- parseArgs(String[]): extrai data inicio/fim, API, entidade, flags.
+- inferirApiPorEntidade(String): mapeia entidade -> API (GraphQL vs DataExport).
+- isEntidadeFaturasGraphQL(String): verifica tolerancia de faturas.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao;
 
 import java.time.LocalDate;

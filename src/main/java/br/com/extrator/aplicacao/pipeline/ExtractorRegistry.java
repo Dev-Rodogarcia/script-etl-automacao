@@ -1,3 +1,29 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/pipeline/ExtractorRegistry.java
+Classe  : ExtractorRegistry (class)
+Pacote  : br.com.extrator.aplicacao.pipeline
+Modulo  : Pipeline - Aplicacao
+
+Papel   : Registro de extractors (steps) por entidade (registry pattern para lookup dinamico).
+
+Conecta com:
+- PipelineStep (supplier fornece instancias)
+
+Fluxo geral:
+1) registrar(entidade, stepSupplier) registra factory para entidade.
+2) get(entidade) retorna Optional<PipelineStep>.
+3) listarTodos() retorna todos os steps.
+4) listarPorEntidades(list) retorna steps para lista específica.
+
+Estrutura interna:
+Atributos-chave:
+- stepsPorEntidade: Map<String, Supplier<PipelineStep>> (chave normalized, case-insensitive).
+Metodos principais:
+- registrar(entidade, supplier): registra step.
+- get(entidade): Optional<PipelineStep>.
+- listarTodos(): List<PipelineStep> imutavel.
+- listarPorEntidades(list): List<PipelineStep> filtrado.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.pipeline;
 
 import java.util.ArrayList;

@@ -1,3 +1,34 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hUseCase.java
+Classe  : ValidacaoApiBanco24hUseCase (public class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Validacao simplificada API vs Banco 24h (consulta totais da API em tempo real, compara com log de extracao + contagem destino).
+
+Conecta com:
+- CompletudeValidator (observabilidade.servicos) - para buscarTotaisEslCloud
+- GerenciadorConexao (suporte.banco)
+- LoggerConsole (suporte.console)
+- ConstantesEntidades (suporte.validacao)
+
+Fluxo geral:
+1) executar(ValidacaoApiBanco24hRequest) resolve data referencia (fallback inteligente com log_extracoes).
+2) Consulta totais API em tempo real via CompletudeValidator.
+3) Para cada entidade: busca ultima janela COMPLETA do dia, extrai counts de mensagem ou tabela.
+4) Compara: banco vs esperado, registra OK/FALHA/BACKFILL com logging.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole statico.
+- ENTIDADES_ORDEM: List de 8 entidades (ordem fixa).
+Inner record JanelaExecucao: inicio, fim, registrosExtraidos, apiCount, uniqueCount, dbUpserts.
+Metodos principais:
+- executar(ValidacaoApiBanco24hRequest): orquestra validacao com resolve de data.
+- resolverDataReferenciaLogs(): fallback inteligente (24h -> dia anterior -> sem filtro -> ultima data).
+- buscarUltimaJanelaCompletaDoDia(): busca log com periodo ou fallback.
+- extrairNumeroCampoMensagem(String, String): regex extrator de campos (api_count, unique_count, db_upserts).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

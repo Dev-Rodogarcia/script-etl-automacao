@@ -1,5 +1,20 @@
 package br.com.extrator.persistencia.adaptador;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/persistencia/adaptador/ManifestoOrfaoQueryAdapter.java
+Classe  : ManifestoOrfaoQueryPort (class)
+Pacote  : br.com.extrator.persistencia.adaptador
+Modulo  : Persistencia - Adaptador
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

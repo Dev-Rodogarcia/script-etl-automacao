@@ -1,3 +1,30 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/PlanejadorEscopoExtracaoIntervalo.java
+Classe  : PlanejadorEscopoExtracaoIntervalo (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Planeja escopo (steps e entidades) de extracao conforme filtros (API, entidade, flags).
+
+Conecta com:
+- ExtracaoPorIntervaloUseCase (consulta para planejar steps e entidades)
+- GraphQLPipelineStep, DataExportPipelineStep (cria instancias)
+- AplicacaoContexto (obtem gateways)
+
+Fluxo geral:
+1) Use case passa filtros (apiEspecifica, entidadeEspecifica, incluirFaturasGraphQL).
+2) Planejar determina quais entidades sao afetadas (para validacao e integridade).
+3) Planejar cria lista de PipelineSteps a orquestrar.
+4) Retorna escopo: passos, entidades para volume, entidades para integridade.
+
+Estrutura interna:
+Metodos principais:
+- criarSteps(): retorna List<PipelineStep> conforme filtros (GraphQL, DataExport, Faturas).
+- determinarEntidadesParaLimite(): quais entidades validar limite de extracao.
+- determinarEntidadesObrigatoriasParaVolume(): entidades criticas para validacao de volume.
+- determinarEntidadesEsperadasParaIntegridade(): entidades esperadas no schema/chaves.
+- normalizarEntidade(): mapeia sinonimos para constantes (coleta, frete, manifesto, etc).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.util.ArrayList;

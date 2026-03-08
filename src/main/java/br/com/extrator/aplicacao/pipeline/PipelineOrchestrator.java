@@ -1,3 +1,37 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/pipeline/PipelineOrchestrator.java
+Classe  : PipelineOrchestrator (class)
+Pacote  : br.com.extrator.aplicacao.pipeline
+Modulo  : Pipeline - Aplicacao
+
+Papel   : Orquestra execucao de pipeline (steps sequencial + paralelo com politicas de resiliencia).
+
+Conecta com:
+- RetryPolicy, FailurePolicy, CircuitBreaker, ErrorClassifier (politicas)
+- ExtractionLoggerPort (logging estruturado)
+- PipelineMetricsPort (metricas)
+- PipelineStep (steps a orquestrar)
+
+Fluxo geral:
+1) executar(dataInicio, dataFim, steps) itera steps.
+2) Detecta executar-em-paralelo (graphql + dataexport).
+3) Para cada step: aplica circuit breaker, retry, failure policy.
+4) Retorna PipelineReport (resultados, aborted, metricas).
+
+Estrutura interna:
+Politicas principais:
+- Circuit breaker: controla acesso (CLOSED/OPEN/HALF_OPEN).
+- Retry: reexecuta com exponential backoff.
+- Failure policy: decide modo (ABORT, DEGRADE, CONTINUE_WITH_ALERT, RETRY).
+- Error classifier: classifica erro para decisoes.
+Metodos principais:
+- executar(): loop de steps com politicas.
+- executarCoreEmParalelo(): graphql+dataexport em paralelo.
+- executarStepComPoliticas(): aplica circuit breaker + retry.
+- tratarFalhaStep(): aplica failure policy.
+Atributos-chave:
+- retryPolicy, failurePolicy, circuitBreaker, errorClassifier.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.pipeline;
 
 import java.time.LocalDate;

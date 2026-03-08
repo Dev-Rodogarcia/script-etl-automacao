@@ -1,5 +1,20 @@
 package br.com.extrator.integracao.graphql.extractors;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/integracao/graphql/extractors/FaturaGraphQLSaveSupport.java
+Classe  :  (class)
+Pacote  : br.com.extrator.integracao.graphql.extractors
+Modulo  : Integracao - GraphQL Extrator
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;

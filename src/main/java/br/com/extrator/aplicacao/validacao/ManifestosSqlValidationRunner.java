@@ -1,3 +1,28 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ManifestosSqlValidationRunner.java
+Classe  : ManifestosSqlValidationRunner (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Executor de 5 testes SQL para validacao de manifestos (duplicados falsos, NULLs, pick_sequence_code, chave composta, resumo).
+
+Conecta com:
+- ManifestosQueryResultPrinter (para formatar saida SQL)
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) executar(Connection) executa 5 testes SQL em sequencia (duplicados, NULL, distribuicao, integridade, resumo).
+2) executarTeste() envolve cada teste com titulo e executa query.
+3) Usa resultPrinter para exibir resultados em formato tabular.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para logging).
+- resultPrinter: ManifestosQueryResultPrinter (para formatacao de saida).
+Metodos principais:
+- executar(Connection): orquestra 5 testes.
+- executarTeste(Connection, String, String): executa SQL individual com titulo.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

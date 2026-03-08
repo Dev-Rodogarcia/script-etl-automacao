@@ -1,3 +1,27 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/integracao/GraphQLTypedResponseParser.java
+Classe  : GraphQLTypedResponseParser (class)
+Pacote  : br.com.extrator.integracao
+Modulo  : Integracao HTTP
+
+Papel   : Parser tipado de respostas GraphQL (edges/node, paginacao, suporta formato antigo).
+
+Conecta com:
+- ObjectMapper (Jackson)
+
+Fluxo geral:
+1) extrairPagina(dadosEntidade, nomeEntidade, tipoClasse) deserializa JSON.
+2) Detecta formato: edges/pageInfo (novo) ou array direto (antigo).
+3) Retorna ParsedGraphQLPage com entidades, hasNextPage, endCursor.
+
+Estrutura interna:
+Inner record ParsedGraphQLPage<T>:
+- entidades: List<T>.
+- hasNextPage, endCursor: paginacao.
+Metodos principais:
+- extrairPagina(): parser principal.
+- adicionarEntidade(): deserializacao com tratamento de erro.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.integracao;
 
 import java.util.ArrayList;

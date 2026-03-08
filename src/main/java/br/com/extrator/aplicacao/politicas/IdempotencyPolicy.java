@@ -1,3 +1,30 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/politicas/IdempotencyPolicy.java
+Classe  : IdempotencyPolicy (class)
+Pacote  : br.com.extrator.aplicacao.politicas
+Modulo  : Politicas - Resiliencia
+
+Papel   : Valida idempotencia de operacoes (chave SHA256 + janela temporal + schema version).
+
+Conecta com:
+- RecoveryUseCase (usa para validar replay)
+
+Fluxo geral:
+1) gerarChave(payload) calcula hash SHA256 de naturalKeys (ex: data_inicio|data_fim|api|entidade).
+2) dentroDaJanela() valida se evento e recente o suficiente (within Duration).
+3) schemaCompativel() verifica se versao schema e consistente.
+4) Use: prevention de duplicated replays (recovery) dentro de intervalo de tempo.
+
+Estrutura interna:
+Atributos-chave:
+- naturalKeys: List<String> (campos que identific am unicidade, ex: [data_inicio, data_fim, api]).
+- janelaTemporal: Duration (janela de idempotencia, ex: 365 dias).
+- schemaVersion: String (versao schema para migracoes, ex: v2).
+Metodos principais:
+- gerarChave(payload): SHA256 hash de natural keys + schema.
+- dentroDaJanela(evento, referencia): valida timestamp dentro janela.
+- schemaCompativel(incomingVersion): verifica compatibilidade de schema.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.politicas;
 
 import java.nio.charset.StandardCharsets;

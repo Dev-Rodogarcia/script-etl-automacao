@@ -1,3 +1,25 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/observabilidade/adaptador/IntegridadeEtlPortAdapter.java
+Classe  : IntegridadeEtlPortAdapter (class)
+Pacote  : br.com.extrator.observabilidade.adaptador
+Modulo  : Observabilidade - Adaptador
+
+Papel   : Adapter que implementa IntegridadeEtlPort usando IntegridadeEtlValidator (wraps validador).
+
+Conecta com:
+- IntegridadeEtlPort (interface que implementa)
+- IntegridadeEtlValidator (delegacao)
+
+Fluxo geral:
+1) validarExecucao(...) delega a validator.
+2) Mapeia ResultadoValidacao -> ResultadoIntegridade.
+
+Estrutura interna:
+Atributos-chave:
+- validator: IntegridadeEtlValidator (instancia no-arg).
+Metodos principais:
+- validarExecucao(): retorna ResultadoIntegridade com isValido + falhas.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.observabilidade.adaptador;
 
 import java.time.LocalDateTime;

@@ -1,3 +1,30 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaComparator.java
+Classe  : ValidacaoApiBanco24hDetalhadaComparator (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Compara dados API vs banco de dados, detectando faltantes, excedentes, divergencias de metadados com suporte a modos fecha do e tolerancias.
+
+Conecta com:
+- ValidacaoApiBanco24hDetalhadaRepository (para consultas de janela e carregamento de chaves/hashes)
+
+Fluxo geral:
+1) compararEntidade() busca janela COMPLETA compativel no banco.
+2) Carrega chaves e hashes do banco na janela, compara com API.
+3) Detecta faltantes (em API mas nao banco), excedentes (em banco mas nao API), divergencias_dados (hash diferente).
+4) Retorna ResultadoComparacao com contagens, amostras de discrepancias, detalhe com modo fechado/fallback.
+
+Estrutura interna:
+Atributos-chave:
+- repository: ValidacaoApiBanco24hDetalhadaRepository (para queries BD).
+- AMOSTRA_MAX: limite de amostras em detalhe (15).
+Metodos principais:
+- compararEntidade(Connection, String, ResultadoApiChaves, LocalDate, LocalDate, LocalDate, boolean, boolean): comparacao principal.
+- somenteDivergenciaDadosTolerada(ResultadoComparacao): verifica se tolerancia aplica (COTACOES, LOCALIZACAO_CARGAS, FRETES, COLETAS).
+- construirDetalheComparacao(): monta string detalhe com amostras.
+- amostraChaves(Set<String>): retorna primeiras AMOSTRA_MAX chaves ordenadas.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;

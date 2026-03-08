@@ -1,5 +1,20 @@
 package br.com.extrator.observabilidade.servicos;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/observabilidade/servicos/CompletudeJanelaTemporalValidator.java
+Classe  :  (class)
+Pacote  : br.com.extrator.observabilidade.servicos
+Modulo  : Observabilidade - Servico
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

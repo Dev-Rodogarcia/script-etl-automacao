@@ -1,3 +1,23 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/integracao/PayloadHashUtil.java
+Classe  : PayloadHashUtil (class)
+Pacote  : br.com.extrator.integracao
+Modulo  : Integracao HTTP
+
+Papel   : Utilitario para calculo de SHA256 hex de payloads (para deduplicacao).
+
+Conecta com:
+- Nenhuma (utilidade pura)
+
+Fluxo geral:
+1) sha256Hex(payload) calcula hash SHA256.
+2) Retorna hex string (minuscula).
+3) Null-safe: null -> "".
+
+Estrutura interna:
+Metodos principais:
+- sha256Hex(String): SHA256 hex string.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.integracao;
 
 import java.nio.charset.StandardCharsets;

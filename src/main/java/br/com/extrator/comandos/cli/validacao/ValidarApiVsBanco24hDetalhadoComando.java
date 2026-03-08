@@ -1,3 +1,21 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/validacao/ValidarApiVsBanco24hDetalhadoComando.java
+Classe  : ValidarApiVsBanco24hDetalhadoComando (command)
+Pacote  : br.com.extrator.comandos.cli.validacao
+Modulo  : CLI - Validacao
+Papel   : Comando para validação detalhada 24h com suporte a período fechado e fallback de janela.
+Conecta com:
+- br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaUseCase
+- br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaRequest
+- br.com.extrator.suporte.tempo.RelogioSistema
+Fluxo geral:
+1) executar() extrai flags: --sem-faturas-graphql, --periodo-fechado, --permitir-fallback-janela
+2) Monta ValidacaoApiBanco24hDetalhadaRequest com flags e data hoje
+3) Delegação a useCase.executar()
+Estrutura interna:
+Atributos: useCase
+Metodos: executar(), possuiFlag() [private]
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.validacao;
 
 import br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaRequest;

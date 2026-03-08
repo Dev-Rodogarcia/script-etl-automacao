@@ -1,3 +1,26 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoSqlResultPrinter.java
+Classe  : ValidacaoSqlResultPrinter (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Formatador tabular de ResultSet com ajuste dinamico de largura de coluna (max 100 chars).
+
+Conecta com:
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) exibirResultado(ResultSet) calcula largura de cada coluna (header + valores).
+2) Formata tabela com cabecalho, separador, linhas (alinhadas a esquerda).
+3) Trunca valores > 100 chars com "..." e registra contagem de linhas.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para logging).
+Metodos principais:
+- exibirResultado(ResultSet): formata e exibe tabela completa.
+- formatarCabecalho(), formatarSeparador(), formatarLinha(): helpers de formatacao.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.ResultSet;

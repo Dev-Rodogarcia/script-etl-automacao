@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/TesteApiUseCase.java
+Classe  : TesteApiUseCase (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Testa funcionalidade de um endpoint API (GraphQL ou DataExport) em ultimas 24h.
+
+Conecta com:
+- PipelineOrchestrator (executa steps)
+- GraphQLPipelineStep, DataExportPipelineStep (steps de teste)
+- ExtractionLogQueryPort (valida status final das entidades)
+- AplicacaoContexto (obtem portas)
+
+Fluxo geral:
+1) executar(TesteApiRequest) valida request e exibe banner da API.
+2) Cria steps conforme tipo e entidade.
+3) Executa pipeline com PipelineOrchestrator.
+4) Valida status das entidades no log dentro de janela de tempo.
+5) Lanca IllegalStateException se falhas ou status nao COMPLETO.
+
+Estrutura interna:
+Metodos principais:
+- executar(TesteApiRequest): ponto de entrada, orquestra teste.
+- executarApi(): cria e executa steps conforme tipo de API.
+- executarGraphQL(), executarDataExport(): especificos por tipo.
+- executarPipeline(): executa pipeline e coleta falhas.
+- validarStatusDasEntidadesExecutadas(): verifica logs finais.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.LocalDate;

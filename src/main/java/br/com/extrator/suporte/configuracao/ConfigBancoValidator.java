@@ -1,5 +1,20 @@
 package br.com.extrator.suporte.configuracao;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/suporte/configuracao/ConfigBancoValidator.java
+Classe  :  (class)
+Pacote  : br.com.extrator.suporte.configuracao
+Modulo  : Suporte - Config
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;

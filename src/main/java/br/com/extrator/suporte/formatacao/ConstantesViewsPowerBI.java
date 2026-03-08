@@ -1,5 +1,20 @@
 package br.com.extrator.suporte.formatacao;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/suporte/formatacao/ConstantesViewsPowerBI.java
+Classe  : ConstantesViewsPowerBI (class)
+Pacote  : br.com.extrator.suporte.formatacao
+Modulo  : Suporte - Formatacao
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.util.HashMap;
 import java.util.Map;
 

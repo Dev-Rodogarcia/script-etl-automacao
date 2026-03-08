@@ -1,3 +1,33 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/politicas/ExponentialBackoffRetryPolicy.java
+Classe  : ExponentialBackoffRetryPolicy (class)
+Pacote  : br.com.extrator.aplicacao.politicas
+Modulo  : Politicas - Resiliencia
+
+Papel   : Implementa retry com backoff exponencial + jitter (para quebrar thundering herd).
+
+Conecta com:
+- RetryPolicy (interface que implementa)
+- ClockPort (obtem tempo, dorme)
+
+Fluxo geral:
+1) executar(supplier, operationName) tenta executar supplier ate maxTentativas vezes.
+2) Em caso de falha: calcula delay exponencial (base * multiplicador^tentativa).
+3) Adiciona jitter aleatorio para evitar sincronizacao de retries.
+4) ClockPort.dormir(delay) aguarda antes de próxima tentativa.
+5) Lança ultima excecao se todas as tentativas falharem.
+
+Estrutura interna:
+Atributos-chave:
+- maxTentativas: numero maximo de tentativas.
+- delayBaseMs: delay inicial em ms.
+- multiplicador: fator exponencial (ex: 2.0 = dobra cada vez).
+- jitter: percentual aleatorio adicional (ex: 0.1 = ±10%).
+- clock: porta para dormir e obter tempo.
+Metodos principais:
+- executar(): loop de retry com backoff.
+- calcularDelay(): exponencial com jitter.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.politicas;
 
 import java.time.Duration;

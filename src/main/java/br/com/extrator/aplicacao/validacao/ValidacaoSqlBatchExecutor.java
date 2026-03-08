@@ -1,3 +1,28 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoSqlBatchExecutor.java
+Classe  : ValidacaoSqlBatchExecutor (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Executor de scripts SQL T-SQL em batches (split por GO, remove PRINT, processa ResultSets).
+
+Conecta com:
+- ValidacaoSqlResultPrinter (para exibicao de resultados)
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) executar(Connection, String, String) recebe SQL script.
+2) Remove linhas PRINT, divide por GO (case-insensitive).
+3) Para cada batch: execute() e exibe ResultSet se presente.
+4) Com fallback: ignora erros de PRINT/syntax.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para warning de erros).
+- resultPrinter: ValidacaoSqlResultPrinter (para exibicao).
+Metodos principais:
+- executar(Connection, String, String): executor principal.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

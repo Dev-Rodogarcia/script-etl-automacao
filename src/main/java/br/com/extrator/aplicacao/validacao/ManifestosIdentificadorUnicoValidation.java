@@ -1,3 +1,25 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ManifestosIdentificadorUnicoValidation.java
+Classe  : ManifestosIdentificadorUnicoValidation (class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Valida estrategia de identificador unico em manifestos (chave composta, duplicados).
+
+Conecta com:
+- ManifestosSqlValidationRunner (delegacao)
+
+Fluxo geral:
+1) executar() valida que coluna identificador_unico existe e funciona.
+2) Testes: duplicados falsos, NULLs, chave composta, pick_sequence_code.
+3) Exibe alertas se problemas encontrados.
+
+Estrutura interna:
+Metodos principais:
+- executar(): orquestra validacoes.
+- exibirDuplicadosFalsos(), contarDuplicadosChaveComposta(): SQL queries.
+- exibirTestes*(): exibicao de resultados.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

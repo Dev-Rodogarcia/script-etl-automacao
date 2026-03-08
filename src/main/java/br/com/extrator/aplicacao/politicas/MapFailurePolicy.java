@@ -1,3 +1,27 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/politicas/MapFailurePolicy.java
+Classe  : MapFailurePolicy (class)
+Pacote  : br.com.extrator.aplicacao.politicas
+Modulo  : Politicas - Resiliencia
+
+Papel   : Implementa FailurePolicy baseada em map (por entidade) com fallback.
+
+Conecta com:
+- FailurePolicy (interface que implementa)
+- FailureMode (valores retornados)
+
+Fluxo geral:
+1) Construtor recebe map (entidade -> FailureMode) e modoPadrao.
+2) Normaliza chaves para lowercase (insensitivo a case).
+3) resolver(entidade, taxonomy) consulta map ou retorna modoPadrao.
+
+Estrutura interna:
+Atributos-chave:
+- porEntidade: Map<String, FailureMode> imutavel (chaves normalized).
+- modoPadrao: FailureMode (fallback se entidade nao esta no map).
+Metodos principais:
+- resolver(entidade, taxonomy): retorna FailureMode por entidade (case-insensitive).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.politicas;
 
 import java.util.Collections;

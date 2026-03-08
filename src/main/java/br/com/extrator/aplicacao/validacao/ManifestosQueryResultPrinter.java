@@ -1,3 +1,25 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ManifestosQueryResultPrinter.java
+Classe  : ManifestosQueryResultPrinter (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Utilitario para formatar e exibir resultados de SQL queries em saida tabular (manifesto validation).
+
+Conecta com:
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) exibirResultado(ResultSet) le dados da query.
+2) Formata como tabela com headers, separadores e dados.
+3) Escreve em System.out com contagem final de linhas.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para logging em console).
+Metodos principais:
+- exibirResultado(ResultSet): formata e exibe tabela com metadados de coluna.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.ResultSet;

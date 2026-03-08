@@ -1,3 +1,26 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaUseCase.java
+Classe  : ValidacaoApiBanco24hDetalhadaUseCase (class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Valida dados 24h: compara API vs Banco chave-a-chave (POSTMAN-like).
+
+Conecta com:
+- ValidacaoApiBanco24hDetalhadaRepository, Comparator, ApiCollector, Reporter (delegacao)
+
+Fluxo geral:
+1) executar(request) orquestra validacao detalhada.
+2) Coletaentidades da API e compara contra BD.
+3) Retorna resumo de falhas (ou lança excecao).
+
+Estrutura interna:
+Composicao com builders:
+- repository: persistencia e queries.
+- comparator: compara resultados API x BD.
+- apiCollector: coleta dados da API.
+- reporter: exibe relatorio.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.EntidadeValidacao;

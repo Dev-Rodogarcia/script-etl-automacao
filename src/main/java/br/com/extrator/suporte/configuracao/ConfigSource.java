@@ -1,5 +1,20 @@
 package br.com.extrator.suporte.configuracao;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/suporte/configuracao/ConfigSource.java
+Classe  :  (class)
+Pacote  : br.com.extrator.suporte.configuracao
+Modulo  : Suporte - Config
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;

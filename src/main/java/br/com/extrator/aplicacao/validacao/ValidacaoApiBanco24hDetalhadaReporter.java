@@ -1,3 +1,27 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaReporter.java
+Classe  : ValidacaoApiBanco24hDetalhadaReporter (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Reporter de resultados de validacao API vs Banco (log e consolidacao).
+
+Conecta com:
+- ValidacaoApiBanco24hDetalhadaComparator (para check de divergencia dinamica tolerada)
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) reportar(List<ResultadoComparacao>) itera resultados.
+2) Classifica cada um: INCONCLUSIVO, OK, OK_DADOS_DINAMICOS, ou FALHA (com log apropriado).
+3) Retorna ResumoExecucao com contadores ok/falhas.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para logging de cada resultado).
+- comparator: ValidacaoApiBanco24hDetalhadaComparator (para verificacao de tolerancia).
+Metodos principais:
+- reportar(List<ResultadoComparacao>): orquestra logging e consolidacao.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.ResumoExecucao;

@@ -1,5 +1,20 @@
 package br.com.extrator.suporte.observabilidade;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/suporte/observabilidade/ExecutionContext.java
+Classe  : ExecutionContext (class)
+Pacote  : br.com.extrator.suporte.observabilidade
+Modulo  : Suporte - Observabilidade
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.util.Map;
 import java.util.UUID;
 

@@ -1,3 +1,29 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaMetadataHasher.java
+Classe  : ValidacaoApiBanco24hDetalhadaMetadataHasher (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Gerador de hashes SHA256 para metadados de entidades (com remocao de campos volateis por entidade).
+
+Conecta com:
+- MapperUtil (suporte.mapeamento)
+- ConstantesEntidades (suporte.validacao)
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) hashMetadata(entidade, metadata) normaliza JSON removendo campos volateis.
+2) Calcula SHA256 em formato hex da string normalizada.
+3) Com fallback: JSON parsing error -> usa string trim().
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole statico para debug.
+Metodos principais:
+- hashMetadata(String, String): retorna hash SHA256 hex.
+- normalizarMetadataParaComparacao(): parse JSON, remove campos volateis por switch de entidade.
+- removerCamposVolateisComparacao(): remove status, datas de predicao, valores, volumes (dependendo entidade).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.nio.charset.StandardCharsets;

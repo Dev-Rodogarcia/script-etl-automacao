@@ -1,3 +1,27 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoDadosCompletoUseCase.java
+Classe  : ValidacaoDadosCompletoUseCase (class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Executa suite completa de validacoes SQL (prova dos 9: completude, gaps, integridade, qualidade, metadata).
+
+Conecta com:
+- ValidacaoSqlScriptLoader, ValidacaoSqlBatchExecutor (delegacao)
+
+Fluxo geral:
+1) executar() carrega 5 scripts SQL de validacao.
+2) Executa cada script no BD.
+3) Exibe resultados e resumo final.
+
+Estrutura interna:
+Atributos-chave:
+- SCRIPTS_VALIDACAO: array com caminhos dos 5 scripts.
+- scriptLoader, batchExecutor: helpers.
+Metodos principais:
+- executar(): orquestra suite.
+- exibirResumoFinal(), exibirBanner(): exibicao.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

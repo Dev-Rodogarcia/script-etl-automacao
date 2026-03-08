@@ -1,3 +1,23 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoSqlScriptLoader.java
+Classe  : ValidacaoSqlScriptLoader (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Loader de scripts SQL do classpath (/sql/ resources).
+
+Conecta com:
+- Nenhuma (utilidade pura)
+
+Fluxo geral:
+1) carregar(String scriptName) lê arquivo /sql/{scriptName} do classpath.
+2) Retorna conteudo como String com linhas juntadas por newline.
+3) Throws Exception se arquivo nao encontrado.
+
+Estrutura interna:
+Metodos principais:
+- carregar(String): carrega e retorna conteudo script.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.io.BufferedReader;

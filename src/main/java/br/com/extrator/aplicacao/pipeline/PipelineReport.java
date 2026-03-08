@@ -1,3 +1,38 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/pipeline/PipelineReport.java
+Classe  : PipelineReport (class)
+Pacote  : br.com.extrator.aplicacao.pipeline
+Modulo  : Pipeline - Aplicacao
+
+Papel   : Relatorio imutavel de resultado de execucao de pipeline (steps, metricas, qualidade).
+
+Conecta com:
+- StepExecutionResult (lista de resultados dos steps)
+- DataQualityReport (resultado de qualidade)
+
+Fluxo geral:
+1) PipelineOrchestrator constroi report via builder pattern.
+2) addResult(), aborted(), metric() adicionam dados.
+3) build() retorna PipelineReport imutavel.
+4) Use cases consultam: getResultados(), isAborted(), isBemSucedido(), totalSucessos(), totalFalhasExecucao().
+
+Estrutura interna:
+Inner class Builder (fluent API):
+- addResult(StepExecutionResult): adiciona resultado.
+- aborted(boolean), abortedBy(String): marca aborcao.
+- generatedAt(LocalDateTime): timestamp do relatorio.
+- qualityReport(DataQualityReport): resultado de qualidade.
+- metric(key, value): adiciona metrica.
+- build(): cria PipelineReport imutavel.
+Atributos-chave:
+- resultados: List<StepExecutionResult> imutavel.
+- aborted, abortedBy: estado de aborcao.
+- qualityReport: resultado de data quality.
+- metricsSnapshot: Map<String, Double> imutavel.
+Metodos principais:
+- totalSucessos(), totalFalhasExecucao(): contadores.
+- isBemSucedido(): valida steps + quality.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.pipeline;
 
 import java.time.LocalDate;

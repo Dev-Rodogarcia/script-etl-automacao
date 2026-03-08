@@ -1,3 +1,31 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/PreBackfillReferencialColetasUseCase.java
+Classe  : PreBackfillReferencialColetasUseCase (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Executa pre-backfill de coletas (referencial) antes do fluxo principal, usando janela dinamica (orfaos).
+
+Conecta com:
+- PipelineOrchestrator (executa GraphQL step)
+- ManifestoOrfaoQueryPort (consulta MIN(created_at) de orfaos)
+- GraphQLPipelineStep (step de coletas)
+- AplicacaoContexto (obtem orquestra e gateway)
+
+Fluxo geral:
+1) executar(dataInicio, dataFim) resolve inicio efetivo (dinamico ou estatico).
+2) Consulta ManifestoOrfaoQueryPort.buscarDataMaisAntigaManifestoOrfao().
+3) Se orfao_min < inicio_estatico, usa orfao_min (janela dinamica para backfill).
+4) Caso contrario, usa inicio_estatico (fallback para janela fixa em config).
+5) Executa GraphQL step para coletas no intervalo resolvido.
+6) Lanca IllegalStateException se falhas no step (pre-backfill critico).
+
+Estrutura interna:
+Metodos principais:
+- executar(LocalDate, LocalDate): resolve inicio e executa pre-backfill coletas.
+- resolverInicioEfetivo(LocalDate): retorna data dinamica (orfao) ou estatica.
+- coletarFalhas(PipelineReport): extrai falhas do relatorio do pipeline.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.LocalDate;

@@ -1,3 +1,28 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoManifestosUseCase.java
+Classe  : ValidacaoManifestosUseCase (class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Valida integridade de manifestos (contagem, duplicados, identificadores, pick_sequence_code).
+
+Conecta com:
+- ManifestosSqlValidationRunner, ManifestosIdentificadorUnicoValidation, ManifestosValidationQueries (delegacao)
+
+Fluxo geral:
+1) executar() orquestra validacoes profundas de manifestos.
+2) Compara API x BD, verifica estrutura e duplicados.
+3) Exibe analises detalhadas e resumo.
+
+Estrutura interna:
+Delegacao:
+- sqlValidationRunner: executa SQLs customizadas.
+- identificadorUnicoValidation: valida chave composta.
+- queries: helpers para consultas.
+Metodos principais:
+- executar(), validarManifestos(): orquestra tudo.
+- exibir*(): exibicao de resultados.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

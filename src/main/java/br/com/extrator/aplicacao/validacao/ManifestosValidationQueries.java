@@ -1,3 +1,30 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ManifestosValidationQueries.java
+Classe  : ManifestosValidationQueries (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Helper para consultas SQL de validacao de manifestos (contagem, duplicados, pick_sequence_code, integridade).
+
+Conecta com:
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) contar() executa SQL com COUNT retornando resultado em coluna 'total'.
+2) Metodos especializados consultam manifestos table (duplicados, NULLs, distribuicoes).
+3) Com fallback silencioso para valores padrao em caso de SQLException.
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para warning em falhas).
+Metodos principais:
+- contar(Connection, String): executa query COUNT generica.
+- contarDesdeUltimaExtracaoComFallback(): COUNT desde ultima extracao com fallback.
+- existeColunaIdentificadorUnico(): verifica schema (INFORMATION_SCHEMA).
+- contarDuplicadosChaveComposta(): consulta duplicados por sequence_code + identificador_unico.
+- contarPickSequenceCode(): retorna int[] com contagem de NULL e nao-NULL.
+- contarDuplicadosUltimas24h(): duplicados nas ultimas 24h.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import java.sql.Connection;

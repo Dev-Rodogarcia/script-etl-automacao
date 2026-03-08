@@ -1,3 +1,36 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaApiCollector.java
+Classe  : ValidacaoApiBanco24hDetalhadaApiCollector (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Coleta dados de APIs (GraphQL, DataExport) para 14 entidades, mapeando DTOs a entities, deduplicando e gerando metadata hashes.
+
+Conecta com:
+- ClienteApiDataExport, ClienteApiGraphQL (integracao)
+- Mappers (mapeamento.*): ManifestoMapper, CotacaoMapper, LocalizacaoCargaMapper, ContasAPagarMapper, FaturaPorClienteMapper, FreteMapper, ColetaMapper
+- Deduplicator (integracao.dataexport.support)
+- ValidacaoApiBanco24hDetalhadaMetadataHasher (para hashing de metadados)
+- ValidacaoApiBanco24hDetalhadaRepository (para queries em banco)
+
+Fluxo geral:
+1) criarEntidades() retorna lista de 8 entidades (ou 9 com FATURAS_GRAPHQL).
+2) Para cada entidade: carregaDados(), mapeia DTOs, deuplica, gera hashes por chave.
+3) Retorna ResultadoApiChaves com contas (bruto, unico, invalidos), chaves, hashes, detalhe.
+
+Estrutura interna:
+Atributos-chave:
+- clienteDataExport, clienteGraphQL: clientes API.
+- mappers: diversos mappers de DTO -> Entity.
+- metadataHasher: para SHA256 de metadados.
+- repository: para consultas auxiliares (faturas orfaas).
+Metodos principais:
+- criarEntidades(Connection, LocalDate, LocalDate, boolean): cria lista com 8-9 entidades.
+- carregarManifestos/Cotacoes/Localizacao/...(): metodos para cada entidade (DataExport).
+- carregarFretes/Coletas(): metodos para GraphQL.
+- carregarFaturasGraphQL(Connection, LocalDate, LocalDate): faturas com fallback para orfaas.
+- carregarDataExport/carregarGraphQL(): templates genericos para coleta, mapeamento, deduplicacao, hashing.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.EntidadeValidacao;

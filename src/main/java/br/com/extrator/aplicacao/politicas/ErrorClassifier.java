@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/politicas/ErrorClassifier.java
+Classe  : ErrorClassifier (class)
+Pacote  : br.com.extrator.aplicacao.politicas
+Modulo  : Politicas - Resiliencia
+
+Papel   : Classifica erros em taxonomia (TIMEOUT, VALIDATION, DB_CONFLICT, SCHEMA_DRIFT, DATA_QUALITY_BREACH, TRANSIENT_API_ERROR).
+
+Conecta com:
+- ErrorTaxonomy (enum de classificacao)
+
+Fluxo geral:
+1) classificar() recebe Throwable e analisa chain de causas.
+2) Detecta tipo por excecao ou keywords em mensagem (timeout, validation, schema, quality, etc).
+3) Retorna ErrorTaxonomy para uso em retry/fallback policies.
+
+Estrutura interna:
+Metodos principais:
+- classificar(Throwable): classifica erro em categoria.
+- rootCause(Throwable): percorre chain ate causa raiz.
+- message(Throwable): extrai mensagem lowercase para pattern matching.
+Regras de classificacao:
+- HttpTimeoutException ou "timeout" => TIMEOUT.
+- IllegalArgumentException ou "validation" => PERMANENT_VALIDATION_ERROR.
+- SQLException (duplicate/unique/conflict) => DB_CONFLICT.
+- "schema" ou "column" => SCHEMA_DRIFT.
+- "quality" ou "freshness" => DATA_QUALITY_BREACH.
+- Else => TRANSIENT_API_ERROR (default).
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.politicas;
 
 import java.util.Locale;

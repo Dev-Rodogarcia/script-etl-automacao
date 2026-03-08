@@ -1,3 +1,26 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/ExecutarFluxoCompletoComando.java
+Classe  : ExecutarFluxoCompletoComando (public class)
+Pacote  : br.com.extrator.comandos.cli.extracao
+Modulo  : Comando CLI - Extracao
+
+Papel   : Comando CLI para extracao completa 24h (com pre-backfill, pipeline, validacoes).
+
+Conecta com:
+- FluxoCompletoUseCase (aplicacao.extracao) - delegacao
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) executar(String[] args) detecta flags: --sem-faturas-graphql, --modo-loop-daemon.
+2) Delega a FluxoCompletoUseCase.executar(incluirFaturasGraphQL, modoLoopDaemon).
+
+Estrutura interna:
+Atributos-chave:
+- fluxoCompletoUseCase: delegate para use case.
+Metodos principais:
+- executar(String[]): flag parser e delegacao.
+- possuiFlag(String[], String): helper para deteccao de flags.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao;
 
 import br.com.extrator.aplicacao.extracao.FluxoCompletoUseCase;

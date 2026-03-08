@@ -1,3 +1,21 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/recovery/RecoveryComando.java
+Classe  : RecoveryComando (command)
+Pacote  : br.com.extrator.comandos.cli.extracao.recovery
+Modulo  : CLI - Recovery
+Papel   : Comando para replay de extração em janela de datas com flags de API e entidade.
+Conecta com:
+- br.com.extrator.aplicacao.extracao.RecoveryUseCase
+- br.com.extrator.comandos.cli.base.Comando
+- br.com.extrator.suporte.console.LoggerConsole
+Fluxo geral:
+1) executar() valida args (data início/fim obrigatórias em ISO_DATE)
+2) Parse de flags: --api [graphql|dataexport], --entidade, --sem-faturas-graphql
+3) Delegação a RecoveryUseCase.executarReplay()
+Estrutura interna:
+Atributos: log [static], DATE_FORMAT [static]
+Metodos: executar(), imprimirUso()
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao.recovery;
 
 import java.time.LocalDate;

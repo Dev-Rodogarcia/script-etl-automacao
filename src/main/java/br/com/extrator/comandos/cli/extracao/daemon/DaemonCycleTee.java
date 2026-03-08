@@ -1,3 +1,18 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/daemon/DaemonCycleTee.java
+Classe  : DaemonCycleTee (utility), CycleTeeHandle (nested), TeeOutputStream (nested)
+Pacote  : br.com.extrator.comandos.cli.extracao.daemon
+Modulo  : CLI - Daemon
+Papel   : Implementa Tee pattern para duplicar stdout/stderr para arquivo durante ciclos daemon.
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) abrir() cria PrintStreams tee e alterna System.out/err
+2) TeeOutputStream copia bytes para dois outputs (console + arquivo)
+3) CycleTeeHandle restaura System.out/err ao close()
+Estrutura interna:
+Atributos: originalOut, originalErr, teeOut, teeErr, arquivoOut, arquivoErr (em CycleTeeHandle)
+Metodos: abrir() [static], close(), write()
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao.daemon;
 
 import java.io.FileOutputStream;

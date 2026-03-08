@@ -1,5 +1,20 @@
 package br.com.extrator.observabilidade.pipeline;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/observabilidade/pipeline/JsonStructuredExtractionLogger.java
+Classe  : ExtractionLoggerPort (class)
+Pacote  : br.com.extrator.observabilidade.pipeline
+Modulo  : Observabilidade - Pipeline
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 

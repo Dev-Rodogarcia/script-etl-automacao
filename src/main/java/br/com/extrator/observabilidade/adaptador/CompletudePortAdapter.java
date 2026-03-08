@@ -1,3 +1,26 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/observabilidade/adaptador/CompletudePortAdapter.java
+Classe  : CompletudePortAdapter (class)
+Pacote  : br.com.extrator.observabilidade.adaptador
+Modulo  : Observabilidade - Adaptador
+
+Papel   : Adapter que implementa CompletudePort usando CompletudeValidator (wraps validador).
+
+Conecta com:
+- CompletudePort (interface que implementa)
+- CompletudeValidator (delegacao)
+
+Fluxo geral:
+1) validarCompletudePorLogs(dataReferencia) delega a validator.
+2) Mapeia StatusValidacao -> StatusCompletude enum.
+
+Estrutura interna:
+Atributos-chave:
+- validator: CompletudeValidator (instancia no-arg).
+Metodos principais:
+- validarCompletudePorLogs(): retorna Map<entidade, StatusCompletude>.
+- mapStatus(): converte enum StatusValidacao -> StatusCompletude.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.observabilidade.adaptador;
 
 import java.time.LocalDate;

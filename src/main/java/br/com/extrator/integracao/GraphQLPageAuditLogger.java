@@ -1,5 +1,20 @@
 package br.com.extrator.integracao;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/integracao/GraphQLPageAuditLogger.java
+Classe  :  (class)
+Pacote  : br.com.extrator.integracao
+Modulo  : Integracao HTTP
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.time.LocalDate;
 
 import org.slf4j.Logger;

@@ -1,5 +1,20 @@
 package br.com.extrator.suporte.log;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/suporte/log/SensitiveDataSanitizer.java
+Classe  : SensitiveDataSanitizer (class)
+Pacote  : br.com.extrator.suporte.log
+Modulo  : Suporte - Log
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import java.util.regex.Pattern;
 
 /**

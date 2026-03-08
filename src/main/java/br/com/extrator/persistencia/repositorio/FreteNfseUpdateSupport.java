@@ -1,5 +1,20 @@
 package br.com.extrator.persistencia.repositorio;
 
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/persistencia/repositorio/FreteNfseUpdateSupport.java
+Classe  :  (class)
+Pacote  : br.com.extrator.persistencia.repositorio
+Modulo  : Persistencia - Repositorio
+Papel   : [DESC PENDENTE]
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) [PENDENTE]
+Estrutura interna:
+Metodos: [PENDENTE]
+Atributos: [PENDENTE]
+[DOC-FILE-END]============================================================== */
+
+
 import br.com.extrator.dominio.graphql.fretes.nfse.FreteNfsePayload;
 
 import java.sql.Connection;

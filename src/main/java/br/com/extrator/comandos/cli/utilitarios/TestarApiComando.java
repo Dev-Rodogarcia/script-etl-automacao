@@ -1,3 +1,21 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/utilitarios/TestarApiComando.java
+Classe  : TestarApiComando (command), ParsedArgs (record)
+Pacote  : br.com.extrator.comandos.cli.utilitarios
+Modulo  : CLI - Utilitario
+Papel   : Comando para teste de conectividade/resposta de APIs (GraphQL ou DataExport).
+Conecta com:
+- br.com.extrator.aplicacao.extracao.TesteApiUseCase
+- br.com.extrator.aplicacao.extracao.TesteApiRequest
+- br.com.extrator.comandos.cli.base.Comando
+Fluxo geral:
+1) executar() valida args (tipo API obrigatório)
+2) parseArgs() extrai entidade e flag --sem-faturas-graphql
+3) Delegação a TesteApiUseCase.executar() com TesteApiRequest
+Estrutura interna:
+Atributos: useCase, FLAG_SEM_FATURAS_GRAPHQL [static]
+Metodos: executar(), parseArgs()
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.utilitarios;
 
 import java.util.ArrayList;

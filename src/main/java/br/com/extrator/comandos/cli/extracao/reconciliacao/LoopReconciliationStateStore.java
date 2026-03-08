@@ -1,3 +1,18 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/reconciliacao/LoopReconciliationStateStore.java
+Classe  : LoopReconciliationStateStore (service), ReconciliationState (value class)
+Pacote  : br.com.extrator.comandos.cli.extracao.reconciliacao
+Modulo  : CLI - Reconciliacao
+Papel   : Persiste/carrega estado de loop de reconciliação em arquivo Properties (datas agendadas, sucesso, pendências).
+Conecta com: Sem dependencia interna (usa Clock, Logger, Path)
+Fluxo geral:
+1) load() lê Properties de arquivo, restaura ReconciliationState ou retorna vazio
+2) save() serializa estado (datas, pendências, último erro) em Properties
+3) parseDate/toStringDate convertem entre LocalDate e ISO_DATE string
+Estrutura interna:
+Atributos: stateFile, clock, logger
+Metodos: load(), save(), parseDate(), toStringDate() [private]
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao.reconciliacao;
 
 import java.io.IOException;

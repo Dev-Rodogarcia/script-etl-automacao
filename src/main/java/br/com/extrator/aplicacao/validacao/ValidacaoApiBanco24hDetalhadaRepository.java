@@ -1,3 +1,32 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/validacao/ValidacaoApiBanco24hDetalhadaRepository.java
+Classe  : ValidacaoApiBanco24hDetalhadaRepository (final class)
+Pacote  : br.com.extrator.aplicacao.validacao
+Modulo  : Use Case - Validacao
+
+Papel   : Acesso a dados do banco para validacao API 24h (resolucao de janela COMPLETA, carregamento de chaves/hashes, faturas orfaas).
+
+Conecta com:
+- ValidacaoApiBanco24hDetalhadaMetadataHasher (para hash de metadados)
+- ConstantesEntidades (suporte.validacao)
+- LoggerConsole (suporte.console)
+
+Fluxo geral:
+1) resolverDataReferenciaLogs(): busca log_extracoes COMPLETO 24h, com fallback para dia anterior ou sem filtro periodo.
+2) carregarChavesBancoNaJanela(): SELECT chaves por entidade na janela de execucao.
+3) carregarHashesMetadataBancoNaJanela(): SELECT chaves + metadata, hasheia cada um.
+4) listarAccountingCreditIdsFretes(): busca IDs de fretes com accounting_credit_id (para faturas orfaas).
+
+Estrutura interna:
+Atributos-chave:
+- log: LoggerConsole (para warning em fallbacks).
+- metadataHasher: ValidacaoApiBanco24hDetalhadaMetadataHasher (para hashing).
+Metodos principais:
+- resolverDataReferenciaLogs(): resolucao inteligente com fallbacks.
+- buscarUltimaJanelaCompletaDoDia(): busca janela na log_extracoes com filtro de periodo ou fallback.
+- carregarChavesBancoNaJanela(), carregarHashesMetadataBancoNaJanela(): switch de entidade para queries.
+- listarAccountingCreditIdsFretes(): busca IDs de fretes para correlacao com faturas.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;

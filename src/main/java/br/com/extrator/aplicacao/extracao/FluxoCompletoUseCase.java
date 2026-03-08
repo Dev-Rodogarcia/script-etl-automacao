@@ -1,3 +1,37 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/aplicacao/extracao/FluxoCompletoUseCase.java
+Classe  : FluxoCompletoUseCase (class)
+Pacote  : br.com.extrator.aplicacao.extracao
+Modulo  : Use Case - Extracao
+
+Papel   : Orquestra fluxo ETL completo de 24h: extracao, validacao de completude e integridade, data quality.
+
+Conecta com:
+- PreBackfillReferencialColetasUseCase (pre-backfill orfaos)
+- PipelineOrchestrator (executa steps)
+- CompletudePort (valida completude origem x destino)
+- IntegridadeEtlPort (valida integridade ETL)
+- AplicacaoContexto (obtem portas)
+- RelogioSistema (marca tempo de execucao)
+
+Fluxo geral:
+1) executar() orquestra extracao completa de ultimas 24h.
+2) Executa pre-backfill de referencial de coletas (orfaos dinamicos).
+3) Orquestra pipeline (GraphQL + DataExport + Data Quality).
+4) Valida completude (origem x destino), integridade e data quality.
+5) Grava timestamp de ultima execucao bem-sucedida se tudo OK.
+6) Retorna status (SUCCESS, PARTIAL, ERROR, SUCCESS_WITH_ALERT em modo daemon).
+
+Estrutura interna:
+Metodos principais:
+- executar(): ponto de entrada, orquestra fluxo completo.
+- determinarStatusExecutivo(): classifica resultado em SUCCESS/PARTIAL/ERROR/ALERT.
+- gravarDataExecucao(): persiste timestamp de execucao bem-sucedida.
+- nomeRunnerParaResultado(): mapeia step para nome amigavel (GraphQL/DataExport/Faturas).
+Atributos-chave:
+- ARQUIVO_ULTIMO_RUN: caminho properties com timestamp ultima execucao.
+- preBackfillReferencialColetasUseCase: executa pre-backfill.
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.io.FileOutputStream;

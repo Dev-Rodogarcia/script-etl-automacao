@@ -1,3 +1,17 @@
+/* ==[DOC-FILE]===============================================================
+Arquivo : src/main/java/br/com/extrator/comandos/cli/extracao/daemon/CycleSummary.java
+Classe  : CycleSummary (value class)
+Pacote  : br.com.extrator.comandos.cli.extracao.daemon
+Modulo  : CLI - Daemon
+Papel   : Encapsula resultado de um ciclo de execução daemon, com timestamps, status e contadores.
+Conecta com: Sem dependencia interna
+Fluxo geral:
+1) Instantiação com parâmetros (início, fim, duração, status, registros, warns, errors, detalhe, log)
+2) Accessors para consulta de estado pós-execução
+Estrutura interna:
+Atributos: inicio, fim, duracaoSegundos, status, totalRegistros, warns, errors, detalhe, logCiclo
+Metodos: getters para todos os campos
+[DOC-FILE-END]============================================================== */
 package br.com.extrator.comandos.cli.extracao.daemon;
 
 import java.time.LocalDateTime;
