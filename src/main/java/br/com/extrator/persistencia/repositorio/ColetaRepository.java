@@ -66,7 +66,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             MERGE dbo.%s AS target
             USING (
                 SELECT
-                    ? AS id, ? AS sequence_code, ? AS request_date, ? AS service_date, ? AS status, ? AS total_value, ? AS total_weight, ? AS total_volumes,
+                    ? AS id, ? AS sequence_code, ? AS request_date, ? AS request_hour, ? AS service_date, ? AS status, ? AS total_value, ? AS total_weight, ? AS total_volumes,
                     ? AS cliente_nome, ? AS cliente_doc, ? AS local_coleta, ? AS numero_coleta, ? AS complemento_coleta, ? AS cidade_coleta, ? AS bairro_coleta, ? AS uf_coleta, ? AS cep_coleta, ? AS filial_id, ? AS filial_nome, ? AS usuario_nome,
                     ? AS finish_date, ? AS manifest_item_pick_id, ? AS vehicle_type_id,
                     ? AS cancellation_reason, ? AS cancellation_user_id,
@@ -79,6 +79,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 UPDATE SET
                     sequence_code = source.sequence_code,
                     request_date = source.request_date,
+                    request_hour = source.request_hour,
                     service_date = source.service_date,
                     status = source.status,
                     total_value = source.total_value,
@@ -113,7 +114,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
                 INSERT (
-                    id, sequence_code, request_date, service_date, status, total_value, total_weight, total_volumes,
+                    id, sequence_code, request_date, request_hour, service_date, status, total_value, total_weight, total_volumes,
                     cliente_nome, cliente_doc, local_coleta, numero_coleta, complemento_coleta, cidade_coleta, bairro_coleta, uf_coleta, cep_coleta, filial_id, filial_nome, usuario_nome,
                     finish_date, manifest_item_pick_id, vehicle_type_id,
                     cancellation_reason, cancellation_user_id,
@@ -122,7 +123,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     metadata, data_extracao
                 )
                 VALUES (
-                    source.id, source.sequence_code, source.request_date, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
+                    source.id, source.sequence_code, source.request_date, source.request_hour, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
                     source.cliente_nome, source.cliente_doc, source.local_coleta, source.numero_coleta, source.complemento_coleta, source.cidade_coleta, source.bairro_coleta, source.uf_coleta, source.cep_coleta, source.filial_id, source.filial_nome, source.usuario_nome,
                     source.finish_date, source.manifest_item_pick_id, source.vehicle_type_id,
                     source.cancellation_reason, source.cancellation_user_id,
@@ -144,17 +145,18 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             int expectedCount;
             try {
                 final int metaCount = statement.getParameterMetaData().getParameterCount();
-                expectedCount = (metaCount > 0 ? metaCount : 35);
+                expectedCount = (metaCount > 0 ? metaCount : 36);
                 logger.debug("MERGE de Coletas preparado: {} parâmetro(s) esperado(s)", expectedCount);
             } catch (final SQLException pmEx) {
                 logger.debug("Não foi possível obter ParameterMetaData: {}", pmEx.getMessage());
-                expectedCount = 35;
+                expectedCount = 36;
             }
             // Define os parâmetros de forma segura e na ordem correta.
             int paramIndex = 1;
             statement.setString(paramIndex++, coleta.getId());
             statement.setObject(paramIndex++, coleta.getSequenceCode(), Types.BIGINT);
             setDateParameter(statement, paramIndex++, coleta.getRequestDate());
+            statement.setString(paramIndex++, coleta.getRequestHour());
             setDateParameter(statement, paramIndex++, coleta.getServiceDate());
             statement.setString(paramIndex++, coleta.getStatus());
             setBigDecimalParameter(statement, paramIndex++, coleta.getTotalValue());

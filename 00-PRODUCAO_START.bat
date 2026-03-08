@@ -56,17 +56,16 @@ if not exist "!SQLITE_AUTH_DB!" (
     goto :END
 )
 echo [OK] Banco de autenticacao SQLite: !SQLITE_AUTH_DB!
-echo.
 
 REM Pipeline SQL Server: migrations, indices e views (modo producao - sem DROP/CREATE).
-REM Chama executar_database.bat sem flags = modo seguro/idempotente.
+REM Roda em silencio (output gravado em logs\database_startup.log) para ir direto ao menu.
 if exist "%~dp0database\executar_database.bat" (
-    call "%~dp0database\executar_database.bat"
+    set "EXTRATOR_DB_SILENT=1"
+    if not exist "%~dp0logs" mkdir "%~dp0logs" >nul 2>&1
+    call "%~dp0database\executar_database.bat" > "%~dp0logs\database_startup.log" 2>&1
+    set "EXTRATOR_DB_SILENT="
     if errorlevel 1 (
-        echo.
-        echo [AVISO] Pipeline de banco SQL Server retornou erro.
-        echo         O menu sera aberto assim mesmo. Verifique os logs.
-        echo.
+        echo [AVISO] Pipeline de banco retornou erro. Veja logs\database_startup.log
         timeout /t 3 /nobreak >nul 2>&1
     )
 )

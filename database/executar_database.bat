@@ -192,6 +192,7 @@ for %%F in (
     "migrations\001_criar_tabela_schema_migrations.sql"
     "migrations\002_corrigir_constraint_manifestos.sql"
     "migrations\003_corrigir_tipo_datetime_faturas_graphql.sql"
+    "migrations\004_adicionar_request_hour_coletas.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -280,5 +281,5 @@ if "!MODO_RECRIAR!"=="1" (
 )
 echo ============================================
 echo.
-pause
+if /i not "!EXTRATOR_DB_SILENT!"=="1" pause
 exit /b 0
