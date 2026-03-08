@@ -52,6 +52,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -73,6 +74,8 @@ public class LoggingService {
     private static final DateTimeFormatter FORMATTER_ARQUIVO = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter FORMATTER_LOG = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_LOG_FILES = 20;
+    private static final String SEPARADOR = "=".repeat(80);
+    private static final String SEPARADOR_SECAO = "-".repeat(80);
     
     private PrintStream originalOut;
     private PrintStream originalErr;
@@ -103,22 +106,22 @@ public class LoggingService {
         errorBuffer = new ByteArrayOutputStream();
         
         // Criar PrintStreams que escrevem tanto no console quanto no buffer
-        teeOut = new PrintStream(new TeeOutputStream(originalOut, outputBuffer));
-        teeErr = new PrintStream(new TeeOutputStream(originalErr, errorBuffer));
+        teeOut = new PrintStream(new TeeOutputStream(originalOut, outputBuffer), true, StandardCharsets.UTF_8);
+        teeErr = new PrintStream(new TeeOutputStream(originalErr, errorBuffer), true, StandardCharsets.UTF_8);
         
         // Redirecionar System.out e System.err
         System.setOut(teeOut);
         System.setErr(teeErr);
         
-        // Cabeçalho melhorado
+        // Cabecalho simples e seguro para console Windows
         System.out.println();
-        System.out.println("╔" + "═".repeat(78) + "╗");
-        System.out.println("║" + " ".repeat(25) + "🚀 INICIANDO OPERAÇÃO" + " ".repeat(30) + "║");
-        System.out.println("╚" + "═".repeat(78) + "╝");
-        System.out.println("📋 Operação: " + nomeOperacao);
-        System.out.println("⏰ Data/Hora de Início: " + inicioOperacao.format(FORMATTER_LOG));
-        System.out.println("📁 Diretório de Logs: " + Paths.get(DIRETORIO_LOGS).toAbsolutePath());
-        System.out.println("─".repeat(80));
+        System.out.println(SEPARADOR);
+        System.out.println("INICIANDO OPERACAO");
+        System.out.println(SEPARADOR);
+        System.out.println("Operacao: " + nomeOperacao);
+        System.out.println("Data/Hora de Inicio: " + inicioOperacao.format(FORMATTER_LOG));
+        System.out.println("Diretorio de Logs: " + Paths.get(DIRETORIO_LOGS).toAbsolutePath());
+        System.out.println(SEPARADOR_SECAO);
         System.out.println();
     }
     
@@ -144,23 +147,23 @@ public class LoggingService {
         final String statusNormalizado = statusExecucao == null ? "" : statusExecucao.trim().toUpperCase();
         final String tituloFinal;
         if ("SUCCESS".equals(statusNormalizado)) {
-            tituloFinal = "✅ OPERAÇÃO CONCLUÍDA";
+            tituloFinal = "[OK] OPERACAO CONCLUIDA";
         } else if ("PARTIAL".equals(statusNormalizado)) {
-            tituloFinal = "⚠️ OPERAÇÃO CONCLUÍDA COM FALHAS";
+            tituloFinal = "[AVISO] OPERACAO CONCLUIDA COM FALHAS";
         } else {
-            tituloFinal = "❌ OPERAÇÃO FALHOU";
+            tituloFinal = "[ERRO] OPERACAO FALHOU";
         }
         
-        // Rodapé melhorado
+        // Rodape em ASCII para evitar caracteres quebrados no console
         System.out.println();
-        System.out.println("─".repeat(80));
-        System.out.println("╔" + "═".repeat(78) + "╗");
-        System.out.println(centralizarLinha(tituloFinal));
-        System.out.println("╚" + "═".repeat(78) + "╝");
-        System.out.println("📋 Operação: " + nomeOperacao);
-        System.out.println("⏰ Data/Hora de Fim: " + fimOperacao.format(FORMATTER_LOG));
-        System.out.println("⏱️ Duração Total: " + formatarDuracao(duracao));
-        System.out.println("📌 Status final: " + (statusNormalizado.isEmpty() ? "DESCONHECIDO" : statusNormalizado));
+        System.out.println(SEPARADOR_SECAO);
+        System.out.println(SEPARADOR);
+        System.out.println(tituloFinal);
+        System.out.println(SEPARADOR);
+        System.out.println("Operacao: " + nomeOperacao);
+        System.out.println("Data/Hora de Fim: " + fimOperacao.format(FORMATTER_LOG));
+        System.out.println("Duracao Total: " + formatarDuracao(duracao));
+        System.out.println("Status final: " + (statusNormalizado.isEmpty() ? "DESCONHECIDO" : statusNormalizado));
         System.out.println();
         
         // Restaurar streams originais
@@ -191,16 +194,6 @@ public class LoggingService {
         inicioOperacao = null;
     }
 
-    private String centralizarLinha(final String texto) {
-        final String conteudo = texto == null ? "" : texto;
-        final int larguraInterna = 78;
-        final int tamanho = Math.min(conteudo.length(), larguraInterna);
-        final String textoLimitado = conteudo.substring(0, tamanho);
-        final int espacosAntes = Math.max(0, (larguraInterna - textoLimitado.length()) / 2);
-        final int espacosDepois = Math.max(0, larguraInterna - textoLimitado.length() - espacosAntes);
-        return "║" + " ".repeat(espacosAntes) + textoLimitado + " ".repeat(espacosDepois) + "║";
-    }
-    
     /**
      * Salva os logs capturados em um arquivo
      */
@@ -211,17 +204,17 @@ public class LoggingService {
             
             final StringBuilder conteudoLog = new StringBuilder();
             
-            // Cabeçalho do log melhorado
-            conteudoLog.append("╔").append("═".repeat(78)).append("╗\n");
-            conteudoLog.append("║").append(" ".repeat(25)).append("📋 LOG DA OPERAÇÃO").append(" ".repeat(33)).append("║\n");
-            conteudoLog.append("╚").append("═".repeat(78)).append("╝\n");
+            // Cabecalho do log em ASCII
+            conteudoLog.append(SEPARADOR).append("\n");
+            conteudoLog.append("LOG DA OPERACAO\n");
+            conteudoLog.append(SEPARADOR).append("\n");
             conteudoLog.append("\n");
-            conteudoLog.append("📋 Operação: ").append(nomeOperacao).append("\n");
-            conteudoLog.append("⏰ Data/Hora de Início: ").append(inicioOperacao.format(FORMATTER_LOG)).append("\n");
-            conteudoLog.append("⏰ Data/Hora de Fim: ").append(fimOperacao.format(FORMATTER_LOG)).append("\n");
-            conteudoLog.append("⏱️ Duração Total: ").append(formatarDuracao(duracao)).append("\n");
-            conteudoLog.append("📁 Arquivo: ").append(nomeArquivo).append("\n");
-            conteudoLog.append("─".repeat(80)).append("\n");
+            conteudoLog.append("Operacao: ").append(nomeOperacao).append("\n");
+            conteudoLog.append("Data/Hora de Inicio: ").append(inicioOperacao.format(FORMATTER_LOG)).append("\n");
+            conteudoLog.append("Data/Hora de Fim: ").append(fimOperacao.format(FORMATTER_LOG)).append("\n");
+            conteudoLog.append("Duracao Total: ").append(formatarDuracao(duracao)).append("\n");
+            conteudoLog.append("Arquivo: ").append(nomeArquivo).append("\n");
+            conteudoLog.append(SEPARADOR_SECAO).append("\n");
             conteudoLog.append("\n");
             
             // Estatísticas do log
@@ -229,54 +222,54 @@ public class LoggingService {
             final int tamanhoError = errorBuffer.size();
             final int totalLinhas = contarLinhas(outputBuffer) + contarLinhas(errorBuffer);
             
-            conteudoLog.append("📊 ESTATÍSTICAS DO LOG:\n");
-            conteudoLog.append("   • Tamanho da saída padrão: ").append(formatarTamanho(tamanhoOutput)).append("\n");
-            conteudoLog.append("   • Tamanho da saída de erro: ").append(formatarTamanho(tamanhoError)).append("\n");
-            conteudoLog.append("   • Total de linhas: ").append(formatarNumero(totalLinhas)).append("\n");
-            conteudoLog.append("─".repeat(80)).append("\n");
+            conteudoLog.append("ESTATISTICAS DO LOG:\n");
+            conteudoLog.append("   - Tamanho da saida padrao: ").append(formatarTamanho(tamanhoOutput)).append("\n");
+            conteudoLog.append("   - Tamanho da saida de erro: ").append(formatarTamanho(tamanhoError)).append("\n");
+            conteudoLog.append("   - Total de linhas: ").append(formatarNumero(totalLinhas)).append("\n");
+            conteudoLog.append(SEPARADOR_SECAO).append("\n");
             conteudoLog.append("\n");
             
             // Saída padrão (System.out)
             if (tamanhoOutput > 0) {
-                conteudoLog.append("╔").append("═".repeat(78)).append("╗\n");
-                conteudoLog.append("║").append(" ".repeat(28)).append("📤 SAÍDA PADRÃO (System.out)").append(" ".repeat(25)).append("║\n");
-                conteudoLog.append("╚").append("═".repeat(78)).append("╝\n");
+                conteudoLog.append(SEPARADOR).append("\n");
+                conteudoLog.append("SAIDA PADRAO (System.out)\n");
+                conteudoLog.append(SEPARADOR).append("\n");
                 conteudoLog.append("\n");
-                conteudoLog.append(outputBuffer.toString("UTF-8"));
+                conteudoLog.append(outputBuffer.toString(StandardCharsets.UTF_8));
                 conteudoLog.append("\n");
             }
             
             // Saída de erro (System.err)
             if (tamanhoError > 0) {
-                conteudoLog.append("╔").append("═".repeat(78)).append("╗\n");
-                conteudoLog.append("║").append(" ".repeat(30)).append("⚠️ SAÍDA DE ERRO (System.err)").append(" ".repeat(25)).append("║\n");
-                conteudoLog.append("╚").append("═".repeat(78)).append("╝\n");
+                conteudoLog.append(SEPARADOR).append("\n");
+                conteudoLog.append("SAIDA DE ERRO (System.err)\n");
+                conteudoLog.append(SEPARADOR).append("\n");
                 conteudoLog.append("\n");
-                conteudoLog.append(errorBuffer.toString("UTF-8"));
+                conteudoLog.append(errorBuffer.toString(StandardCharsets.UTF_8));
                 conteudoLog.append("\n");
             }
             
-            // Rodapé do log melhorado
+            // Rodape do log
             conteudoLog.append("\n");
-            conteudoLog.append("╔").append("═".repeat(78)).append("╗\n");
-            conteudoLog.append("║").append(" ".repeat(30)).append("✅ FIM DO LOG").append(" ".repeat(35)).append("║\n");
-            conteudoLog.append("╚").append("═".repeat(78)).append("╝\n");
+            conteudoLog.append(SEPARADOR).append("\n");
+            conteudoLog.append("FIM DO LOG\n");
+            conteudoLog.append(SEPARADOR).append("\n");
             
             // Escrever arquivo
-            final byte[] bytes = conteudoLog.toString().getBytes("UTF-8");
+            final byte[] bytes = conteudoLog.toString().getBytes(StandardCharsets.UTF_8);
             Files.write(caminhoArquivo, bytes);
             final long tamanhoArquivo = Files.size(caminhoArquivo);
             
-            System.out.println("📄 Log salvo com sucesso!");
-            System.out.println("   • Arquivo: " + caminhoArquivo.toAbsolutePath());
-            System.out.println("   • Tamanho: " + formatarTamanho((int) tamanhoArquivo));
-            System.out.println("   • Linhas: " + formatarNumero(totalLinhas));
+            System.out.println("[OK] Log salvo com sucesso!");
+            System.out.println("   - Arquivo: " + caminhoArquivo.toAbsolutePath());
+            System.out.println("   - Tamanho: " + formatarTamanho((int) tamanhoArquivo));
+            System.out.println("   - Linhas: " + formatarNumero(totalLinhas));
             System.out.println();
             
             aplicarRetencaoLogs();
             
         } catch (final IOException e) {
-            System.err.println("❌ Erro ao salvar log em arquivo: " + e.getMessage());
+            System.err.println("[ERRO] Erro ao salvar log em arquivo: " + e.getMessage());
         }
     }
     
@@ -326,7 +319,7 @@ public class LoggingService {
             return 0;
         }
         try {
-            final String conteudo = buffer.toString("UTF-8");
+            final String conteudo = buffer.toString(StandardCharsets.UTF_8);
             return conteudo.split("\r?\n").length;
         } catch (final Exception e) {
             return 0;
@@ -354,10 +347,10 @@ public class LoggingService {
             Path diretorio = Paths.get(DIRETORIO_LOGS);
             if (!Files.exists(diretorio)) {
                 Files.createDirectories(diretorio);
-                System.out.println("📁 Diretório de logs criado: " + diretorio.toAbsolutePath());
+                System.out.println("[INFO] Diretorio de logs criado: " + diretorio.toAbsolutePath());
             }
         } catch (IOException e) {
-            System.err.println("❌ Erro ao criar diretório de logs: " + e.getMessage());
+            System.err.println("[ERRO] Erro ao criar diretorio de logs: " + e.getMessage());
         }
     }
     
@@ -383,7 +376,7 @@ public class LoggingService {
             for (int i = 0; i < excedente; i++) {
                 try {
                     Files.deleteIfExists(arquivosLog[i].toPath());
-                    logger.debug("🧹 Log antigo removido por retenção: {}", arquivosLog[i].getName());
+                    logger.debug("Log antigo removido por retencao: {}", arquivosLog[i].getName());
                 } catch (final IOException | SecurityException e) {
                     logger.warn("Falha ao remover log antigo {}: {}", arquivosLog[i].getName(), e.getMessage());
                 }

@@ -93,7 +93,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.3.1</version>
                 <configuration>
-                    <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+                    <argLine>-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 --enable-native-access=ALL-UNNAMED</argLine>
+                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    <environmentVariables>
+                        <API_RETRY_MAX_TENTATIVAS>2</API_RETRY_MAX_TENTATIVAS>
+                        <API_GRAPHQL_RETRY_MAX_TENTATIVAS_DIA>2</API_GRAPHQL_RETRY_MAX_TENTATIVAS_DIA>
+                        <API_RETRY_DELAY_BASE_MS>500</API_RETRY_DELAY_BASE_MS>
+                        <API_RETRY_MULTIPLICADOR>1.0</API_RETRY_MULTIPLICADOR>
+                    </environmentVariables>
                 </configuration>
             </plugin>
             <plugin>
@@ -116,6 +123,7 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.2</version>
                 <configuration>
+                    <forceCreation>true</forceCreation>
                     <archive>
                         <manifest>
                             <mainClass>br.com.extrator.bootstrap.Main</mainClass>
@@ -140,9 +148,15 @@
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                        <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/LICENSE.txt</exclude>
+                                        <exclude>META-INF/NOTICE</exclude>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/versions/*/module-info.class</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

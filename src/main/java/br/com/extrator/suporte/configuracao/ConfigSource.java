@@ -17,6 +17,8 @@ Atributos: [PENDENTE]
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 
 import org.slf4j.Logger;
@@ -25,24 +27,67 @@ import org.slf4j.LoggerFactory;
 final class ConfigSource {
     private static final Logger logger = LoggerFactory.getLogger(ConfigSource.class);
     private static final String ARQUIVO_CONFIG = "config.properties";
+    private static final Path[] CAMINHOS_FALLBACK = {
+        Path.of(ARQUIVO_CONFIG),
+        Path.of("config", ARQUIVO_CONFIG),
+        Path.of("src", "main", "resources", ARQUIVO_CONFIG)
+    };
 
     private static final class PropertiesHolder {
         private static final Properties INSTANCE = carregarPropriedadesInterno();
 
         private static Properties carregarPropriedadesInterno() {
             final Properties props = new Properties();
+            if (carregarDoClasspath(props)) {
+                logger.info("Arquivo de configuracao carregado com sucesso do classpath");
+                return props;
+            }
+
+            final Path caminhoFallback = localizarArquivoConfiguracao();
+            if (caminhoFallback != null) {
+                try (InputStream input = Files.newInputStream(caminhoFallback)) {
+                    props.load(input);
+                    logger.info(
+                        "Arquivo de configuracao carregado com sucesso do disco: {}",
+                        caminhoFallback.toAbsolutePath()
+                    );
+                } catch (final IOException ex) {
+                    logger.error(
+                        "Erro ao carregar o arquivo de configuracao do disco: {}",
+                        caminhoFallback.toAbsolutePath(),
+                        ex
+                    );
+                }
+                return props;
+            }
+
+            logger.warn(
+                "Arquivo de configuracao '{}' nao encontrado no classpath nem em disco. Continuando com variaveis de ambiente.",
+                ARQUIVO_CONFIG
+            );
+            return props;
+        }
+
+        private static boolean carregarDoClasspath(final Properties props) {
             try (InputStream input = ConfigSource.class.getClassLoader().getResourceAsStream(ARQUIVO_CONFIG)) {
                 if (input == null) {
-                    logger.error("Nao foi possivel encontrar o arquivo {}", ARQUIVO_CONFIG);
-                    throw new RuntimeException("Arquivo de configuracao nao encontrado: " + ARQUIVO_CONFIG);
+                    return false;
                 }
                 props.load(input);
-                logger.info("Arquivo de configuracao carregado com sucesso (thread-safe)");
+                return true;
             } catch (final IOException ex) {
-                logger.error("Erro ao carregar o arquivo de configuracao", ex);
-                throw new RuntimeException("Erro ao carregar arquivo de configuracao", ex);
+                logger.error("Erro ao carregar o arquivo de configuracao do classpath", ex);
+                return false;
             }
-            return props;
+        }
+
+        private static Path localizarArquivoConfiguracao() {
+            for (final Path caminho : CAMINHOS_FALLBACK) {
+                if (Files.isRegularFile(caminho)) {
+                    return caminho;
+                }
+            }
+            return null;
         }
     }
 
@@ -103,7 +148,7 @@ final class ConfigSource {
                 "Configuracao '{}' nao encontrada em variavel de ambiente ({}) nem no arquivo de configuracao '{}'",
                 nomeChaveProperties,
                 nomesVariaveisAmbiente == null ? "<nenhuma>" : String.join(", ", nomesVariaveisAmbiente),
-                nomeChaveProperties
+                ARQUIVO_CONFIG
             );
         } else {
             logger.debug("Configuracao '{}' obtida do arquivo config.properties", nomeChaveProperties);

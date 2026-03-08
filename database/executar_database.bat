@@ -1,5 +1,5 @@
 @echo off
-SETLOCAL ENABLEDELAYEDEXPANSION
+SETLOCAL EnableExtensions DisableDelayedExpansion
 
 REM ================================================================
 REM Script : database/executar_database.bat
@@ -8,8 +8,9 @@ REM
 REM MODOS DE USO:
 REM
 REM   executar_database.bat
-REM     Modo PRODUCAO (padrao, seguro):
+REM     Modo PADRAO (seguro):
 REM     - Banco ja deve existir
+REM     - Garante tabelas base sem usar DROP/CREATE DATABASE
 REM     - Executa: migrations, indices, views, validacoes
 REM     - NAO executa DROP/CREATE DATABASE
 REM     - Idempotente - pode rodar multiplas vezes
@@ -40,14 +41,14 @@ set "MODO_RECRIAR=0"
 if /i "%~1"=="--recriar" set "MODO_RECRIAR=1"
 
 echo.
-if "!MODO_RECRIAR!"=="1" (
+if "%MODO_RECRIAR%"=="1" (
     echo ============================================
-    echo   EXECUTAR DATABASE - MODO DEV (--recriar)
-    echo   ATENCAO: banco sera apagado e recriado!
+    echo   EXECUTAR DATABASE - MODO DEV ^(--recriar^)
+    echo   ATENCAO: banco sera apagado e recriado.
     echo ============================================
 ) else (
     echo ============================================
-    echo   EXECUTAR DATABASE - MODO PRODUCAO
+    echo   EXECUTAR DATABASE - MODO PADRAO
     echo   Banco existente - sem DROP/CREATE
     echo ============================================
 )
@@ -60,7 +61,7 @@ if not exist "config.bat" (
     echo Copie config_exemplo.bat para config.bat e preencha:
     echo   DB_SERVER, DB_NAME
     echo   DB_USER e DB_PASSWORD apenas para autenticacao SQL
-    echo   (deixe vazios para usar Windows Authentication)
+    echo   ^(deixe vazios para usar Windows Authentication^)
     echo.
     pause
     exit /b 1
@@ -70,12 +71,12 @@ REM --- 2. Carregar config.bat ---
 call config.bat
 
 REM --- 3. Validar variaveis obrigatorias ---
-if "!DB_SERVER!"=="" (
+if "%DB_SERVER%"=="" (
     echo [ERRO] DB_SERVER nao definido no config.bat
     pause
     exit /b 1
 )
-if "!DB_NAME!"=="" (
+if "%DB_NAME%"=="" (
     echo [ERRO] DB_NAME nao definido no config.bat
     pause
     exit /b 1
@@ -95,96 +96,41 @@ if errorlevel 1 (
 )
 
 REM --- 5. Definir autenticacao: Windows (-E) ou SQL (-U + SQLCMDPASSWORD) ---
-if "!DB_USER!"=="" (
+if "%DB_USER%"=="" (
     set "AUTH_CMD=-E"
     set "SQLCMDPASSWORD="
     echo Autenticacao: Windows ^(integrada^)
 ) else (
-    if "!DB_PASSWORD!"=="" (
+    if "%DB_PASSWORD%"=="" (
         echo [ERRO] DB_USER definido mas DB_PASSWORD esta vazio no config.bat
         pause
         exit /b 1
     )
-    set "AUTH_CMD=-U !DB_USER!"
-    set "SQLCMDPASSWORD=!DB_PASSWORD!"
-    echo Autenticacao: SQL ^(!DB_USER!^)
+    set "AUTH_CMD=-U %DB_USER%"
+    set "SQLCMDPASSWORD=%DB_PASSWORD%"
+    echo Autenticacao: SQL ^(%DB_USER%^)
 )
-echo Servidor: !DB_SERVER!  |  Banco: !DB_NAME!
+echo Servidor: %DB_SERVER%  ^|  Banco: %DB_NAME%
 echo.
 
 REM ================================================================
 REM MODO DEV: recriar banco do zero (apenas com --recriar)
 REM ================================================================
-if "!MODO_RECRIAR!"=="1" (
-    echo ATENCAO: Esta operacao vai APAGAR todos os dados do banco [!DB_NAME!].
-    echo.
-    set "CONFIRMA="
-    set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
-    if /i not "!CONFIRMA!"=="RECRIAR" (
-        echo Operacao cancelada.
-        set "SQLCMDPASSWORD="
-        exit /b 0
-    )
-
-    echo.
-    echo [EXEC] DROP / CREATE DATABASE [!DB_NAME!]...
-    sqlcmd -S !DB_SERVER! !AUTH_CMD! -d master -Q "IF DB_ID('!DB_NAME!') IS NOT NULL BEGIN ALTER DATABASE [!DB_NAME!] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [!DB_NAME!]; END; CREATE DATABASE [!DB_NAME!];"
-    if errorlevel 1 (
-        echo [ERRO] Falha ao recriar banco de dados: !DB_NAME!
-        set "SQLCMDPASSWORD="
-        pause
-        exit /b 1
-    )
-    echo [OK] Banco [!DB_NAME!] recriado.
-    echo.
-
-    REM Tabelas (apenas no modo recriar - banco estava vazio)
-    echo [ETAPA] Criando tabelas...
-    for %%F in (
-        "tabelas\001_criar_tabela_coletas.sql"
-        "tabelas\002_criar_tabela_fretes.sql"
-        "tabelas\003_criar_tabela_manifestos.sql"
-        "tabelas\004_criar_tabela_cotacoes.sql"
-        "tabelas\005_criar_tabela_localizacao_cargas.sql"
-        "tabelas\006_criar_tabela_contas_a_pagar.sql"
-        "tabelas\007_criar_tabela_faturas_por_cliente.sql"
-        "tabelas\008_criar_tabela_faturas_graphql.sql"
-        "tabelas\009_criar_tabela_log_extracoes.sql"
-        "tabelas\010_criar_tabela_page_audit.sql"
-        "tabelas\011_criar_tabela_dim_usuarios.sql"
-        "tabelas\012_criar_tabela_sys_execution_history.sql"
-        "tabelas\013_criar_tabela_sys_auditoria_temp.sql"
-    ) do (
-        if not exist %%F (
-            echo [ERRO] Script nao encontrado: %%~F
-            set "SQLCMDPASSWORD="
-            pause
-            exit /b 1
-        )
-        echo   [EXEC] %%~F
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "%%~F" -b
-        if errorlevel 1 (
-            echo [ERRO] Falha em: %%~F
-            set "SQLCMDPASSWORD="
-            pause
-            exit /b 1
-        )
-    )
-    echo [OK] Tabelas criadas.
-    echo.
-
-    REM Seguranca SQL Server (permissoes - apenas no recriar)
-    if exist "seguranca\024_configurar_permissoes_usuario.sql" (
-        echo   [EXEC] seguranca\024_configurar_permissoes_usuario.sql
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "seguranca\024_configurar_permissoes_usuario.sql" -b
-        if errorlevel 1 echo   [AVISO] Permissoes retornaram erro - verifique manualmente.
-        echo.
-    )
+if /i "%MODO_RECRIAR%"=="1" (
+    call :RECRIAR_BANCO
+    if errorlevel 2 exit /b 0
+    if errorlevel 1 exit /b 1
 )
 
 REM ================================================================
-REM AMBOS OS MODOS: migrations, indices, views, validacoes
+REM AMBOS OS MODOS: tabelas base, migrations, indices, views, validacoes
 REM ================================================================
+
+REM --- Tabelas base (idempotente - cria faltantes sem recriar o banco) ---
+if /i not "%MODO_RECRIAR%"=="1" (
+    call :GARANTIR_TABELAS_BASE
+    if errorlevel 1 exit /b 1
+)
 
 REM --- Migrations (criticas - para em erro) ---
 echo [ETAPA] Migrations...
@@ -198,7 +144,7 @@ for %%F in (
         echo   [SKIP] Nao encontrada: %%~F
     ) else (
         echo   [EXEC] %%~F
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "%%~F" -b
+        sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
         if errorlevel 1 (
             echo [ERRO] Falha critica na migration: %%~F
             set "SQLCMDPASSWORD="
@@ -217,7 +163,7 @@ for %%F in (
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "%%~F"
+        sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F"
         if errorlevel 1 echo   [AVISO] Indice pode ja existir: %%~F
     )
 )
@@ -245,7 +191,7 @@ for %%F in (
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "%%~F"
+        sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F"
         if errorlevel 1 echo   [AVISO] View pode ja existir: %%~F
     )
 )
@@ -263,7 +209,7 @@ for %%F in (
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
-        sqlcmd -S !DB_SERVER! -d !DB_NAME! !AUTH_CMD! -i "%%~F"
+        sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F"
         if errorlevel 1 echo   [AVISO] Validacao retornou aviso: %%~F
     )
 )
@@ -274,12 +220,83 @@ REM Limpar senha da memoria
 set "SQLCMDPASSWORD="
 
 echo ============================================
-if "!MODO_RECRIAR!"=="1" (
+if "%MODO_RECRIAR%"=="1" (
     echo   CONCLUIDO - Banco recriado e configurado.
 ) else (
-    echo   CONCLUIDO - Pipeline de producao executado.
+    echo   CONCLUIDO - Scripts SQL executados sem recriar o banco.
 )
 echo ============================================
 echo.
-if /i not "!EXTRATOR_DB_SILENT!"=="1" pause
+if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+exit /b 0
+
+:GARANTIR_TABELAS_BASE
+echo [ETAPA] Garantindo tabelas base...
+for %%F in (
+    "tabelas\001_criar_tabela_coletas.sql"
+    "tabelas\002_criar_tabela_fretes.sql"
+    "tabelas\003_criar_tabela_manifestos.sql"
+    "tabelas\004_criar_tabela_cotacoes.sql"
+    "tabelas\005_criar_tabela_localizacao_cargas.sql"
+    "tabelas\006_criar_tabela_contas_a_pagar.sql"
+    "tabelas\007_criar_tabela_faturas_por_cliente.sql"
+    "tabelas\008_criar_tabela_faturas_graphql.sql"
+    "tabelas\009_criar_tabela_log_extracoes.sql"
+    "tabelas\010_criar_tabela_page_audit.sql"
+    "tabelas\011_criar_tabela_dim_usuarios.sql"
+    "tabelas\012_criar_tabela_sys_execution_history.sql"
+    "tabelas\013_criar_tabela_sys_auditoria_temp.sql"
+) do (
+    if not exist %%F (
+        echo [ERRO] Script nao encontrado: %%~F
+        set "SQLCMDPASSWORD="
+        pause
+        exit /b 1
+    )
+    echo   [EXEC] %%~F
+    sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
+    if errorlevel 1 (
+        echo [ERRO] Falha em: %%~F
+        set "SQLCMDPASSWORD="
+        pause
+        exit /b 1
+    )
+)
+echo [OK] Tabelas base garantidas.
+echo.
+exit /b 0
+
+:RECRIAR_BANCO
+echo ATENCAO: Esta operacao vai APAGAR todos os dados do banco [%DB_NAME%].
+echo.
+set "CONFIRMA="
+set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
+if /i not "%CONFIRMA%"=="RECRIAR" (
+    echo Operacao cancelada.
+    set "SQLCMDPASSWORD="
+    exit /b 2
+)
+
+echo.
+echo [EXEC] DROP / CREATE DATABASE [%DB_NAME%]...
+sqlcmd -S %DB_SERVER% %AUTH_CMD% -d master -Q "IF DB_ID('%DB_NAME%') IS NOT NULL BEGIN ALTER DATABASE [%DB_NAME%] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%DB_NAME%]; END; CREATE DATABASE [%DB_NAME%];"
+if errorlevel 1 (
+    echo [ERRO] Falha ao recriar banco de dados: %DB_NAME%
+    set "SQLCMDPASSWORD="
+    pause
+    exit /b 1
+)
+echo [OK] Banco [%DB_NAME%] recriado.
+echo.
+
+call :GARANTIR_TABELAS_BASE
+if errorlevel 1 exit /b 1
+
+REM Seguranca SQL Server (permissoes - apenas no recriar)
+if exist "seguranca\024_configurar_permissoes_usuario.sql" (
+    echo   [EXEC] seguranca\024_configurar_permissoes_usuario.sql
+    sqlcmd -S %DB_SERVER% -d %DB_NAME% %AUTH_CMD% -i "seguranca\024_configurar_permissoes_usuario.sql" -b
+    if errorlevel 1 echo   [AVISO] Permissoes retornaram erro - verifique manualmente.
+    echo.
+)
 exit /b 0

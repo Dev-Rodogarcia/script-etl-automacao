@@ -84,14 +84,14 @@ public class ExtractionLogger {
         
         final LocalDateTime inicio = RelogioSistema.agora();
         final String entityName = extractor.getEntityName();
-        final String displayEmoji = emoji != null ? emoji : extractor.getEmoji();
+        final String prefixoEntidade = montarPrefixoEntidade(emoji != null ? emoji : extractor.getEmoji());
         
         // Log inicial detalhado
         log.info("{}", "=".repeat(80));
-        log.info("{} {} INICIANDO EXTRAÇÃO: {}", displayEmoji, displayEmoji, entityName.toUpperCase());
+        log.info("{}INICIANDO EXTRACAO: {}", prefixoEntidade, entityName.toUpperCase());
         log.info("{}", "=".repeat(80));
-        log.info("📅 Período: {}", formatarPeriodo(dataInicio, dataFim));
-        log.info("⏰ Início: {}", inicio.format(TIME_FORMATTER));
+        log.info("Periodo: {}", formatarPeriodo(dataInicio, dataFim));
+        log.info("Inicio: {}", inicio.format(TIME_FORMATTER));
         log.info("{}", "-".repeat(80));
 
         int registrosExtraidosAteFalha = 0;
@@ -106,13 +106,15 @@ public class ExtractionLogger {
             final List<T> dtos = resultado.getDados();
             final int totalPaginas = resultado.getPaginasProcessadas();
             final boolean completo = resultado.isCompleto();
-            final String statusMsg = completo ? "✅ COMPLETO" : "⚠️ INCOMPLETO (" + resultado.getMotivoInterrupcao() + ")";
+            final String statusMsg = completo
+                ? "[OK] COMPLETO"
+                : "[AVISO] INCOMPLETO (" + resultado.getMotivoInterrupcao() + ")";
             registrosExtraidosAteFalha = resultado.getRegistrosExtraidos();
             paginasProcessadasAteFalha = totalPaginas;
             
             // Log de extração detalhado
             log.info("{}", "-".repeat(80));
-            log.info("📊 RESULTADO DA EXTRAÇÃO:");
+            log.info("RESULTADO DA EXTRACAO:");
             log.info("   • Total extraído da API: {} registros", formatarNumero(dtos.size()));
             log.info("   • Páginas processadas: {}", totalPaginas);
             log.info("   • Status: {}", statusMsg);
@@ -120,7 +122,7 @@ public class ExtractionLogger {
             log.info("   • Tempo de extração (apenas busca na API): {} ms ({} s)",
                 duracaoExtracao.toMillis(),
                 String.format("%.2f", segundosExtracao));
-            log.info("      ↳ enriquecimento e gravação entram no Tempo de salvamento abaixo");
+            log.info("      [INFO] enriquecimento e gravacao entram no Tempo de salvamento abaixo");
             if (dtos.size() > 0 && duracaoExtracao.toMillis() > 0) {
                 final double registrosPorSegundo = (dtos.size() * 1000.0) / duracaoExtracao.toMillis();
                 log.info("   • Taxa de extração: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
@@ -206,14 +208,14 @@ public class ExtractionLogger {
             );
 
             if (!salvamentoConsistente) {
-                log.error("❌ Divergência de carga detectada em {}: únicos={} | salvos={}",
+                log.error("[ERRO] Divergencia de carga detectada em {}: unicos={} | salvos={}",
                     entityName, formatarNumero(totalUnicos), formatarNumero(registrosSalvos));
             }
             if (registrosInvalidos > 0 && !invalidosDentroTolerancia) {
-                log.error("? Registros inválidos descartados em {}: {}", entityName, formatarNumero(registrosInvalidos));
+                log.error("[ERRO] Registros invalidos descartados em {}: {}", entityName, formatarNumero(registrosInvalidos));
             } else if (registrosInvalidos > 0) {
                 final double percentualInvalidos = (registrosInvalidos * 100.0) / Math.max(1, totalRecebido);
-                log.warn("?? Registros inválidos descartados em {} dentro da tolerância operacional: {} ({}%)",
+                log.warn("[AVISO] Registros invalidos descartados em {} dentro da tolerancia operacional: {} ({}%)",
                     entityName,
                     formatarNumero(registrosInvalidos),
                     String.format("%.2f", percentualInvalidos));
@@ -229,10 +231,10 @@ public class ExtractionLogger {
             
             // Log de resumo final
             log.info("{}", "=".repeat(80));
-            log.info("{} {} RESUMO FINAL: {}", displayEmoji, displayEmoji, entityName.toUpperCase());
+            log.info("{}RESUMO FINAL: {}", prefixoEntidade, entityName.toUpperCase());
             log.info("{}", "=".repeat(80));
-            log.info("📈 Estatísticas:");
-            log.info("   • API → DB: {} → {} registros", formatarNumero(totalRecebido), formatarNumero(registrosSalvos));
+            log.info("Estatisticas:");
+            log.info("   • API -> DB: {} -> {} registros", formatarNumero(totalRecebido), formatarNumero(registrosSalvos));
             if (totalRecebido != totalUnicos) {
                 log.info("   • Únicos após deduplicação: {}", formatarNumero(totalUnicos));
             }
@@ -247,7 +249,7 @@ public class ExtractionLogger {
                 log.info("   • Registros inválidos descartados: {}", formatarNumero(registrosInvalidos));
             }
             log.info("   • Status: {}", formatarStatusHumano(statusFinal));
-            log.info("⏰ Fim: {}", fim.format(TIME_FORMATTER));
+            log.info("Fim: {}", fim.format(TIME_FORMATTER));
             log.info("{}", "=".repeat(80));
             log.info(""); // Linha em branco para separação visual
             
@@ -270,7 +272,7 @@ public class ExtractionLogger {
             final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
             log.error("{}", "=".repeat(80));
-            log.error("❌ ERRO NA EXTRAÇÃO: {}", entityName.toUpperCase());
+            log.error("[ERRO] ERRO NA EXTRACAO: {}", entityName.toUpperCase());
             log.error("{}", "=".repeat(80));
             log.error("   • Erro: {}", e.getMessage());
             log.error("   • Tipo: {}", e.getClass().getSimpleName());
@@ -415,13 +417,19 @@ public class ExtractionLogger {
         return totalUnicosAtual;
     }
 
+    private String montarPrefixoEntidade(final String emoji) {
+        if (emoji == null || emoji.isBlank()) {
+            return "";
+        }
+        return "[ENTIDADE] ";
+    }
+
     private String formatarStatusHumano(final String statusCode) {
         if (ConstantesEntidades.STATUS_COMPLETO.equals(statusCode)) {
-            return "✅ COMPLETO";
+            return "[OK] COMPLETO";
         }
-        return "⚠️ " + statusCode;
+        return "[AVISO] " + statusCode;
     }
 }
-
 
 

@@ -66,13 +66,8 @@ import br.com.extrator.suporte.tempo.RelogioSistema;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final Path ARQUIVO_FALLBACK_HISTORICO = Path.of("logs", "execution_history_fallback.ndjson");
-
-    private static final Map<String, Comando> COMANDOS;
-
-    static {
-        PipelineCompositionRoot.inicializarContexto();
-        COMANDOS = CommandRegistry.criarMapaComandos();
-    }
+    private static final AtomicBoolean CONTEXTO_INICIALIZADO = new AtomicBoolean(false);
+    private static final Map<String, Comando> COMANDOS = CommandRegistry.criarMapaComandos();
 
     public static void main(final String[] args) {
         final String nomeComando = (args.length == 0) ? "--fluxo-completo" : args[0].toLowerCase();
@@ -207,6 +202,8 @@ public class Main {
             if (!COMANDOS.containsKey(nomeComando)) {
                 System.err.println("Comando desconhecido: " + nomeComando);
                 System.err.println("Use --ajuda para ver os comandos disponiveis.");
+            } else {
+                inicializarContextoSeNecessario(nomeComando);
             }
             comando.executar(args);
         } catch (final PartialExecutionException e) {
@@ -253,6 +250,33 @@ public class Main {
 
     private static boolean isComandoLongaDuracao(final String nomeComando) {
         return "--loop".equals(nomeComando) || "--loop-daemon-run".equals(nomeComando);
+    }
+
+    static boolean requerInicializacaoContexto(final String nomeComando) {
+        if (nomeComando == null) {
+            return false;
+        }
+        return switch (nomeComando.toLowerCase()) {
+            case "--fluxo-completo",
+                "--extracao-intervalo",
+                "--recovery",
+                "--loop",
+                "--auditar-api",
+                "--testar-api",
+                "--validar-api-banco-24h",
+                "--validar-api-banco-24h-detalhado",
+                "--loop-daemon-run" -> true;
+            default -> false;
+        };
+    }
+
+    private static void inicializarContextoSeNecessario(final String nomeComando) {
+        if (!requerInicializacaoContexto(nomeComando)) {
+            return;
+        }
+        if (CONTEXTO_INICIALIZADO.compareAndSet(false, true)) {
+            PipelineCompositionRoot.inicializarContexto();
+        }
     }
 
     private static boolean isComandoSilencioso(final String nomeComando) {

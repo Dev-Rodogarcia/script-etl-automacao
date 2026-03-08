@@ -36,28 +36,26 @@ public class ValidarAcessoComando implements Comando {
     
     @Override
     public void executar(String[] args) throws Exception {
-        log.info("🔍 Validando configurações do sistema...");
+        log.info("[INFO] Validando configuracoes do sistema...");
         log.console("=".repeat(50));
-        
+
         try {
-            // Valida conexão com banco de dados
-            log.info("📊 Validando conexão com banco de dados...");
+            log.info("[INFO] Validando conexao com banco de dados...");
             ConfigBanco.validarConexaoBancoDados();
-            log.info("✅ Conexão com banco de dados: OK");
-            
-            log.info("✅ Tabela dbo.log_extracoes deve existir (criada via scripts SQL em database/)");
-            
-            // Valida configurações das APIs
-            log.info("🌐 Validando configurações das APIs...");
-            log.info("✅ Configurações das APIs: OK");
-            
+            log.info("[OK] Conexao com banco de dados: OK");
+
+            log.info("[OK] Tabela dbo.log_extracoes deve existir (criada via scripts SQL em database/)");
+
+            log.info("[INFO] Validando configuracoes das APIs...");
+            log.info("[OK] Configuracoes das APIs: OK");
+
             log.console("=".repeat(50));
-            log.info("✅ Todas as validações foram bem-sucedidas!");
-            log.info("O sistema está pronto para execução.");
-            
+            log.info("[OK] Todas as validacoes foram bem-sucedidas.");
+            log.info("O sistema esta pronto para execucao.");
+
         } catch (final Exception e) {
-            log.error("❌ ERRO na validação: {}", e.getMessage());
-            log.error("Verifique as configurações e tente novamente.");
+            log.error("[ERRO] ERRO na validacao: {}", e.getMessage());
+            log.error("Verifique as configuracoes e tente novamente.");
             throw e;
         }
     }

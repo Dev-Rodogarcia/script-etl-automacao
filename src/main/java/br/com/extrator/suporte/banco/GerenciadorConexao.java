@@ -83,7 +83,7 @@ public final class GerenciadorConexao {
      * Cria e configura o DataSource HikariCP.
      */
     private static HikariDataSource criarDataSource() {
-        logger.info("🔧 Inicializando pool de conexões HikariCP...");
+        logger.info("[INFO] Inicializando pool de conexoes HikariCP...");
 
         // PROBLEMA 3 CORRIGIDO: Usar CarregadorConfig em vez de System.getenv() diretamente
         final String dbUrl = obterUrlComDatabaseName();
@@ -131,7 +131,7 @@ public final class GerenciadorConexao {
 
         final HikariDataSource ds = new HikariDataSource(config);
         
-        logger.info("✅ Pool HikariCP inicializado: maxSize={}, minIdle={}", 
+        logger.info("[OK] Pool HikariCP inicializado: maxSize={}, minIdle={}", 
             config.getMaximumPoolSize(), config.getMinimumIdle());
         
         // Hook para fechar o pool no shutdown da JVM.
@@ -140,7 +140,7 @@ public final class GerenciadorConexao {
         try {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 if (!ds.isClosed()) {
-                    logger.info("🔌 Fechando pool de conexões...");
+                    logger.info("[INFO] Fechando pool de conexoes...");
                     ds.close();
                 }
             }));

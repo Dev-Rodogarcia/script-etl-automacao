@@ -109,13 +109,13 @@ public class GraphQLExtractionService {
         final List<ExtractionResult> resultados = new ArrayList<>();
         
         log.info("");
-        log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(20) + "🚀 INICIANDO EXTRAÇÕES GRAPHQL" + " ".repeat(26) + "║");
-        log.info("╚" + "═".repeat(78) + "╝");
-        log.info("📅 Período: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
-        log.info("⏰ Início: {}", inicioExecucao);
-        log.info("🎯 Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
-        log.info("🛡️ Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
+        log.info("=".repeat(80));
+        log.info("INICIANDO EXTRACOES GRAPHQL");
+        log.info("=".repeat(80));
+        log.info("Periodo: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
+        log.info("Inicio: {}", inicioExecucao);
+        log.info("Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
+        log.info("Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
         log.info("");
         
         ConfigBanco.validarConexaoBancoDados();
@@ -136,7 +136,7 @@ public class GraphQLExtractionService {
                     resultados.add(resultUsuarios);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                log.error("[ERRO] Erro ao extrair Usuarios do Sistema: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage(), e);
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -147,7 +147,7 @@ public class GraphQLExtractionService {
                     resultados.add(resultUsuarios);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Usuários do Sistema: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                log.error("[ERRO] Erro ao extrair Usuarios do Sistema: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage(), e);
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.USUARIOS_SISTEMA, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -160,7 +160,7 @@ public class GraphQLExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Coletas: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                log.error("[ERRO] Erro ao extrair Coletas: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage(), e);
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.COLETAS, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -173,7 +173,7 @@ public class GraphQLExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Fretes: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                log.error("[ERRO] Erro ao extrair Fretes: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage(), e);
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.FRETES, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -202,13 +202,13 @@ public class GraphQLExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Faturas GraphQL: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage(), e);
+                log.error("[ERRO] Erro ao extrair Faturas GraphQL: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage(), e);
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.FATURAS_GRAPHQL, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
         } else if (executarFaturasGraphql) {
             // Faturas GraphQL será executado POR ÚLTIMO pelo comando orquestrador
-            log.info("ℹ️ Faturas GraphQL será extraído POR ÚLTIMO após todas as outras entidades (FASE 3)");
+            log.info("[INFO] Faturas GraphQL sera extraido POR ULTIMO apos todas as outras entidades (FASE 3)");
         }
 
         // Resumo consolidado final
@@ -251,13 +251,13 @@ public class GraphQLExtractionService {
         );
         
         final String motivo = throwOnError ? "" : ConstantesExtracao.MSG_MOTIVO_USUARIOS_COLETAS;
-        log.info(ConstantesExtracao.MSG_LOG_EXTRAINDO_COM_MOTIVO, extractor.getEmoji(), "Usuários do Sistema", motivo);
+        log.info(ConstantesExtracao.MSG_LOG_EXTRAINDO_COM_MOTIVO, extractor.getEmoji(), "Usuarios do Sistema", motivo);
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
         
         if (throwOnError && ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
-            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "usuários do sistema"), result.getErro());
+            throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "usuarios do sistema"), result.getErro());
         }
         
         return result;
@@ -311,9 +311,9 @@ public class GraphQLExtractionService {
         final Duration duracaoTotal = Duration.between(inicioExecucao, fimExecucao);
         
         log.info("");
-        log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(20) + "📊 RESUMO CONSOLIDADO GRAPHQL" + " ".repeat(26) + "║");
-        log.info("╚" + "═".repeat(78) + "╝");
+        log.info("=".repeat(80));
+        log.info("RESUMO CONSOLIDADO GRAPHQL");
+        log.info("=".repeat(80));
         
         final int totalEntidades = resultados.size();
         int entidadesComSucesso = 0;
@@ -336,42 +336,42 @@ public class GraphQLExtractionService {
             totalPaginas += result.getPaginasProcessadas();
         }
         
-        log.info("📈 Estatísticas Gerais:");
-        log.info("   • Entidades processadas: {}", totalEntidades);
-        log.info("   • ✅ Sucessos: {}", entidadesComSucesso);
+        log.info("Estatisticas Gerais:");
+        log.info("   - Entidades processadas: {}", totalEntidades);
+        log.info("   - [OK] Sucessos: {}", entidadesComSucesso);
         if (entidadesIncompletas > 0) {
-            log.info("   • ⚠️ Incompletas: {}", entidadesIncompletas);
+            log.info("   - [AVISO] Incompletas: {}", entidadesIncompletas);
         }
         if (entidadesComErro > 0) {
-            log.info("   • ❌ Erros: {}", entidadesComErro);
+            log.info("   - [ERRO] Erros: {}", entidadesComErro);
         }
         log.info("");
-        log.info("📊 Volumes:");
-        log.info("   • Total extraído da API: {} registros", formatarNumero(totalRegistrosExtraidos));
-        log.info("   • Total salvo no banco: {} registros", formatarNumero(totalRegistrosSalvos));
-        log.info("   • Total de páginas: {}", formatarNumero(totalPaginas));
+        log.info("Volumes:");
+        log.info("   - Total extraido da API: {} registros", formatarNumero(totalRegistrosExtraidos));
+        log.info("   - Total salvo no banco: {} registros", formatarNumero(totalRegistrosSalvos));
+        log.info("   - Total de paginas: {}", formatarNumero(totalPaginas));
         log.info("");
-        log.info("⏱️ Performance:");
-        log.info("   • Tempo total: {} ms ({} s)", 
+        log.info("Performance:");
+        log.info("   - Tempo total: {} ms ({} s)", 
             duracaoTotal.toMillis(), 
             String.format("%.2f", duracaoTotal.toMillis() / 1000.0));
         if (totalRegistrosSalvos > 0 && duracaoTotal.toMillis() > 0) {
             final double registrosPorSegundo = (totalRegistrosSalvos * 1000.0) / duracaoTotal.toMillis();
-            log.info("   • Taxa média: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
+            log.info("   - Taxa media: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
         }
         log.info("");
-        log.info("📋 Detalhamento por Entidade:");
+        log.info("Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
             final String statusIcon;
             if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
-                statusIcon = "✅";
+                statusIcon = "[OK]";
             } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
-                statusIcon = "❌";
+                statusIcon = "[ERRO]";
             } else {
-                statusIcon = "⚠️";
+                statusIcon = "[AVISO]";
             }
-            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
+            log.info("   {}. {} {}: {} registros salvos | {} paginas | {}",
                 i + 1,
                 statusIcon,
                 result.getEntityName(),
@@ -384,30 +384,29 @@ public class GraphQLExtractionService {
         final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
         for (final ExtractionResult r : resultados) {
             if (!ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())) {
-                eventos.add("Entidade " + r.getEntityName() + " não concluiu como COMPLETO (status="
-                    + r.getStatus() + "). Será reextraída na próxima execução.");
+                eventos.add("Entidade " + r.getEntityName() + " nao concluiu como COMPLETO (status="
+                    + r.getStatus() + "). Sera reextraida na proxima execucao.");
             }
         }
         if (!eventos.isEmpty()) {
             log.info("");
-            log.info("⚠️ EVENTOS / OBSERVAÇÕES (registrado para auditoria):");
+            log.info("[AVISO] EVENTOS / OBSERVACOES (registrado para auditoria):");
             for (final String ev : eventos) {
-                log.info("   • {}", ev);
+                log.info("   - {}", ev);
             }
         }
 
         log.info("");
-        log.info("⏰ Fim: {}", fimExecucao);
-        log.info("╔" + "═".repeat(78) + "╗");
+        log.info("Fim: {}", fimExecucao);
+        log.info("=".repeat(80));
         if (entidadesComErro > 0 || entidadesIncompletas > 0) {
-            final String resumoFalhas = "⚠️ EXTRAÇÕES GRAPHQL COM NÃO CONFORMIDADES "
+            final String resumoFalhas = "[AVISO] EXTRACOES GRAPHQL COM NAO CONFORMIDADES "
                 + "(incompletas=" + entidadesIncompletas + ", erros=" + entidadesComErro + ")";
-            final int padding = Math.max(0, 78 - resumoFalhas.length());
-            log.info("║" + resumoFalhas + " ".repeat(padding) + "║");
+            log.info(resumoFalhas);
         } else {
-            log.info("║" + " ".repeat(20) + "✅ EXTRAÇÕES GRAPHQL CONCLUÍDAS" + " ".repeat(26) + "║");
+            log.info("[OK] EXTRACOES GRAPHQL CONCLUIDAS");
         }
-        log.info("╚" + "═".repeat(78) + "╝");
+        log.info("=".repeat(80));
         log.info("");
     }
     

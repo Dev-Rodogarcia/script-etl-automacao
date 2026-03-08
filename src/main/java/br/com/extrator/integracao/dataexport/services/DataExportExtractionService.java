@@ -105,13 +105,13 @@ public class DataExportExtractionService {
         final List<ExtractionResult> resultados = new ArrayList<>();
         
         log.info("");
-        log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(20) + "🚀 INICIANDO EXTRAÇÕES DATAEXPORT" + " ".repeat(25) + "║");
-        log.info("╚" + "═".repeat(78) + "╝");
-        log.info("📅 Período: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
-        log.info("⏰ Início: {}", inicioExecucao);
-        log.info("🎯 Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
-        log.info("🛡️ Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
+        log.info("=".repeat(80));
+        log.info("INICIANDO EXTRACOES DATAEXPORT");
+        log.info("=".repeat(80));
+        log.info("Periodo: {} a {}", dataInicio, dataFim != null ? dataFim : dataInicio);
+        log.info("Inicio: {}", inicioExecucao);
+        log.info("Entidade(s): {}", entidade == null || entidade.isBlank() ? "TODAS" : entidade);
+        log.info("Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
         log.info("");
         
         ConfigBanco.validarConexaoBancoDados();
@@ -137,7 +137,7 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Manifestos: {}", e.getMessage());
+                log.error("[ERRO] Erro ao extrair Manifestos: {}", e.getMessage());
                 resultados.add(ExtractionResult.erro("manifestos", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -150,7 +150,7 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Cotações: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
+                log.error("[ERRO] Erro ao extrair Cotacoes: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage());
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.COTACOES, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -163,7 +163,7 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Localização de Cargas: {}", e.getMessage());
+                log.error("[ERRO] Erro ao extrair Localizacao de Cargas: {}", e.getMessage());
                 resultados.add(ExtractionResult.erro("localizacao_cargas", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -176,7 +176,7 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Contas a Pagar: {}. Indo para a próxima entidade; será reextraída na próxima execução.", e.getMessage());
+                log.error("[ERRO] Erro ao extrair Contas a Pagar: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.", e.getMessage());
                 resultados.add(ExtractionResult.erro(ConstantesEntidades.CONTAS_A_PAGAR, RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -189,7 +189,7 @@ public class DataExportExtractionService {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                log.error("❌ Erro ao extrair Faturas por Cliente: {}", e.getMessage());
+                log.error("[ERRO] Erro ao extrair Faturas por Cliente: {}", e.getMessage());
                 resultados.add(ExtractionResult.erro("faturas_por_cliente", RelogioSistema.agora(), e).build());
             }
             ExtractionHelper.aplicarDelay();
@@ -285,9 +285,9 @@ public class DataExportExtractionService {
         final Duration duracaoTotal = Duration.between(inicioExecucao, fimExecucao);
         
         log.info("");
-        log.info("╔" + "═".repeat(78) + "╗");
-        log.info("║" + " ".repeat(18) + "📊 RESUMO CONSOLIDADO DATAEXPORT" + " ".repeat(26) + "║");
-        log.info("╚" + "═".repeat(78) + "╝");
+        log.info("=".repeat(80));
+        log.info("RESUMO CONSOLIDADO DATAEXPORT");
+        log.info("=".repeat(80));
         
         final int totalEntidades = resultados.size();
         int entidadesComSucesso = 0;
@@ -312,48 +312,48 @@ public class DataExportExtractionService {
             totalPaginas += result.getPaginasProcessadas();
         }
         
-        log.info("📈 Estatísticas Gerais:");
-        log.info("   • Entidades processadas: {}", totalEntidades);
-        log.info("   • ✅ Sucessos: {}", entidadesComSucesso);
+        log.info("Estatisticas Gerais:");
+        log.info("   - Entidades processadas: {}", totalEntidades);
+        log.info("   - [OK] Sucessos: {}", entidadesComSucesso);
         if (entidadesIncompletas > 0) {
-            log.info("   • ⚠️ Incompletas: {}", entidadesIncompletas);
+            log.info("   - [AVISO] Incompletas: {}", entidadesIncompletas);
         }
         if (entidadesComErro > 0) {
-            log.info("   • ❌ Erros: {}", entidadesComErro);
+            log.info("   - [ERRO] Erros: {}", entidadesComErro);
         }
         log.info("");
-        log.info("📊 Volumes:");
-        log.info("   • Total extraído da API: {} registros", formatarNumero(totalRegistrosExtraidos));
-        log.info("   • Total únicos após deduplicação: {} registros", formatarNumero(totalUnicos));
-        log.info("   • Total salvo no banco: {} registros", formatarNumero(totalRegistrosSalvos));
+        log.info("Volumes:");
+        log.info("   - Total extraido da API: {} registros", formatarNumero(totalRegistrosExtraidos));
+        log.info("   - Total unicos apos deduplicacao: {} registros", formatarNumero(totalUnicos));
+        log.info("   - Total salvo no banco: {} registros", formatarNumero(totalRegistrosSalvos));
         if (totalRegistrosExtraidos != totalUnicos) {
             final int duplicadosRemovidos = totalRegistrosExtraidos - totalUnicos;
             final double percentualDuplicados = (duplicadosRemovidos * 100.0) / totalRegistrosExtraidos;
-            log.info("   • Duplicados removidos: {} ({}%)", formatarNumero(duplicadosRemovidos), String.format("%.2f", percentualDuplicados));
+            log.info("   - Duplicados removidos: {} ({}%)", formatarNumero(duplicadosRemovidos), String.format("%.2f", percentualDuplicados));
         }
-        log.info("   • Total de páginas: {}", formatarNumero(totalPaginas));
+        log.info("   - Total de paginas: {}", formatarNumero(totalPaginas));
         log.info("");
-        log.info("⏱️ Performance:");
-        log.info("   • Tempo total: {} ms ({} s)", 
+        log.info("Performance:");
+        log.info("   - Tempo total: {} ms ({} s)", 
             duracaoTotal.toMillis(), 
             String.format("%.2f", duracaoTotal.toMillis() / 1000.0));
         if (totalRegistrosSalvos > 0 && duracaoTotal.toMillis() > 0) {
             final double registrosPorSegundo = (totalRegistrosSalvos * 1000.0) / duracaoTotal.toMillis();
-            log.info("   • Taxa média: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
+            log.info("   - Taxa media: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
         }
         log.info("");
-        log.info("📋 Detalhamento por Entidade:");
+        log.info("Detalhamento por Entidade:");
         for (int i = 0; i < resultados.size(); i++) {
             final ExtractionResult result = resultados.get(i);
             final String statusIcon;
             if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
-                statusIcon = "✅";
+                statusIcon = "[OK]";
             } else if (ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
-                statusIcon = "❌";
+                statusIcon = "[ERRO]";
             } else {
-                statusIcon = "⚠️";
+                statusIcon = "[AVISO]";
             }
-            log.info("   {}. {} {}: {} registros salvos | {} páginas | {}",
+            log.info("   {}. {} {}: {} registros salvos | {} paginas | {}",
                 i + 1,
                 statusIcon,
                 result.getEntityName(),
@@ -366,30 +366,29 @@ public class DataExportExtractionService {
         final List<String> eventos = new ArrayList<>(ExtractionHelper.drenarAvisosSeguranca());
         for (final ExtractionResult r : resultados) {
             if (!ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())) {
-                eventos.add("Entidade " + r.getEntityName() + " não concluiu como COMPLETO (status="
-                    + r.getStatus() + "). Será reextraída na próxima execução.");
+                eventos.add("Entidade " + r.getEntityName() + " nao concluiu como COMPLETO (status="
+                    + r.getStatus() + "). Sera reextraida na proxima execucao.");
             }
         }
         if (!eventos.isEmpty()) {
             log.info("");
-            log.info("⚠️ EVENTOS / OBSERVAÇÕES (registrado para auditoria):");
+            log.info("[AVISO] EVENTOS / OBSERVACOES (registrado para auditoria):");
             for (final String ev : eventos) {
-                log.info("   • {}", ev);
+                log.info("   - {}", ev);
             }
         }
 
         log.info("");
-        log.info("⏰ Fim: {}", fimExecucao);
-        log.info("╔" + "═".repeat(78) + "╗");
+        log.info("Fim: {}", fimExecucao);
+        log.info("=".repeat(80));
         if (entidadesComErro > 0 || entidadesIncompletas > 0) {
-            final String resumoFalhas = "⚠️ EXTRAÇÕES DATAEXPORT COM NÃO CONFORMIDADES "
+            final String resumoFalhas = "[AVISO] EXTRACOES DATAEXPORT COM NAO CONFORMIDADES "
                 + "(incompletas=" + entidadesIncompletas + ", erros=" + entidadesComErro + ")";
-            final int padding = Math.max(0, 78 - resumoFalhas.length());
-            log.info("║" + resumoFalhas + " ".repeat(padding) + "║");
+            log.info(resumoFalhas);
         } else {
-            log.info("║" + " ".repeat(18) + "✅ EXTRAÇÕES DATAEXPORT CONCLUÍDAS" + " ".repeat(26) + "║");
+            log.info("[OK] EXTRACOES DATAEXPORT CONCLUIDAS");
         }
-        log.info("╚" + "═".repeat(78) + "╝");
+        log.info("=".repeat(80));
         log.info("");
     }
 

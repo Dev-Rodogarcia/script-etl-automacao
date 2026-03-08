@@ -33,6 +33,7 @@ package br.com.extrator.comandos.cli;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import br.com.extrator.comandos.cli.auditoria.AuditarEstruturaApiComando;
 import br.com.extrator.comandos.cli.auditoria.ExecutarAuditoriaComando;
@@ -71,37 +72,66 @@ public final class CommandRegistry {
         return Collections.unmodifiableMap(comandos);
     }
 
+    static Comando lazy(final Supplier<Comando> factory) {
+        return new LazyComando(factory);
+    }
+
     private static void registrarComandosPadrao(final Map<String, Comando> comandos) {
-        comandos.put("--fluxo-completo", new ExecutarFluxoCompletoComando());
-        comandos.put("--extracao-intervalo", new ExecutarExtracaoPorIntervaloComando());
-        comandos.put("--recovery", new RecoveryComando());
-        comandos.put("--loop", new LoopExtracaoComando());
-        comandos.put("--validar", new ValidarAcessoComando());
-        comandos.put("--ajuda", new ExibirAjudaComando());
-        comandos.put("--help", new ExibirAjudaComando());
-        comandos.put("--introspeccao", new RealizarIntrospeccaoGraphQLComando());
-        comandos.put("--auditoria", new ExecutarAuditoriaComando());
-        comandos.put("--auditar-api", new AuditarEstruturaApiComando());
-        comandos.put("--testar-api", new TestarApiComando());
-        comandos.put("--limpar-tabelas", new LimparTabelasComando());
-        comandos.put("--verificar-timestamps", new VerificarTimestampsComando());
-        comandos.put("--verificar-timezone", new VerificarTimezoneComando());
-        comandos.put("--validar-manifestos", new ValidarManifestosComando());
-        comandos.put("--validar-dados", new ValidarDadosCompletoComando());
-        comandos.put("--validar-api-banco-24h", new ValidarApiVsBanco24hComando());
-        comandos.put("--validar-api-banco-24h-detalhado", new ValidarApiVsBanco24hDetalhadoComando());
-        comandos.put("--exportar-csv", new ExportarCsvComando());
+        comandos.put("--fluxo-completo", lazy(ExecutarFluxoCompletoComando::new));
+        comandos.put("--extracao-intervalo", lazy(ExecutarExtracaoPorIntervaloComando::new));
+        comandos.put("--recovery", lazy(RecoveryComando::new));
+        comandos.put("--loop", lazy(LoopExtracaoComando::new));
+        comandos.put("--validar", lazy(ValidarAcessoComando::new));
+        comandos.put("--ajuda", lazy(ExibirAjudaComando::new));
+        comandos.put("--help", lazy(ExibirAjudaComando::new));
+        comandos.put("--introspeccao", lazy(RealizarIntrospeccaoGraphQLComando::new));
+        comandos.put("--auditoria", lazy(ExecutarAuditoriaComando::new));
+        comandos.put("--auditar-api", lazy(AuditarEstruturaApiComando::new));
+        comandos.put("--testar-api", lazy(TestarApiComando::new));
+        comandos.put("--limpar-tabelas", lazy(LimparTabelasComando::new));
+        comandos.put("--verificar-timestamps", lazy(VerificarTimestampsComando::new));
+        comandos.put("--verificar-timezone", lazy(VerificarTimezoneComando::new));
+        comandos.put("--validar-manifestos", lazy(ValidarManifestosComando::new));
+        comandos.put("--validar-dados", lazy(ValidarDadosCompletoComando::new));
+        comandos.put("--validar-api-banco-24h", lazy(ValidarApiVsBanco24hComando::new));
+        comandos.put("--validar-api-banco-24h-detalhado", lazy(ValidarApiVsBanco24hDetalhadoComando::new));
+        comandos.put("--exportar-csv", lazy(ExportarCsvComando::new));
 
-        comandos.put("--auth-check", new AuthCheckComando());
-        comandos.put("--auth-bootstrap", new AuthBootstrapComando());
-        comandos.put("--auth-create-user", new AuthCreateUserComando());
-        comandos.put("--auth-reset-password", new AuthResetPasswordComando());
-        comandos.put("--auth-disable-user", new AuthDisableUserComando());
-        comandos.put("--auth-info", new AuthInfoComando());
+        comandos.put("--auth-check", lazy(AuthCheckComando::new));
+        comandos.put("--auth-bootstrap", lazy(AuthBootstrapComando::new));
+        comandos.put("--auth-create-user", lazy(AuthCreateUserComando::new));
+        comandos.put("--auth-reset-password", lazy(AuthResetPasswordComando::new));
+        comandos.put("--auth-disable-user", lazy(AuthDisableUserComando::new));
+        comandos.put("--auth-info", lazy(AuthInfoComando::new));
 
-        comandos.put("--loop-daemon-start", new LoopDaemonComando(LoopDaemonComando.Modo.START));
-        comandos.put("--loop-daemon-stop", new LoopDaemonComando(LoopDaemonComando.Modo.STOP));
-        comandos.put("--loop-daemon-status", new LoopDaemonComando(LoopDaemonComando.Modo.STATUS));
-        comandos.put("--loop-daemon-run", new LoopDaemonComando(LoopDaemonComando.Modo.RUN));
+        comandos.put("--loop-daemon-start", lazy(() -> new LoopDaemonComando(LoopDaemonComando.Modo.START)));
+        comandos.put("--loop-daemon-stop", lazy(() -> new LoopDaemonComando(LoopDaemonComando.Modo.STOP)));
+        comandos.put("--loop-daemon-status", lazy(() -> new LoopDaemonComando(LoopDaemonComando.Modo.STATUS)));
+        comandos.put("--loop-daemon-run", lazy(() -> new LoopDaemonComando(LoopDaemonComando.Modo.RUN)));
+    }
+
+    private static final class LazyComando implements Comando {
+        private final Supplier<Comando> factory;
+        private volatile Comando delegate;
+
+        private LazyComando(final Supplier<Comando> factory) {
+            this.factory = factory;
+        }
+
+        @Override
+        public void executar(final String[] args) throws Exception {
+            resolver().executar(args);
+        }
+
+        private Comando resolver() {
+            if (delegate == null) {
+                synchronized (this) {
+                    if (delegate == null) {
+                        delegate = factory.get();
+                    }
+                }
+            }
+            return delegate;
+        }
     }
 }

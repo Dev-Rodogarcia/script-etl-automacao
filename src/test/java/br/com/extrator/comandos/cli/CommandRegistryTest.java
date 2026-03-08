@@ -23,10 +23,12 @@ Atributos-chave:
 
 package br.com.extrator.comandos.cli;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,5 +49,21 @@ class CommandRegistryTest {
     void mapaDeveSerImutavel() {
         final Map<String, Comando> comandos = CommandRegistry.criarMapaComandos();
         assertThrows(UnsupportedOperationException.class, () -> comandos.put("--novo", null));
+    }
+
+    @Test
+    void comandosDevemSerInstanciadosSobDemanda() throws Exception {
+        final AtomicInteger instanciacoes = new AtomicInteger();
+        final Comando comando = CommandRegistry.lazy(() -> {
+            instanciacoes.incrementAndGet();
+            return args -> {
+            };
+        });
+
+        assertEquals(0, instanciacoes.get());
+        comando.executar(new String[] {"--teste"});
+        comando.executar(new String[] {"--teste"});
+
+        assertEquals(1, instanciacoes.get());
     }
 }

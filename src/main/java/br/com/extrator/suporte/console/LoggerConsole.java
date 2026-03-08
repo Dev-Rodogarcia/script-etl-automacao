@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.suporte.log.SensitiveDataSanitizer;
 
 /**
- * Utilitário para logging duplo: Logger (arquivo) + Console (visual).
- * Mantém o feedback visual para scripts .bat enquanto grava logs estruturados.
+ * Utilitário para logging estruturado com opção de espelhamento manual no console.
+ * O espelhamento fica desligado por padrão porque o Logback já escreve no console.
  * 
  * @author Sistema de Extração ESL Cloud
  * @version 1.0
@@ -48,7 +48,7 @@ public final class LoggerConsole {
     
     private final Logger logger;
     private static final boolean ESPELHAR_NO_CONSOLE =
-        !"false".equalsIgnoreCase(System.getProperty("extrator.logger.console.mirror", "true"));
+        "true".equalsIgnoreCase(System.getProperty("extrator.logger.console.mirror", "false"));
     
     /**
      * Cria uma instância do LoggerConsole para a classe especificada.
