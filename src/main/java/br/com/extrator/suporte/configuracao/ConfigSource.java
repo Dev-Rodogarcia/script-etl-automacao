@@ -1,0 +1,107 @@
+package br.com.extrator.suporte.configuracao;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+final class ConfigSource {
+    private static final Logger logger = LoggerFactory.getLogger(ConfigSource.class);
+    private static final String ARQUIVO_CONFIG = "config.properties";
+
+    private static final class PropertiesHolder {
+        private static final Properties INSTANCE = carregarPropriedadesInterno();
+
+        private static Properties carregarPropriedadesInterno() {
+            final Properties props = new Properties();
+            try (InputStream input = ConfigSource.class.getClassLoader().getResourceAsStream(ARQUIVO_CONFIG)) {
+                if (input == null) {
+                    logger.error("Nao foi possivel encontrar o arquivo {}", ARQUIVO_CONFIG);
+                    throw new RuntimeException("Arquivo de configuracao nao encontrado: " + ARQUIVO_CONFIG);
+                }
+                props.load(input);
+                logger.info("Arquivo de configuracao carregado com sucesso (thread-safe)");
+            } catch (final IOException ex) {
+                logger.error("Erro ao carregar o arquivo de configuracao", ex);
+                throw new RuntimeException("Erro ao carregar arquivo de configuracao", ex);
+            }
+            return props;
+        }
+    }
+
+    private ConfigSource() {
+    }
+
+    static Properties carregarPropriedades() {
+        return PropertiesHolder.INSTANCE;
+    }
+
+    static String obterConfiguracaoObrigatoria(final String nomeVariavelAmbiente) {
+        final String valor = System.getenv(nomeVariavelAmbiente);
+        if (valor == null || valor.trim().isEmpty()) {
+            final String mensagem = String.format(
+                "Variavel de ambiente obrigatoria '%s' nao encontrada ou esta vazia. Configure esta variavel de ambiente antes de executar a aplicacao.",
+                nomeVariavelAmbiente
+            );
+            logger.error(mensagem);
+            throw new IllegalStateException(mensagem);
+        }
+        logger.debug("Configuracao sensivel '{}' obtida da variavel de ambiente", nomeVariavelAmbiente);
+        return valor;
+    }
+
+    static String obterConfiguracao(final String nomeVariavelAmbiente, final String nomeChaveProperties) {
+        return obterConfiguracao(new String[] { nomeVariavelAmbiente }, nomeChaveProperties);
+    }
+
+    static String obterConfiguracao(final String[] nomesVariaveisAmbiente, final String nomeChaveProperties) {
+        if (nomesVariaveisAmbiente != null) {
+            for (int i = 0; i < nomesVariaveisAmbiente.length; i++) {
+                final String nomeVariavelAmbiente = nomesVariaveisAmbiente[i];
+                if (nomeVariavelAmbiente == null || nomeVariavelAmbiente.isBlank()) {
+                    continue;
+                }
+
+                final String valorAmbiente = System.getenv(nomeVariavelAmbiente);
+                if (valorAmbiente != null && !valorAmbiente.trim().isEmpty()) {
+                    if (i > 0) {
+                        logger.warn(
+                            "Configuracao '{}' obtida por alias de variavel de ambiente '{}'. Prefira '{}'.",
+                            nomeChaveProperties,
+                            nomeVariavelAmbiente,
+                            nomesVariaveisAmbiente[0]
+                        );
+                    } else {
+                        logger.debug("Configuracao '{}' obtida da variavel de ambiente", nomeVariavelAmbiente);
+                    }
+                    return valorAmbiente;
+                }
+            }
+        }
+
+        final Properties props = carregarPropriedades();
+        final String valorProperties = props.getProperty(nomeChaveProperties);
+        if (valorProperties == null) {
+            logger.warn(
+                "Configuracao '{}' nao encontrada em variavel de ambiente ({}) nem no arquivo de configuracao '{}'",
+                nomeChaveProperties,
+                nomesVariaveisAmbiente == null ? "<nenhuma>" : String.join(", ", nomesVariaveisAmbiente),
+                nomeChaveProperties
+            );
+        } else {
+            logger.debug("Configuracao '{}' obtida do arquivo config.properties", nomeChaveProperties);
+        }
+        return valorProperties;
+    }
+
+    static String obterPropriedade(final String chave) {
+        final Properties props = carregarPropriedades();
+        final String valor = props.getProperty(chave);
+        if (valor == null) {
+            logger.warn("Propriedade '{}' nao encontrada no arquivo de configuracao", chave);
+        }
+        return valor;
+    }
+}
