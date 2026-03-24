@@ -1,0 +1,13 @@
+﻿{
+  "base_url": "https://rodogarcia.eslcloud.com.br",
+  "graphqlEndpoint": "/graphql",
+  "graphqlToken": "pGsc57wLxCHxTtbp8juDY3Q5BWpB2uurXB3-zoVkkDysMwf5taHqqw",
+  "dataExportToken": "pGsc57wLxCHxTtbp8juDY3Q5BWpB2uurXB3-zoVkkDysMwf5taHqqw",
+  "dataExportPathBase": "/api/analytics/reports",
+  "templateManifestos": "6399",
+  "templateLocalizacaoCarga": "8656",
+  "templateCotacoes": "6906",
+  "templateContasAPagar": "8636",
+  "templateFaturasPorCliente": "4924",
+  "templateFretes": "4323"
+}

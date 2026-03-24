@@ -1,0 +1,113 @@
+package br.com.extrator.integracao.graphql.services;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import br.com.extrator.integracao.comum.ExtractionLogger;
+import br.com.extrator.integracao.comum.ExtractionResult;
+import br.com.extrator.persistencia.repositorio.LogExtracaoRepository;
+import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
+
+class GraphQLExtractionServiceTest {
+
+    @Test
+    void deveBloquearFretesQuandoColetasNaoConcluirComSucessoNoMesmoCiclo() {
+        final TestableGraphQLExtractionService service = new TestableGraphQLExtractionService(
+            resultado(ConstantesEntidades.USUARIOS_SISTEMA, ConstantesEntidades.STATUS_COMPLETO, true, "usuarios ok"),
+            resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_INCOMPLETO_DADOS, false, "coletas incompleto"),
+            resultado(ConstantesEntidades.FRETES, ConstantesEntidades.STATUS_COMPLETO, true, "fretes ok")
+        );
+
+        final RuntimeException erro = assertThrows(
+            RuntimeException.class,
+            () -> service.execute(LocalDate.of(2026, 3, 18), LocalDate.of(2026, 3, 18), null)
+        );
+
+        assertFalse(service.fretesExecutado, "Fretes nao deve iniciar quando Coletas falha no mesmo ciclo");
+        assertTrue(
+            service.logsGerados.stream().anyMatch(log -> log.getEntidade().equals(ConstantesEntidades.FRETES)
+                && ConstantesEntidades.STATUS_INCOMPLETO_DADOS.equals(log.getStatusFinal().getValor())),
+            "Bloqueio de Fretes deve ser gravado em log_extracoes com status explicito"
+        );
+        assertTrue(erro.getMessage().contains("Fretes") || erro.getMessage().contains("fretes"));
+        assertEquals(3, service.logsGerados.size(), "Usuarios, Coletas e o bloqueio de Fretes devem ser auditados");
+    }
+
+    private static ExtractionResult resultado(final String entidade,
+                                              final String status,
+                                              final boolean sucesso,
+                                              final String mensagem) {
+        return new ExtractionResult.Builder(entidade, LocalDateTime.of(2026, 3, 18, 10, 0))
+            .fim(LocalDateTime.of(2026, 3, 18, 10, 1))
+            .status(status)
+            .registrosSalvos(sucesso ? 10 : 0)
+            .registrosExtraidos(sucesso ? 10 : 0)
+            .totalUnicos(sucesso ? 10 : 0)
+            .paginasProcessadas(sucesso ? 2 : 0)
+            .mensagem(mensagem)
+            .sucesso(sucesso)
+            .build();
+    }
+
+    private static final class TestableGraphQLExtractionService extends GraphQLExtractionService {
+        private final ExtractionResult usuariosResult;
+        private final ExtractionResult coletasResult;
+        private final ExtractionResult fretesResult;
+        private final List<br.com.extrator.persistencia.entidade.LogExtracaoEntity> logsGerados = new ArrayList<>();
+        private boolean fretesExecutado;
+
+        private TestableGraphQLExtractionService(final ExtractionResult usuariosResult,
+                                                 final ExtractionResult coletasResult,
+                                                 final ExtractionResult fretesResult) {
+            super(null, new LogExtracaoRepository(), new ExtractionLogger(TestableGraphQLExtractionService.class),
+                LoggerConsole.getLogger(TestableGraphQLExtractionService.class));
+            this.usuariosResult = usuariosResult;
+            this.coletasResult = coletasResult;
+            this.fretesResult = fretesResult;
+        }
+
+        @Override
+        protected void validarInfraestrutura() {
+            // no-op
+        }
+
+        @Override
+        protected void aplicarDelayEntreEntidades() {
+            // no-op
+        }
+
+        @Override
+        protected void registrarLogExtracao(final ExtractionResult result) {
+            logsGerados.add(result.toLogEntity());
+        }
+
+        @Override
+        protected ExtractionResult extractUsuarios(final LocalDate dataInicio, final LocalDate dataFim, final boolean throwOnError) {
+            registrarLogExtracao(usuariosResult);
+            return usuariosResult;
+        }
+
+        @Override
+        protected ExtractionResult extractColetas(final LocalDate dataInicio, final LocalDate dataFim) {
+            registrarLogExtracao(coletasResult);
+            return coletasResult;
+        }
+
+        @Override
+        protected ExtractionResult extractFretes(final LocalDate dataInicio, final LocalDate dataFim) {
+            fretesExecutado = true;
+            registrarLogExtracao(fretesResult);
+            return fretesResult;
+        }
+    }
+}
