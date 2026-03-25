@@ -71,6 +71,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
    ```
 
    O `executar_database.bat` usa **sqlcmd** e o `config.bat`; não é preciso ter o SSMS aberto. Ele roda na ordem: tabelas, views, views-dimensão, segurança (024) e **todas as validações (025-029)**.
+   O script já força leitura dos arquivos `.sql` em **UTF-8** com `-f 65001`, preservando aliases e comentários com acentos.
 
 ### Opção 2: SQL Server Management Studio (SSMS)
 
@@ -82,9 +83,36 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 ### Opção 3: sqlcmd (Linha de Comando)
 
 ```cmd
-sqlcmd -S servidor -d banco -U usuario -P senha -i 001_criar_tabela_coletas.sql
-sqlcmd -S servidor -d banco -U usuario -P senha -i 002_criar_tabela_fretes.sql
+sqlcmd -S servidor -d banco -U usuario -P senha -f 65001 -i 001_criar_tabela_coletas.sql
+sqlcmd -S servidor -d banco -U usuario -P senha -f 65001 -i 002_criar_tabela_fretes.sql
 ... (continue para todos os scripts)
+```
+
+**Importante:** o `chcp 65001` ajusta apenas o console do Windows. Para o `sqlcmd` ler os arquivos `.sql` em UTF-8, use sempre `-f 65001` nas execuções manuais.
+
+## Verificação de Encoding das Views
+
+Para validar os aliases reais expostos pelas views, consulte `INFORMATION_SCHEMA.COLUMNS` ou `sys.columns`. Não use `INFORMATION_SCHEMA.VIEW_COLUMN_USAGE` para este caso, porque ele mostra as colunas-base referenciadas pela view, não os nomes finais publicados por ela.
+
+```sql
+SELECT COLUMN_NAME, ORDINAL_POSITION
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'dbo'
+  AND TABLE_NAME = 'vw_coletas_powerbi'
+ORDER BY ORDINAL_POSITION;
+```
+
+```sql
+SELECT v.name, c.column_id, c.name
+FROM sys.views v
+JOIN sys.columns c ON c.object_id = v.object_id
+WHERE v.schema_id = SCHEMA_ID('dbo')
+  AND (
+      c.name COLLATE Latin1_General_100_BIN2 LIKE N'%Ã%'
+      OR c.name COLLATE Latin1_General_100_BIN2 LIKE N'%Â%'
+      OR c.name COLLATE Latin1_General_100_BIN2 LIKE N'%�%'
+  )
+ORDER BY v.name, c.column_id;
 ```
 
 ## Importante

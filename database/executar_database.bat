@@ -88,7 +88,8 @@ if "%DB_NAME%"=="" (
 
 set "DB_SERVER_TARGET=%DB_SERVER%"
 if not "%DB_PORT%"=="" set "DB_SERVER_TARGET=%DB_SERVER%,%DB_PORT%"
-set "SQLCMD_FLAGS=-I"
+REM Leitura explicita em UTF-8 para preservar aliases/acento dos scripts .sql
+set "SQLCMD_FLAGS=-I -f 65001"
 if not "%SQLCMD_EXTRA_ARGS%"=="" set "SQLCMD_FLAGS=%SQLCMD_FLAGS% %SQLCMD_EXTRA_ARGS%"
 
 REM --- 4. Verificar sqlcmd ---
