@@ -9,6 +9,8 @@ image: docs/assets/foto1.png
 
 # Extrator de Dados ESL Cloud
 
+**Versao:** 2.3.4
+
 Sistema ETL em Java para extrair dados do ESL Cloud, persistir em SQL Server e executar validacoes operacionais e de qualidade.
 
 ## Arquitetura final
@@ -122,3 +124,9 @@ mvn --% -q -DskipTests org.codehaus.mojo:exec-maven-plugin:3.5.1:java -Dexec.mai
 - `docs/moderno/fluxos/ciclo-completo.md`
 - `docs/legado/classificacao.md`
 - `database/README.md`
+
+## Novidades 2.3.4
+
+- endurecimento da validacao API x banco de 24h com hashing de metadata e tratamento de dados dinamicos
+- auditoria de execucao e watermark para rastrear ciclos do daemon e janelas de extracao
+- reforco dos fluxos de extracao completa, intervalo e loop de 30 minutos com melhor observabilidade operacional

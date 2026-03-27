@@ -4,9 +4,9 @@ Fail CI when release version metadata drifts across canonical files.
 
 Canonical source: pom.xml <version>.
 Validated files:
-- README_RESUMIDO.md ("**Versao:** X.Y.Z")
-- docs/README.md ("**Versao:** X.Y.Z")
-- README_RESUMIDO.md must contain "Novidades X.Y.Z".
+- README.md ("**Versao:** X.Y.Z" or front matter `version: X.Y.Z`)
+- docs/README.md ("**Versao:** X.Y.Z" or front matter `version: X.Y.Z`)
+- README.md must contain "Novidades X.Y.Z".
 """
 
 from __future__ import annotations
@@ -19,10 +19,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 POM_FILE = ROOT / "pom.xml"
-README_RESUMIDO_FILE = ROOT / "README_RESUMIDO.md"
+README_FILE = ROOT / "README.md"
 DOCS_README_FILE = ROOT / "docs" / "README.md"
 
 VERSION_PATTERN = re.compile(r"\b(\d+\.\d+\.\d+)\b")
+FRONT_MATTER_VERSION_PATTERN = re.compile(
+    r"^(?:version|versao)\s*:\s*(\d+\.\d+\.\d+)\s*$",
+    re.IGNORECASE,
+)
 
 
 def read_text(path: Path) -> str:
@@ -48,6 +52,10 @@ def parse_pom_version(path: Path) -> str:
 def parse_markdown_declared_version(path: Path) -> str:
     content = read_text(path)
     for line in content.splitlines():
+        match = FRONT_MATTER_VERSION_PATTERN.match(line.strip())
+        if match:
+            return match.group(1)
+    for line in content.splitlines():
         if "**" not in line:
             continue
         if "vers" not in line.lower():
@@ -69,13 +77,13 @@ def ensure_readme_has_release_section(path: Path, version: str) -> None:
 def main() -> int:
     try:
         pom_version = parse_pom_version(POM_FILE)
-        resumido_version = parse_markdown_declared_version(README_RESUMIDO_FILE)
+        readme_version = parse_markdown_declared_version(README_FILE)
         docs_version = parse_markdown_declared_version(DOCS_README_FILE)
 
         errors: list[str] = []
-        if resumido_version != pom_version:
+        if readme_version != pom_version:
             errors.append(
-                f"README_RESUMIDO.md divergente: {resumido_version} (esperado: {pom_version})"
+                f"README.md divergente: {readme_version} (esperado: {pom_version})"
             )
         if docs_version != pom_version:
             errors.append(
@@ -83,7 +91,7 @@ def main() -> int:
             )
 
         try:
-            ensure_readme_has_release_section(README_RESUMIDO_FILE, pom_version)
+            ensure_readme_has_release_section(README_FILE, pom_version)
         except ValueError as exc:
             errors.append(str(exc))
 
@@ -95,7 +103,7 @@ def main() -> int:
 
         print(
             "Version Consistency Guard: OK "
-            f"(pom={pom_version}, README_RESUMIDO={resumido_version}, docs/README={docs_version})"
+            f"(pom={pom_version}, README={readme_version}, docs/README={docs_version})"
         )
         return 0
     except Exception as exc:  # noqa: BLE001 - fail closed in CI

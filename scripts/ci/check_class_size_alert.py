@@ -25,6 +25,10 @@ class ClassSize:
     path: Path
     lines: int
 
+    @property
+    def relative_path(self) -> str:
+        return self.path.relative_to(ROOT).as_posix()
+
 
 def contar_linhas(path: Path) -> int:
     with path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -58,7 +62,6 @@ def main() -> int:
     classes.sort(key=lambda c: c.lines, reverse=True)
 
     alertas = [c for c in classes if c.lines >= ALERT_THRESHOLD]
-    falhas = [c for c in classes if c.lines >= FAIL_THRESHOLD]
     baseline = carregar_baseline(BASELINE_FILE) if ENFORCE_NO_GROWTH else {}
 
     if not alertas:
@@ -73,14 +76,24 @@ def main() -> int:
         f"({len(alertas)} classe(s) >= {ALERT_THRESHOLD} linhas; fail threshold={FAIL_THRESHOLD})."
     )
     for classe in alertas[:TOP_LIMIT]:
-        rel = classe.path.relative_to(ROOT).as_posix()
-        print(f" - {classe.lines:4d} linhas | {rel}")
+        print(f" - {classe.lines:4d} linhas | {classe.relative_path}")
+
+    falhas: list[tuple[ClassSize, int]] = []
+    for classe in classes:
+        if classe.lines < FAIL_THRESHOLD:
+            continue
+        base = baseline.get(classe.relative_path, 0)
+        if base >= FAIL_THRESHOLD and classe.lines <= base:
+            continue
+        falhas.append((classe, base))
 
     if falhas:
         print("Class Size Guard: FALHA (classe(s) acima do limite de bloqueio):")
-        for classe in falhas:
-            rel = classe.path.relative_to(ROOT).as_posix()
-            print(f" - {classe.lines:4d} linhas | {rel}")
+        for classe, base in falhas:
+            if base > 0:
+                print(f" - {classe.lines:4d} linhas | {classe.relative_path} (baseline: {base})")
+            else:
+                print(f" - {classe.lines:4d} linhas | {classe.relative_path}")
         return 1
 
     if ENFORCE_NO_GROWTH:
@@ -92,7 +105,7 @@ def main() -> int:
         else:
             regressao: list[tuple[str, int, int]] = []
             for classe in alertas:
-                rel = classe.path.relative_to(ROOT).as_posix()
+                rel = classe.relative_path
                 base = baseline.get(rel)
                 if base is None:
                     regressao.append((rel, 0, classe.lines))

@@ -10,15 +10,20 @@ if [[ ! -f "$JAR_PATH" ]]; then
   exit 1
 fi
 
+JAVA_BIN="java"
+if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]]; then
+  JAVA_BIN="${JAVA_HOME}/bin/java"
+fi
+
 SMOKE_DIR="target/ci/security-smoke"
 rm -rf "$SMOKE_DIR"
 mkdir -p "$SMOKE_DIR"
 
 echo "[smoke] Validando comando de ajuda no JAR empacotado..."
-java -jar "$JAR_PATH" --ajuda >/dev/null
+"$JAVA_BIN" -jar "$JAR_PATH" --ajuda >/dev/null
 
 echo "[smoke] Validando inicializacao do modulo de seguranca (SQLite) no JAR empacotado..."
-java -Dextrator.security.db.path="$SMOKE_DIR/users.db" \
+"$JAVA_BIN" -Dextrator.security.db.path="$SMOKE_DIR/users.db" \
   -jar "$JAR_PATH" \
   --auth-info >/dev/null
 
