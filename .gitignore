@@ -4,7 +4,7 @@
 !.env.example
 last_run.properties
 last_successful_run.properties
-runtime/
+/runtime/
 docs/08-arquivos-secretos/
 database/config.bat
 
