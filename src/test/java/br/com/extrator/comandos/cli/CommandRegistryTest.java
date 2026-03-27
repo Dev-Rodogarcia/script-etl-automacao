@@ -43,6 +43,7 @@ class CommandRegistryTest {
         assertTrue(comandos.containsKey("--recovery"));
         assertTrue(comandos.containsKey("--loop-daemon-run"));
         assertTrue(comandos.containsKey("--auth-check"));
+        assertTrue(comandos.containsKey("--sincronizar-usuarios"));
         assertTrue(comandos.containsKey("--validar-etl-extremo"));
         assertTrue(comandos.containsKey("--validar-etl-resiliencia"));
     }

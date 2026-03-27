@@ -43,8 +43,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import br.com.extrator.features.usuarios.aplicacao.UsuariosSistemaSnapshotService;
-import br.com.extrator.features.usuarios.persistencia.sqlserver.SqlServerUsuariosEstadoRepository;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
@@ -59,6 +57,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Usuários do Sistema (Individual - GraphQL).
  * Utiliza filtro incremental via updatedAt para extrair apenas usuários modificados no período.
  * Deduplica por user_id (Keep Last) antes de salvar para que o log e o banco batam na validação API vs banco.
+ * A carga completa de dim_usuarios é deliberadamente explícita e deve ser feita via comando dedicado.
  */
 public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDTO> {
 
@@ -67,34 +66,23 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
     private final ClienteApiGraphQL apiClient;
     private final UsuarioSistemaRepository repository;
     private final UsuarioSistemaMapper mapper;
-    private final UsuariosSistemaSnapshotService snapshotService;
 
     public UsuarioSistemaExtractor(final ClienteApiGraphQL apiClient,
-                                  final UsuarioSistemaRepository repository,
-                                  final UsuarioSistemaMapper mapper) {
-        this(
-            apiClient,
-            repository,
-            mapper,
-            new UsuariosSistemaSnapshotService(new SqlServerUsuariosEstadoRepository())
-        );
-    }
-
-    UsuarioSistemaExtractor(final ClienteApiGraphQL apiClient,
-                            final UsuarioSistemaRepository repository,
-                            final UsuarioSistemaMapper mapper,
-                            final UsuariosSistemaSnapshotService snapshotService) {
+                                   final UsuarioSistemaRepository repository,
+                                   final UsuarioSistemaMapper mapper) {
         this.apiClient = apiClient;
         this.repository = java.util.Objects.requireNonNull(repository, "repository");
         this.mapper = mapper;
-        this.snapshotService = java.util.Objects.requireNonNull(snapshotService, "snapshotService");
     }
 
     @Override
     public ResultadoExtracao<IndividualNodeDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        if (deveExecutarCargaCompletaInicial()) {
-            logger.info("usuarios_sistema: dim_usuarios vazia. Executando FULL LOAD inicial.");
-            return apiClient.buscarUsuariosSistema();
+        if (dimUsuariosVazia()) {
+            logger.warn(
+                "usuarios_sistema: dim_usuarios vazia. A extracao operacional permanecera restrita ao periodo {} a {} via updatedAt. Execute --sincronizar-usuarios para uma carga completa explicita.",
+                dataInicio,
+                dataFim
+            );
         }
 
         logger.info(
@@ -116,8 +104,6 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
             return new EntityExtractor.SaveMetrics(0, 0, 0);
         }
 
-        final boolean cargaCompletaInicial = deveExecutarCargaCompletaInicial();
-
         final List<UsuarioSistemaEntity> entities = dtos.stream()
             .map(mapper::toEntity)
             .collect(Collectors.toList());
@@ -126,17 +112,6 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
         if (unicos.size() < entities.size()) {
             logger.warn("⚠️ usuarios_sistema: {} nós da API, {} user_id únicos (duplicados removidos).",
                 entities.size(), unicos.size());
-        }
-
-        if (cargaCompletaInicial) {
-            final EntityExtractor.SaveMetrics snapshotMetrics = snapshotService.persistirSnapshot(unicos);
-            return new EntityExtractor.SaveMetrics(
-                snapshotMetrics.getRegistrosSalvos(),
-                unicos.size(),
-                0,
-                snapshotMetrics.getRegistrosPersistidos(),
-                snapshotMetrics.getRegistrosNoOpIdempotente()
-            );
         }
 
         final int registrosSalvos = repository.salvar(unicos);
@@ -174,7 +149,7 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
         return ConstantesExtracao.EMOJI_USUARIOS;
     }
 
-    private boolean deveExecutarCargaCompletaInicial() {
+    private boolean dimUsuariosVazia() {
         try {
             return !repository.temDados();
         } catch (java.sql.SQLException e) {

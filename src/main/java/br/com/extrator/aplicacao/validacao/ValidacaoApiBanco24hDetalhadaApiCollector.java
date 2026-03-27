@@ -38,8 +38,6 @@ import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaT
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.ResultadoApiChaves;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -225,9 +223,7 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
     private ResultadoApiChaves carregarUsuariosSistema(final Connection conexao,
                                                        final LocalDate dataInicio,
                                                        final LocalDate dataFim) {
-        final ResultadoExtracao<IndividualNodeDTO> resultado = deveExecutarCargaCompletaUsuarios(conexao)
-            ? clienteGraphQL.buscarUsuariosSistema()
-            : clienteGraphQL.buscarUsuariosSistema(dataInicio, dataFim);
+        final ResultadoExtracao<IndividualNodeDTO> resultado = clienteGraphQL.buscarUsuariosSistema(dataInicio, dataFim);
         final List<IndividualNodeDTO> dtos = resultado.getDados() != null ? resultado.getDados() : List.of();
         final int bruto = dtos.size();
         int invalidos = 0;
@@ -267,16 +263,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             resultado.getPaginasProcessadas(),
             caminhosEstruturais
         );
-    }
-
-    private boolean deveExecutarCargaCompletaUsuarios(final Connection conexao) {
-        final String sql = "SELECT TOP 1 1 FROM dbo.dim_usuarios";
-        try (PreparedStatement stmt = conexao.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            return !rs.next();
-        } catch (SQLException e) {
-            throw new IllegalStateException("Falha ao verificar estado atual de dim_usuarios para validacao.", e);
-        }
     }
 
     private ResultadoApiChaves carregarManifestos(final LocalDate dataInicio, final LocalDate dataFim) {

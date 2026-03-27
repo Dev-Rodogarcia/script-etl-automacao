@@ -51,6 +51,8 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  --auditar-api         Audita estrutura das APIs e gera CSV");
         System.out.println("  --testar-api [tipo]   Testa API especifica (graphql|dataexport)");
         System.out.println("                        Uso: --testar-api [tipo] [entidade] [--sem-faturas-graphql]");
+        System.out.println("  --sincronizar-usuarios");
+        System.out.println("                        Executa carga completa explicita de dim_usuarios via snapshot");
         System.out.println("  --validar-api-banco-24h");
         System.out.println("                        Compara API ao vivo x banco (janela da ultima extracao COMPLETA; nao necessariamente 24h corridas)");
         System.out.println("                        Opcional: --sem-faturas-graphql | --permitir-fallback-janela");
@@ -85,6 +87,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  java -jar extrator.jar --fluxo-completo --sem-faturas-graphql");
         System.out.println("  java -jar extrator.jar --extracao-intervalo 2026-01-01 2026-01-31 --sem-faturas-graphql");
         System.out.println("  java -jar extrator.jar --recovery 2026-01-01 2026-01-31 --api graphql --entidade coletas");
+        System.out.println("  java -jar extrator.jar --sincronizar-usuarios");
         System.out.println("  java -jar extrator.jar --validar-api-banco-24h-detalhado --periodo-fechado");
         System.out.println("  java -jar extrator.jar --validar-etl-extremo --periodo-fechado --stress-repeticoes 3");
         System.out.println("  java -jar extrator.jar --validar-etl-resiliencia --auto-chaos --ciclos 12 --duracao-segundos 120");

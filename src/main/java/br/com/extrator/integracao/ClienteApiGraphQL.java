@@ -184,7 +184,7 @@ public class ClienteApiGraphQL {
 
     /**
      * Busca TODOS os usuários do sistema (full load).
-     * Usado apenas na carga inicial quando a tabela dim_usuarios está vazia.
+     * Usado apenas na sincronização completa explícita de dim_usuarios.
      *
      * @return Resultado da extração com todos os usuários habilitados
      */

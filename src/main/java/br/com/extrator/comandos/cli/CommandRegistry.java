@@ -54,6 +54,7 @@ import br.com.extrator.comandos.cli.seguranca.AuthResetPasswordComando;
 import br.com.extrator.comandos.cli.utilitarios.ExportarCsvComando;
 import br.com.extrator.comandos.cli.utilitarios.LimparTabelasComando;
 import br.com.extrator.comandos.cli.utilitarios.RealizarIntrospeccaoGraphQLComando;
+import br.com.extrator.comandos.cli.utilitarios.SincronizarUsuariosComando;
 import br.com.extrator.comandos.cli.utilitarios.TestarApiComando;
 import br.com.extrator.comandos.cli.validacao.ValidarAcessoComando;
 import br.com.extrator.comandos.cli.validacao.ValidarApiVsBanco24hComando;
@@ -91,6 +92,7 @@ public final class CommandRegistry {
         comandos.put("--auditoria", lazy(ExecutarAuditoriaComando::new));
         comandos.put("--auditar-api", lazy(AuditarEstruturaApiComando::new));
         comandos.put("--testar-api", lazy(TestarApiComando::new));
+        comandos.put("--sincronizar-usuarios", lazy(SincronizarUsuariosComando::new));
         comandos.put("--limpar-tabelas", lazy(LimparTabelasComando::new));
         comandos.put("--verificar-timestamps", lazy(VerificarTimestampsComando::new));
         comandos.put("--verificar-timezone", lazy(VerificarTimezoneComando::new));

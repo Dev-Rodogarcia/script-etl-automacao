@@ -270,6 +270,7 @@ public class Main {
             case "--fluxo-completo",
                 "--extracao-intervalo",
                 "--recovery",
+                "--sincronizar-usuarios",
                 "--loop",
                 "--auditar-api",
                 "--executar-step-isolado",

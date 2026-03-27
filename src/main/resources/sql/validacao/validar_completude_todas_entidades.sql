@@ -15,6 +15,7 @@ WITH LogUltimasExtracoes AS (
 ContagensBanco AS (
     SELECT 'usuarios_sistema' AS entidade, COUNT(*) AS registros_banco_24h
     FROM dim_usuarios
+    WHERE data_atualizacao >= DATEADD(HOUR, -24, GETDATE())
     UNION ALL
     SELECT 'coletas', COUNT(*) FROM coletas WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
     UNION ALL
