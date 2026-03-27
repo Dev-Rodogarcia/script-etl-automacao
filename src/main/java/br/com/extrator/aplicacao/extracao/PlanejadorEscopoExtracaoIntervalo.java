@@ -97,20 +97,14 @@ final class PlanejadorEscopoExtracaoIntervalo {
         final DataExportGateway dataExportGateway = AplicacaoContexto.dataExportGateway();
 
         if (apiEspecifica == null || apiEspecifica.isBlank()) {
-            steps.add(new GraphQLPipelineStep(graphQLGateway, "graphql"));
-            steps.add(new DataExportPipelineStep(dataExportGateway, "dataexport"));
-            if (incluirFaturasGraphQL) {
-                steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FATURAS_GRAPHQL));
-            }
+            adicionarStepsGraphQLGranulares(steps, graphQLGateway, incluirFaturasGraphQL);
+            adicionarStepsDataExportGranulares(steps, dataExportGateway);
             return steps;
         }
 
         if ("graphql".equalsIgnoreCase(apiEspecifica)) {
             if (entidadeNormalizada == null) {
-                steps.add(new GraphQLPipelineStep(graphQLGateway, "graphql"));
-                if (incluirFaturasGraphQL) {
-                    steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FATURAS_GRAPHQL));
-                }
+                adicionarStepsGraphQLGranulares(steps, graphQLGateway, incluirFaturasGraphQL);
                 return steps;
             }
             steps.add(new GraphQLPipelineStep(graphQLGateway, entidadeNormalizada));
@@ -118,10 +112,11 @@ final class PlanejadorEscopoExtracaoIntervalo {
         }
 
         if ("dataexport".equalsIgnoreCase(apiEspecifica)) {
-            steps.add(new DataExportPipelineStep(
-                dataExportGateway,
-                entidadeNormalizada == null ? "dataexport" : entidadeNormalizada
-            ));
+            if (entidadeNormalizada == null) {
+                adicionarStepsDataExportGranulares(steps, dataExportGateway);
+                return steps;
+            }
+            steps.add(new DataExportPipelineStep(dataExportGateway, entidadeNormalizada));
         }
 
         return steps;
@@ -261,5 +256,25 @@ final class PlanejadorEscopoExtracaoIntervalo {
         }
 
         return valor;
+    }
+
+    private void adicionarStepsGraphQLGranulares(final List<PipelineStep> steps,
+                                                 final GraphQLGateway graphQLGateway,
+                                                 final boolean incluirFaturasGraphQL) {
+        steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.USUARIOS_SISTEMA));
+        steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.COLETAS));
+        steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FRETES));
+        if (incluirFaturasGraphQL) {
+            steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FATURAS_GRAPHQL));
+        }
+    }
+
+    private void adicionarStepsDataExportGranulares(final List<PipelineStep> steps,
+                                                    final DataExportGateway dataExportGateway) {
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.MANIFESTOS));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.COTACOES));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.LOCALIZACAO_CARGAS));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.CONTAS_A_PAGAR));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.FATURAS_POR_CLIENTE));
     }
 }

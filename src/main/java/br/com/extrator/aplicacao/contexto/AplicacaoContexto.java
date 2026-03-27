@@ -34,6 +34,7 @@ package br.com.extrator.aplicacao.contexto;
 
 import br.com.extrator.aplicacao.portas.CompletudePort;
 import br.com.extrator.aplicacao.portas.DataExportGateway;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.aplicacao.portas.ExtractionLogQueryPort;
 import br.com.extrator.aplicacao.portas.GraphQLGateway;
 import br.com.extrator.aplicacao.portas.IntegridadeEtlPort;
@@ -56,6 +57,7 @@ public final class AplicacaoContexto {
     private static volatile GraphQLGateway graphQLGateway;
     private static volatile DataExportGateway dataExportGateway;
     private static volatile ExtractionLogQueryPort extractionLogQueryPort;
+    private static volatile ExecutionAuditPort executionAuditPort;
     private static volatile CompletudePort completudePort;
     private static volatile IntegridadeEtlPort integridadeEtlPort;
     private static volatile LimpezaBancoPort limpezaBancoPort;
@@ -84,6 +86,10 @@ public final class AplicacaoContexto {
 
     public static void registrar(final ExtractionLogQueryPort port) {
         extractionLogQueryPort = port;
+    }
+
+    public static void registrar(final ExecutionAuditPort port) {
+        executionAuditPort = port;
     }
 
     public static void registrar(final CompletudePort port) {
@@ -131,6 +137,10 @@ public final class AplicacaoContexto {
             throw new IllegalStateException("AplicacaoContexto nao inicializado: CompletudePort ausente.");
         }
         return completudePort;
+    }
+
+    public static ExecutionAuditPort executionAuditPort() {
+        return executionAuditPort != null ? executionAuditPort : new NoOpExecutionAuditPort();
     }
 
     public static GraphQLGateway graphQLGateway() {

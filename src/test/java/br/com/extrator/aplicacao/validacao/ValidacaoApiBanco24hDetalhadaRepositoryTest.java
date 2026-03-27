@@ -98,6 +98,48 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
         assertEquals("%Data: 2026-03-09%", captured.get(4));
     }
 
+    @Test
+    void deveAncorarValidacaoAbertaAoUltimoFluxoCompleto() throws SQLException {
+        final LocalDateTime ultimoFluxoCompleto = LocalDateTime.of(2026, 3, 27, 7, 47, 33);
+        final ValidacaoApiBanco24hDetalhadaRepository repositoryComAnchor =
+            new ValidacaoApiBanco24hDetalhadaRepository(
+                LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaRepositoryTest.class),
+                new ValidacaoApiBanco24hDetalhadaMetadataHasher(),
+                () -> Optional.of(ultimoFluxoCompleto)
+            );
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final LocalDateTime inicio = LocalDateTime.of(2026, 3, 27, 7, 44, 30);
+        final LocalDateTime fim = LocalDateTime.of(2026, 3, 27, 7, 47, 22);
+        final Connection conexao = criarConexao(sql -> {
+            assertTrue(sql.contains("timestamp_fim <= ?"));
+            return criarPreparedStatement(
+                captured,
+                criarResultSet(
+                    List.of(
+                        Map.of(
+                            "timestamp_inicio", Timestamp.valueOf(inicio),
+                            "timestamp_fim", Timestamp.valueOf(fim)
+                        )
+                    )
+                )
+            );
+        });
+
+        final Optional<JanelaExecucao> janela = repositoryComAnchor.buscarUltimaJanelaCompletaDoDia(
+            conexao,
+            ConstantesEntidades.FRETES,
+            LocalDate.of(2026, 3, 27),
+            LocalDate.of(2026, 3, 26),
+            LocalDate.of(2026, 3, 27),
+            true
+        );
+
+        assertTrue(janela.isPresent());
+        assertEquals(inicio, janela.get().inicio());
+        assertEquals(fim, janela.get().fim());
+        assertEquals(Timestamp.valueOf(ultimoFluxoCompleto), captured.get(5));
+    }
+
     private Connection criarConexao(final StatementFactory factory) {
         return (Connection) Proxy.newProxyInstance(
             Connection.class.getClassLoader(),

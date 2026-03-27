@@ -83,6 +83,14 @@ public interface EntityExtractor<T> {
     }
 
     /**
+     * Permite que o extractor informe que registros inválidos foram auditados
+     * fora da tabela principal e podem ser tolerados dentro dos limites configurados.
+     */
+    default boolean permiteConcluirComInvalidosAuditados() {
+        return false;
+    }
+
+    /**
      * Métricas de salvamento de uma entidade.
      */
     final class SaveMetrics {

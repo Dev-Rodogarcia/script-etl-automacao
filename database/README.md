@@ -4,7 +4,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 
 ## Estrutura
 
-### Tabelas (001-013)
+### Tabelas (001-017)
 - `001_criar_tabela_coletas.sql`
 - `002_criar_tabela_fretes.sql`
 - `003_criar_tabela_manifestos.sql`
@@ -18,6 +18,10 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 - `011_criar_tabela_dim_usuarios.sql`
 - `012_criar_tabela_sys_execution_history.sql`
 - `013_criar_tabela_sys_auditoria_temp.sql`
+- `014_criar_tabela_sys_execution_audit.sql`
+- `015_criar_tabela_sys_execution_watermark.sql`
+- `016_alter_tabela_dim_usuarios_estado.sql`
+- `017_criar_tabela_dim_usuarios_historico.sql`
 
 ### Views Power BI Principais (011-018)
 - `011_criar_view_faturas_por_cliente_powerbi.sql`
@@ -78,7 +82,7 @@ Esta pasta contém todos os scripts SQL necessários para criar as tabelas e vie
 1. Abra o SQL Server Management Studio
 2. Conecte-se ao banco de dados de produção
 3. Execute os scripts na ordem definida em `executar_database.bat`
-4. **IMPORTANTE**: Execute primeiro as tabelas (001-013), depois as views principais (011-018), views de dimensões (019-024), segurança (024) e validações (025-029)
+4. **IMPORTANTE**: Execute primeiro as tabelas (001-017), depois as views principais (011-018), views de dimensões (019-024), segurança (024) e validações (025-029)
 
 ### Opção 3: sqlcmd (Linha de Comando)
 
@@ -119,7 +123,7 @@ ORDER BY v.name, c.column_id;
 
 1. **Execute apenas UMA VEZ** no ambiente de produção
 2. **Ordem de execução é crítica**: 
-   - Primeiro as tabelas (001-013)
+   - Primeiro as tabelas (001-017)
    - Depois as views principais (011-018)
    - Por último as views de dimensões (019-024)
    - **Segurança**: Configure permissões (024 em `seguranca/`) - PRINCÍPIO DO MENOR PRIVILÉGIO
@@ -194,3 +198,5 @@ As views foram corrigidas para garantir unicidade:
 - As views usam `CREATE OR ALTER` para permitir atualizações futuras
 - Os scripts foram extraídos diretamente do código Java do projeto
 - **Views de dimensão foram corrigidas para garantir unicidade das chaves primárias**
+- A partir dos scripts `014` a `017`, a aprovação final do run passa a depender de trilha estruturada em `sys_execution_audit` e de `watermark` por entidade
+- O estado de `usuarios_sistema` deixa de ser apenas snapshot implícito e passa a ter colunas de estado e histórico simples em `dim_usuarios_historico`

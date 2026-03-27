@@ -48,6 +48,11 @@ public class IntegridadeEtlPortAdapter implements IntegridadeEtlPort {
     ) {
         final IntegridadeEtlValidator.ResultadoValidacao resultado =
             validator.validarExecucao(inicioExecucao, fimExecucao, entidadesEsperadas, modoLoopDaemon);
-        return new ResultadoIntegridade(resultado.isValido(), resultado.getFalhas());
+        return new ResultadoIntegridade(
+            resultado.isValido(),
+            resultado.getTotalEntidades(),
+            resultado.getEntidadesNaoOk(),
+            resultado.getFalhas()
+        );
     }
 }

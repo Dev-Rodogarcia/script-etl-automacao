@@ -287,4 +287,130 @@ class ValidacaoApiBanco24hDetalhadaMetadataHasherTest {
             hasher.hashMetadata(ConstantesEntidades.CONTAS_A_PAGAR, alterado)
         );
     }
+
+    @Test
+    void deveIgnorarDriftOperacionalEmFaturasPorCliente() {
+        final String baseline = """
+            {
+              "fit_nse_number":123,
+              "nfse_number":"123",
+              "fit_fhe_cte_number":456,
+              "fit_fhe_cte_issued_at":"2026-03-09T10:00:00Z",
+              "fit_fhe_cte_key":"CTE-1",
+              "fit_fhe_cte_status":"authorized",
+              "fit_fhe_cte_status_result":"ok",
+              "fit_ant_document":"FAT-100",
+              "fit_ant_issue_date":"2026-03-09",
+              "fit_ant_value":"1500.75",
+              "fit_ant_ils_due_date":"2026-03-20",
+              "fit_ant_ils_original_due_date":"2026-03-20",
+              "fit_ant_ils_atn_transaction_date":"2026-03-21",
+              "total":"1300.50",
+              "third_party_ctes_value":"200.25",
+              "type":"Freight::Normal",
+              "fit_crn_psn_nickname":"SPO",
+              "fit_diy_sae_name":"SP",
+              "fit_fsn_name":"DISTRIBUICAO",
+              "fit_pyr_name":"Pagador A",
+              "fit_pyr_document":"12345678000100",
+              "fit_rpt_name":"Remetente A",
+              "fit_rpt_document":"22345678000100",
+              "fit_sdr_name":"Destinatario A",
+              "fit_sdr_document":"32345678000100",
+              "fit_sps_slr_psn_name":"Vendedor A",
+              "invoices_mapping":["NF-1","NF-2"],
+              "fit_fte_invoices_order_number":["PED-1","PED-2"]
+            }
+            """;
+        final String drift = """
+            {
+              "fit_nse_number":123,
+              "nfse_number":"123",
+              "fit_fhe_cte_number":456,
+              "fit_fhe_cte_issued_at":"2026-03-09T10:00:00Z",
+              "fit_fhe_cte_key":"CTE-1",
+              "fit_fhe_cte_status":"cancelled",
+              "fit_fhe_cte_status_result":"changed",
+              "fit_ant_document":"FAT-100",
+              "fit_ant_issue_date":"2026-03-09",
+              "fit_ant_value":"1500.75",
+              "fit_ant_ils_due_date":"2026-03-20",
+              "fit_ant_ils_original_due_date":"2026-03-20",
+              "fit_ant_ils_atn_transaction_date":"2026-03-25",
+              "total":"1300.50",
+              "third_party_ctes_value":"200.25",
+              "type":"Freight::Normal",
+              "fit_crn_psn_nickname":"SPO",
+              "fit_diy_sae_name":"SP",
+              "fit_fsn_name":"DISTRIBUICAO",
+              "fit_pyr_name":"Pagador B",
+              "fit_pyr_document":"12345678000100",
+              "fit_rpt_name":"Remetente B",
+              "fit_rpt_document":"22345678000100",
+              "fit_sdr_name":"Destinatario B",
+              "fit_sdr_document":"32345678000100",
+              "fit_sps_slr_psn_name":"Vendedor B",
+              "invoices_mapping":["NF-2","NF-1"],
+              "fit_fte_invoices_order_number":["PED-2","PED-1"]
+            }
+            """;
+
+        assertEquals(
+            hasher.hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, baseline),
+            hasher.hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, drift)
+        );
+    }
+
+    @Test
+    void deveDetectarMudancaEstavelEmFaturasPorCliente() {
+        final String baseline = """
+            {
+              "fit_nse_number":123,
+              "fit_fhe_cte_number":456,
+              "fit_fhe_cte_issued_at":"2026-03-09T10:00:00Z",
+              "fit_fhe_cte_key":"CTE-1",
+              "fit_ant_document":"FAT-100",
+              "fit_ant_issue_date":"2026-03-09",
+              "fit_ant_value":"1500.75",
+              "fit_ant_ils_due_date":"2026-03-20",
+              "fit_ant_ils_original_due_date":"2026-03-20",
+              "total":"1300.50",
+              "third_party_ctes_value":"200.25",
+              "type":"Freight::Normal",
+              "fit_crn_psn_nickname":"SPO",
+              "fit_diy_sae_name":"SP",
+              "fit_fsn_name":"DISTRIBUICAO",
+              "fit_pyr_document":"12345678000100",
+              "fit_rpt_document":"22345678000100",
+              "fit_sdr_document":"32345678000100"
+            }
+            """;
+        final String alterado = """
+            {
+              "fit_nse_number":123,
+              "fit_fhe_cte_number":456,
+              "fit_fhe_cte_issued_at":"2026-03-09T10:00:00Z",
+              "fit_fhe_cte_key":"CTE-1",
+              "fit_ant_document":"FAT-101",
+              "fit_ant_issue_date":"2026-03-09",
+              "fit_ant_value":"1500.75",
+              "fit_ant_ils_due_date":"2026-03-20",
+              "fit_ant_ils_original_due_date":"2026-03-20",
+              "total":"1300.50",
+              "third_party_ctes_value":"200.25",
+              "type":"Freight::Normal",
+              "fit_crn_psn_nickname":"SPO",
+              "fit_diy_sae_name":"SP",
+              "fit_fsn_name":"DISTRIBUICAO",
+              "fit_pyr_document":"12345678000100",
+              "fit_rpt_document":"22345678000100",
+              "fit_sdr_document":"32345678000100"
+            }
+            """;
+
+        assertNotEquals(
+            hasher.hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, baseline),
+            hasher.hashMetadata(ConstantesEntidades.FATURAS_POR_CLIENTE, alterado)
+        );
+    }
 }

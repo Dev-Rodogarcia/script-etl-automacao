@@ -47,7 +47,10 @@ public class UsuarioSistemaMapper {
         final UsuarioSistemaEntity entity = new UsuarioSistemaEntity();
         entity.setUserId(dto.getId());
         entity.setNome(dto.getName());
+        entity.setAtivo(true);
+        entity.setOrigemAtualizadoEm(null);
         entity.setDataAtualizacao(LocalDateTime.now());
+        entity.setUltimaExtracaoEm(LocalDateTime.now());
         return entity;
     }
 }

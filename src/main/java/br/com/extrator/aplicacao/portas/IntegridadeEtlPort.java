@@ -42,15 +42,30 @@ public interface IntegridadeEtlPort {
 
     final class ResultadoIntegridade {
         private final boolean valido;
+        private final int totalEntidades;
+        private final int entidadesNaoOk;
         private final List<String> falhas;
 
-        public ResultadoIntegridade(final boolean valido, final List<String> falhas) {
+        public ResultadoIntegridade(final boolean valido,
+                                   final int totalEntidades,
+                                   final int entidadesNaoOk,
+                                   final List<String> falhas) {
             this.valido = valido;
+            this.totalEntidades = totalEntidades;
+            this.entidadesNaoOk = entidadesNaoOk;
             this.falhas = List.copyOf(falhas);
         }
 
         public boolean isValido() {
             return valido;
+        }
+
+        public int getTotalEntidades() {
+            return totalEntidades;
+        }
+
+        public int getEntidadesNaoOk() {
+            return entidadesNaoOk;
         }
 
         public List<String> getFalhas() {

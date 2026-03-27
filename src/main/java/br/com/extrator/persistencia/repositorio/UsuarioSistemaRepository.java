@@ -25,6 +25,7 @@ package br.com.extrator.persistencia.repositorio;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.slf4j.Logger;
@@ -48,6 +49,18 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
     @Override
     protected boolean aceitarMergeSemAlteracoesComoSucesso(final UsuarioSistemaEntity usuario) {
         return true;
+    }
+
+    /**
+     * Indica se a dimensão de usuários já possui ao menos um registro persistido.
+     */
+    public boolean temDados() throws SQLException {
+        final String sql = String.format("SELECT TOP 1 1 FROM dbo.%s", NOME_TABELA);
+        try (Connection conexao = obterConexao();
+             PreparedStatement statement = conexao.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            return resultSet.next();
+        }
     }
 
     /**

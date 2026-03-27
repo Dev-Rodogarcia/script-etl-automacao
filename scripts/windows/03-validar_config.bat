@@ -64,13 +64,30 @@ if not exist "target\extrator.jar" (
     exit /b 1
 )
 
+if not defined JAVA_HOME (
+    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Java\jdk-17*" 2^>nul') do (
+        set "JAVA_HOME=C:\Program Files\Java\%%D"
+        goto :javahomefound
+    )
+    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :javahomefound
+    )
+)
+:javahomefound
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        set "PATH=%JAVA_HOME%\bin;%PATH%"
+    )
+)
+
 call :AUTH_CHECK RUN_VALIDAR_CONFIG "Validar configuracoes"
 if errorlevel 1 exit /b 1
 
-echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar
+echo Executando: java -jar "target\extrator.jar" --validar
 echo.
 
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar
+java -jar "target\extrator.jar" --validar
 
 if !ERRORLEVEL! equ 0 (
     echo.
@@ -92,7 +109,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

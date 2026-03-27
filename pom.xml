@@ -93,7 +93,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.3.1</version>
                 <configuration>
-                    <argLine>-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 --enable-native-access=ALL-UNNAMED</argLine>
+                    <argLine>-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8</argLine>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <environmentVariables>
                         <API_RETRY_MAX_TENTATIVAS>2</API_RETRY_MAX_TENTATIVAS>

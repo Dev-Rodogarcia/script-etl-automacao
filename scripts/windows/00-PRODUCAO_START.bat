@@ -133,8 +133,8 @@ if errorlevel 1 (
     timeout /t 2 /nobreak >nul 2>&1
     goto :MENU
 )
-echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
-java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
+echo Executando: java -jar "%JAR_PATH%" --ajuda
+java -jar "%JAR_PATH%" --ajuda
 echo.
 pause
 goto :MENU
@@ -196,7 +196,7 @@ echo.
 echo   Caminho verificado: !SQLITE_AUTH_DB!
 echo.
 echo   Para inicializar o banco de autenticacao, execute:
-echo     java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-bootstrap
+echo     java -jar "%JAR_PATH%" --auth-bootstrap
 echo.
 echo   Para usar caminho customizado, defina a variavel de ambiente:
 echo     EXTRATOR_SECURITY_DB_PATH=C:\caminho\customizado\users.db
@@ -241,7 +241,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
+java -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     exit /b 1

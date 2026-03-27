@@ -37,12 +37,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class ExtractionLoggerTest {
+    private static final String PROP_INTEGRIDADE = "ETL_INTEGRIDADE_MODO";
+    private static final String PROP_INVALIDOS_QTD = "ETL_INVALIDOS_QUANTIDADE_MAX";
+    private static final String PROP_INVALIDOS_PCT = "ETL_INVALIDOS_PERCENTUAL_MAX";
+
+    @AfterEach
+    void limparOverrides() {
+        System.clearProperty(PROP_INTEGRIDADE);
+        System.clearProperty(PROP_INVALIDOS_QTD);
+        System.clearProperty(PROP_INVALIDOS_PCT);
+    }
 
     @Test
     void deveClassificarComoCompletoQuandoSemDivergencias() {
@@ -56,12 +67,28 @@ class ExtractionLoggerTest {
 
     @Test
     void deveClassificarComoIncompletoDadosQuandoHaInvalidos() {
+        System.setProperty(PROP_INTEGRIDADE, "STRICT_INTEGRITY");
         final ResultadoExtracao<String> resultadoExtracao = ResultadoExtracao.completo(List.of("a", "b"), 1, 2);
         final DataExportEntityExtractor.SaveResult saveResult = new DataExportEntityExtractor.SaveResult(2, 2, 1);
         final ExtractionResult result = executar(resultadoExtracao, saveResult);
 
         assertEquals(ConstantesEntidades.STATUS_INCOMPLETO_DADOS, result.getStatus());
         assertFalse(result.isSucesso());
+    }
+
+    @Test
+    void deveClassificarComoCompletoQuandoExtractorPermiteInvalidosAuditadosNoModoEstrito() {
+        System.setProperty(PROP_INTEGRIDADE, "STRICT_INTEGRITY");
+        System.setProperty(PROP_INVALIDOS_QTD, "10");
+        System.setProperty(PROP_INVALIDOS_PCT, "10.0");
+        final ResultadoExtracao<String> resultadoExtracao =
+            ResultadoExtracao.completo(List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j"), 1, 10);
+        final DataExportEntityExtractor.SaveResult saveResult = new DataExportEntityExtractor.SaveResult(9, 9, 1);
+        final ExtractionResult result = executar(resultadoExtracao, saveResult, true);
+
+        assertEquals(ConstantesEntidades.STATUS_COMPLETO, result.getStatus());
+        assertEquals(1, result.getRegistrosInvalidos());
+        assertTrue(result.isSucesso());
     }
 
     @Test
@@ -116,8 +143,15 @@ class ExtractionLoggerTest {
 
     private ExtractionResult executar(final ResultadoExtracao<String> resultadoExtracao,
                                       final DataExportEntityExtractor.SaveResult saveResult) {
+        return executar(resultadoExtracao, saveResult, false);
+    }
+
+    private ExtractionResult executar(final ResultadoExtracao<String> resultadoExtracao,
+                                      final DataExportEntityExtractor.SaveResult saveResult,
+                                      final boolean permiteInvalidosAuditados) {
         final ExtractionLogger logger = new ExtractionLogger(ExtractionLoggerTest.class);
-        final DummyDataExportExtractor extractor = new DummyDataExportExtractor(resultadoExtracao, saveResult);
+        final DummyDataExportExtractor extractor =
+            new DummyDataExportExtractor(resultadoExtracao, saveResult, permiteInvalidosAuditados);
         return logger.executeWithLogging(extractor, LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 1), "");
     }
 
@@ -131,11 +165,14 @@ class ExtractionLoggerTest {
     private static final class DummyDataExportExtractor implements DataExportEntityExtractor<String> {
         private final ResultadoExtracao<String> resultadoExtracao;
         private final SaveResult saveResult;
+        private final boolean permiteInvalidosAuditados;
 
         private DummyDataExportExtractor(final ResultadoExtracao<String> resultadoExtracao,
-                                         final SaveResult saveResult) {
+                                         final SaveResult saveResult,
+                                         final boolean permiteInvalidosAuditados) {
             this.resultadoExtracao = resultadoExtracao;
             this.saveResult = saveResult;
+            this.permiteInvalidosAuditados = permiteInvalidosAuditados;
         }
 
         @Override
@@ -156,6 +193,11 @@ class ExtractionLoggerTest {
         @Override
         public String getEmoji() {
             return "";
+        }
+
+        @Override
+        public boolean permiteConcluirComInvalidosAuditados() {
+            return permiteInvalidosAuditados;
         }
     }
 

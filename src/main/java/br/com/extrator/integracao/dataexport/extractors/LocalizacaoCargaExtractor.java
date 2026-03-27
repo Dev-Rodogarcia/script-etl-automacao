@@ -152,6 +152,11 @@ public class LocalizacaoCargaExtractor implements DataExportEntityExtractor<Loca
         return ConstantesExtracao.EMOJI_LOCALIZACAO;
     }
 
+    @Override
+    public boolean permiteConcluirComInvalidosAuditados() {
+        return true;
+    }
+
     private void auditarRegistroInvalido(final LocalizacaoCargaDTO dto,
                                          final String reasonCode,
                                          final String detalhe) {

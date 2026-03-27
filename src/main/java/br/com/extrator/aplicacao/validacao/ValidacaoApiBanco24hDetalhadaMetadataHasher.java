@@ -196,6 +196,27 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
                 "ant_aln_name",
                 "ant_ils_expense_description"
             );
+            case ConstantesEntidades.FATURAS_POR_CLIENTE -> List.of(
+                "fit_nse_number",
+                "nfse_number",
+                "fit_fhe_cte_number",
+                "fit_fhe_cte_issued_at",
+                "fit_fhe_cte_key",
+                "fit_ant_document",
+                "fit_ant_issue_date",
+                "fit_ant_value",
+                "fit_ant_ils_due_date",
+                "fit_ant_ils_original_due_date",
+                "total",
+                "third_party_ctes_value",
+                "type",
+                "fit_crn_psn_nickname",
+                "fit_diy_sae_name",
+                "fit_fsn_name",
+                "fit_pyr_document",
+                "fit_rpt_document",
+                "fit_sdr_document"
+            );
             default -> null;
         };
 

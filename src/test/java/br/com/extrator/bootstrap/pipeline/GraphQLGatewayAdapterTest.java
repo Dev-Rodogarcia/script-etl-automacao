@@ -11,9 +11,12 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.integracao.graphql.services.GraphQLExtractionService;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class GraphQLGatewayAdapterTest {
 
@@ -43,9 +46,26 @@ class GraphQLGatewayAdapterTest {
         assertTrue(isolatedExecutor.executado);
         assertFalse(service.executado);
         assertEquals(IsolatedStepProcessExecutor.ApiType.GRAPHQL, isolatedExecutor.apiType);
-        assertEquals(Duration.ofMillis(1_200_000L), isolatedExecutor.timeout);
+        assertEquals(ConfigEtl.obterTimeoutStepGraphQLCompleto(), isolatedExecutor.timeout);
         assertEquals("isolated_process", result.getMetadata().get("execution_mode"));
         assertEquals(Boolean.TRUE, result.getMetadata().get("forced_by_daemon"));
+    }
+
+    @Test
+    void deveUsarTimeoutDaEntidadeQuandoExecutaGraphqlEspecifico() throws Exception {
+        System.setProperty("ETL_PROCESS_ISOLATION_ENABLED", "true");
+
+        final RecordingGraphQLService service = new RecordingGraphQLService();
+        final RecordingIsolatedExecutor isolatedExecutor = new RecordingIsolatedExecutor();
+        final GraphQLGatewayAdapter adapter = new GraphQLGatewayAdapter(service, isolatedExecutor);
+
+        adapter.executar(
+            LocalDate.of(2026, 3, 18),
+            LocalDate.of(2026, 3, 18),
+            ConstantesEntidades.USUARIOS_SISTEMA
+        );
+
+        assertEquals(Duration.ofMinutes(30), isolatedExecutor.timeout);
     }
 
     private static final class RecordingGraphQLService extends GraphQLExtractionService {
@@ -55,6 +75,7 @@ class GraphQLGatewayAdapterTest {
             super(
                 null,
                 new br.com.extrator.persistencia.repositorio.LogExtracaoRepository(),
+                AplicacaoContexto.executionAuditPort(),
                 new br.com.extrator.integracao.comum.ExtractionLogger(RecordingGraphQLService.class),
                 br.com.extrator.suporte.console.LoggerConsole.getLogger(RecordingGraphQLService.class)
             );

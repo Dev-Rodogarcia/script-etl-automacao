@@ -78,9 +78,10 @@ if /i not "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" (
         pause
         exit /b 1
     )
+    call :ENSURE_JAVA_17
     echo.
     echo Autenticacao obrigatoria para executar esta acao.
-    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
+    java -jar "target\extrator.jar" --auth-check RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
     if errorlevel 1 (
         echo Acesso negado.
         echo.
@@ -402,6 +403,8 @@ if not exist "target\extrator.jar" (
     exit /b 1
 )
 
+call :ENSURE_JAVA_17
+
 echo.
 echo ================================================================
 echo Iniciando extracao por intervalo
@@ -442,7 +445,7 @@ if defined FLAG_FATURAS_GRAPHQL (
 )
 
 REM Executar comando
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --extracao-intervalo !CMD_ARGS!
+java -jar "target\extrator.jar" --extracao-intervalo !CMD_ARGS!
 set "JAVA_EXIT_CODE=%ERRORLEVEL%"
 set "FINAL_EXIT_CODE=%JAVA_EXIT_CODE%"
 
@@ -557,4 +560,21 @@ if not "%DATA_TESTE:~10,1%"=="" exit /b 1
 set "DATA_NUMERICA=%DATA_TESTE:-=%"
 if not "%DATA_NUMERICA:~8,1%"=="" exit /b 1
 for /f "delims=0123456789" %%A in ("%DATA_NUMERICA%") do exit /b 1
+exit /b 0
+
+:ENSURE_JAVA_17
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    exit /b 0
+)
+for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Java\jdk-17*" 2^>nul') do (
+    set "JAVA_HOME=C:\Program Files\Java\%%D"
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    exit /b 0
+)
+for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
+    set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    exit /b 0
+)
 exit /b 0

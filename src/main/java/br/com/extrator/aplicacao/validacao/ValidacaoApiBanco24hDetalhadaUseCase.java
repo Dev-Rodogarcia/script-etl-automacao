@@ -99,6 +99,7 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
 
     public void executar(final ValidacaoApiBanco24hDetalhadaRequest request) throws Exception {
         final List<ResultadoComparacao> resultados = new ArrayList<>();
+        comparator.definirPeriodoFechado(request.periodoFechado());
 
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             final LocalDate dataReferencia = repository.resolverDataReferenciaLogs(conexao, request.dataReferenciaSistema());

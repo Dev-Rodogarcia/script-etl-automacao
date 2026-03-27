@@ -137,18 +137,18 @@ if errorlevel 1 (
 )
 
 if defined FLAG_FATURAS_GRAPHQL (
-    echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
+    echo Executando: java -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
 ) else (
-    echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo
+    echo Executando: java -jar "target\extrator.jar" --fluxo-completo
 )
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
 echo.
 
 if defined FLAG_FATURAS_GRAPHQL (
-    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
+    java -jar "target\extrator.jar" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
 ) else (
-    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --fluxo-completo
+    java -jar "target\extrator.jar" --fluxo-completo
 )
 set "JAVA_EXIT_CODE=%ERRORLEVEL%"
 
@@ -180,7 +180,7 @@ endlocal & exit /b %RET_CODE%
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

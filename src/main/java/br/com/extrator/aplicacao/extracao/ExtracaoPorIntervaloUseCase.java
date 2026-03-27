@@ -55,6 +55,9 @@ import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.formatacao.FormatadorData;
 public class ExtracaoPorIntervaloUseCase {
     private static final String EXECUTION_LOCK_RESOURCE = "etl-global-execution";
+    private static final String PROP_PRUNE_AUSENTES_FRETES = "ETL_FRETES_PRUNE_AUSENTES";
+    private static final String PROP_TIMEOUT_FRETES = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_FRETES_MS";
+    private static final long TIMEOUT_FRETES_INTERVALO_MS = 10_800_000L;
     private static final LoggerConsole log = LoggerConsole.getLogger(ExtracaoPorIntervaloUseCase.class);
     private static final int TAMANHO_BLOCO_DIAS = 30;
     private final PreBackfillReferencialColetasUseCase preBackfillReferencialColetasUseCase;
@@ -88,6 +91,11 @@ public class ExtracaoPorIntervaloUseCase {
 
     public void executar(final ExtracaoPorIntervaloRequest request) throws Exception {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
+        final String pruneFretesAnterior = System.getProperty(PROP_PRUNE_AUSENTES_FRETES);
+        final String timeoutFretesAnterior = System.getProperty(PROP_TIMEOUT_FRETES);
+        System.setProperty(PROP_PRUNE_AUSENTES_FRETES, Boolean.TRUE.toString());
+        aplicarTimeoutMinimo(PROP_TIMEOUT_FRETES, TIMEOUT_FRETES_INTERVALO_MS);
+        try {
         final LocalDate dataInicio = request.dataInicio();
         final LocalDate dataFim = request.dataFim();
         final String apiEspecifica = request.apiEspecifica();
@@ -155,7 +163,6 @@ public class ExtracaoPorIntervaloUseCase {
         executarPreBackfillReferencialColetas(dataInicio, apiEspecifica, entidadeEspecifica, modoLoopDaemon);
 
         final LocalDateTime inicioExecucao = LocalDateTime.now();
-        final PipelineOrchestrator orchestrator = AplicacaoContexto.orchestratorFactory().criar();
         int blocosCompletos = 0;
         int blocosFalhados = 0;
         final List<String> blocosFalhadosLista = new ArrayList<>();
@@ -194,6 +201,7 @@ public class ExtracaoPorIntervaloUseCase {
             final LocalDateTime inicioExecucaoBloco = LocalDateTime.now();
             boolean blocoComFalha = false;
             final List<String> falhasBloco = new ArrayList<>();
+            final PipelineOrchestrator orchestrator = AplicacaoContexto.orchestratorFactory().criar();
             final List<PipelineStep> steps = planejadorEscopo.criarSteps(
                 apiEspecifica,
                 entidadeEspecifica,
@@ -277,7 +285,33 @@ public class ExtracaoPorIntervaloUseCase {
                 + " - "
                 + String.join(", ", blocosFalhadosLista)
         );
+        } finally {
+            if (pruneFretesAnterior == null) {
+                System.clearProperty(PROP_PRUNE_AUSENTES_FRETES);
+            } else {
+                System.setProperty(PROP_PRUNE_AUSENTES_FRETES, pruneFretesAnterior);
+            }
+            if (timeoutFretesAnterior == null) {
+                System.clearProperty(PROP_TIMEOUT_FRETES);
+            } else {
+                System.setProperty(PROP_TIMEOUT_FRETES, timeoutFretesAnterior);
+            }
         }
+        }
+    }
+
+    private void aplicarTimeoutMinimo(final String propriedade, final long timeoutMinimoMs) {
+        final String atual = System.getProperty(propriedade);
+        if (atual != null) {
+            try {
+                if (Long.parseLong(atual) >= timeoutMinimoMs) {
+                    return;
+                }
+            } catch (final NumberFormatException ignored) {
+                // Valor invalido atual sera substituido pelo minimo seguro para backfill.
+            }
+        }
+        System.setProperty(propriedade, Long.toString(timeoutMinimoMs));
     }
 
     private List<BlocoPeriodo> dividirEmBlocos(final LocalDate dataInicio, final LocalDate dataFim) {

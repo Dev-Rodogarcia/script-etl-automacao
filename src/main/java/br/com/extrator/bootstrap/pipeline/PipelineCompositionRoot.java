@@ -34,6 +34,7 @@ import br.com.extrator.observabilidade.adaptador.CompletudePortAdapter;
 import br.com.extrator.observabilidade.adaptador.IntegridadeEtlPortAdapter;
 import br.com.extrator.persistencia.adaptador.ExtractionLogQueryAdapter;
 import br.com.extrator.persistencia.adaptador.ManifestoOrfaoQueryAdapter;
+import br.com.extrator.plataforma.auditoria.persistencia.sqlserver.SqlServerExecutionAuditPortAdapter;
 import br.com.extrator.aplicacao.pipeline.DataExportPipelineStep;
 import br.com.extrator.aplicacao.pipeline.DataQualityPipelineStep;
 import br.com.extrator.aplicacao.pipeline.ExtractorRegistry;
@@ -112,6 +113,7 @@ public final class PipelineCompositionRoot {
         AplicacaoContexto.registrar((br.com.extrator.aplicacao.portas.GraphQLGateway) graphQLGateway);
         AplicacaoContexto.registrar((br.com.extrator.aplicacao.portas.DataExportGateway) dataExportGateway);
         AplicacaoContexto.registrar(new ExtractionLogQueryAdapter());
+        AplicacaoContexto.registrar(new SqlServerExecutionAuditPortAdapter());
         AplicacaoContexto.registrar(new CompletudePortAdapter());
         AplicacaoContexto.registrar(new IntegridadeEtlPortAdapter());
         AplicacaoContexto.registrar(new ManifestoOrfaoQueryAdapter());
@@ -257,5 +259,4 @@ public final class PipelineCompositionRoot {
         }
     }
 }
-
 

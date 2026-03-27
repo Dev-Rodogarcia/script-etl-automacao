@@ -99,9 +99,22 @@ public class PreBackfillReferencialColetasUseCase {
         final Optional<LocalDate> dataOrfao
     ) {
         final int bufferDias = ConfigEtl.obterEtlReferencialColetasBackfillBufferDias();
+        final int maxExpansaoDias = ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDias();
         if (dataOrfao.isPresent()) {
             final LocalDate inicioDinamico = dataOrfao.get().minusDays(bufferDias);
             if (inicioDinamico.isBefore(inicioEstatico)) {
+                final LocalDate inicioMinimoPermitido = inicioEstatico.minusDays(Math.max(0, maxExpansaoDias));
+                if (inicioDinamico.isBefore(inicioMinimoPermitido)) {
+                    log.info(
+                        "PRE-BACKFILL | janela_dinamica=limitada | orfao_mais_antigo={} | buffer_dias={} | inicio_estatico={} | max_expansao_dias={} | usando inicio_limitado={}",
+                        dataOrfao.get(),
+                        bufferDias,
+                        inicioEstatico,
+                        maxExpansaoDias,
+                        inicioMinimoPermitido
+                    );
+                    return inicioMinimoPermitido;
+                }
                 log.info(
                     "PRE-BACKFILL | janela_dinamica=true | orfao_mais_antigo={} | buffer_dias={} | inicio_estatico={} | usando inicio_dinamico={}",
                     dataOrfao.get(), bufferDias, inicioEstatico, inicioDinamico
@@ -156,6 +169,6 @@ public class PreBackfillReferencialColetasUseCase {
             dataInicio,
             dataFim
         );
-        new GraphQLExtractionService().executarSomenteColetasReferencial(dataInicio, dataFim);
+        new GraphQLExtractionService(false).executarSomenteColetasReferencial(dataInicio, dataFim);
     }
 }

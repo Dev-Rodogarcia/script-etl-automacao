@@ -15,11 +15,10 @@ rm -rf "$SMOKE_DIR"
 mkdir -p "$SMOKE_DIR"
 
 echo "[smoke] Validando comando de ajuda no JAR empacotado..."
-java --enable-native-access=ALL-UNNAMED -jar "$JAR_PATH" --ajuda >/dev/null
+java -jar "$JAR_PATH" --ajuda >/dev/null
 
 echo "[smoke] Validando inicializacao do modulo de seguranca (SQLite) no JAR empacotado..."
 java -Dextrator.security.db.path="$SMOKE_DIR/users.db" \
-  --enable-native-access=ALL-UNNAMED \
   -jar "$JAR_PATH" \
   --auth-info >/dev/null
 

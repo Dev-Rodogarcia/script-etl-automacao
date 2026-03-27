@@ -90,7 +90,7 @@ if "%OP%"=="0" goto :END
 
 if "%OP%"=="1" (
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-bootstrap
+    java -jar "%~dp0target\extrator.jar" --auth-bootstrap
     echo.
     pause
     goto :MENU
@@ -98,7 +98,7 @@ if "%OP%"=="1" (
 
 if "%OP%"=="2" (
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-create-user
+    java -jar "%~dp0target\extrator.jar" --auth-create-user
     echo.
     pause
     goto :MENU
@@ -106,7 +106,7 @@ if "%OP%"=="2" (
 
 if "%OP%"=="3" (
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-reset-password
+    java -jar "%~dp0target\extrator.jar" --auth-reset-password
     echo.
     pause
     goto :MENU
@@ -114,7 +114,7 @@ if "%OP%"=="3" (
 
 if "%OP%"=="4" (
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-disable-user
+    java -jar "%~dp0target\extrator.jar" --auth-disable-user
     echo.
     pause
     goto :MENU
@@ -122,7 +122,7 @@ if "%OP%"=="4" (
 
 if "%OP%"=="5" (
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-info
+    java -jar "%~dp0target\extrator.jar" --auth-info
     echo.
     pause
     goto :MENU

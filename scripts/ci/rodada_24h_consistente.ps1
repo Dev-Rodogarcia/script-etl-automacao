@@ -23,8 +23,8 @@ function Invoke-Step {
 
     Write-Host ""
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $Titulo"
-    Write-Host "Comando: java --enable-native-access=ALL-UNNAMED -jar target\\extrator.jar $Args"
-    & java --enable-native-access=ALL-UNNAMED -jar $jarPath $Args.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
+    Write-Host "Comando: java -jar target\\extrator.jar $Args"
+    & java -jar $jarPath $Args.Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)
     if ($LASTEXITCODE -ne 0) {
         throw "Falha na etapa: $Titulo (exit code=$LASTEXITCODE)"
     }

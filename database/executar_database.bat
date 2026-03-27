@@ -257,6 +257,10 @@ for %%F in (
     "tabelas\011_criar_tabela_dim_usuarios.sql"
     "tabelas\012_criar_tabela_sys_execution_history.sql"
     "tabelas\013_criar_tabela_sys_auditoria_temp.sql"
+    "tabelas\014_criar_tabela_sys_execution_audit.sql"
+    "tabelas\015_criar_tabela_sys_execution_watermark.sql"
+    "tabelas\016_alter_tabela_dim_usuarios_estado.sql"
+    "tabelas\017_criar_tabela_dim_usuarios_historico.sql"
 ) do (
     if not exist %%F (
         echo [ERRO] Script nao encontrado: %%~F

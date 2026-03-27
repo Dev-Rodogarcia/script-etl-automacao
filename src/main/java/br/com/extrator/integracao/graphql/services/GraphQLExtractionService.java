@@ -49,6 +49,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
 import br.com.extrator.persistencia.repositorio.FreteRepository;
@@ -67,6 +69,9 @@ import br.com.extrator.integracao.graphql.extractors.ColetaExtractor;
 import br.com.extrator.integracao.graphql.extractors.FreteExtractor;
 import br.com.extrator.integracao.graphql.extractors.FaturaGraphQLExtractor;
 import br.com.extrator.integracao.graphql.extractors.UsuarioSistemaExtractor;
+import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionAuditRecorder;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 import br.com.extrator.suporte.concorrencia.OperationTimeoutGuard;
 import br.com.extrator.suporte.configuracao.ConfigBanco;
@@ -87,27 +92,50 @@ public class GraphQLExtractionService {
 
     private record TimedExtractionOutcome(ExtractionResult result, List<String> avisosSeguranca) {
     }
+
+    private record ExecutionDates(LocalDate inicio, LocalDate fim) {
+    }
     
     private final ClienteApiGraphQL apiClient;
     private final LogExtracaoRepository logRepository;
+    private final ExecutionAuditPort executionAuditPort;
+    private final boolean auditoriaEstruturadaAtiva;
     private final ExtractionLogger logger;
     private final LoggerConsole log;
     
     public GraphQLExtractionService() {
+        this(true);
+    }
+
+    public GraphQLExtractionService(final boolean auditoriaEstruturadaAtiva) {
         this(
             new ClienteApiGraphQL(),
             new LogExtracaoRepository(),
+            AplicacaoContexto.executionAuditPort(),
             new ExtractionLogger(GraphQLExtractionService.class),
-            LoggerConsole.getLogger(GraphQLExtractionService.class)
+            LoggerConsole.getLogger(GraphQLExtractionService.class),
+            auditoriaEstruturadaAtiva
         );
     }
 
     protected GraphQLExtractionService(final ClienteApiGraphQL apiClient,
                                        final LogExtracaoRepository logRepository,
+                                       final ExecutionAuditPort executionAuditPort,
                                        final ExtractionLogger logger,
                                        final LoggerConsole log) {
+        this(apiClient, logRepository, executionAuditPort, logger, log, true);
+    }
+
+    protected GraphQLExtractionService(final ClienteApiGraphQL apiClient,
+                                       final LogExtracaoRepository logRepository,
+                                       final ExecutionAuditPort executionAuditPort,
+                                       final ExtractionLogger logger,
+                                       final LoggerConsole log,
+                                       final boolean auditoriaEstruturadaAtiva) {
         this.apiClient = apiClient;
         this.logRepository = logRepository;
+        this.executionAuditPort = executionAuditPort;
+        this.auditoriaEstruturadaAtiva = auditoriaEstruturadaAtiva;
         this.logger = logger;
         this.log = log;
         final String pipelineExecutionId =
@@ -162,26 +190,54 @@ public class GraphQLExtractionService {
             try {
                 final ExtractionResult resultUsuarios = executarComTimeout(
                     ConstantesEntidades.USUARIOS_SISTEMA,
-                    () -> extractUsuarios(dataInicio, dataFim, false)
+                    () -> {
+                        final ExecutionDates datas = resolverDatasExecucao(
+                            ConstantesEntidades.USUARIOS_SISTEMA,
+                            dataInicio,
+                            dataFim
+                        );
+                        return extractUsuarios(datas.inicio(), datas.fim(), false);
+                    }
                 );
                 if (resultUsuarios != null) {
                     resultados.add(resultUsuarios);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.USUARIOS_SISTEMA, "Usuarios do Sistema", e);
+                registrarFalhaEntidade(
+                    resultados,
+                    ConstantesEntidades.USUARIOS_SISTEMA,
+                    "Usuarios do Sistema",
+                    e,
+                    dataInicio,
+                    dataFim
+                );
             }
             aplicarDelayEntreEntidades();
         } else if (executarUsuariosSistema) {
             try {
                 final ExtractionResult resultUsuarios = executarComTimeout(
                     ConstantesEntidades.USUARIOS_SISTEMA,
-                    () -> extractUsuarios(dataInicio, dataFim, true)
+                    () -> {
+                        final ExecutionDates datas = resolverDatasExecucao(
+                            ConstantesEntidades.USUARIOS_SISTEMA,
+                            dataInicio,
+                            dataFim
+                        );
+                        return extractUsuarios(datas.inicio(), datas.fim(), true);
+                    }
                 );
                 if (resultUsuarios != null) {
                     resultados.add(resultUsuarios);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.USUARIOS_SISTEMA, "Usuarios do Sistema", e);
+                registrarFalhaEntidade(
+                    resultados,
+                    ConstantesEntidades.USUARIOS_SISTEMA,
+                    "Usuarios do Sistema",
+                    e,
+                    dataInicio,
+                    dataFim
+                );
             }
             aplicarDelayEntreEntidades();
         }
@@ -190,7 +246,10 @@ public class GraphQLExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.COLETAS,
-                    () -> extractColetas(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas = resolverDatasExecucao(ConstantesEntidades.COLETAS, dataInicio, dataFim);
+                        return extractColetas(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
@@ -198,7 +257,7 @@ public class GraphQLExtractionService {
                 }
             } catch (final Exception e) {
                 coletasConcluidasComSucesso = false;
-                registrarFalhaEntidade(resultados, ConstantesEntidades.COLETAS, "Coletas", e);
+                registrarFalhaEntidade(resultados, ConstantesEntidades.COLETAS, "Coletas", e, dataInicio, dataFim);
             }
             aplicarDelayEntreEntidades();
         }
@@ -211,13 +270,17 @@ public class GraphQLExtractionService {
                 try {
                     final ExtractionResult result = executarComTimeout(
                         ConstantesEntidades.FRETES,
-                        () -> extractFretes(dataInicio, dataFim)
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.FRETES, dataInicio, dataFim);
+                            return extractFretes(datas.inicio(), datas.fim());
+                        }
                     );
                     if (result != null) {
                         resultados.add(result);
                     }
                 } catch (final Exception e) {
-                    registrarFalhaEntidade(resultados, ConstantesEntidades.FRETES, "Fretes", e);
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.FRETES, "Fretes", e, dataInicio, dataFim);
                 }
             }
             aplicarDelayEntreEntidades();
@@ -243,13 +306,24 @@ public class GraphQLExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.FATURAS_GRAPHQL,
-                    () -> extractFaturasGraphQL(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.FATURAS_GRAPHQL, dataInicio, dataFim);
+                        return extractFaturasGraphQL(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.FATURAS_GRAPHQL, "Faturas GraphQL", e);
+                registrarFalhaEntidade(
+                    resultados,
+                    ConstantesEntidades.FATURAS_GRAPHQL,
+                    "Faturas GraphQL",
+                    e,
+                    dataInicio,
+                    dataFim
+                );
             }
             aplicarDelayEntreEntidades();
         } else if (executarFaturasGraphql) {
@@ -293,7 +367,8 @@ public class GraphQLExtractionService {
         final ExtractionResult resultado;
         try {
             resultado = executarComTimeout(
-                ConstantesEntidades.COLETAS,
+                "coletas_referencial",
+                ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial(),
                 () -> extractColetas(dataInicio, dataFim)
             );
         } catch (final Exception e) {
@@ -301,7 +376,7 @@ public class GraphQLExtractionService {
                 final String aviso = String.format(
                     "Timeout na entidade %s apos %d ms. A extracao auxiliar sera encerrada.",
                     ConstantesEntidades.COLETAS,
-                    ConfigEtl.obterTimeoutEntidadeGraphQL(ConstantesEntidades.COLETAS).toMillis()
+                    ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial().toMillis()
                 );
                 ExtractionHelper.appendAvisoSeguranca(aviso);
                 log.error("[TIMEOUT] {}", aviso, e);
@@ -351,6 +426,9 @@ public class GraphQLExtractionService {
 
     protected void registrarLogExtracao(final ExtractionResult result) {
         logRepository.gravarLogExtracao(result.toLogEntity());
+        if (auditoriaEstruturadaAtiva) {
+            ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        }
     }
 
     protected ExtractionResult extractUsuarios(final LocalDate dataInicio, final LocalDate dataFim, final boolean throwOnError) {
@@ -526,9 +604,19 @@ public class GraphQLExtractionService {
 
     private ExtractionResult executarComTimeout(final String entidade,
                                                 final TimedExtractionSupplier supplier) throws Exception {
-        final TimedExtractionOutcome outcome = OperationTimeoutGuard.executar(
-            "graphql:" + entidade,
+        return executarComTimeout(
+            entidade,
             ConfigEtl.obterTimeoutEntidadeGraphQL(entidade),
+            supplier
+        );
+    }
+
+    private ExtractionResult executarComTimeout(final String operacao,
+                                                final Duration timeout,
+                                                final TimedExtractionSupplier supplier) throws Exception {
+        final TimedExtractionOutcome outcome = OperationTimeoutGuard.executar(
+            "graphql:" + operacao,
+            timeout,
             () -> new TimedExtractionOutcome(
                 supplier.executar(),
                 ExtractionHelper.drenarAvisosSeguranca()
@@ -557,7 +645,9 @@ public class GraphQLExtractionService {
     private void registrarFalhaEntidade(final List<ExtractionResult> resultados,
                                         final String entidade,
                                         final String descricao,
-                                        final Exception erro) {
+                                        final Exception erro,
+                                        final LocalDate dataInicio,
+                                        final LocalDate dataFim) {
         if (erro instanceof ExecutionTimeoutException) {
             final long timeoutMs = ConfigEtl.obterTimeoutEntidadeGraphQL(entidade).toMillis();
             final String aviso = String.format(
@@ -575,10 +665,39 @@ public class GraphQLExtractionService {
                 erro
             );
         }
-        resultados.add(ExtractionResult.erro(entidade, RelogioSistema.agora(), erro).build());
+        final ExecutionDates datas = resolverDatasExecucao(entidade, dataInicio, dataFim);
+        final ExecutionWindowPlan plano =
+            ExecutionPlanContext.getPlano(entidade).orElseGet(() -> criarJanelaPadrao(datas.inicio(), datas.fim()));
+        final ExtractionResult erroResult = ExtractionResult.erro(entidade, RelogioSistema.agora(), erro)
+            .janelaConsultaInicio(plano.consultaInicioDateTime())
+            .janelaConsultaFim(plano.consultaFimDateTime())
+            .janelaConfirmacaoInicio(plano.confirmacaoInicio())
+            .janelaConfirmacaoFim(plano.confirmacaoFim())
+            .build();
+        registrarLogExtracao(erroResult);
+        resultados.add(erroResult);
     }
 
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
+    }
+
+    private ExecutionDates resolverDatasExecucao(final String entidade,
+                                                 final LocalDate dataInicio,
+                                                 final LocalDate dataFim) {
+        final ExecutionWindowPlan plano =
+            ExecutionPlanContext.getPlano(entidade).orElseGet(() -> criarJanelaPadrao(dataInicio, dataFim));
+        return new ExecutionDates(plano.consultaDataInicio(), plano.consultaDataFim());
+    }
+
+    private ExecutionWindowPlan criarJanelaPadrao(final LocalDate dataInicio, final LocalDate dataFim) {
+        final LocalDate inicio = dataInicio != null ? dataInicio : RelogioSistema.hoje().minusDays(1);
+        final LocalDate fim = dataFim != null ? dataFim : inicio;
+        return new ExecutionWindowPlan(
+            inicio,
+            fim,
+            inicio.atStartOfDay(),
+            fim.atTime(java.time.LocalTime.MAX)
+        );
     }
 }

@@ -23,13 +23,13 @@ O ciclo completo moderno segue esta sequencia:
 2. `CommandRegistry` entrega `ExecutarFluxoCompletoComando`
 3. `PipelineCompositionRoot` registra o contexto do pipeline
 4. `FluxoCompletoUseCase` adquire lock global
-5. define janela `D-1..D`
+5. planeja janelas por entidade com `ExecutionWindowPlanner`
 6. executa pre-backfill de coletas quando aplicavel
 7. executa pipeline principal
 8. executa pos-hidratacao de coletas quando aplicavel
-9. valida completude
-10. valida integridade ETL
-11. considera data quality
+9. executa validacao autorizativa do run
+10. considera data quality
+11. atualiza `watermark` confirmado no sucesso pleno
 12. grava historico e, se for sucesso pleno, grava `last_run.properties`
 
 ## Fluxo detalhado
@@ -61,8 +61,9 @@ Sem esse lock, a execucao falha antes de mover dados.
 
 Observacao:
 
-- essa e a janela principal diaria;
-- ela nao substitui janelas auxiliares de hidratacao referencial.
+- essa e a base do ciclo;
+- entidades criticas passam por planejamento de `consulta` e `confirmacao`;
+- o fluxo deixa explicita a separacao entre overlap de consulta e watermark confirmado.
 
 ### Passo 5. Pre-backfill
 
@@ -87,9 +88,14 @@ Se nao houve falha nos runners e o modo nao e loop daemon:
 
 O fluxo so e considerado plenamente valido quando:
 
-- completude por logs fecha;
-- integridade ETL fecha;
+- a validacao autorizativa do run fecha;
+- existe trilha estruturada por `execution_uuid`;
 - data quality aprova.
+
+Observacao:
+
+- a validacao rapida de 24h continua existindo como telemetria;
+- ela nao aprova a execucao principal.
 
 ### Passo 9. Fechamento
 
@@ -108,10 +114,10 @@ window = D-1..D
 pre_backfill_coletas()
 report = orchestrator.executar(steps)
 pos_hidratacao_coletas()
-completude = validar_completude()
-integridade = validar_integridade()
+integridade = validar_integridade_autorizativa_por_execution_uuid()
 quality = validar_data_quality()
-status = consolidar(report, completude, integridade, quality)
+status = consolidar(report, integridade, quality)
+if success: atualizar_watermarks()
 persistir_historico(status)
 release lock
 ```
@@ -120,7 +126,8 @@ release lock
 
 - entrada e historico: `Main`
 - janela e regras executivas: `FluxoCompletoUseCase`
+- plano de janela e watermark: `ExecutionWindowPlanner`
 - wiring: `PipelineCompositionRoot`
 - step runtime: `PipelineOrchestrator`
 - coletas auxiliares: `PreBackfillReferencialColetasUseCase`
-- validacao: `CompletudeValidator` e `IntegridadeEtlValidator`
+- validacao autorizativa: `IntegridadeEtlValidator`

@@ -108,6 +108,28 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
     }
 
     @Test
+    void deveTolerarColetasComDoisExcedentesEmJanelaAberta() {
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.COLETAS,
+            288,
+            288,
+            0,
+            290,
+            0,
+            2,
+            0,
+            true,
+            null,
+            "snapshot vivo com requestDate"
+        );
+
+        final ResumoExecucao resumo = reporter.reportar(List.of(resultado));
+
+        assertEquals(1, resumo.ok());
+        assertEquals(0, resumo.falhas());
+    }
+
+    @Test
     void deveTolerarContasAPagarComDriftMarginal() {
         final ResultadoComparacao resultado = new ResultadoComparacao(
             ConstantesEntidades.CONTAS_A_PAGAR,
@@ -121,6 +143,28 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
             true,
             null,
             "snapshot vivo"
+        );
+
+        final ResumoExecucao resumo = reporter.reportar(List.of(resultado));
+
+        assertEquals(1, resumo.ok());
+        assertEquals(0, resumo.falhas());
+    }
+
+    @Test
+    void deveTolerarFretesComUmFaltanteMarginalEmJanelaAberta() {
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.FRETES,
+            941,
+            941,
+            0,
+            940,
+            1,
+            0,
+            0,
+            true,
+            null,
+            "snapshot vivo do frete"
         );
 
         final ResumoExecucao resumo = reporter.reportar(List.of(resultado));
@@ -152,6 +196,88 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
     }
 
     @Test
+    void naoDeveTolerarFretesMarginaisEmPeriodoFechado() {
+        final ValidacaoApiBanco24hDetalhadaComparator comparatorFechado =
+            new ValidacaoApiBanco24hDetalhadaComparator(null);
+        comparatorFechado.definirPeriodoFechado(true);
+        final ValidacaoApiBanco24hDetalhadaReporter reporterFechado =
+            new ValidacaoApiBanco24hDetalhadaReporter(
+                LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaReporterTest.class),
+                comparatorFechado
+            );
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.FRETES,
+            941,
+            941,
+            0,
+            940,
+            1,
+            0,
+            0,
+            true,
+            null,
+            "periodo fechado"
+        );
+
+        final ResumoExecucao resumo = reporterFechado.reportar(List.of(resultado));
+
+        assertEquals(0, resumo.ok());
+        assertEquals(1, resumo.falhas());
+    }
+
+    @Test
+    void deveTolerarManifestoAbertoComUmaDivergenciaDeConteudo() {
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.MANIFESTOS,
+            369,
+            369,
+            0,
+            369,
+            0,
+            0,
+            1,
+            true,
+            null,
+            "snapshot vivo do manifesto em aberto"
+        );
+
+        final ResumoExecucao resumo = reporter.reportar(List.of(resultado));
+
+        assertEquals(1, resumo.ok());
+        assertEquals(0, resumo.falhas());
+    }
+
+    @Test
+    void naoDeveTolerarManifestoFechadoComUmaDivergenciaDeConteudo() {
+        final ValidacaoApiBanco24hDetalhadaComparator comparatorFechado =
+            new ValidacaoApiBanco24hDetalhadaComparator(null);
+        comparatorFechado.definirPeriodoFechado(true);
+        final ValidacaoApiBanco24hDetalhadaReporter reporterFechado =
+            new ValidacaoApiBanco24hDetalhadaReporter(
+                LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaReporterTest.class),
+                comparatorFechado
+            );
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.MANIFESTOS,
+            369,
+            369,
+            0,
+            369,
+            0,
+            0,
+            1,
+            true,
+            null,
+            "manifesto fechado com divergencia"
+        );
+
+        final ResumoExecucao resumo = reporterFechado.reportar(List.of(resultado));
+
+        assertEquals(0, resumo.ok());
+        assertEquals(1, resumo.falhas());
+    }
+
+    @Test
     void deveTolerarLocalizacaoComUmExcedenteDeSnapshot() {
         final ResultadoComparacao resultado = new ResultadoComparacao(
             ConstantesEntidades.LOCALIZACAO_CARGAS,
@@ -165,6 +291,28 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
             true,
             null,
             "snapshot vivo da origem"
+        );
+
+        final ResumoExecucao resumo = reporter.reportar(List.of(resultado));
+
+        assertEquals(1, resumo.ok());
+        assertEquals(0, resumo.falhas());
+    }
+
+    @Test
+    void deveTolerarLocalizacaoComUmFaltanteEPequenaDivergenciaEmJanelaAberta() {
+        final ResultadoComparacao resultado = new ResultadoComparacao(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            941,
+            941,
+            0,
+            940,
+            1,
+            0,
+            2,
+            true,
+            null,
+            "snapshot vivo da localizacao"
         );
 
         final ResumoExecucao resumo = reporter.reportar(List.of(resultado));

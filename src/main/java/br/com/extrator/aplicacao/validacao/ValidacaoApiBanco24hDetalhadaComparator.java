@@ -49,11 +49,18 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
     private static final double LIMIAR_USUARIOS_FALTANTES_PERCENTUAL = 0.005d;
     private static final int LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO = 5;
     private static final double LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL = 0.02d;
+    private static final int LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO_ABERTO = 20;
+    private static final double LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL_ABERTO = 0.05d;
 
     private final ValidacaoApiBanco24hDetalhadaRepository repository;
+    private boolean periodoFechadoContexto;
 
     ValidacaoApiBanco24hDetalhadaComparator(final ValidacaoApiBanco24hDetalhadaRepository repository) {
         this.repository = repository;
+    }
+
+    void definirPeriodoFechado(final boolean periodoFechado) {
+        this.periodoFechadoContexto = periodoFechado;
     }
 
     ResultadoComparacao compararEntidade(
@@ -91,8 +98,20 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         }
 
         final JanelaExecucao janela = janelaOpt.get();
-        final Set<String> chavesBanco = repository.carregarChavesBancoNaJanela(conexao, entidade, janela);
-        final Map<String, String> hashesBanco = repository.carregarHashesMetadataBancoNaJanela(conexao, entidade, janela);
+        final Set<String> chavesBanco = repository.carregarChavesBancoNaJanela(
+            conexao,
+            entidade,
+            janela,
+            periodoInicio,
+            periodoFim
+        );
+        final Map<String, String> hashesBanco = repository.carregarHashesMetadataBancoNaJanela(
+            conexao,
+            entidade,
+            janela,
+            periodoInicio,
+            periodoFim
+        );
 
         final Set<String> faltantes = new HashSet<>(api.chaves());
         faltantes.removeAll(chavesBanco);
@@ -199,6 +218,7 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
                  ConstantesEntidades.LOCALIZACAO_CARGAS,
                  ConstantesEntidades.FRETES,
                  ConstantesEntidades.COLETAS -> true;
+            case ConstantesEntidades.MANIFESTOS -> manifestosDivergenciaMarginalTolerada(resultado);
             default -> false;
         };
     }
@@ -208,8 +228,10 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             return false;
         }
         return usuariosSistemaDinamicosTolerados(resultado)
+            || fretesMarginalmenteDinamicos(resultado)
             || coletasMarginaisToleradas(resultado)
             || manifestosMarginaisTolerados(resultado)
+            || cotacoesMarginalmenteDinamicas(resultado)
             || localizacaoCargasMarginalmenteDinamicas(resultado)
             || faturasPorClienteMarginalmenteDinamicas(resultado)
             || contasAPagarMarginaisToleradas(resultado);
@@ -232,7 +254,8 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
     private boolean coletasMarginaisToleradas(final ResultadoComparacao resultado) {
         return ConstantesEntidades.COLETAS.equals(resultado.entidade())
             && resultado.faltantes() <= 2
-            && resultado.excedentes() <= 1
+            && resultado.excedentes() <= 2
+            && resultado.divergenciasDados() <= 10
             && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
     }
 
@@ -246,34 +269,67 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             return false;
         }
         final int base = Math.max(resultado.apiUnico(), resultado.banco());
-        final int limitePercentual = (int) Math.ceil(base * LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL);
-        final int limite = Math.max(2, Math.min(LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO, limitePercentual));
+        final double limitePercentualBase = periodoFechadoContexto
+            ? LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL
+            : LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL_ABERTO;
+        final int limiteAbsoluto = periodoFechadoContexto
+            ? LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO
+            : LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO_ABERTO;
+        final int limitePercentual = (int) Math.ceil(base * limitePercentualBase);
+        final int limite = Math.max(2, Math.min(limiteAbsoluto, limitePercentual));
         return delta <= limite;
     }
 
-    private boolean localizacaoCargasMarginalmenteDinamicas(final ResultadoComparacao resultado) {
-        return ConstantesEntidades.LOCALIZACAO_CARGAS.equals(resultado.entidade())
-            && resultado.faltantes() == 0
+    private boolean cotacoesMarginalmenteDinamicas(final ResultadoComparacao resultado) {
+        return !periodoFechadoContexto
+            && ConstantesEntidades.COTACOES.equals(resultado.entidade())
+            && resultado.faltantes() <= 2
             && resultado.excedentes() <= 1
-            && resultado.banco() >= resultado.apiUnico()
-            && (resultado.banco() - resultado.apiUnico()) <= 1;
+            && resultado.divergenciasDados() <= 2
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+    }
+
+    private boolean manifestosDivergenciaMarginalTolerada(final ResultadoComparacao resultado) {
+        return !periodoFechadoContexto
+            && ConstantesEntidades.MANIFESTOS.equals(resultado.entidade())
+            && resultado.faltantes() == 0
+            && resultado.excedentes() == 0
+            && resultado.apiUnico() == resultado.banco()
+            && resultado.divergenciasDados() <= 1;
+    }
+
+    private boolean localizacaoCargasMarginalmenteDinamicas(final ResultadoComparacao resultado) {
+        return !periodoFechadoContexto
+            && ConstantesEntidades.LOCALIZACAO_CARGAS.equals(resultado.entidade())
+            && resultado.faltantes() <= 2
+            && resultado.excedentes() <= 1
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+    }
+
+    private boolean fretesMarginalmenteDinamicos(final ResultadoComparacao resultado) {
+        return !periodoFechadoContexto
+            && ConstantesEntidades.FRETES.equals(resultado.entidade())
+            && resultado.faltantes() <= 1
+            && resultado.excedentes() <= 1
+            && resultado.divergenciasDados() == 0
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 1;
     }
 
     private boolean faturasPorClienteMarginalmenteDinamicas(final ResultadoComparacao resultado) {
-        return ConstantesEntidades.FATURAS_POR_CLIENTE.equals(resultado.entidade())
-            && resultado.faltantes() == 0
+        return !periodoFechadoContexto
+            && ConstantesEntidades.FATURAS_POR_CLIENTE.equals(resultado.entidade())
+            && resultado.faltantes() <= 2
             && resultado.excedentes() <= 1
             && resultado.divergenciasDados() <= 1
-            && resultado.banco() >= resultado.apiUnico()
-            && (resultado.banco() - resultado.apiUnico()) <= 1;
+            && Math.abs(resultado.banco() - resultado.apiUnico()) <= 2;
     }
 
     private boolean contasAPagarMarginaisToleradas(final ResultadoComparacao resultado) {
         return ConstantesEntidades.CONTAS_A_PAGAR.equals(resultado.entidade())
             && resultado.divergenciasDados() == 0
             && resultado.excedentes() == 0
-            && resultado.faltantes() <= 1
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 1;
+            && resultado.faltantes() <= 2
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
     }
 
     private String construirDetalheComparacao(

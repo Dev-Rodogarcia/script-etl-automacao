@@ -27,34 +27,59 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
+import br.com.extrator.plataforma.auditoria.persistencia.sqlserver.SqlServerExecutionAuditPortAdapter;
 
 public class IntegridadeEtlValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(IntegridadeEtlValidator.class);
-    private static final Pattern PADRAO_METRICA_LOG = Pattern.compile("\\b%s=(-?\\d+)\\b");
     private static final Map<String, IntegridadeEtlSpec> SPECS = IntegridadeEtlSpecCatalog.carregarSpecs();
     private final IntegridadeEtlSqlSupport sqlSupport = new IntegridadeEtlSqlSupport();
+    private final ExecutionAuditPort executionAuditPort;
+
+    public IntegridadeEtlValidator() {
+        this(new SqlServerExecutionAuditPortAdapter());
+    }
+
+    IntegridadeEtlValidator(final ExecutionAuditPort executionAuditPort) {
+        this.executionAuditPort = executionAuditPort;
+    }
 
     public static final class ResultadoValidacao {
         private final boolean valido;
+        private final int totalEntidades;
+        private final int entidadesNaoOk;
         private final List<String> falhas;
 
-        public ResultadoValidacao(final boolean valido, final List<String> falhas) {
+        public ResultadoValidacao(final boolean valido,
+                                 final int totalEntidades,
+                                 final int entidadesNaoOk,
+                                 final List<String> falhas) {
             this.valido = valido;
+            this.totalEntidades = totalEntidades;
+            this.entidadesNaoOk = entidadesNaoOk;
             this.falhas = List.copyOf(falhas);
         }
 
         public boolean isValido() {
             return valido;
+        }
+
+        public int getTotalEntidades() {
+            return totalEntidades;
+        }
+
+        public int getEntidadesNaoOk() {
+            return entidadesNaoOk;
         }
 
         public List<String> getFalhas() {
@@ -74,99 +99,95 @@ public class IntegridadeEtlValidator {
                                               final boolean modoLoopDaemon) {
         final List<String> falhas = new ArrayList<>();
         final Set<String> entidades = new LinkedHashSet<>(entidadesEsperadas);
+        final String executionId = ExecutionContext.currentExecutionId();
 
         if (entidades.isEmpty()) {
             registrarFalha(falhas, "SEM_ENTIDADES", "Nenhuma entidade informada para validacao de integridade.");
-            return new ResultadoValidacao(false, falhas);
+            return new ResultadoValidacao(false, 0, 0, falhas);
+        }
+        if (executionId == null || "n/a".equalsIgnoreCase(executionId)) {
+            registrarFalha(
+                falhas,
+                "EXECUTION_ID_AUSENTE",
+                "Validacao autorizativa exige execution_uuid corrente; o contexto MDC nao foi inicializado."
+            );
+            return new ResultadoValidacao(false, entidades.size(), entidades.size(), falhas);
+        }
+        if (!executionAuditPort.isDisponivel()) {
+            registrarFalha(
+                falhas,
+                "AUDITORIA_ESTRUTURADA_INDISPONIVEL",
+                "sys_execution_audit/sys_execution_watermark indisponiveis. A validacao autorizativa nao pode usar fallback legado."
+            );
+            return new ResultadoValidacao(false, entidades.size(), entidades.size(), falhas);
         }
 
+        int entidadesNaoOk = 0;
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             for (String entidade : entidades) {
+                final int falhasAntes = falhas.size();
                 final IntegridadeEtlSpec spec = SPECS.get(entidade);
                 if (spec == null) {
                     registrarFalha(falhas, "ENTIDADE_NAO_SUPORTADA", "Entidade sem spec de validacao: " + entidade);
+                    entidadesNaoOk++;
                     continue;
                 }
 
                 validarSchema(conexao, spec, falhas);
+                final Optional<ExecutionAuditRecord> auditOpt =
+                    executionAuditPort.buscarResultado(executionId, spec.entidade());
+                validarComAuditoriaEstruturada(conexao, spec, auditOpt, executionId, falhas);
 
-                final Optional<IntegridadeEtlLogWindow> logJanela =
-                    buscarLogDaExecucao(conexao, entidade, inicioExecucao, fimExecucao);
-                if (logJanela.isEmpty()) {
-                    registrarFalha(falhas, "LOG_AUSENTE",
-                        "Sem log_extracoes para entidade '" + entidade + "' na execucao atual.");
-                    continue;
-                }
+                final LocalDateTime inicioValidacaoEntidade = auditOpt
+                    .map(ExecutionAuditRecord::startedAt)
+                    .orElse(inicioExecucao);
+                final LocalDateTime fimValidacaoEntidade = auditOpt
+                    .map(ExecutionAuditRecord::finishedAt)
+                    .orElse(fimExecucao);
 
-                final IntegridadeEtlLogWindow logEntidade = logJanela.get();
-                if (!ConstantesEntidades.STATUS_COMPLETO.equals(logEntidade.status())) {
-                    final String detalheMensagem = logEntidade.mensagem() == null || logEntidade.mensagem().isBlank()
-                        ? ""
-                        : " mensagem=\"" + resumirMensagem(logEntidade.mensagem()) + "\".";
-                    registrarFalha(falhas, "STATUS_NAO_COMPLETO",
-                        "Entidade '" + entidade + "' com status " + logEntidade.status()
-                            + " em log_extracoes." + detalheMensagem);
-                    continue;
-                }
-
-                final Integer esperadoPersistido = extrairNumeroCampoMensagem(logEntidade.mensagem(), "db_persisted");
-                final int origemEsperada = esperadoPersistido != null
-                    ? esperadoPersistido
-                    : logEntidade.registrosExtraidos();
-                final int totalBanco = contarRegistrosNoIntervalo(
-                    conexao, spec, logEntidade.inicio(), logEntidade.fim()
+                final int chavesNulas = contarChavesNulas(
+                    conexao,
+                    spec,
+                    inicioValidacaoEntidade,
+                    fimValidacaoEntidade
                 );
-                if (totalBanco != origemEsperada) {
-                    registrarFalha(falhas, "DIVERGENCIA_CONTAGEM",
-                        String.format("Entidade '%s': origem=%d, destino=%d (janela %s ate %s).",
-                            entidade,
-                            origemEsperada,
-                            totalBanco,
-                            logEntidade.inicio(),
-                            logEntidade.fim()));
-                } else {
-                    registrarEventoInfo("CONTAGEM_OK", entidade,
-                        "origem=" + origemEsperada + ", destino=" + totalBanco);
-                }
-
-                final int chavesNulas = contarChavesNulas(conexao, spec, logEntidade.inicio(), logEntidade.fim());
                 if (chavesNulas > 0) {
                     registrarFalha(falhas, "CHAVE_NULA",
                         "Entidade '" + entidade + "' possui " + chavesNulas + " registro(s) com chave nula.");
                 }
 
                 final int gruposDuplicados = contarGruposDuplicados(
-                    conexao, spec, logEntidade.inicio(), logEntidade.fim()
+                    conexao,
+                    spec,
+                    inicioValidacaoEntidade,
+                    fimValidacaoEntidade
                 );
                 if (gruposDuplicados > 0) {
                     registrarFalha(falhas, "DUPLICIDADE_CHAVE",
                         "Entidade '" + entidade + "' possui " + gruposDuplicados + " grupo(s) duplicado(s) por chave.");
                 }
+
+                if (falhas.size() > falhasAntes) {
+                    entidadesNaoOk++;
+                }
             }
 
-            validarIntegridadeReferencial(conexao, inicioExecucao, fimExecucao, entidades, falhas, modoLoopDaemon);
+            validarIntegridadeReferencial(
+                conexao,
+                inicioExecucao,
+                fimExecucao,
+                executionId,
+                entidades,
+                falhas,
+                modoLoopDaemon
+            );
         } catch (SQLException e) {
             registrarFalha(falhas, "ERRO_SQL_VALIDACAO",
                 "Falha SQL durante validacao de integridade: " + e.getMessage());
+            entidadesNaoOk = Math.max(entidadesNaoOk, 1);
         }
 
-        return new ResultadoValidacao(falhas.isEmpty(), falhas);
-    }
-
-    private Integer extrairNumeroCampoMensagem(final String mensagem, final String campo) {
-        if (mensagem == null || mensagem.isBlank() || campo == null || campo.isBlank()) {
-            return null;
-        }
-        final Pattern pattern = Pattern.compile(PADRAO_METRICA_LOG.pattern().formatted(Pattern.quote(campo)));
-        final Matcher matcher = pattern.matcher(mensagem);
-        if (!matcher.find()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(matcher.group(1));
-        } catch (final NumberFormatException e) {
-            return null;
-        }
+        return new ResultadoValidacao(falhas.isEmpty(), entidades.size(), entidadesNaoOk, falhas);
     }
 
     private void validarSchema(final Connection conexao,
@@ -193,37 +214,70 @@ public class IntegridadeEtlValidator {
         }
     }
 
-    private Optional<IntegridadeEtlLogWindow> buscarLogDaExecucao(final Connection conexao,
-                                                                  final String entidade,
-                                                                  final LocalDateTime inicioExecucao,
-                                                                  final LocalDateTime fimExecucao)
-            throws SQLException {
-        final String sql = """
-            SELECT TOP 1 status_final, registros_extraidos, timestamp_inicio, timestamp_fim, mensagem
-            FROM dbo.log_extracoes
-            WHERE entidade = ?
-              AND timestamp_fim >= ?
-              AND timestamp_inicio <= ?
-            ORDER BY timestamp_fim DESC
-            """;
-
-        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setString(1, entidade);
-            stmt.setTimestamp(2, Timestamp.valueOf(inicioExecucao));
-            stmt.setTimestamp(3, Timestamp.valueOf(fimExecucao));
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(new IntegridadeEtlLogWindow(
-                        rs.getString("status_final"),
-                        rs.getInt("registros_extraidos"),
-                        rs.getTimestamp("timestamp_inicio").toLocalDateTime(),
-                        rs.getTimestamp("timestamp_fim").toLocalDateTime(),
-                        rs.getString("mensagem")
-                    ));
-                }
-            }
+    private void validarComAuditoriaEstruturada(final Connection conexao,
+                                                final IntegridadeEtlSpec spec,
+                                                final Optional<ExecutionAuditRecord> auditOpt,
+                                                final String executionId,
+                                                final List<String> falhas) throws SQLException {
+        if (auditOpt.isEmpty()) {
+            registrarFalha(
+                falhas,
+                "AUDIT_AUSENTE",
+                "Sem sys_execution_audit para entidade '" + spec.entidade() + "' na execucao " + executionId + "."
+            );
+            return;
         }
-        return Optional.empty();
+
+        final ExecutionAuditRecord audit = auditOpt.get();
+        if (!audit.isStatusCompleto()) {
+            registrarFalha(
+                falhas,
+                "STATUS_NAO_COMPLETO",
+                "Entidade '" + spec.entidade() + "' com status " + audit.statusExecucao()
+                    + " em sys_execution_audit. detalhe=" + resumirMensagem(audit.detalhe())
+            );
+            return;
+        }
+
+        if (!audit.apiCompleta()) {
+            registrarFalha(
+                falhas,
+                "API_INCOMPLETA",
+                "Entidade '" + spec.entidade() + "' marcou api_completa=false. motivo=" + audit.motivoIncompletude()
+            );
+            return;
+        }
+
+        if (audit.startedAt() == null || audit.finishedAt() == null) {
+            registrarFalha(
+                falhas,
+                "AUDIT_SEM_JANELA_EXECUCAO",
+                "Entidade '" + spec.entidade() + "' sem started_at/finished_at estruturados."
+            );
+            return;
+        }
+
+        final int totalBanco = contarRegistrosNoIntervalo(conexao, spec, audit.startedAt(), audit.finishedAt());
+        if (totalBanco != audit.dbPersistidos()) {
+            registrarFalha(
+                falhas,
+                "DIVERGENCIA_CONTAGEM",
+                String.format(
+                    "Entidade '%s': audit.db_persistidos=%d, destino=%d (janela %s ate %s).",
+                    spec.entidade(),
+                    audit.dbPersistidos(),
+                    totalBanco,
+                    audit.startedAt(),
+                    audit.finishedAt()
+                )
+            );
+        } else {
+            registrarEventoInfo(
+                "CONTAGEM_OK",
+                spec.entidade(),
+                "audit.db_persistidos=" + audit.dbPersistidos() + ", destino=" + totalBanco
+            );
+        }
     }
 
     private int contarRegistrosNoIntervalo(final Connection conexao,
@@ -301,16 +355,26 @@ public class IntegridadeEtlValidator {
     private void validarIntegridadeReferencial(final Connection conexao,
                                                final LocalDateTime inicioExecucao,
                                                final LocalDateTime fimExecucao,
+                                               final String executionId,
                                                final Set<String> entidades,
                                                final List<String> falhas,
                                                final boolean modoLoopDaemon) throws SQLException {
-        validarReferencialManifestos(conexao, inicioExecucao, fimExecucao, entidades, falhas, modoLoopDaemon);
+        validarReferencialManifestos(
+            conexao,
+            inicioExecucao,
+            fimExecucao,
+            executionId,
+            entidades,
+            falhas,
+            modoLoopDaemon
+        );
         validarReferencialFretes(conexao, inicioExecucao, fimExecucao, entidades, falhas);
     }
 
     private void validarReferencialManifestos(final Connection conexao,
                                               final LocalDateTime inicioExecucao,
                                               final LocalDateTime fimExecucao,
+                                              final String executionId,
                                               final Set<String> entidades,
                                               final List<String> falhas,
                                               final boolean modoLoopDaemon) throws SQLException {
@@ -318,12 +382,10 @@ public class IntegridadeEtlValidator {
             return;
         }
 
-        final Optional<IntegridadeEtlLogWindow> logManifestos = buscarLogDaExecucao(
-            conexao, ConstantesEntidades.MANIFESTOS, inicioExecucao, fimExecucao
-        );
-        final Optional<IntegridadeEtlLogWindow> logColetas = buscarLogDaExecucao(
-            conexao, ConstantesEntidades.COLETAS, inicioExecucao, fimExecucao
-        );
+        final Optional<ExecutionAuditRecord> auditManifestos =
+            executionAuditPort.buscarResultado(executionId, ConstantesEntidades.MANIFESTOS);
+        final Optional<ExecutionAuditRecord> auditColetas =
+            executionAuditPort.buscarResultado(executionId, ConstantesEntidades.COLETAS);
 
         final String sqlManifestosOrfaos = """
             SELECT COUNT(*)
@@ -371,9 +433,9 @@ public class IntegridadeEtlValidator {
         final List<Long> amostraOrfaos = sqlSupport.executarListaLong(
             conexao, sqlManifestosOrfaosAmostra, inicioExecucao, fimExecucao
         );
-        final String contextoManifestos = resumirJanela(logManifestos);
-        final String contextoColetas = resumirJanela(logColetas);
-        final boolean coletasVaziasNaExecucao = logColetas.isPresent() && logColetas.get().registrosExtraidos() == 0;
+        final String contextoManifestos = resumirAuditoria(auditManifestos);
+        final String contextoColetas = resumirAuditoria(auditColetas);
+        final boolean coletasVaziasNaExecucao = auditColetas.isPresent() && auditColetas.get().dbPersistidos() == 0;
         final String codigoFalha = coletasVaziasNaExecucao
             ? "INTEGRIDADE_REFERENCIAL_MANIFESTOS_JANELA"
             : "INTEGRIDADE_REFERENCIAL_MANIFESTOS";
@@ -456,11 +518,20 @@ public class IntegridadeEtlValidator {
                 + " | amostra_accounting_credit_id=" + amostraOrfaos);
     }
 
-    private String resumirJanela(final Optional<IntegridadeEtlLogWindow> janela) {
-        return janela
-            .map(log -> String.format("status=%s, registros=%d, janela=[%s .. %s], mensagem=%s",
-                log.status(), log.registrosExtraidos(), log.inicio(), log.fim(), resumirMensagem(log.mensagem())))
-            .orElse("sem_log");
+    private String resumirAuditoria(final Optional<ExecutionAuditRecord> audit) {
+        return audit
+            .map(record -> String.format(
+                "status=%s, api_total_unico=%d, db_persistidos=%d, execucao=[%s .. %s], consulta=[%s .. %s], api_completa=%s",
+                record.statusExecucao(),
+                record.apiTotalUnico(),
+                record.dbPersistidos(),
+                record.startedAt(),
+                record.finishedAt(),
+                record.janelaConsultaInicio(),
+                record.janelaConsultaFim(),
+                record.apiCompleta()
+            ))
+            .orElse("sem_auditoria");
     }
 
     private void registrarFalha(final List<String> falhas, final String codigo, final String detalhe) {

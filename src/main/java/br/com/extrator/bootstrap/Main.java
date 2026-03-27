@@ -272,6 +272,7 @@ public class Main {
                 "--recovery",
                 "--loop",
                 "--auditar-api",
+                "--executar-step-isolado",
                 "--testar-api",
                 "--validar-api-banco-24h",
                 "--validar-api-banco-24h-detalhado",

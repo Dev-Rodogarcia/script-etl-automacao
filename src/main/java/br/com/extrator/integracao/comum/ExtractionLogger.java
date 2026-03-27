@@ -40,12 +40,15 @@ package br.com.extrator.integracao.comum;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import br.com.extrator.integracao.ResultadoExtracao;
 // DataExportEntityExtractor é usado em instanceof e cast (linhas 54, 56, 79) - falso positivo do linter
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.tempo.RelogioSistema;
@@ -196,7 +199,8 @@ public class ExtractionLogger {
             final int totalRecebido = dtos.size();
             final int deltaIgnorados = Math.max(0, totalUnicos - registrosSalvos);
             final boolean salvamentoConsistente = registrosSalvos == totalUnicos;
-            final boolean invalidosDentroTolerancia = isInvalidosDentroTolerancia(registrosInvalidos, totalRecebido);
+            final boolean invalidosDentroTolerancia =
+                isInvalidosDentroTolerancia(extractor, registrosInvalidos, totalRecebido);
             final String statusFinal = determinarStatusFinal(resultado, salvamentoConsistente, invalidosDentroTolerancia);
             final String motivoStatus = determinarMotivoStatus(
                 resultado,
@@ -218,6 +222,8 @@ public class ExtractionLogger {
                 statusFinal,
                 motivoStatus
             );
+            final ExecutionWindowPlan planoJanela =
+                ExecutionPlanContext.getPlano(entityName).orElseGet(() -> criarJanelaPadrao(dataInicio, dataFim));
 
             if (!salvamentoConsistente) {
                 log.error("[ERRO] Divergencia de carga detectada em {}: unicos={} | salvos={}",
@@ -279,11 +285,25 @@ public class ExtractionLogger {
             if (usarUnicos) {
                 return ExtractionResult.sucessoComUnicos(entityName, inicio, resultado, registrosSalvos, totalUnicos, mensagem)
                     .status(statusFinal)
+                    .janelaConsultaInicio(planoJanela.consultaInicioDateTime())
+                    .janelaConsultaFim(planoJanela.consultaFimDateTime())
+                    .janelaConfirmacaoInicio(planoJanela.confirmacaoInicio())
+                    .janelaConfirmacaoFim(planoJanela.confirmacaoFim())
+                    .registrosPersistidos(registrosPersistidos)
+                    .registrosNoOpIdempotente(registrosNoOpIdempotente)
+                    .registrosInvalidos(registrosInvalidos)
                     .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             } else {
                 return ExtractionResult.sucesso(entityName, inicio, resultado, registrosSalvos, mensagem)
                     .status(statusFinal)
+                    .janelaConsultaInicio(planoJanela.consultaInicioDateTime())
+                    .janelaConsultaFim(planoJanela.consultaFimDateTime())
+                    .janelaConfirmacaoInicio(planoJanela.confirmacaoInicio())
+                    .janelaConfirmacaoFim(planoJanela.confirmacaoFim())
+                    .registrosPersistidos(registrosPersistidos)
+                    .registrosNoOpIdempotente(registrosNoOpIdempotente)
+                    .registrosInvalidos(registrosInvalidos)
                     .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             }
@@ -312,12 +332,28 @@ public class ExtractionLogger {
                 e,
                 registrosExtraidosAteFalha,
                 paginasProcessadasAteFalha
-            ).build();
+            )
+                .janelaConsultaInicio(criarJanelaPadrao(dataInicio, dataFim).consultaInicioDateTime())
+                .janelaConsultaFim(criarJanelaPadrao(dataInicio, dataFim).consultaFimDateTime())
+                .janelaConfirmacaoInicio(criarJanelaPadrao(dataInicio, dataFim).confirmacaoInicio())
+                .janelaConfirmacaoFim(criarJanelaPadrao(dataInicio, dataFim).confirmacaoFim())
+                .build();
         }
     }
     
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
+    }
+
+    private ExecutionWindowPlan criarJanelaPadrao(final LocalDate dataInicio, final LocalDate dataFim) {
+        final LocalDate inicio = dataInicio != null ? dataInicio : RelogioSistema.hoje().minusDays(1);
+        final LocalDate fim = dataFim != null ? dataFim : inicio;
+        return new ExecutionWindowPlan(
+            inicio,
+            fim,
+            inicio.atStartOfDay(),
+            fim.atTime(LocalTime.MAX)
+        );
     }
     
     private String formatarPeriodo(final LocalDate dataInicio, final LocalDate dataFim) {
@@ -418,20 +454,27 @@ public class ExtractionLogger {
         return "OK";
     }
 
-    private boolean isInvalidosDentroTolerancia(final int registrosInvalidos, final int totalRecebido) {
+    private boolean isInvalidosDentroTolerancia(final EntityExtractor<?> extractor,
+                                                final int registrosInvalidos,
+                                                final int totalRecebido) {
         if (registrosInvalidos <= 0) {
             return true;
-        }
-
-        if (ConfigEtl.isModoIntegridadeEstrito()) {
-            return false;
         }
 
         final int limiteAbsoluto = ConfigEtl.obterMaxInvalidosToleradosPorEntidade();
         final double limitePercentual = ConfigEtl.obterPercentualMaxInvalidosToleradosPorEntidade();
         final double percentualInvalidos = (registrosInvalidos * 100.0) / Math.max(1, totalRecebido);
+        final boolean dentroDosLimites =
+            registrosInvalidos <= limiteAbsoluto && percentualInvalidos <= limitePercentual;
+        if (!dentroDosLimites) {
+            return false;
+        }
 
-        return registrosInvalidos <= limiteAbsoluto && percentualInvalidos <= limitePercentual;
+        if (!ConfigEtl.isModoIntegridadeEstrito()) {
+            return true;
+        }
+
+        return extractor != null && extractor.permiteConcluirComInvalidosAuditados();
     }
 
     private int ajustarTotalUnicosAposSalvamento(final String entityName,

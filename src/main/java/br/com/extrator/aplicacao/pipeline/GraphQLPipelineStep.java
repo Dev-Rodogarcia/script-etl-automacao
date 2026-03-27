@@ -62,7 +62,12 @@ public final class GraphQLPipelineStep implements PipelineStep {
         if (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidade)) {
             return ConfigEtl.obterTimeoutStepFaturasGraphQL();
         }
-        return ConfigEtl.obterTimeoutStepGraphQL();
+        if ("graphql".equalsIgnoreCase(entidade)) {
+            return ConfigEtl.obterTimeoutStepGraphQLCompleto();
+        }
+        if (entidade != null && !entidade.isBlank()) {
+            return ConfigEtl.obterTimeoutEntidadeGraphQL(entidade);
+        }
+        return ConfigEtl.obterTimeoutStepGraphQLCompleto();
     }
 }
-

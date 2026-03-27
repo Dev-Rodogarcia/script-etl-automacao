@@ -38,9 +38,9 @@ function Invoke-Extrator {
 
     Write-Host ""
     Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Titulo"
-    Write-Host ("Comando: java --enable-native-access=ALL-UNNAMED -jar target\\extrator.jar {0}" -f ($Args -join " "))
+    Write-Host ("Comando: java -jar target\\extrator.jar {0}" -f ($Args -join " "))
 
-    & java --enable-native-access=ALL-UNNAMED -jar $jarPath @Args
+    & java -jar $jarPath @Args
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0 -and -not $IgnoreFailure) {

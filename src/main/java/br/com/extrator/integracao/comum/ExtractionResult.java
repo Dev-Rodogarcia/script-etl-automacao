@@ -68,6 +68,15 @@ public class ExtractionResult {
     private final String mensagem;
     private final boolean sucesso;
     private final Exception erro;
+    private final boolean apiCompleta;
+    private final String motivoIncompletude;
+    private final LocalDateTime janelaConsultaInicio;
+    private final LocalDateTime janelaConsultaFim;
+    private final LocalDateTime janelaConfirmacaoInicio;
+    private final LocalDateTime janelaConfirmacaoFim;
+    private final int registrosPersistidos;
+    private final int registrosNoOpIdempotente;
+    private final int registrosInvalidos;
     
     private ExtractionResult(final Builder builder) {
         this.entityName = builder.entityName;
@@ -81,6 +90,15 @@ public class ExtractionResult {
         this.mensagem = builder.mensagem;
         this.sucesso = builder.sucesso;
         this.erro = builder.erro;
+        this.apiCompleta = builder.apiCompleta;
+        this.motivoIncompletude = builder.motivoIncompletude;
+        this.janelaConsultaInicio = builder.janelaConsultaInicio;
+        this.janelaConsultaFim = builder.janelaConsultaFim;
+        this.janelaConfirmacaoInicio = builder.janelaConfirmacaoInicio;
+        this.janelaConfirmacaoFim = builder.janelaConfirmacaoFim;
+        this.registrosPersistidos = builder.registrosPersistidos;
+        this.registrosNoOpIdempotente = builder.registrosNoOpIdempotente;
+        this.registrosInvalidos = builder.registrosInvalidos;
     }
     
     public static Builder sucesso(final String entityName, 
@@ -95,6 +113,8 @@ public class ExtractionResult {
             .totalUnicos(resultado.getDados().size()) // Padrão: tamanho da lista
             .paginasProcessadas(resultado.getPaginasProcessadas())
             .mensagem(mensagem)
+            .apiCompleta(resultado.isCompleto())
+            .motivoIncompletude(resultado.getMotivoInterrupcao())
             .sucesso(resultado.isCompleto());
     }
     
@@ -111,6 +131,8 @@ public class ExtractionResult {
             .totalUnicos(totalUnicos)
             .paginasProcessadas(resultado.getPaginasProcessadas())
             .mensagem(mensagem)
+            .apiCompleta(resultado.isCompleto())
+            .motivoIncompletude(resultado.getMotivoInterrupcao())
             .sucesso(resultado.isCompleto());
     }
     
@@ -135,6 +157,8 @@ public class ExtractionResult {
             .totalUnicos(0)
             .paginasProcessadas(Math.max(0, paginasProcessadas))
             .mensagem("Erro: " + erro.getMessage() + sufixoProgresso)
+            .apiCompleta(false)
+            .motivoIncompletude(ConstantesEntidades.STATUS_ERRO_API)
             .sucesso(false)
             .erro(erro);
     }
@@ -153,6 +177,8 @@ public class ExtractionResult {
             .totalUnicos(0)
             .paginasProcessadas(0)
             .mensagem(mensagem)
+            .apiCompleta(false)
+            .motivoIncompletude("DEPENDENCIA_BLOQUEADA")
             .sucesso(false);
     }
     
@@ -188,6 +214,14 @@ public class ExtractionResult {
     public boolean isSucesso() {
         return sucesso;
     }
+
+    public LocalDateTime getInicio() {
+        return inicio;
+    }
+
+    public LocalDateTime getFim() {
+        return fim;
+    }
     
     public Exception getErro() {
         return erro;
@@ -212,6 +246,42 @@ public class ExtractionResult {
     public int getTotalUnicos() {
         return totalUnicos;
     }
+
+    public boolean isApiCompleta() {
+        return apiCompleta;
+    }
+
+    public String getMotivoIncompletude() {
+        return motivoIncompletude;
+    }
+
+    public LocalDateTime getJanelaConsultaInicio() {
+        return janelaConsultaInicio;
+    }
+
+    public LocalDateTime getJanelaConsultaFim() {
+        return janelaConsultaFim;
+    }
+
+    public LocalDateTime getJanelaConfirmacaoInicio() {
+        return janelaConfirmacaoInicio;
+    }
+
+    public LocalDateTime getJanelaConfirmacaoFim() {
+        return janelaConfirmacaoFim;
+    }
+
+    public int getRegistrosPersistidos() {
+        return registrosPersistidos;
+    }
+
+    public int getRegistrosNoOpIdempotente() {
+        return registrosNoOpIdempotente;
+    }
+
+    public int getRegistrosInvalidos() {
+        return registrosInvalidos;
+    }
     
     public static class Builder {
         private final String entityName;
@@ -225,6 +295,15 @@ public class ExtractionResult {
         private String mensagem;
         private boolean sucesso;
         private Exception erro;
+        private boolean apiCompleta;
+        private String motivoIncompletude;
+        private LocalDateTime janelaConsultaInicio;
+        private LocalDateTime janelaConsultaFim;
+        private LocalDateTime janelaConfirmacaoInicio;
+        private LocalDateTime janelaConfirmacaoFim;
+        private int registrosPersistidos;
+        private int registrosNoOpIdempotente;
+        private int registrosInvalidos;
         
         public Builder(final String entityName, final LocalDateTime inicio) {
             this.entityName = entityName;
@@ -264,6 +343,51 @@ public class ExtractionResult {
         
         public Builder mensagem(final String mensagem) {
             this.mensagem = mensagem;
+            return this;
+        }
+
+        public Builder apiCompleta(final boolean apiCompleta) {
+            this.apiCompleta = apiCompleta;
+            return this;
+        }
+
+        public Builder motivoIncompletude(final String motivoIncompletude) {
+            this.motivoIncompletude = motivoIncompletude;
+            return this;
+        }
+
+        public Builder janelaConsultaInicio(final LocalDateTime janelaConsultaInicio) {
+            this.janelaConsultaInicio = janelaConsultaInicio;
+            return this;
+        }
+
+        public Builder janelaConsultaFim(final LocalDateTime janelaConsultaFim) {
+            this.janelaConsultaFim = janelaConsultaFim;
+            return this;
+        }
+
+        public Builder janelaConfirmacaoInicio(final LocalDateTime janelaConfirmacaoInicio) {
+            this.janelaConfirmacaoInicio = janelaConfirmacaoInicio;
+            return this;
+        }
+
+        public Builder janelaConfirmacaoFim(final LocalDateTime janelaConfirmacaoFim) {
+            this.janelaConfirmacaoFim = janelaConfirmacaoFim;
+            return this;
+        }
+
+        public Builder registrosPersistidos(final int registrosPersistidos) {
+            this.registrosPersistidos = registrosPersistidos;
+            return this;
+        }
+
+        public Builder registrosNoOpIdempotente(final int registrosNoOpIdempotente) {
+            this.registrosNoOpIdempotente = registrosNoOpIdempotente;
+            return this;
+        }
+
+        public Builder registrosInvalidos(final int registrosInvalidos) {
+            this.registrosInvalidos = registrosInvalidos;
             return this;
         }
         

@@ -5,17 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.integracao.comum.ExtractionLogger;
 import br.com.extrator.integracao.comum.ExtractionResult;
+import br.com.extrator.persistencia.entidade.LogExtracaoEntity;
 import br.com.extrator.persistencia.repositorio.LogExtracaoRepository;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class GraphQLExtractionServiceTest {
@@ -41,6 +47,38 @@ class GraphQLExtractionServiceTest {
         );
         assertTrue(erro.getMessage().contains("Fretes") || erro.getMessage().contains("fretes"));
         assertEquals(3, service.logsGerados.size(), "Usuarios, Coletas e o bloqueio de Fretes devem ser auditados");
+    }
+
+    @Test
+    void naoDeveRegistrarAuditoriaEstruturadaQuandoExecucaoAuxiliarDesativarAuditoria() {
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort();
+        final RecordingLogExtracaoRepository logRepository = new RecordingLogExtracaoRepository();
+        final AuditToggleGraphQLExtractionService service =
+            new AuditToggleGraphQLExtractionService(logRepository, auditPort, false);
+
+        service.registrar(resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas ok"));
+
+        assertEquals(1, logRepository.logs.size(), "Log operacional da entidade deve continuar sendo gravado.");
+        assertEquals(0, auditPort.records.size(), "Execucao auxiliar nao deve contaminar sys_execution_audit.");
+    }
+
+    @Test
+    void deveRegistrarAuditoriaEstruturadaQuandoModoPadraoEstiverAtivo() {
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort();
+        final RecordingLogExtracaoRepository logRepository = new RecordingLogExtracaoRepository();
+        final AuditToggleGraphQLExtractionService service =
+            new AuditToggleGraphQLExtractionService(logRepository, auditPort, true);
+
+        try {
+            ExecutionContext.initialize("--teste-graph-ql");
+            service.registrar(resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas ok"));
+        } finally {
+            ExecutionContext.clear();
+        }
+
+        assertEquals(1, logRepository.logs.size());
+        assertEquals(1, auditPort.records.size(), "Execucao principal deve continuar auditando normalmente.");
+        assertEquals(ConstantesEntidades.COLETAS, auditPort.records.get(0).entidade());
     }
 
     private static ExtractionResult resultado(final String entidade,
@@ -69,7 +107,8 @@ class GraphQLExtractionServiceTest {
         private TestableGraphQLExtractionService(final ExtractionResult usuariosResult,
                                                  final ExtractionResult coletasResult,
                                                  final ExtractionResult fretesResult) {
-            super(null, new LogExtracaoRepository(), new ExtractionLogger(TestableGraphQLExtractionService.class),
+            super(null, new LogExtracaoRepository(), AplicacaoContexto.executionAuditPort(),
+                new ExtractionLogger(TestableGraphQLExtractionService.class),
                 LoggerConsole.getLogger(TestableGraphQLExtractionService.class));
             this.usuariosResult = usuariosResult;
             this.coletasResult = coletasResult;
@@ -108,6 +147,63 @@ class GraphQLExtractionServiceTest {
             fretesExecutado = true;
             registrarLogExtracao(fretesResult);
             return fretesResult;
+        }
+    }
+
+    private static final class AuditToggleGraphQLExtractionService extends GraphQLExtractionService {
+        private AuditToggleGraphQLExtractionService(final LogExtracaoRepository logRepository,
+                                                    final ExecutionAuditPort executionAuditPort,
+                                                    final boolean auditoriaEstruturadaAtiva) {
+            super(
+                null,
+                logRepository,
+                executionAuditPort,
+                new ExtractionLogger(AuditToggleGraphQLExtractionService.class),
+                LoggerConsole.getLogger(AuditToggleGraphQLExtractionService.class),
+                auditoriaEstruturadaAtiva
+            );
+        }
+
+        private void registrar(final ExtractionResult result) {
+            registrarLogExtracao(result);
+        }
+    }
+
+    private static final class RecordingLogExtracaoRepository extends LogExtracaoRepository {
+        private final List<LogExtracaoEntity> logs = new ArrayList<>();
+
+        @Override
+        public void gravarLogExtracao(final LogExtracaoEntity logExtracao) {
+            logs.add(logExtracao);
+        }
+    }
+
+    private static final class RecordingExecutionAuditPort implements ExecutionAuditPort {
+        private final List<ExecutionAuditRecord> records = new ArrayList<>();
+
+        @Override
+        public void registrarResultado(final ExecutionAuditRecord record) {
+            records.add(record);
+        }
+
+        @Override
+        public Optional<ExecutionAuditRecord> buscarResultado(final String executionUuid, final String entidade) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<ExecutionAuditRecord> listarResultados(final String executionUuid) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<LocalDateTime> buscarWatermarkConfirmado(final String entidade) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void atualizarWatermarkConfirmado(final String entidade, final LocalDateTime watermarkConfirmado) {
+            // no-op
         }
     }
 }

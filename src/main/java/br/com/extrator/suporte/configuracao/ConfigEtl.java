@@ -190,6 +190,20 @@ public final class ConfigEtl {
         );
     }
 
+    public static int obterEtlReferencialColetasBackfillMaxExpansaoDias() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS",
+                "etl.referencial.coletas.backfill.max_expansao_dias"
+            ),
+            30,
+            value -> value >= 0,
+            null,
+            null,
+            null
+        );
+    }
+
     public static int obterEtlReferencialColetasLookaheadDias() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao(
@@ -202,6 +216,17 @@ public final class ConfigEtl {
             null,
             null
         );
+    }
+
+    public static boolean isPruneAusentesFretesAtivo() {
+        String valor = System.getProperty("ETL_FRETES_PRUNE_AUSENTES");
+        if (valor == null || valor.isBlank()) {
+            valor = System.getProperty("etl.fretes.prune.ausentes");
+        }
+        if (valor == null || valor.isBlank()) {
+            valor = System.getenv("ETL_FRETES_PRUNE_AUSENTES");
+        }
+        return valor != null && Boolean.parseBoolean(valor.trim().toLowerCase(Locale.ROOT));
     }
 
     public static int obterTimeoutLockExecucaoMs() {
@@ -236,6 +261,21 @@ public final class ConfigEtl {
         ));
     }
 
+    public static Duration obterTimeoutStepGraphQLCompleto() {
+        final long margemMs = obterLongComFallback(
+            "ETL_PIPELINE_TIMEOUT_STEP_GRAPHQL_COMPLETO_MARGEM_MS",
+            "etl.pipeline.timeout.step.graphql_completo.margem.ms",
+            120_000L
+        );
+        final long totalMs = somarDuracoesComSaturacao(
+            obterTimeoutEntidadeGraphQL(ConstantesEntidades.USUARIOS_SISTEMA).toMillis(),
+            obterTimeoutEntidadeGraphQL(ConstantesEntidades.COLETAS).toMillis(),
+            obterTimeoutEntidadeGraphQL(ConstantesEntidades.FRETES).toMillis(),
+            margemMs
+        );
+        return Duration.ofMillis(totalMs);
+    }
+
     public static Duration obterTimeoutStepDataExport() {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_PIPELINE_TIMEOUT_STEP_DATAEXPORT_MS",
@@ -264,7 +304,7 @@ public final class ConfigEtl {
         final String chave = normalizarChaveEntidade(entidade);
         final long padrao;
         if ("USUARIOS_SISTEMA".equals(chave)) {
-            padrao = 1_200_000L;
+            padrao = 1_800_000L;
         } else if ("FATURAS_GRAPHQL".equals(chave)) {
             padrao = 7_200_000L;
         } else {
@@ -273,6 +313,18 @@ public final class ConfigEtl {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_GRAPHQL_TIMEOUT_ENTIDADE_" + chave + "_MS",
             "etl.graphql.timeout.entidade." + chave.toLowerCase(Locale.ROOT) + ".ms",
+            padrao
+        ));
+    }
+
+    public static Duration obterTimeoutEntidadeGraphQLColetasReferencial() {
+        final long padrao = Math.max(
+            obterTimeoutEntidadeGraphQL(ConstantesEntidades.COLETAS).toMillis(),
+            1_800_000L
+        );
+        return Duration.ofMillis(obterLongComFallback(
+            "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_REFERENCIAL_MS",
+            "etl.graphql.timeout.entidade.coletas_referencial.ms",
             padrao
         ));
     }
@@ -378,6 +430,20 @@ public final class ConfigEtl {
             return valorPadrao;
         }
         return Boolean.parseBoolean(valor.trim());
+    }
+
+    private static long somarDuracoesComSaturacao(final long... valores) {
+        long total = 0L;
+        for (final long valor : valores) {
+            if (valor <= 0L) {
+                continue;
+            }
+            if (Long.MAX_VALUE - total < valor) {
+                return Long.MAX_VALUE;
+            }
+            total += valor;
+        }
+        return total;
     }
 
     private static String normalizarChaveEntidade(final String entidade) {

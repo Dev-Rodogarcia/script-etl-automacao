@@ -73,9 +73,9 @@ if defined FLAG_EXECUTAR_IDEMPOTENCIA set "CMD_FLAGS=!CMD_FLAGS! --executar-idem
 if defined FLAG_EXECUTAR_HIDRATACAO set "CMD_FLAGS=!CMD_FLAGS! --executar-hidratacao-orfaos"
 
 echo.
-echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
+echo Executando: java -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
 echo.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
+java -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
 set "RET_CODE=%ERRORLEVEL%"
 
 echo.
@@ -154,7 +154,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

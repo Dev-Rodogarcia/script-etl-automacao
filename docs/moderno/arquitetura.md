@@ -25,8 +25,8 @@ Main
   -> PipelineCompositionRoot
   -> PipelineOrchestrator
   -> Gateways / Services de integracao
+  -> Auditoria estruturada / Validacoes
   -> Repositories / SQL Server
-  -> Validacoes / Observabilidade
 ```
 
 ## Pacotes relevantes
@@ -49,6 +49,7 @@ Main
 - Orquestracao de pipeline.
 - Politicas de falha, retry e circuit breaker.
 - Portas de aplicacao.
+- Agora tambem concentra a porta `ExecutionAuditPort`.
 
 ### `integracao`
 
@@ -69,6 +70,24 @@ Main
 - Data quality.
 - Validadores de completude e integridade.
 - Historicos e relatorios.
+
+### `features`
+
+- Nova trilha incremental por feature.
+- Nesta frente ja abriga:
+  - `features/coletas/aplicacao`
+  - `features/manifestos/aplicacao`
+  - `features/fretes/aplicacao`
+  - `features/usuarios/aplicacao`
+  - `features/usuarios/persistencia/sqlserver`
+
+### `plataforma`
+
+- Nova trilha incremental para componentes transversais.
+- Nesta frente ja abriga:
+  - `plataforma/auditoria/aplicacao`
+  - `plataforma/auditoria/dominio`
+  - `plataforma/auditoria/persistencia/sqlserver`
 
 ### `suporte`
 
@@ -92,6 +111,7 @@ Main
 - factory dos steps do fluxo completo
 - `GraphQLGateway`
 - `DataExportGateway`
+- `ExecutionAuditPort`
 - adaptadores de completude
 - adaptadores de integridade ETL
 - query de orfaos de manifestos
@@ -107,6 +127,7 @@ Main
   -> CommandRegistry.criarMapaComandos()
   -> PipelineCompositionRoot.inicializarContexto() quando o comando exige
   -> use case principal
+  -> ExecutionWindowPlanner / ExecutionPlanContext quando o fluxo exige
   -> LoggingService / ExecutionHistoryRepository
 ```
 
@@ -115,9 +136,11 @@ Main
 ### `FluxoCompletoUseCase`
 
 - depende de lock global SQL Server;
+- planeja janelas por entidade;
 - chama pre-backfill de coletas;
 - usa `PipelineOrchestrator`;
-- roda validacoes finais;
+- roda validacao autorizativa vinculada ao `execution_uuid`;
+- atualiza `watermark` confirmado em caso de sucesso pleno;
 - grava `runtime/state/last_run.properties` quando tudo fecha como sucesso.
 
 ### `ExtracaoPorIntervaloUseCase`
@@ -134,6 +157,32 @@ Main
 - registra historico;
 - chama reconciliacao automatica ao final de cada ciclo.
 
+## Organizacao alvo
+
+```text
+br.com.extrator/
+  features/
+    coletas/
+    manifestos/
+    fretes/
+    faturas/
+    usuarios/
+  plataforma/
+    bootstrap/
+    pipeline/
+    auditoria/
+    observabilidade/
+    seguranca/
+    suporte/
+```
+
+Regra de dependencia da trilha nova:
+
+- `integracao` entrega DTOs/resultados;
+- `aplicacao` orquestra janela, regra e idempotencia;
+- `persistencia` implementa portas;
+- `plataforma` oferece infraestrutura transversal.
+
 ## Como a arquitetura evoluiu
 
 Arquiteturas antigas descreviam modulos e diretorios que nao existem mais, por exemplo estruturas separadas de `runners/ports/servicos` fora da arvore atual. No codigo moderno, a consolidacao ocorreu em torno de:
@@ -145,7 +194,12 @@ Arquiteturas antigas descreviam modulos e diretorios que nao existem mais, por e
 - `observabilidade`
 - `suporte`
 
-Essa consolidacao e a arquitetura que deve orientar manutencao nova.
+Essa consolidacao continua valida para entendimento do legado.
+
+Para manutencao nova, a direcao oficial e:
+
+- componentes novos em `features/*` e `plataforma/*`;
+- drenagem incremental do legado, sem big bang.
 
 ## Exemplo de raciocinio correto
 

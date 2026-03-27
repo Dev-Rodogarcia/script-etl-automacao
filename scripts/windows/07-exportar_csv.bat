@@ -105,7 +105,7 @@ if "%OPCAO%"=="1" (
     echo.
     echo Exportando TODAS as tabelas...
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --exportar-csv
+    java -jar "target\extrator.jar" --exportar-csv
     goto :END
 )
 
@@ -156,7 +156,7 @@ if "%OPCAO%"=="2" (
     echo.
     echo Exportando tabela: !TABELA!
     echo.
-    java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --exportar-csv "!TABELA!"
+    java -jar "target\extrator.jar" --exportar-csv "!TABELA!"
     goto :END
 )
 
@@ -231,7 +231,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

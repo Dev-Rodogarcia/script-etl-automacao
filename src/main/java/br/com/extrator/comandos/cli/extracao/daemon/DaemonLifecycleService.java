@@ -47,12 +47,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Properties;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,6 +150,7 @@ public final class DaemonLifecycleService {
         comando.add("-Dsun.stdout.encoding=UTF-8");
         comando.add("-Dsun.stderr.encoding=UTF-8");
         comando.add("-Dextrator.logger.console.mirror=false");
+        adicionarSystemPropertiesConfiguracao(comando);
 
         final Path jarAtual = resolverJarAtual();
         if (jarAtual != null && Files.exists(jarAtual)) {
@@ -363,5 +366,47 @@ public final class DaemonLifecycleService {
         final String nomeExecutavel = windows ? "java.exe" : "java";
         final Path executavel = Path.of(javaHome, "bin", nomeExecutavel).toAbsolutePath().normalize();
         return executavel.toString();
+    }
+
+    private void adicionarSystemPropertiesConfiguracao(final List<String> comando) {
+        final Set<String> chavesJaConfiguradas = new HashSet<>();
+        for (final String argumento : comando) {
+            if (argumento == null || !argumento.startsWith("-D")) {
+                continue;
+            }
+            final int separador = argumento.indexOf('=');
+            final String chave = separador > 0
+                ? argumento.substring(2, separador)
+                : argumento.substring(2);
+            chavesJaConfiguradas.add(chave);
+        }
+
+        final List<String> chavesOrdenadas = System.getProperties()
+            .stringPropertyNames()
+            .stream()
+            .filter(this::devePropagarSystemProperty)
+            .sorted()
+            .toList();
+
+        for (final String chave : chavesOrdenadas) {
+            if (chavesJaConfiguradas.contains(chave)) {
+                continue;
+            }
+            final String valor = System.getProperty(chave);
+            if (valor == null) {
+                continue;
+            }
+            comando.add("-D" + chave + "=" + valor);
+        }
+    }
+
+    private boolean devePropagarSystemProperty(final String chave) {
+        if (chave == null || chave.isBlank()) {
+            return false;
+        }
+        return chave.startsWith("API_")
+            || chave.startsWith("ETL_")
+            || chave.startsWith("api.")
+            || chave.startsWith("etl.");
     }
 }

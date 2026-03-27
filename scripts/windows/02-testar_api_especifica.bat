@@ -287,10 +287,10 @@ if errorlevel 1 exit /b 1
 set "CMD_ARGS=--testar-api %API%"
 if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
 if defined FLAG_FATURAS_GRAPHQL set "CMD_ARGS=%CMD_ARGS% %FLAG_FATURAS_GRAPHQL%"
-echo Executando: java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" %CMD_ARGS%
+echo Executando: java -jar "target\extrator.jar" %CMD_ARGS%
 echo.
 
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" %CMD_ARGS%
+java -jar "target\extrator.jar" %CMD_ARGS%
 if errorlevel 1 goto :FAIL
 goto :SUCCESS
 
@@ -355,7 +355,7 @@ goto :PERGUNTAR_FATURAS_GRAPHQL
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

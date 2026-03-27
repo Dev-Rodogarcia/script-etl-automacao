@@ -51,12 +51,15 @@ import java.util.Set;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
 import br.com.extrator.aplicacao.pipeline.PipelineOrchestrator;
-import br.com.extrator.aplicacao.portas.CompletudePort;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.aplicacao.portas.IntegridadeEtlPort;
 import br.com.extrator.aplicacao.pipeline.PipelineReport;
 import br.com.extrator.aplicacao.pipeline.PipelineStep;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
+import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionWindowPlanner;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.console.BannerUtil;
@@ -95,6 +98,22 @@ public class FluxoCompletoUseCase {
 
         final LocalDate dataFim = RelogioSistema.hoje();
         final LocalDate dataInicio = dataFim.minusDays(1);
+        final ExecutionAuditPort executionAuditPort = AplicacaoContexto.executionAuditPort();
+        final Map<String, ExecutionWindowPlan> planosExecucao =
+            new ExecutionWindowPlanner(executionAuditPort).planejarFluxoCompleto(dataFim, incluirFaturasGraphQL);
+        final LocalDate dataInicioOrquestracao = planosExecucao.values().stream()
+            .map(ExecutionWindowPlan::consultaDataInicio)
+            .min(LocalDate::compareTo)
+            .orElse(dataInicio);
+        final LocalDate dataInicioColetas = planosExecucao.getOrDefault(
+            ConstantesEntidades.COLETAS,
+            new ExecutionWindowPlan(
+                dataInicioOrquestracao,
+                dataFim,
+                dataInicioOrquestracao.atStartOfDay(),
+                dataFim.atTime(java.time.LocalTime.MAX)
+            )
+        ).consultaDataInicio();
 
         log.info("Iniciando processo de extracao de dados das APIs do ESL Cloud");
         log.console("\n" + "=".repeat(60));
@@ -110,11 +129,15 @@ public class FluxoCompletoUseCase {
             "Faturas GraphQL: {}",
             incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)"
         );
-        log.console("Periodo de extracao: {} a {}", FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
+        log.console("Periodo base do ciclo: {} a {}", FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
         log.console("Inicio: {}", FormatadorData.formatBR(RelogioSistema.agora()));
         log.console("=".repeat(60) + "\n");
 
-        executarPreBackfillReferencialColetas(dataInicio, modoLoopDaemon);
+        ExecutionPlanContext.setPlanos(planosExecucao);
+        try {
+        registrarResumoPlanos(planosExecucao);
+
+        executarPreBackfillReferencialColetas(dataInicioColetas, modoLoopDaemon);
 
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         boolean validacaoFinalCompleta = true;
@@ -134,7 +157,7 @@ public class FluxoCompletoUseCase {
         final List<PipelineStep> steps = AplicacaoContexto.stepsFactory().criarStepsFluxoCompleto(incluirFaturasGraphQL, true);
         log.info("Iniciando fluxo ETL via PipelineOrchestrator com {} steps", steps.size());
 
-        final PipelineReport pipelineReport = orchestrator.executar(dataInicio, dataFim, steps);
+        final PipelineReport pipelineReport = orchestrator.executar(dataInicioOrquestracao, dataFim, steps);
         for (final StepExecutionResult result : pipelineReport.getResultados()) {
             if ("quality".equalsIgnoreCase(result.obterNomeEntidade())) {
                 qualidadeDadosAprovada = result.getStatus() == StepStatus.SUCCESS;
@@ -185,10 +208,10 @@ public class FluxoCompletoUseCase {
         }
         log.console("=".repeat(60) + "\n");
 
-        executarPosHidratacaoReferencialColetas(dataInicio, dataFim, modoLoopDaemon, totalFalhas > 0);
+        executarPosHidratacaoReferencialColetas(dataInicioColetas, dataFim, modoLoopDaemon, totalFalhas > 0);
 
         log.console("\n" + "=".repeat(60));
-        log.info("INICIANDO VALIDACAO DE COMPLETUDE DOS DADOS");
+        log.info("INICIANDO VALIDACAO AUTORIZATIVA DO RUN");
         log.console("=".repeat(60));
 
         if (totalFalhas > 0) {
@@ -196,44 +219,7 @@ public class FluxoCompletoUseCase {
         }
 
         try {
-            final CompletudePort completudePort = AplicacaoContexto.completudePort();
-            log.info("Validando completude (origem x destino) com base nos logs da execucao");
-            final Map<String, CompletudePort.StatusCompletude> resultadosValidacao =
-                completudePort.validarCompletudePorLogs(dataFim);
-
-            if (!incluirFaturasGraphQL) {
-                resultadosValidacao.remove(ConstantesEntidades.FATURAS_GRAPHQL);
-                log.info("Validacao de completude sem {}", ConstantesEntidades.FATURAS_GRAPHQL);
-            }
-
-            final boolean extracaoCompleta = resultadosValidacao.values().stream()
-                .allMatch(status -> status == CompletudePort.StatusCompletude.OK);
-            completudeEntidadesTotal = resultadosValidacao.size();
-            completudeEntidadesNaoOk = (int) resultadosValidacao.values().stream()
-                .filter(status -> status != CompletudePort.StatusCompletude.OK)
-                .count();
-
-            if (!extracaoCompleta) {
-                resultadosValidacao.forEach((entidade, status) -> {
-                    if (status != CompletudePort.StatusCompletude.OK) {
-                        if (modoLoopDaemon) {
-                            log.warn(
-                                "INTEGRIDADE_ETL | resultado=ALERTA_LOOP | codigo=COMPLETUDE | entidade={} | status={}",
-                                entidade,
-                                status
-                            );
-                        } else {
-                            log.error(
-                                "INTEGRIDADE_ETL | resultado=FALHA | codigo=COMPLETUDE | entidade={} | status={}",
-                                entidade,
-                                status
-                            );
-                        }
-                    }
-                });
-            }
-
-            log.info("Executando validacao estrita de integridade ETL");
+            log.info("Executando validacao estrita de integridade ETL vinculada ao run atual");
             final IntegridadeEtlPort integridadePort = AplicacaoContexto.integridadeEtlPort();
             final Set<String> entidadesEsperadas = new LinkedHashSet<>(List.of(
                 ConstantesEntidades.USUARIOS_SISTEMA,
@@ -264,9 +250,11 @@ public class FluxoCompletoUseCase {
                     );
                 }
             }
+            completudeEntidadesTotal = resultadoIntegridade.getTotalEntidades();
+            completudeEntidadesNaoOk = resultadoIntegridade.getEntidadesNaoOk();
             integridadeFalhas = resultadoIntegridade.getFalhas().size();
 
-            validacaoFinalCompleta = extracaoCompleta && resultadoIntegridade.isValido() && qualidadeDadosAprovada;
+            validacaoFinalCompleta = resultadoIntegridade.isValido() && qualidadeDadosAprovada;
             if (!qualidadeDadosAprovada && (detalheQualidadeDados == null || detalheQualidadeDados.isBlank())) {
                 detalheQualidadeDados = "Data quality reprovada";
             }
@@ -276,8 +264,8 @@ public class FluxoCompletoUseCase {
                 log.info("EXTRACAO COMPLETA E VALIDADA");
             } else {
                 final List<String> motivos = new ArrayList<>();
-                if (!extracaoCompleta || !resultadoIntegridade.isValido()) {
-                    motivos.add("Validacao de integridade reprovada (completude/schema/chaves/referencial)");
+                if (!resultadoIntegridade.isValido()) {
+                    motivos.add("Validacao autorizativa do run reprovada (auditoria estruturada/schema/chaves/referencial)");
                 }
                 if (!qualidadeDadosAprovada) {
                     motivos.add(detalheQualidadeDados == null ? "Data quality reprovada" : detalheQualidadeDados);
@@ -344,6 +332,7 @@ public class FluxoCompletoUseCase {
                 duracaoMinutos
             );
             log.info("Todas as APIs foram processadas com sucesso.");
+            atualizarWatermarksConfirmados(executionAuditPort, planosExecucao);
             gravarDataExecucao();
             return;
         }
@@ -396,6 +385,9 @@ public class FluxoCompletoUseCase {
         throw new PartialExecutionException(
             "Fluxo completo concluido com falhas parciais. Runners falhados: " + String.join(", ", runnersFalhados)
         );
+        } finally {
+            ExecutionPlanContext.clear();
+        }
         }
     }
 
@@ -520,6 +512,61 @@ public class FluxoCompletoUseCase {
                 e.getMessage()
             );
             log.debug("Detalhes da falha na pos-hidratacao referencial de coletas:", e);
+        }
+    }
+
+    private void registrarResumoPlanos(final Map<String, ExecutionWindowPlan> planosExecucao) {
+        if (planosExecucao == null || planosExecucao.isEmpty()) {
+            return;
+        }
+
+        log.console("\n" + "=".repeat(60));
+        log.info("PLANO DE JANELAS DO CICLO");
+        log.console("=".repeat(60));
+        for (final String entidade : List.of(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            ConstantesEntidades.COLETAS,
+            ConstantesEntidades.MANIFESTOS,
+            ConstantesEntidades.FRETES
+        )) {
+            final ExecutionWindowPlan plano = planosExecucao.get(entidade);
+            if (plano == null) {
+                continue;
+            }
+            log.info(
+                "PLANO_EXECUCAO | entidade={} | consulta={}..{} | confirmacao={}..{}",
+                entidade,
+                FormatadorData.formatBR(plano.consultaDataInicio()),
+                FormatadorData.formatBR(plano.consultaDataFim()),
+                FormatadorData.formatBR(plano.confirmacaoInicio()),
+                FormatadorData.formatBR(plano.confirmacaoFim())
+            );
+        }
+        log.console("=".repeat(60) + "\n");
+    }
+
+    private void atualizarWatermarksConfirmados(final ExecutionAuditPort executionAuditPort,
+                                                final Map<String, ExecutionWindowPlan> planosExecucao) {
+        if (executionAuditPort == null || !executionAuditPort.isDisponivel() || planosExecucao == null) {
+            return;
+        }
+
+        for (final String entidade : List.of(
+            ConstantesEntidades.COLETAS,
+            ConstantesEntidades.MANIFESTOS,
+            ConstantesEntidades.FRETES,
+            ConstantesEntidades.USUARIOS_SISTEMA
+        )) {
+            final ExecutionWindowPlan plano = planosExecucao.get(entidade);
+            if (plano == null) {
+                continue;
+            }
+            executionAuditPort.atualizarWatermarkConfirmado(entidade, plano.confirmacaoFim());
+            log.info(
+                "WATERMARK_EXECUCAO | entidade={} | confirmado_em={}",
+                entidade,
+                FormatadorData.formatBR(plano.confirmacaoFim())
+            );
         }
     }
 }

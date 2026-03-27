@@ -27,19 +27,45 @@ REM [DOC-FILE-END]===========================================================
 chcp 1252 >nul
 
 if not defined JAVA_HOME (
+  for /f "delims=" %%D in ('dir /b /ad /o-n "C:\\Program Files\\Java\\jdk-17*" 2^>nul') do (
+    set "JAVA_HOME=C:\\Program Files\\Java\\%%D"
+    goto :setjava
+  )
+  for /f "delims=" %%D in ('dir /b /ad /o-n "C:\\Program Files\\Eclipse Adoptium\\jdk-17*" 2^>nul') do (
+    set "JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\%%D"
+    goto :setjava
+  )
+  for /f "delims=" %%D in ('dir /b /ad /o-n "C:\\Program Files\\Java\\jdk*" 2^>nul') do (
+    set "JAVA_HOME=C:\\Program Files\\Java\\%%D"
+    goto :setjava
+  )
+  for /f "delims=" %%D in ('dir /b /ad /o-n "C:\\Program Files\\Eclipse Adoptium\\jdk*" 2^>nul') do (
+    set "JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\%%D"
+    goto :setjava
+  )
   for /f "delims=" %%J in ('where java 2^>nul') do (
     set "__JAVA_BIN=%%~dpJ"
     goto :setjava
   )
   :setjava
-  if defined __JAVA_BIN (
+  if defined __JAVA_BIN if not defined JAVA_HOME (
     for %%A in ("%__JAVA_BIN%..") do set "JAVA_HOME=%%~fA"
-    if exist "%JAVA_HOME%\bin\java.exe" set "PATH=%JAVA_HOME%\bin;%PATH%"
   )
-  if not exist "%JAVA_HOME%\bin\java.exe" (
-    for /f "delims=" %%D in ('dir /b /ad "C:\\Program Files\\Java\\jdk*" 2^>nul') do set "JAVA_HOME=C:\\Program Files\\Java\\%%D"
-    if not exist "%JAVA_HOME%\bin\java.exe" for /f "delims=" %%D in ('dir /b /ad "C:\\Program Files\\Eclipse Adoptium\\jdk*" 2^>nul') do set "JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\%%D"
-    if exist "%JAVA_HOME%\bin\java.exe" set "PATH=%JAVA_HOME%\bin;%PATH%"
+  if exist "%JAVA_HOME%\bin\java.exe" (
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+  ) else (
+    set "JAVA_HOME="
+  )
+  if not defined JAVA_HOME (
+    for /f "delims=" %%J in ('where java 2^>nul') do (
+      set "__JAVA_BIN=%%~dpJ"
+      goto :setjavafallback
+    )
+    :setjavafallback
+    if defined __JAVA_BIN (
+      for %%A in ("%__JAVA_BIN%..") do set "JAVA_HOME=%%~fA"
+      if exist "%JAVA_HOME%\bin\java.exe" set "PATH=%JAVA_HOME%\bin;%PATH%"
+    )
   )
 )
 

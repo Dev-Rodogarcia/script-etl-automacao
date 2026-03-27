@@ -39,7 +39,10 @@ public class UsuarioSistemaEntity {
 
     private Long userId;
     private String nome;
+    private boolean ativo = true;
+    private LocalDateTime origemAtualizadoEm;
     private LocalDateTime dataAtualizacao;
+    private LocalDateTime ultimaExtracaoEm;
 
     public Long getUserId() {
         return userId;
@@ -57,11 +60,35 @@ public class UsuarioSistemaEntity {
         this.nome = nome;
     }
 
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(final boolean ativo) {
+        this.ativo = ativo;
+    }
+
+    public LocalDateTime getOrigemAtualizadoEm() {
+        return origemAtualizadoEm;
+    }
+
+    public void setOrigemAtualizadoEm(final LocalDateTime origemAtualizadoEm) {
+        this.origemAtualizadoEm = origemAtualizadoEm;
+    }
+
     public LocalDateTime getDataAtualizacao() {
         return dataAtualizacao;
     }
 
     public void setDataAtualizacao(final LocalDateTime dataAtualizacao) {
         this.dataAtualizacao = dataAtualizacao;
+    }
+
+    public LocalDateTime getUltimaExtracaoEm() {
+        return ultimaExtracaoEm;
+    }
+
+    public void setUltimaExtracaoEm(final LocalDateTime ultimaExtracaoEm) {
+        this.ultimaExtracaoEm = ultimaExtracaoEm;
     }
 }

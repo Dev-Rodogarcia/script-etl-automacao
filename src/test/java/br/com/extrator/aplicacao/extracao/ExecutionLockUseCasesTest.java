@@ -40,6 +40,40 @@ class ExecutionLockUseCasesTest {
     }
 
     @Test
+    void extracaoPorIntervaloDeveRestaurarTimeoutDeFretesMesmoQuandoFalha() {
+        final String propriedade = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_FRETES_MS";
+        final String valorAnterior = System.getProperty(propriedade);
+        final RecordingLockManager lockManager = new RecordingLockManager();
+        final ExtracaoPorIntervaloUseCase useCase = new ExtracaoPorIntervaloUseCase(
+            new PreBackfillReferencialColetasUseCase(),
+            new PlanejadorEscopoExtracaoIntervalo(),
+            lockManager
+        );
+
+        final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
+            LocalDate.of(2026, 3, 9),
+            LocalDate.of(2026, 3, 9),
+            null,
+            null,
+            false,
+            false
+        );
+
+        try {
+            System.setProperty(propriedade, "600000");
+
+            assertThrows(Exception.class, () -> useCase.executar(request));
+            assertEquals("600000", System.getProperty(propriedade));
+        } finally {
+            if (valorAnterior == null) {
+                System.clearProperty(propriedade);
+            } else {
+                System.setProperty(propriedade, valorAnterior);
+            }
+        }
+    }
+
+    @Test
     void testeApiDeveAdquirirLockAntesDeExecutar() {
         final RecordingLockManager lockManager = new RecordingLockManager();
         final TesteApiUseCase useCase = new TesteApiUseCase(lockManager);

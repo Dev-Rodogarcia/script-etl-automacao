@@ -115,6 +115,9 @@ mvn --% -q -DskipTests org.codehaus.mojo:exec-maven-plugin:3.5.1:java -Dexec.mai
 
 - `docs/index.md`
 - `docs/moderno/overview.md`
+- `docs/moderno/plano-correcao-integridade-etl.md`
+- `docs/moderno/runbook-daemon.md`
+- `docs/moderno/testes-migracao-integridade.md`
 - `docs/moderno/arquitetura.md`
 - `docs/moderno/fluxos/ciclo-completo.md`
 - `docs/legado/classificacao.md`

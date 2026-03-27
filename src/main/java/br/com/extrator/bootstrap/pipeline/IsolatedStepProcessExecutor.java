@@ -12,8 +12,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
@@ -125,6 +127,7 @@ public class IsolatedStepProcessExecutor {
         comando.add("-Detl.parent.execution.id=" + ExecutionContext.currentExecutionId());
         comando.add("-Detl.parent.command=" + ExecutionContext.currentCommand());
         comando.add("-Detl.parent.cycle.id=" + ExecutionContext.currentCycleId());
+        adicionarSystemPropertiesConfiguracao(comando);
 
         final Path jarAtual = resolverJarAtual();
         if (jarAtual != null && Files.exists(jarAtual)) {
@@ -321,6 +324,53 @@ public class IsolatedStepProcessExecutor {
         return Path.of(javaHome, "bin", nomeExecutavel).toAbsolutePath().normalize().toString();
     }
 
+    private void adicionarSystemPropertiesConfiguracao(final List<String> comando) {
+        final Set<String> chavesJaConfiguradas = new HashSet<>();
+        for (final String argumento : comando) {
+            if (argumento != null && argumento.startsWith("-D")) {
+                final int separador = argumento.indexOf('=');
+                final String chave = separador > 0
+                    ? argumento.substring(2, separador)
+                    : argumento.substring(2);
+                chavesJaConfiguradas.add(chave);
+            }
+        }
+
+        final List<String> chavesOrdenadas = System.getProperties()
+            .stringPropertyNames()
+            .stream()
+            .filter(this::devePropagarSystemProperty)
+            .sorted()
+            .toList();
+
+        for (final String chave : chavesOrdenadas) {
+            if (chavesJaConfiguradas.contains(chave)) {
+                continue;
+            }
+            final String valor = System.getProperty(chave);
+            if (valor == null) {
+                continue;
+            }
+            comando.add("-D" + chave + "=" + valor);
+        }
+    }
+
+    private boolean devePropagarSystemProperty(final String chave) {
+        if (chave == null || chave.isBlank()) {
+            return false;
+        }
+        if (CHILD_PROCESS_PROPERTY.equals(chave)
+            || "etl.process.isolation.enabled".equals(chave)
+            || "ETL_PROCESS_ISOLATION_ENABLED".equals(chave)
+            || chave.startsWith("etl.parent.")) {
+            return false;
+        }
+        return chave.startsWith("API_")
+            || chave.startsWith("ETL_")
+            || chave.startsWith("api.")
+            || chave.startsWith("etl.");
+    }
+
     private Duration resolverTimeoutPadrao(final ApiType apiType, final String entidade) {
         if (apiType == ApiType.DATAEXPORT) {
             return ConfigEtl.obterTimeoutStepDataExport();
@@ -328,7 +378,10 @@ public class IsolatedStepProcessExecutor {
         if (entidade != null && "faturas_graphql".equalsIgnoreCase(entidade)) {
             return ConfigEtl.obterTimeoutStepFaturasGraphQL();
         }
-        return ConfigEtl.obterTimeoutStepGraphQL();
+        if (entidade == null || entidade.isBlank() || "all".equalsIgnoreCase(entidade)) {
+            return ConfigEtl.obterTimeoutStepGraphQLCompleto();
+        }
+        return ConfigEtl.obterTimeoutEntidadeGraphQL(entidade);
     }
 
     public enum ApiType {

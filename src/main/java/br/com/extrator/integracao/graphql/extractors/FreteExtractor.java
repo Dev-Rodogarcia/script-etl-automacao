@@ -38,6 +38,7 @@ package br.com.extrator.integracao.graphql.extractors;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -51,6 +52,7 @@ import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
@@ -64,6 +66,9 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
     private final ClienteApiGraphQL apiClient;
     private final FreteRepository repository;
     private final FreteMapper mapper;
+    private LocalDate ultimaDataInicio;
+    private LocalDate ultimaDataFim;
+    private boolean ultimaExtracaoCompleta;
     
     public FreteExtractor(final ClienteApiGraphQL apiClient,
                          final FreteRepository repository,
@@ -75,7 +80,9 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
     
     @Override
     public ResultadoExtracao<FreteNodeDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        return apiClient.buscarFretes(dataInicio, dataFim);
+        final ResultadoExtracao<FreteNodeDTO> resultado = apiClient.buscarFretes(dataInicio, dataFim);
+        registrarUltimaExtracao(dataInicio, dataFim, resultado != null && resultado.isCompleto());
+        return resultado;
     }
     
     @Override
@@ -102,6 +109,24 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
         }
         
         final int registrosSalvos = repository.salvar(entitiesUnicos);
+        if (devePrunarAusentesNoPeriodo()) {
+            final int removidos = repository.removerAusentesNoPeriodo(
+                ultimaDataInicio,
+                ultimaDataFim,
+                entitiesUnicos.stream()
+                    .map(FreteEntity::getId)
+                    .filter(Objects::nonNull)
+                    .toList()
+            );
+            if (removidos > 0) {
+                logger.warn(
+                    "Reconciliacao por periodo removeu {} frete(s) ausente(s) na API para {} a {}",
+                    removidos,
+                    ultimaDataInicio,
+                    ultimaDataFim
+                );
+            }
+        }
         return new EntityExtractor.SaveMetrics(
             registrosSalvos,
             entitiesUnicos.size(),
@@ -141,6 +166,28 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
         if (entity == null || entity.getId() == null) {
             throw new IllegalStateException("Frete sem ID estavel nao pode ser persistido.");
         }
+    }
+
+    void registrarUltimaExtracaoParaTeste(final LocalDate dataInicio,
+                                          final LocalDate dataFim,
+                                          final boolean completa) {
+        registrarUltimaExtracao(dataInicio, dataFim, completa);
+    }
+
+    private void registrarUltimaExtracao(final LocalDate dataInicio,
+                                         final LocalDate dataFim,
+                                         final boolean completa) {
+        this.ultimaDataInicio = dataInicio;
+        this.ultimaDataFim = dataFim;
+        this.ultimaExtracaoCompleta = completa;
+    }
+
+    private boolean devePrunarAusentesNoPeriodo() {
+        return ConfigEtl.isPruneAusentesFretesAtivo()
+            && ultimaExtracaoCompleta
+            && ultimaDataInicio != null
+            && ultimaDataFim != null
+            && !ultimaDataFim.isBefore(ultimaDataInicio);
     }
     
     @Override

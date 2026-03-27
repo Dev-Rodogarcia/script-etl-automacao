@@ -15,10 +15,10 @@ if (Test-Path $smokeDir) {
 New-Item -ItemType Directory -Path $smokeDir | Out-Null
 
 Write-Host "[smoke] Validando comando de ajuda no JAR empacotado..."
-& java --enable-native-access=ALL-UNNAMED -jar $jarPath --ajuda | Out-Null
+& java -jar $jarPath --ajuda | Out-Null
 
 Write-Host "[smoke] Validando inicializacao do modulo de seguranca (SQLite) no JAR empacotado..."
-& java "-Dextrator.security.db.path=$smokeDir\users.db" --enable-native-access=ALL-UNNAMED -jar $jarPath --auth-info | Out-Null
+& java "-Dextrator.security.db.path=$smokeDir\users.db" -jar $jarPath --auth-info | Out-Null
 
 $dbFile = Join-Path $smokeDir "users.db"
 if (-not (Test-Path $dbFile)) {

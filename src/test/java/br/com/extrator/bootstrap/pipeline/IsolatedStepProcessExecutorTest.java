@@ -2,17 +2,27 @@ package br.com.extrator.bootstrap.pipeline;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 
 class IsolatedStepProcessExecutorTest {
+
+    @AfterEach
+    void limparSystemProperties() {
+        System.clearProperty("API_THROTTLING_MINIMO_MS");
+        System.clearProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS");
+        System.clearProperty("etl.parent.execution.id");
+        System.clearProperty("etl.process.isolation.enabled");
+    }
 
     @Test
     void deveEncerrarProcessoFilhoTravadoQuandoTimeoutExpira() {
@@ -35,6 +45,25 @@ class IsolatedStepProcessExecutorTest {
         assertTrue(erro.getMessage().contains("timeout") || erro.getMessage().contains("excedeu"));
     }
 
+    @Test
+    void devePropagarOverridesApiEEtlParaProcessoFilho() throws Exception {
+        System.setProperty("API_THROTTLING_MINIMO_MS", "500");
+        System.setProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS", "5400000");
+        System.setProperty("etl.process.isolation.enabled", "true");
+
+        final InspectingExecutor executor = new InspectingExecutor();
+        final List<String> comando = executor.construir(
+            IsolatedStepProcessExecutor.ApiType.GRAPHQL,
+            LocalDate.of(2026, 3, 18),
+            LocalDate.of(2026, 3, 18),
+            "usuarios_sistema"
+        );
+
+        assertTrue(comando.contains("-DAPI_THROTTLING_MINIMO_MS=500"));
+        assertTrue(comando.contains("-DETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS=5400000"));
+        assertFalse(comando.contains("-Detl.process.isolation.enabled=true"));
+    }
+
     private static final class HangingCommandExecutor extends IsolatedStepProcessExecutor {
         @Override
         protected List<String> construirComando(final ApiType apiType,
@@ -48,6 +77,15 @@ class IsolatedStepProcessExecutorTest {
                 "-Command",
                 "while ($true) { Start-Sleep -Milliseconds 200 }"
             );
+        }
+    }
+
+    private static final class InspectingExecutor extends IsolatedStepProcessExecutor {
+        private List<String> construir(final ApiType apiType,
+                                       final LocalDate dataInicio,
+                                       final LocalDate dataFim,
+                                       final String entidade) throws URISyntaxException {
+            return construirComando(apiType, dataInicio, dataFim, entidade, FaultMode.NONE);
         }
     }
 }

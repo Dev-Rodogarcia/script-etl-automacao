@@ -20,6 +20,7 @@ class MainBootstrapRoutingTest {
         assertTrue(Main.requerInicializacaoContexto("--fluxo-completo"));
         assertTrue(Main.requerInicializacaoContexto("--recovery"));
         assertTrue(Main.requerInicializacaoContexto("--loop-daemon-run"));
+        assertTrue(Main.requerInicializacaoContexto("--executar-step-isolado"));
         assertTrue(Main.requerInicializacaoContexto("--validar-api-banco-24h-detalhado"));
         assertTrue(Main.requerInicializacaoContexto("--validar-etl-extremo"));
     }

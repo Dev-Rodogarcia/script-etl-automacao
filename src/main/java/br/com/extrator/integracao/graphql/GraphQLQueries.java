@@ -320,7 +320,7 @@ public final class GraphQLQueries {
      * Query para buscar Usuários do Sistema (Individual)
      * Tipo GraphQL: Individual
      * Filtro: enabled: true (obrigatório), updatedAt: intervalo de datas (opcional, para extração incremental)
-     * Paginação: cursor-based (first: 100, after: $cursor)
+     * Paginação: cursor-based (first: 1000, after: $cursor)
      *
      * ATENÇÃO: Esta query busca usuários do tipo Individual.
      * Validar se destroyUserId e cancellationUserId em Pick são do mesmo tipo Individual
@@ -329,7 +329,7 @@ public final class GraphQLQueries {
      */
     public static final String QUERY_USUARIOS_SISTEMA = """
             query ExtrairUsuariosSistema($params: IndividualInput!, $after: String) {
-              individual(params: $params, first: 100, after: $after) {
+              individual(params: $params, first: 1000, after: $after) {
                 pageInfo {
                   hasNextPage
                   endCursor

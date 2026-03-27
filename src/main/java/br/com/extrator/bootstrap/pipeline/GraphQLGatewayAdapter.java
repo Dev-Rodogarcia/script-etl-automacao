@@ -101,7 +101,10 @@ public final class GraphQLGatewayAdapter implements GraphQLGateway {
         if (filtroEntidade != null && ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(filtroEntidade)) {
             return ConfigEtl.obterTimeoutStepFaturasGraphQL();
         }
-        return ConfigEtl.obterTimeoutStepGraphQL();
+        if (filtroEntidade == null || filtroEntidade.isBlank()) {
+            return ConfigEtl.obterTimeoutStepGraphQLCompleto();
+        }
+        return ConfigEtl.obterTimeoutEntidadeGraphQL(filtroEntidade);
     }
 
     private String normalizeEntityFilter(final String entidade) {

@@ -43,6 +43,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.features.usuarios.aplicacao.UsuariosSistemaSnapshotService;
+import br.com.extrator.features.usuarios.persistencia.sqlserver.SqlServerUsuariosEstadoRepository;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
@@ -65,18 +67,41 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
     private final ClienteApiGraphQL apiClient;
     private final UsuarioSistemaRepository repository;
     private final UsuarioSistemaMapper mapper;
+    private final UsuariosSistemaSnapshotService snapshotService;
 
     public UsuarioSistemaExtractor(final ClienteApiGraphQL apiClient,
                                   final UsuarioSistemaRepository repository,
                                   final UsuarioSistemaMapper mapper) {
+        this(
+            apiClient,
+            repository,
+            mapper,
+            new UsuariosSistemaSnapshotService(new SqlServerUsuariosEstadoRepository())
+        );
+    }
+
+    UsuarioSistemaExtractor(final ClienteApiGraphQL apiClient,
+                            final UsuarioSistemaRepository repository,
+                            final UsuarioSistemaMapper mapper,
+                            final UsuariosSistemaSnapshotService snapshotService) {
         this.apiClient = apiClient;
-        this.repository = repository;
+        this.repository = java.util.Objects.requireNonNull(repository, "repository");
         this.mapper = mapper;
+        this.snapshotService = java.util.Objects.requireNonNull(snapshotService, "snapshotService");
     }
 
     @Override
     public ResultadoExtracao<IndividualNodeDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        // Extração incremental: busca apenas usuários atualizados no intervalo
+        if (deveExecutarCargaCompletaInicial()) {
+            logger.info("usuarios_sistema: dim_usuarios vazia. Executando FULL LOAD inicial.");
+            return apiClient.buscarUsuariosSistema();
+        }
+
+        logger.info(
+            "usuarios_sistema: executando modo incremental via updatedAt para o periodo {} a {}.",
+            dataInicio,
+            dataFim
+        );
         return apiClient.buscarUsuariosSistema(dataInicio, dataFim);
     }
 
@@ -91,6 +116,8 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
             return new EntityExtractor.SaveMetrics(0, 0, 0);
         }
 
+        final boolean cargaCompletaInicial = deveExecutarCargaCompletaInicial();
+
         final List<UsuarioSistemaEntity> entities = dtos.stream()
             .map(mapper::toEntity)
             .collect(Collectors.toList());
@@ -100,6 +127,18 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
             logger.warn("⚠️ usuarios_sistema: {} nós da API, {} user_id únicos (duplicados removidos).",
                 entities.size(), unicos.size());
         }
+
+        if (cargaCompletaInicial) {
+            final EntityExtractor.SaveMetrics snapshotMetrics = snapshotService.persistirSnapshot(unicos);
+            return new EntityExtractor.SaveMetrics(
+                snapshotMetrics.getRegistrosSalvos(),
+                unicos.size(),
+                0,
+                snapshotMetrics.getRegistrosPersistidos(),
+                snapshotMetrics.getRegistrosNoOpIdempotente()
+            );
+        }
+
         final int registrosSalvos = repository.salvar(unicos);
         return new EntityExtractor.SaveMetrics(
             registrosSalvos,
@@ -133,5 +172,13 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
     @Override
     public String getEmoji() {
         return ConstantesExtracao.EMOJI_USUARIOS;
+    }
+
+    private boolean deveExecutarCargaCompletaInicial() {
+        try {
+            return !repository.temDados();
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("Falha ao verificar se dim_usuarios ja possui dados.", e);
+        }
     }
 }

@@ -96,7 +96,7 @@ if errorlevel 1 exit /b 1
 echo Executando auditor...
 echo.
 
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auditar-api
+java -jar "target\extrator.jar" --auditar-api
 set "EXITCODE=%ERRORLEVEL%"
 
 if %EXITCODE% NEQ 0 (
@@ -126,7 +126,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

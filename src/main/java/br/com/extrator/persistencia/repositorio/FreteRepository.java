@@ -32,10 +32,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -105,6 +107,83 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             }
         }
         return ids;
+    }
+
+    public int removerAusentesNoPeriodo(final LocalDate dataInicio,
+                                        final LocalDate dataFim,
+                                        final Collection<Long> idsPresentes) throws SQLException {
+        if (dataInicio == null || dataFim == null || dataFim.isBefore(dataInicio)) {
+            return 0;
+        }
+
+        final List<Long> idsNormalizados = idsPresentes == null
+            ? List.of()
+            : idsPresentes.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        final String sqlDelete = """
+            DELETE f
+            FROM dbo.fretes f
+            WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM #fretes_periodo_api_ids ids
+                    WHERE ids.id = f.id
+              )
+            """;
+
+        try (Connection conexao = obterConexao()) {
+            final boolean autoCommitOriginal = conexao.getAutoCommit();
+            conexao.setAutoCommit(false);
+            try {
+                try (Statement stmt = conexao.createStatement()) {
+                    stmt.execute("CREATE TABLE #fretes_periodo_api_ids (id BIGINT NOT NULL PRIMARY KEY)");
+                }
+
+                if (!idsNormalizados.isEmpty()) {
+                    try (PreparedStatement insert = conexao.prepareStatement(
+                        "INSERT INTO #fretes_periodo_api_ids (id) VALUES (?)"
+                    )) {
+                        int contadorBatch = 0;
+                        for (final Long id : idsNormalizados) {
+                            insert.setLong(1, id);
+                            insert.addBatch();
+                            contadorBatch++;
+                            if (contadorBatch % 500 == 0) {
+                                insert.executeBatch();
+                            }
+                        }
+                        if (contadorBatch % 500 != 0) {
+                            insert.executeBatch();
+                        }
+                    }
+                }
+
+                final int removidos;
+                try (PreparedStatement delete = conexao.prepareStatement(sqlDelete)) {
+                    delete.setObject(1, dataInicio, Types.DATE);
+                    delete.setObject(2, dataFim, Types.DATE);
+                    removidos = delete.executeUpdate();
+                }
+
+                conexao.commit();
+                logger.info(
+                    "Reconciliacao de fretes por periodo concluida: periodo={}..{} | ids_api={} | removidos={}",
+                    dataInicio,
+                    dataFim,
+                    idsNormalizados.size(),
+                    removidos
+                );
+                return removidos;
+            } catch (final SQLException e) {
+                conexao.rollback();
+                throw e;
+            } finally {
+                conexao.setAutoCommit(autoCommitOriginal);
+            }
+        }
     }
 
     /**

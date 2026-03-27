@@ -128,10 +128,10 @@ Na pratica, a fase atual reescreveu a explicacao do sistema a partir do runtime 
 ## O que um dev novo deve ler primeiro
 
 1. `docs/moderno/arquitetura.md`
-2. `docs/moderno/pipeline.md`
+2. `docs/moderno/plano-correcao-integridade-etl.md`
 3. `docs/moderno/fluxos/ciclo-completo.md`
-4. `docs/moderno/persistencia.md`
-5. `docs/moderno/troubleshooting.md`
+4. `docs/moderno/runbook-daemon.md`
+5. `docs/moderno/testes-migracao-integridade.md`
 
 ## Pseudocodigo mental do sistema
 

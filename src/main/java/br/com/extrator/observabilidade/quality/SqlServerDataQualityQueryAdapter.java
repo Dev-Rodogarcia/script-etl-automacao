@@ -55,12 +55,19 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
     @Override
     public long contarLinhasIncompletas(final String entidade, final LocalDate dataInicio, final LocalDate dataFim) {
         final String sql = """
-            SELECT COUNT(*)
-            FROM dbo.log_extracoes
-            WHERE entidade = ?
-              AND CAST(timestamp_inicio AS DATE) >= ?
-              AND CAST(timestamp_fim AS DATE) <= ?
-              AND status_final <> 'COMPLETO'
+            WITH latest_run AS (
+                SELECT TOP 1 status_final
+                FROM dbo.log_extracoes
+                WHERE entidade = ?
+                  AND CAST(timestamp_inicio AS DATE) >= ?
+                  AND CAST(timestamp_fim AS DATE) <= ?
+                ORDER BY timestamp_fim DESC, timestamp_inicio DESC
+            )
+            SELECT CASE
+                WHEN NOT EXISTS (SELECT 1 FROM latest_run) THEN 1
+                WHEN EXISTS (SELECT 1 FROM latest_run WHERE status_final <> 'COMPLETO') THEN 1
+                ELSE 0
+            END
             """;
         return queryLong(sql, ps -> {
             ps.setString(1, normalize(entidade));
@@ -184,5 +191,4 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
         void bind(PreparedStatement statement) throws SQLException;
     }
 }
-
 

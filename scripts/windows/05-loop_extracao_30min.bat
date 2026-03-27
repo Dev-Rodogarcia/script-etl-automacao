@@ -119,10 +119,10 @@ if errorlevel 1 goto :MENU
 
 if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
   echo Iniciando loop daemon com Faturas GraphQL DESABILITADO...
-  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+  java -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
 ) else (
   echo Iniciando loop daemon com Faturas GraphQL INCLUIDO...
-  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
+  java -jar "%~dp0target\extrator.jar" --loop-daemon-start
 )
 echo.
 pause
@@ -131,7 +131,7 @@ goto :MENU
 :STATUS
 call :AUTH_CHECK LOOP_STATUS "Consultar status do loop daemon"
 if errorlevel 1 goto :MENU
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-status
+java -jar "%~dp0target\extrator.jar" --loop-daemon-status
 echo.
 pause
 goto :MENU
@@ -140,7 +140,7 @@ goto :MENU
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" goto :DO_STOP
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-check LOOP_STOP "Parar loop daemon"
+java -jar "%~dp0target\extrator.jar" --auth-check LOOP_STOP "Parar loop daemon"
 if errorlevel 1 (
   echo Acesso negado.
   echo.
@@ -148,7 +148,7 @@ if errorlevel 1 (
   goto :MENU
 )
 :DO_STOP
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-stop
+java -jar "%~dp0target\extrator.jar" --loop-daemon-stop
 echo.
 pause
 goto :MENU
@@ -160,11 +160,11 @@ call :ASK_FATURAS_GRAPHQL_LOOP
 if errorlevel 1 goto :MENU
 
 echo Reiniciando loop daemon com nova configuracao de Faturas GraphQL...
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-stop >nul 2>&1
+java -jar "%~dp0target\extrator.jar" --loop-daemon-stop >nul 2>&1
 if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
-  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+  java -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
 ) else (
-  java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
+  java -jar "%~dp0target\extrator.jar" --loop-daemon-start
 )
 echo.
 pause
@@ -208,7 +208,7 @@ if /i "%AUTH_ACTION%"=="LOOP_EXIT_MENU" (
 )
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --auth-check %~1 "%~2"
+java -jar "%~dp0target\extrator.jar" --auth-check %~1 "%~2"
 if errorlevel 1 (
   echo Acesso negado.
   echo.

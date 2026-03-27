@@ -47,6 +47,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.persistencia.repositorio.ContasAPagarRepository;
 import br.com.extrator.persistencia.repositorio.CotacaoRepository;
@@ -67,6 +69,9 @@ import br.com.extrator.integracao.dataexport.extractors.CotacaoExtractor;
 import br.com.extrator.integracao.dataexport.extractors.FaturaPorClienteExtractor;
 import br.com.extrator.integracao.dataexport.extractors.LocalizacaoCargaExtractor;
 import br.com.extrator.integracao.dataexport.extractors.ManifestoExtractor;
+import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionAuditRecorder;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 import br.com.extrator.suporte.concorrencia.OperationTimeoutGuard;
 import br.com.extrator.suporte.configuracao.ConfigBanco;
@@ -87,9 +92,13 @@ public class DataExportExtractionService {
 
     private record TimedExtractionOutcome(ExtractionResult result, List<String> avisosSeguranca) {
     }
+
+    private record ExecutionDates(LocalDate inicio, LocalDate fim) {
+    }
     
     private final ClienteApiDataExport apiClient;
     private final LogExtracaoRepository logRepository;
+    private final ExecutionAuditPort executionAuditPort;
     private final ExtractionLogger logger;
     private final LoggerConsole log;
     
@@ -103,6 +112,7 @@ public class DataExportExtractionService {
                 : pipelineExecutionId
         );
         this.logRepository = new LogExtracaoRepository();
+        this.executionAuditPort = AplicacaoContexto.executionAuditPort();
         this.logger = new ExtractionLogger(DataExportExtractionService.class);
         this.log = LoggerConsole.getLogger(DataExportExtractionService.class);
     }
@@ -149,13 +159,17 @@ public class DataExportExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.MANIFESTOS,
-                    () -> extractManifestos(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.MANIFESTOS, dataInicio, dataFim);
+                        return extractManifestos(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.MANIFESTOS, "Manifestos", e);
+                registrarFalhaEntidade(resultados, ConstantesEntidades.MANIFESTOS, "Manifestos", e, dataInicio, dataFim);
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -164,13 +178,17 @@ public class DataExportExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.COTACOES,
-                    () -> extractCotacoes(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.COTACOES, dataInicio, dataFim);
+                        return extractCotacoes(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.COTACOES, "Cotacoes", e);
+                registrarFalhaEntidade(resultados, ConstantesEntidades.COTACOES, "Cotacoes", e, dataInicio, dataFim);
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -179,7 +197,11 @@ public class DataExportExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.LOCALIZACAO_CARGAS,
-                    () -> extractLocalizacoes(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.LOCALIZACAO_CARGAS, dataInicio, dataFim);
+                        return extractLocalizacoes(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
@@ -189,7 +211,9 @@ public class DataExportExtractionService {
                     resultados,
                     ConstantesEntidades.LOCALIZACAO_CARGAS,
                     "Localizacao de Cargas",
-                    e
+                    e,
+                    dataInicio,
+                    dataFim
                 );
             }
             ExtractionHelper.aplicarDelay();
@@ -199,13 +223,24 @@ public class DataExportExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.CONTAS_A_PAGAR,
-                    () -> extractContasAPagar(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.CONTAS_A_PAGAR, dataInicio, dataFim);
+                        return extractContasAPagar(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
                 }
             } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.CONTAS_A_PAGAR, "Contas a Pagar", e);
+                registrarFalhaEntidade(
+                    resultados,
+                    ConstantesEntidades.CONTAS_A_PAGAR,
+                    "Contas a Pagar",
+                    e,
+                    dataInicio,
+                    dataFim
+                );
             }
             ExtractionHelper.aplicarDelay();
         }
@@ -214,7 +249,11 @@ public class DataExportExtractionService {
             try {
                 final ExtractionResult result = executarComTimeout(
                     ConstantesEntidades.FATURAS_POR_CLIENTE,
-                    () -> extractFaturasPorCliente(dataInicio, dataFim)
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.FATURAS_POR_CLIENTE, dataInicio, dataFim);
+                        return extractFaturasPorCliente(datas.inicio(), datas.fim());
+                    }
                 );
                 if (result != null) {
                     resultados.add(result);
@@ -224,7 +263,9 @@ public class DataExportExtractionService {
                     resultados,
                     ConstantesEntidades.FATURAS_POR_CLIENTE,
                     "Faturas por Cliente",
-                    e
+                    e,
+                    dataInicio,
+                    dataFim
                 );
             }
             ExtractionHelper.aplicarDelay();
@@ -257,6 +298,7 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
         return result;
     }
     
@@ -270,6 +312,7 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
         return result;
     }
     
@@ -283,6 +326,7 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
         return result;
     }
     
@@ -296,6 +340,7 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
         return result;
     }
     
@@ -309,6 +354,7 @@ public class DataExportExtractionService {
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
         return result;
     }
     
@@ -448,7 +494,9 @@ public class DataExportExtractionService {
     private void registrarFalhaEntidade(final List<ExtractionResult> resultados,
                                         final String entidade,
                                         final String descricao,
-                                        final Exception erro) {
+                                        final Exception erro,
+                                        final LocalDate dataInicio,
+                                        final LocalDate dataFim) {
         if (erro instanceof ExecutionTimeoutException) {
             final long timeoutMs = ConfigEtl.obterTimeoutEntidadeDataExport(entidade).toMillis();
             final String aviso = String.format(
@@ -465,10 +513,40 @@ public class DataExportExtractionService {
                 erro.getMessage()
             );
         }
-        resultados.add(ExtractionResult.erro(entidade, RelogioSistema.agora(), erro).build());
+        final ExecutionDates datas = resolverDatasExecucao(entidade, dataInicio, dataFim);
+        final ExecutionWindowPlan plano =
+            ExecutionPlanContext.getPlano(entidade).orElseGet(() -> criarJanelaPadrao(datas.inicio(), datas.fim()));
+        final ExtractionResult erroResult = ExtractionResult.erro(entidade, RelogioSistema.agora(), erro)
+            .janelaConsultaInicio(plano.consultaInicioDateTime())
+            .janelaConsultaFim(plano.consultaFimDateTime())
+            .janelaConfirmacaoInicio(plano.confirmacaoInicio())
+            .janelaConfirmacaoFim(plano.confirmacaoFim())
+            .build();
+        logRepository.gravarLogExtracao(erroResult.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, erroResult);
+        resultados.add(erroResult);
     }
 
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
+    }
+
+    private ExecutionDates resolverDatasExecucao(final String entidade,
+                                                 final LocalDate dataInicio,
+                                                 final LocalDate dataFim) {
+        final ExecutionWindowPlan plano =
+            ExecutionPlanContext.getPlano(entidade).orElseGet(() -> criarJanelaPadrao(dataInicio, dataFim));
+        return new ExecutionDates(plano.consultaDataInicio(), plano.consultaDataFim());
+    }
+
+    private ExecutionWindowPlan criarJanelaPadrao(final LocalDate dataInicio, final LocalDate dataFim) {
+        final LocalDate inicio = dataInicio != null ? dataInicio : RelogioSistema.hoje().minusDays(1);
+        final LocalDate fim = dataFim != null ? dataFim : inicio;
+        return new ExecutionWindowPlan(
+            inicio,
+            fim,
+            inicio.atStartOfDay(),
+            fim.atTime(java.time.LocalTime.MAX)
+        );
     }
 }

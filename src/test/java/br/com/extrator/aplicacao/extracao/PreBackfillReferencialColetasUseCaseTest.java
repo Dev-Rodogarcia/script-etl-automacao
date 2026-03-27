@@ -48,6 +48,23 @@ class PreBackfillReferencialColetasUseCaseTest {
     }
 
     @Test
+    void deveLimitarExpansaoDinamicaDoPreBackfill() throws Exception {
+        final String anterior = System.getProperty("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS");
+        System.setProperty("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS", "30");
+        try {
+            final Optional<LocalDate> dataOrfao = Optional.of(LocalDate.of(2025, 9, 30));
+            AplicacaoContexto.registrar((ManifestoOrfaoQueryPort) () -> dataOrfao);
+
+            final LocalDate inicioEstatico = LocalDate.of(2026, 3, 25);
+            final LocalDate resultado = resolverInicioEfetivo(inicioEstatico, dataOrfao);
+
+            assertEquals(inicioEstatico.minusDays(30), resultado);
+        } finally {
+            restaurarPropriedade("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS", anterior);
+        }
+    }
+
+    @Test
     void deveEncerrarHidratacaoRetroativaNoDiaAnteriorAoPeriodoPrincipal() throws Exception {
         assertEquals(
             LocalDate.of(2026, 3, 8),
@@ -107,5 +124,13 @@ class PreBackfillReferencialColetasUseCaseTest {
             .getDeclaredMethod("resolverFimLookaheadPosExtracao", LocalDate.class);
         metodo.setAccessible(true);
         return (Optional<LocalDate>) metodo.invoke(useCase, fimPrincipal);
+    }
+
+    private void restaurarPropriedade(final String chave, final String valorAnterior) {
+        if (valorAnterior == null) {
+            System.clearProperty(chave);
+            return;
+        }
+        System.setProperty(chave, valorAnterior);
     }
 }

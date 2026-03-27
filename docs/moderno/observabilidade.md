@@ -34,6 +34,8 @@ related_files:
 
 - `log_extracoes`
 - `page_audit`
+- `sys_execution_audit`
+- `sys_execution_watermark`
 - `sys_execution_history`
 
 ### Runtime do daemon
@@ -50,6 +52,7 @@ related_files:
 
 - `etl_execution_id`
 - `etl_command`
+- `etl_cycle_id`
 
 Isso permite correlacionar logs entre:
 
@@ -57,21 +60,37 @@ Isso permite correlacionar logs entre:
 - steps paralelos;
 - componentes que respeitam MDC.
 
+## Validacao operacional x validacao autorizativa
+
+### Validacao operacional
+
+- atende comandos rapidos e telemetria;
+- pode continuar usando sinais auxiliares e leitura de runtime;
+- nao autoriza sucesso do ciclo principal.
+
+### Validacao autorizativa
+
+- e a usada no fechamento do `FluxoCompletoUseCase`;
+- exige `execution_uuid` ativo;
+- consulta `sys_execution_audit`;
+- reprova se a API vier parcial ou se a trilha estruturada estiver indisponivel.
+
 ## O que olhar primeiro em incidentes
 
 1. status final do comando
 2. `sys_execution_history`
-3. `log_extracoes` da janela
-4. logs estruturados de step
-5. logs do daemon ou de processo isolado
-6. relatorios de validacao extrema/resiliencia quando existirem
+3. `sys_execution_audit` do `execution_uuid`
+4. `log_extracoes` da janela
+5. logs estruturados de step
+6. logs do daemon ou de processo isolado
 
 ## Sinais fortes
 
 ### Saude boa
 
 - `SUCCESS` no historico;
-- `COMPLETO` em `log_extracoes`;
+- `COMPLETO` em `sys_execution_audit`;
+- `api_completa = true` na trilha estruturada;
 - nenhuma falha de integridade;
 - nenhum step `FAILED`.
 
@@ -79,6 +98,7 @@ Isso permite correlacionar logs entre:
 
 - `PARTIAL`, `ERROR` ou `SUCCESS_WITH_ALERT`;
 - `INCOMPLETO_*` em logs de entidade;
+- ausencia de `execution_uuid` ou de `sys_execution_audit`;
 - divergencia em `INTEGRIDADE_ETL`;
 - timeout ou thread leak;
 - reconciliacao acumulando pendencias.
@@ -103,6 +123,7 @@ Isso permite correlacionar logs entre:
 Nunca conclua "o ETL funcionou" apenas porque o processo terminou com exit code `0`. O veredito operacional depende de:
 
 - historico;
+- auditoria estruturada por entidade;
 - logs por entidade;
 - integridade final;
 - alertas do daemon.

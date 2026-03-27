@@ -22,6 +22,7 @@ Atributos-chave:
 
 package br.com.extrator.comandos.cli.extracao.daemon;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,6 +57,46 @@ class DaemonLifecycleServiceTest {
 
         assertTrue(comando.contains("--loop-daemon-run"), "Comando deve conter flag de loop daemon");
         assertTrue(comando.contains("--sem-faturas-graphql"), "Comando deve carregar flag de desabilitar faturas GraphQL");
+    }
+
+    @Test
+    void devePropagarSystemPropertiesDeConfiguracaoParaProcessoFilho() throws Exception {
+        final String chaveApi = "API_THROTTLING_MINIMO_MS";
+        final String chaveEtl = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS";
+        final String chaveLower = "etl.custom.flag";
+        final String chaveIgnorada = "user.language";
+        final String valorApiAnterior = System.getProperty(chaveApi);
+        final String valorEtlAnterior = System.getProperty(chaveEtl);
+        final String valorLowerAnterior = System.getProperty(chaveLower);
+        final String valorIgnoradoAnterior = System.getProperty(chaveIgnorada);
+
+        try {
+            System.setProperty(chaveApi, "500");
+            System.setProperty(chaveEtl, "5400000");
+            System.setProperty(chaveLower, "habilitado");
+            System.setProperty(chaveIgnorada, "pt");
+
+            final DaemonLifecycleService service = novoService();
+            final List<String> comando = service.construirComandoFilho(false);
+
+            assertTrue(comando.contains("-D" + chaveApi + "=500"));
+            assertTrue(comando.contains("-D" + chaveEtl + "=5400000"));
+            assertTrue(comando.contains("-D" + chaveLower + "=habilitado"));
+            assertFalse(
+                comando.stream().anyMatch(arg -> arg.startsWith("-D" + chaveIgnorada + "=")),
+                "Propriedades alheias a API/ETL nao devem vazar para o daemon"
+            );
+            assertEquals(
+                1L,
+                comando.stream().filter(arg -> arg.equals("-Dfile.encoding=UTF-8")).count(),
+                "Flags fixas nao devem ser duplicadas ao propagar propriedades"
+            );
+        } finally {
+            restaurarSystemProperty(chaveApi, valorApiAnterior);
+            restaurarSystemProperty(chaveEtl, valorEtlAnterior);
+            restaurarSystemProperty(chaveLower, valorLowerAnterior);
+            restaurarSystemProperty(chaveIgnorada, valorIgnoradoAnterior);
+        }
     }
 
     @Test
@@ -118,5 +159,13 @@ class DaemonLifecycleServiceTest {
         } catch (final Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void restaurarSystemProperty(final String chave, final String valorAnterior) {
+        if (valorAnterior == null) {
+            System.clearProperty(chave);
+            return;
+        }
+        System.setProperty(chave, valorAnterior);
     }
 }
