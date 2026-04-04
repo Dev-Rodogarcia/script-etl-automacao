@@ -6,13 +6,25 @@ last_run.properties
 last_successful_run.properties
 /runtime/
 docs/08-arquivos-secretos/
+docs/**/08-arquivos-secretos/
 database/config.bat
 
 # Ferramentas locais de desenvolvimento (machine-specific)
 .claude/settings.local.json
+.tmp/
+.maven-clean/
+.history/
+.fleet/
+.vs/
+*.code-workspace
 
 # Relatorios gerados automaticamente
 docs/relatorio-validacao-etl-*.md
+docs/AUDITORIA-TECNICA-ETL-*.md
+
+# Analises internas e materiais de apoio locais
+docs/analises/
+tmp_horario_corte_xlsx/
 
 # Build e artefatos
 target/
@@ -36,6 +48,12 @@ temp/
 *.temp
 *.pid
 *.state
+*.orig
+*.rej
+*.stackdump
+*.hprof
+hs_err_pid*
+replay_pid*
 *~
 
 # Saidas geradas pelo projeto
