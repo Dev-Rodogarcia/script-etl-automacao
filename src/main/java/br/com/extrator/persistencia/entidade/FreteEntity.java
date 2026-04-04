@@ -78,6 +78,9 @@ public class FreteEntity {
     private Long idCidadeDestino;
     private LocalDate dataPrevisaoEntrega;
     private LocalDate serviceDate;
+    private OffsetDateTime finishedAt;
+    private OffsetDateTime fitDpnPerformanceFinishedAt;
+    private Long corporationSequenceNumber;
 
     // --- Campos Expandidos (22 campos do CSV) ---
     private Long pagadorId;
@@ -290,6 +293,30 @@ public class FreteEntity {
 
     public void setServiceDate(final LocalDate serviceDate) {
         this.serviceDate = serviceDate;
+    }
+
+    public OffsetDateTime getFinishedAt() {
+        return finishedAt;
+    }
+
+    public void setFinishedAt(final OffsetDateTime finishedAt) {
+        this.finishedAt = finishedAt;
+    }
+
+    public OffsetDateTime getFitDpnPerformanceFinishedAt() {
+        return fitDpnPerformanceFinishedAt;
+    }
+
+    public void setFitDpnPerformanceFinishedAt(final OffsetDateTime fitDpnPerformanceFinishedAt) {
+        this.fitDpnPerformanceFinishedAt = fitDpnPerformanceFinishedAt;
+    }
+
+    public Long getCorporationSequenceNumber() {
+        return corporationSequenceNumber;
+    }
+
+    public void setCorporationSequenceNumber(final Long corporationSequenceNumber) {
+        this.corporationSequenceNumber = corporationSequenceNumber;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

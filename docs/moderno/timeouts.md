@@ -39,13 +39,19 @@ Chaves:
 
 ### GraphQL
 
-- `usuarios_sistema`: `1_200_000 ms`
+- `usuarios_sistema`: `1_800_000 ms`
+- `coletas`: `600_000 ms`
+- `coletas` no modo `--extracao-intervalo`: `1_800_000 ms` (aplicado como minimo temporario no runtime)
 - `faturas_graphql`: `7_200_000 ms`
 - demais entidades GraphQL: `600_000 ms`
 
 Chave base:
 
 - `etl.graphql.timeout.entidade.<entidade>.ms`
+
+Chave adicional do modo intervalo:
+
+- `etl.graphql.timeout.entidade.coletas.intervalo.ms`
 
 ### DataExport
 
@@ -119,6 +125,7 @@ Se um step travou, a ordem de analise correta e:
 
 1. timeout do step;
 2. timeout da entidade;
-3. timeout do ciclo do daemon;
-4. tempo de destruicao do processo isolado;
-5. existencia de thread leak apos cancelamento.
+3. se era `--extracao-intervalo`, verificar se `coletas` herdou o timeout reforcado de intervalo;
+4. timeout do ciclo do daemon;
+5. tempo de destruicao do processo isolado;
+6. existencia de thread leak apos cancelamento.

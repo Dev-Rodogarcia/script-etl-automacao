@@ -56,7 +56,9 @@ class PlanejadorEscopoExtracaoIntervaloTest {
                 "dataexport:cotacoes",
                 "dataexport:localizacao_cargas",
                 "dataexport:contas_a_pagar",
-                "dataexport:faturas_por_cliente"
+                "dataexport:faturas_por_cliente",
+                "dataexport:inventario",
+                "dataexport:sinistros"
             ),
             steps
         );

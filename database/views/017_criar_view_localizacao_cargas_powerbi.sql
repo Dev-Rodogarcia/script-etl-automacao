@@ -19,6 +19,7 @@ SELECT
     predicted_delivery_at AS [Previsão Entrega/Previsão de entrega], -- CHECK
     destination_location_name AS [Região Destino], -- CHECK
     destination_branch_nickname AS [Filial Destino], -- CHECK
+    destination_branch_nickname AS [Responsável pela Região de Destino],
     classification AS [Classificação], -- CHECK
     CASE status
         WHEN 'pending' THEN 'Pendente'

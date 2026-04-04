@@ -16,6 +16,8 @@ REM Para compilar, use o ambiente de desenvolvimento separadamente.
 REM ----------------------------------------------------------------
 set "PROD_MODE=1"
 
+if /i "%~1"=="--auto-intervalo" goto :RUN_AUTO_INTERVALO
+
 :MENU
 cls
 echo ================================================================
@@ -24,10 +26,10 @@ echo            suporte: lucasmac.dev@gmail.com
 echo            by: @valentelucass
 echo ================================================================
 echo.
-echo 01. Extracao completa ultimas 24h
-echo 02. Loop de extracao 30 minutos
-echo 03. Extracao por intervalo
-echo 04. Testar API especifica
+echo 01. Extracao completa ultimas 24h ^(inclui inventario e sinistros^)
+echo 02. Loop de extracao 30 minutos ^(inclui inventario e sinistros^)
+echo 03. Extracao por intervalo ^(inclui inventario e sinistros^)
+echo 04. Testar API especifica ^(inventario e sinistros disponiveis^)
 echo 05. Validar configuracoes
 echo 06. Bateria extrema e relatorio de saude do ETL
 echo 07. Exportar CSV
@@ -35,6 +37,10 @@ echo 08. Auditar estrutura das APIs
 echo 09. Ver ajuda de comandos
 echo 10. Gerenciar usuarios de acesso ^(tecla U^)
 echo 00. Sair
+echo.
+echo Cobertura atual do ETL:
+echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 if not "%STARTUP_READY%"=="1" (
     echo Ambiente sera validado ao executar a primeira opcao.
@@ -70,6 +76,32 @@ echo.
 echo Opcao invalida.
 timeout /t 2 /nobreak >nul 2>&1
 goto :MENU
+
+:RUN_AUTO_INTERVALO
+call :PREPARE_PRODUCTION
+if errorlevel 1 (
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+if "%~2"=="" (
+    echo.
+    echo ERRO: Data de inicio nao informada para o modo automatico.
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql]
+    echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport inventario
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+if "%~3"=="" (
+    echo.
+    echo ERRO: Data de fim nao informada para o modo automatico.
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql]
+    echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport sinistros
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "%~2" "%~3" "%~4" "%~5" "%~6"
+set "AUTO_EXIT=!ERRORLEVEL!"
+goto :END_WITH_CODE
 
 :RUN_01
 call :PREPARE_PRODUCTION
@@ -169,6 +201,9 @@ if exist "%~dp0database\executar_database.bat" (
     if errorlevel 1 (
         echo [AVISO] Pipeline de banco retornou erro. Veja logs\database_startup.log
         timeout /t 3 /nobreak >nul 2>&1
+    ) else (
+        echo [OK] Ambiente de banco preparado, incluindo inventario/sinistros e views do BI.
+        echo [INFO] Referencia: logs\database_startup.log
     )
 )
 set "STARTUP_READY=1"
@@ -281,3 +316,7 @@ goto :eof
 popd
 endlocal
 exit /b 0
+
+:END_WITH_CODE
+popd
+endlocal & exit /b %AUTO_EXIT%

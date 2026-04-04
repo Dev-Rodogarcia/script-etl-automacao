@@ -25,6 +25,9 @@ echo ================================================================
 echo GERENCIAMENTO DE USUARIOS DE ACESSO
 echo ================================================================
 echo.
+echo Este menu controla o acesso a todas as trilhas operacionais,
+echo incluindo inventario e sinistros.
+echo.
 
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.

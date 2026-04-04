@@ -31,8 +31,11 @@ import br.com.extrator.integracao.constantes.ConstantesApiDataExport.Configuraca
 import br.com.extrator.persistencia.repositorio.PageAuditRepository;
 import br.com.extrator.dominio.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.dominio.dataexport.cotacao.CotacaoDTO;
+import br.com.extrator.dominio.dataexport.fretes.FreteIndicadorDTO;
+import br.com.extrator.dominio.dataexport.inventario.InventarioDTO;
 import br.com.extrator.dominio.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.dominio.dataexport.manifestos.ManifestoDTO;
+import br.com.extrator.dominio.dataexport.sinistros.SinistroDTO;
 import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.http.GerenciadorRequisicaoHttp;
 import br.com.extrator.suporte.tempo.RelogioSistema;
@@ -160,6 +163,16 @@ public class ClienteApiDataExport {
         return buscarFaturasPorCliente(hoje.minusDays(1), hoje);
     }
 
+    public ResultadoExtracao<InventarioDTO> buscarInventario() {
+        final LocalDate hoje = RelogioSistema.hoje();
+        return buscarInventario(hoje.minusDays(1), hoje);
+    }
+
+    public ResultadoExtracao<SinistroDTO> buscarSinistros() {
+        final LocalDate hoje = RelogioSistema.hoje();
+        return buscarSinistros(hoje.minusDays(1), hoje);
+    }
+
     public ResultadoExtracao<ManifestoDTO> buscarManifestos(final LocalDate dataInicio, final LocalDate dataFim) {
         logger.info("Buscando manifestos da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
@@ -255,6 +268,48 @@ public class ClienteApiDataExport {
         );
     }
 
+    public ResultadoExtracao<InventarioDTO> buscarInventario(final LocalDate dataInicio, final LocalDate dataFim) {
+        logger.info("Buscando inventario da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.INVENTARIO);
+        return buscarDadosDiretos(
+            dataInicio,
+            dataFim,
+            config,
+            new TypeReference<List<InventarioDTO>>() {}
+        );
+    }
+
+    public ResultadoExtracao<SinistroDTO> buscarSinistros(final LocalDate dataInicio, final LocalDate dataFim) {
+        logger.info("Buscando sinistros da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.SINISTROS);
+        return buscarDadosDiretos(
+            dataInicio,
+            dataFim,
+            config,
+            new TypeReference<List<SinistroDTO>>() {}
+        );
+    }
+
+    public ResultadoExtracao<FreteIndicadorDTO> buscarFretesIndicadores(final LocalDate dataInicio,
+                                                                         final LocalDate dataFim) {
+        logger.info("Buscando fretes indicadores da API DataExport - Período: {} a {}", dataInicio, dataFim);
+        final ConfiguracaoEntidade config = new ConfiguracaoEntidade(
+            6389,
+            "service_at",
+            "freights",
+            "1000",
+            Duration.ofSeconds(120),
+            "corporation_sequence_number asc",
+            false
+        );
+        return buscarDadosDiretos(
+            dataInicio,
+            dataFim,
+            config,
+            new TypeReference<List<FreteIndicadorDTO>>() {}
+        );
+    }
+
     public int obterContagemManifestos(final LocalDate dataReferencia) {
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
         try {
@@ -289,6 +344,16 @@ public class ClienteApiDataExport {
     public int obterContagemFaturasPorCliente(final LocalDate dataReferencia) {
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.FATURAS_POR_CLIENTE);
         return obterContagemGenericaCsv(config.templateId(), config.tabelaApi(), config.campoData(), dataReferencia, "faturas por cliente");
+    }
+
+    public int obterContagemInventario(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.INVENTARIO);
+        return obterContagemGenericaCsv(config.templateId(), config.tabelaApi(), config.campoData(), dataReferencia, "inventario");
+    }
+
+    public int obterContagemSinistros(final LocalDate dataReferencia) {
+        final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.SINISTROS);
+        return obterContagemGenericaCsv(config.templateId(), config.tabelaApi(), config.campoData(), dataReferencia, "sinistros");
     }
 
     private <T> ResultadoExtracao<T> buscarDadosDiretos(final LocalDate dataInicio,

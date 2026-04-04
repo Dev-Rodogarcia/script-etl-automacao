@@ -24,6 +24,9 @@ BEGIN
         id_cidade_destino BIGINT,
         data_previsao_entrega DATE,
         service_date DATE,
+        finished_at DATETIMEOFFSET,
+        fit_dpn_performance_finished_at DATETIMEOFFSET,
+        corporation_sequence_number BIGINT,
 
         -- Campos Expandidos (22 campos do CSV)
         pagador_id BIGINT,

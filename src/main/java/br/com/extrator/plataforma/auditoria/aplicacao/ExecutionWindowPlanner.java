@@ -66,6 +66,8 @@ public final class ExecutionWindowPlanner {
             ConstantesEntidades.MANIFESTOS,
             ConstantesEntidades.COTACOES,
             ConstantesEntidades.LOCALIZACAO_CARGAS,
+            ConstantesEntidades.INVENTARIO,
+            ConstantesEntidades.SINISTROS,
             ConstantesEntidades.CONTAS_A_PAGAR,
             ConstantesEntidades.FATURAS_POR_CLIENTE
         ));

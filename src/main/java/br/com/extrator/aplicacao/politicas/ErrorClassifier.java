@@ -29,7 +29,11 @@ Regras de classificacao:
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.politicas;
 
+import java.net.http.HttpTimeoutException;
 import java.util.Locale;
+import java.util.concurrent.TimeoutException;
+
+import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 
 public class ErrorClassifier {
     public ErrorTaxonomy classificar(final Throwable throwable) {
@@ -37,9 +41,10 @@ public class ErrorClassifier {
             return ErrorTaxonomy.TRANSIENT_API_ERROR;
         }
         final Throwable root = rootCause(throwable);
-        final String msg = message(root);
+        final String msg = messages(throwable);
 
-        if (root instanceof java.net.http.HttpTimeoutException || msg.contains("timeout")) {
+        if (causedBy(throwable, ExecutionTimeoutException.class, HttpTimeoutException.class, TimeoutException.class)
+            || contemIndicadorTimeout(msg)) {
             return ErrorTaxonomy.TIMEOUT;
         }
         if (root instanceof IllegalArgumentException || msg.contains("validation")) {
@@ -65,10 +70,40 @@ public class ErrorClassifier {
         return current;
     }
 
-    private String message(final Throwable t) {
-        final String message = t.getMessage();
-        return message == null ? "" : message.toLowerCase(Locale.ROOT);
+    private boolean causedBy(final Throwable throwable, final Class<?>... tipos) {
+        Throwable current = throwable;
+        while (current != null) {
+            for (final Class<?> tipo : tipos) {
+                if (tipo.isInstance(current)) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean contemIndicadorTimeout(final String msg) {
+        return msg.contains("timeout")
+            || msg.contains("timed out")
+            || msg.contains("excedeu timeout")
+            || msg.contains("timeout ao executar");
+    }
+
+    private String messages(final Throwable throwable) {
+        final StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        while (current != null) {
+            final String message = current.getMessage();
+            if (message != null && !message.isBlank()) {
+                if (builder.length() > 0) {
+                    builder.append(' ');
+                }
+                builder.append(message.toLowerCase(Locale.ROOT));
+            }
+            current = current.getCause();
+        }
+        return builder.toString();
     }
 }
-
 

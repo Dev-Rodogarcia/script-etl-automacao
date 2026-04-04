@@ -91,6 +91,24 @@ SELECT
 FROM dbo.faturas_por_cliente
 WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
 
+UNION ALL
+
+SELECT 
+    'inventario' AS entidade,
+    COUNT(*) AS total_registros,
+    MAX(data_extracao) AS ultima_extracao
+FROM dbo.inventario
+WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
+
+UNION ALL
+
+SELECT 
+    'sinistros' AS entidade,
+    COUNT(*) AS total_registros,
+    MAX(data_extracao) AS ultima_extracao
+FROM dbo.sinistros
+WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
+
 ORDER BY entidade;
 
 PRINT '';

@@ -219,7 +219,9 @@ public final class PipelineCompositionRoot {
             ConstantesEntidades.COTACOES,
             ConstantesEntidades.LOCALIZACAO_CARGAS,
             ConstantesEntidades.CONTAS_A_PAGAR,
-            ConstantesEntidades.FATURAS_POR_CLIENTE
+            ConstantesEntidades.FATURAS_POR_CLIENTE,
+            ConstantesEntidades.INVENTARIO,
+            ConstantesEntidades.SINISTROS
         ));
         if (incluirFaturasGraphQL) {
             entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
@@ -259,4 +261,3 @@ public final class PipelineCompositionRoot {
         }
     }
 }
-

@@ -73,6 +73,8 @@ public class AuditorEstruturaApi {
         ENDPOINTS.put(ConstantesEntidades.FRETES, "");
         ENDPOINTS.put(ConstantesEntidades.MANIFESTOS, "");
         ENDPOINTS.put(ConstantesEntidades.LOCALIZACAO_CARGAS, "");
+        ENDPOINTS.put(ConstantesEntidades.INVENTARIO, "");
+        ENDPOINTS.put(ConstantesEntidades.SINISTROS, "");
     }
 
     public static void main(final String[] args) {
@@ -166,6 +168,16 @@ public class AuditorEstruturaApi {
             case ConstantesEntidades.LOCALIZACAO_CARGAS -> {
                 final ResultadoExtracao<br.com.extrator.dominio.dataexport.localizacaocarga.LocalizacaoCargaDTO> r = clienteDataExport.buscarLocalizacaoCarga();
                 final java.util.List<br.com.extrator.dominio.dataexport.localizacaocarga.LocalizacaoCargaDTO> l = r.getDados();
+                yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
+            }
+            case ConstantesEntidades.INVENTARIO -> {
+                final ResultadoExtracao<br.com.extrator.dominio.dataexport.inventario.InventarioDTO> r = clienteDataExport.buscarInventario();
+                final java.util.List<br.com.extrator.dominio.dataexport.inventario.InventarioDTO> l = r.getDados();
+                yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
+            }
+            case ConstantesEntidades.SINISTROS -> {
+                final ResultadoExtracao<br.com.extrator.dominio.dataexport.sinistros.SinistroDTO> r = clienteDataExport.buscarSinistros();
+                final java.util.List<br.com.extrator.dominio.dataexport.sinistros.SinistroDTO> l = r.getDados();
                 yield l.isEmpty() ? null : mapper.valueToTree(l.get(0));
             }
             case ConstantesEntidades.CONTAS_A_PAGAR -> {

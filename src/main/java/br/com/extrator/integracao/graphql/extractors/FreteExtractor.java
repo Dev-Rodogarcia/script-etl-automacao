@@ -37,22 +37,29 @@ Atributos-chave:
 package br.com.extrator.integracao.graphql.extractors;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.dominio.dataexport.fretes.FreteIndicadorDTO;
+import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.ResultadoExtracao;
-import br.com.extrator.persistencia.entidade.FreteEntity;
-import br.com.extrator.persistencia.repositorio.FreteRepository;
-import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
-import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
+import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
+import br.com.extrator.persistencia.entidade.FreteEntity;
+import br.com.extrator.persistencia.repositorio.FreteRepository;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
+import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
@@ -62,18 +69,36 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  */
 public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
     private static final Logger logger = LoggerFactory.getLogger(FreteExtractor.class);
-    
+    private static final DateTimeFormatter[] FORMATOS_BR_DATA_HORA = {
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+    };
+
+    @FunctionalInterface
+    public interface FreteIndicadoresProvider {
+        ResultadoExtracao<FreteIndicadorDTO> buscar(LocalDate dataInicio, LocalDate dataFim);
+    }
+
     private final ClienteApiGraphQL apiClient;
+    private final FreteIndicadoresProvider freteIndicadoresProvider;
     private final FreteRepository repository;
     private final FreteMapper mapper;
     private LocalDate ultimaDataInicio;
     private LocalDate ultimaDataFim;
     private boolean ultimaExtracaoCompleta;
-    
+
     public FreteExtractor(final ClienteApiGraphQL apiClient,
-                         final FreteRepository repository,
-                         final FreteMapper mapper) {
+                          final FreteRepository repository,
+                          final FreteMapper mapper) {
+        this(apiClient, repository, mapper, null);
+    }
+
+    public FreteExtractor(final ClienteApiGraphQL apiClient,
+                          final FreteRepository repository,
+                          final FreteMapper mapper,
+                          final FreteIndicadoresProvider freteIndicadoresProvider) {
         this.apiClient = apiClient;
+        this.freteIndicadoresProvider = freteIndicadoresProvider;
         this.repository = repository;
         this.mapper = mapper;
     }
@@ -107,6 +132,8 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             logger.warn("⚠️ Duplicados removidos na API GraphQL (Fretes): {} duplicados", 
                 entities.size() - entitiesUnicos.size());
         }
+
+        enriquecerComIndicadoresDataExport(entitiesUnicos);
         
         final int registrosSalvos = repository.salvar(entitiesUnicos);
         if (devePrunarAusentesNoPeriodo()) {
@@ -188,6 +215,163 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             && ultimaDataInicio != null
             && ultimaDataFim != null
             && !ultimaDataFim.isBefore(ultimaDataInicio);
+    }
+
+    private void enriquecerComIndicadoresDataExport(final List<FreteEntity> entities) {
+        if (freteIndicadoresProvider == null || entities == null || entities.isEmpty()) {
+            return;
+        }
+        if (ultimaDataInicio == null || ultimaDataFim == null) {
+            logger.debug("Enriquecimento de fretes ignorado: janela da ultima extracao nao foi registrada.");
+            return;
+        }
+
+        final ResultadoExtracao<FreteIndicadorDTO> resultadoIndicadores;
+        try {
+            resultadoIndicadores = freteIndicadoresProvider.buscar(ultimaDataInicio, ultimaDataFim);
+        } catch (final RuntimeException e) {
+            logger.warn(
+                "Falha ao enriquecer fretes com Data Export 6389 para {} a {}: {}",
+                ultimaDataInicio,
+                ultimaDataFim,
+                e.getMessage()
+            );
+            return;
+        }
+
+        if (resultadoIndicadores == null
+            || resultadoIndicadores.getDados() == null
+            || resultadoIndicadores.getDados().isEmpty()) {
+            logger.info(
+                "Enriquecimento de fretes via Data Export 6389 sem dados para {} a {}",
+                ultimaDataInicio,
+                ultimaDataFim
+            );
+            return;
+        }
+
+        final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta = indexarIndicadores(resultadoIndicadores.getDados());
+        int totalEnriquecidos = 0;
+        int totalPerformanceOficial = 0;
+        int totalFinishedAtFallback = 0;
+
+        for (final FreteEntity entity : entities) {
+            if (entity == null || entity.getCorporationSequenceNumber() == null) {
+                continue;
+            }
+            final FreteIndicadorDTO indicador = indicadoresPorMinuta.get(entity.getCorporationSequenceNumber());
+            if (indicador == null) {
+                continue;
+            }
+
+            boolean alterado = false;
+            final OffsetDateTime performanceFinishedAt =
+                parsePerformanceFinishedAt(indicador.getPerformanceFinishedAt(), entity);
+            if (performanceFinishedAt != null) {
+                entity.setFitDpnPerformanceFinishedAt(performanceFinishedAt);
+                totalPerformanceOficial++;
+                alterado = true;
+            }
+
+            if (entity.getFinishedAt() == null) {
+                final OffsetDateTime finishedAt = FormatadorData.parseOffsetDateTime(indicador.getFinishedAt());
+                if (finishedAt != null) {
+                    entity.setFinishedAt(finishedAt);
+                    totalFinishedAtFallback++;
+                    alterado = true;
+                }
+            }
+
+            if (alterado) {
+                totalEnriquecidos++;
+            }
+        }
+
+        if (!resultadoIndicadores.isCompleto()) {
+            logger.warn(
+                "Enriquecimento de fretes via Data Export 6389 retornou parcialmente para {} a {} | motivo={} | paginas={}",
+                ultimaDataInicio,
+                ultimaDataFim,
+                resultadoIndicadores.getMotivoInterrupcao(),
+                resultadoIndicadores.getPaginasProcessadas()
+            );
+        }
+
+        logger.info(
+            "Enriquecimento de fretes via Data Export 6389 concluido para {} a {} | correspondencias={} | performance_oficial={} | finished_at_fallback={}",
+            ultimaDataInicio,
+            ultimaDataFim,
+            totalEnriquecidos,
+            totalPerformanceOficial,
+            totalFinishedAtFallback
+        );
+    }
+
+    private Map<Long, FreteIndicadorDTO> indexarIndicadores(final List<FreteIndicadorDTO> indicadores) {
+        final Map<Long, FreteIndicadorDTO> index = new LinkedHashMap<>();
+        for (final FreteIndicadorDTO indicador : indicadores) {
+            if (indicador == null || indicador.getCorporationSequenceNumber() == null) {
+                continue;
+            }
+            final FreteIndicadorDTO atual = index.get(indicador.getCorporationSequenceNumber());
+            if (atual == null || deveSubstituirIndicador(atual, indicador)) {
+                index.put(indicador.getCorporationSequenceNumber(), indicador);
+            }
+        }
+        return index;
+    }
+
+    private boolean deveSubstituirIndicador(final FreteIndicadorDTO atual, final FreteIndicadorDTO candidato) {
+        final boolean atualTemPerformance =
+            atual.getPerformanceFinishedAt() != null && !atual.getPerformanceFinishedAt().isBlank();
+        final boolean candidatoTemPerformance =
+            candidato.getPerformanceFinishedAt() != null && !candidato.getPerformanceFinishedAt().isBlank();
+        if (candidatoTemPerformance && !atualTemPerformance) {
+            return true;
+        }
+        final boolean atualTemFinishedAt = atual.getFinishedAt() != null && !atual.getFinishedAt().isBlank();
+        final boolean candidatoTemFinishedAt = candidato.getFinishedAt() != null && !candidato.getFinishedAt().isBlank();
+        return candidatoTemFinishedAt && !atualTemFinishedAt;
+    }
+
+    private OffsetDateTime parsePerformanceFinishedAt(final String valorBruto, final FreteEntity entity) {
+        final OffsetDateTime parsed = FormatadorData.parseOffsetDateTime(valorBruto);
+        if (valorBruto == null || valorBruto.isBlank()) {
+            return parsed;
+        }
+        if (parsed == null || entity == null || entity.getServicoEm() == null || !valorBruto.contains("/")) {
+            return parsed;
+        }
+
+        final OffsetDateTime parsedBr = parseOffsetDateTimeBr(valorBruto);
+        if (parsedBr == null) {
+            return parsed;
+        }
+
+        if (parsed.toLocalDate().isBefore(entity.getServicoEm().toLocalDate())
+            && !parsedBr.toLocalDate().isBefore(entity.getServicoEm().toLocalDate())) {
+            logger.warn(
+                "Performance oficial ajustada para formato BR em frete/minuta {}: valor='{}' | parser_padrao={} | parser_br={}",
+                entity.getCorporationSequenceNumber(),
+                valorBruto,
+                parsed,
+                parsedBr
+            );
+            return parsedBr;
+        }
+
+        return parsed;
+    }
+
+    private OffsetDateTime parseOffsetDateTimeBr(final String valor) {
+        for (final DateTimeFormatter formatter : FORMATOS_BR_DATA_HORA) {
+            try {
+                return java.time.LocalDateTime.parse(valor, formatter).atOffset(java.time.ZoneOffset.of("-03:00"));
+            } catch (final DateTimeParseException ignored) {
+                // tenta o proximo formato BR
+            }
+        }
+        return null;
     }
     
     @Override

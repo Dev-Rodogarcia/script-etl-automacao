@@ -68,6 +68,8 @@ final class PlanejadorEscopoExtracaoIntervalo {
                 entidadesParaValidar.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
                 entidadesParaValidar.add(ConstantesEntidades.CONTAS_A_PAGAR);
                 entidadesParaValidar.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
+                entidadesParaValidar.add(ConstantesEntidades.INVENTARIO);
+                entidadesParaValidar.add(ConstantesEntidades.SINISTROS);
             }
             return entidadesParaValidar;
         }
@@ -79,6 +81,8 @@ final class PlanejadorEscopoExtracaoIntervalo {
         entidadesParaValidar.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
         entidadesParaValidar.add(ConstantesEntidades.CONTAS_A_PAGAR);
         entidadesParaValidar.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
+        entidadesParaValidar.add(ConstantesEntidades.INVENTARIO);
+        entidadesParaValidar.add(ConstantesEntidades.SINISTROS);
         if (incluirFaturasGraphQL) {
             entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
         }
@@ -153,6 +157,8 @@ final class PlanejadorEscopoExtracaoIntervalo {
             entidades.add(ConstantesEntidades.MANIFESTOS);
             entidades.add(ConstantesEntidades.COTACOES);
             entidades.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
+            entidades.add(ConstantesEntidades.INVENTARIO);
+            entidades.add(ConstantesEntidades.SINISTROS);
         }
 
         return entidades;
@@ -195,6 +201,8 @@ final class PlanejadorEscopoExtracaoIntervalo {
             entidades.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
             entidades.add(ConstantesEntidades.CONTAS_A_PAGAR);
             entidades.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
+            entidades.add(ConstantesEntidades.INVENTARIO);
+            entidades.add(ConstantesEntidades.SINISTROS);
         }
 
         return entidades;
@@ -254,6 +262,12 @@ final class PlanejadorEscopoExtracaoIntervalo {
             || "faturas-por-cliente".equals(valor)) {
             return ConstantesEntidades.FATURAS_POR_CLIENTE;
         }
+        if (ConstantesEntidades.INVENTARIO.equals(valor) || "inventário".equals(valor)) {
+            return ConstantesEntidades.INVENTARIO;
+        }
+        if (ConstantesEntidades.SINISTROS.equals(valor) || "sinistro".equals(valor)) {
+            return ConstantesEntidades.SINISTROS;
+        }
 
         return valor;
     }
@@ -276,5 +290,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
         steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.LOCALIZACAO_CARGAS));
         steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.CONTAS_A_PAGAR));
         steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.FATURAS_POR_CLIENTE));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.INVENTARIO));
+        steps.add(new DataExportPipelineStep(dataExportGateway, ConstantesEntidades.SINISTROS));
     }
 }

@@ -2,6 +2,10 @@
 -- MIGRACAO 001: criar tabela de controle de migracoes aplicadas
 -- ============================================================================
 
+SET NOCOUNT ON;
+
+DECLARE @MigrationId NVARCHAR(255) = N'001_criar_tabela_schema_migrations';
+
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.schema_migrations (
@@ -16,5 +20,16 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela dbo.schema_migrations ja existe. Pulando criacao.';
+END
+
+IF NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = @MigrationId)
+BEGIN
+    INSERT INTO dbo.schema_migrations (migration_id, notes)
+    VALUES (@MigrationId, N'Bootstrap da tabela de controle de migrations.');
+    PRINT 'Migracao 001 registrada com sucesso.';
+END
+ELSE
+BEGIN
+    PRINT 'Migracao 001_criar_tabela_schema_migrations ja registrada. Pulando.';
 END
 GO

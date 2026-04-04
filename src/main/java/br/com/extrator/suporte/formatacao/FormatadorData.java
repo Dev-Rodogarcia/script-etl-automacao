@@ -95,7 +95,16 @@ public final class FormatadorData {
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS"),
+        DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm:ss"),
+        DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm")
+    };
+
+    /** Formatos comuns de data sem hora que já apareceram em integrações. */
+    private static final DateTimeFormatter[] FORMATOS_DATA_SEM_HORA = {
+        ISO_DATE,
+        DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+        BR_DATE
     };
     
     // ========== MÉTODOS DE PARSING ==========
@@ -110,12 +119,16 @@ public final class FormatadorData {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
         }
-        try {
-            return LocalDate.parse(dateStr.trim(), ISO_DATE);
-        } catch (final DateTimeParseException e) {
-            logger.warn("Erro ao parsear LocalDate '{}': {}", dateStr, e.getMessage());
-            return null;
+        final String valor = dateStr.trim();
+        for (final DateTimeFormatter formatter : FORMATOS_DATA_SEM_HORA) {
+            try {
+                return LocalDate.parse(valor, formatter);
+            } catch (final DateTimeParseException ignored) {
+                // tenta próximo formato conhecido
+            }
         }
+        logger.warn("Erro ao parsear LocalDate '{}': formato nao reconhecido", dateStr);
+        return null;
     }
     
     /**

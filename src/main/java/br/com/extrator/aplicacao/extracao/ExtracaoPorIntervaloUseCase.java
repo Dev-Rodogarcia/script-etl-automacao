@@ -57,6 +57,9 @@ public class ExtracaoPorIntervaloUseCase {
     private static final String EXECUTION_LOCK_RESOURCE = "etl-global-execution";
     private static final String PROP_PRUNE_AUSENTES_FRETES = "ETL_FRETES_PRUNE_AUSENTES";
     private static final String PROP_TIMEOUT_FRETES = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_FRETES_MS";
+    private static final String PROP_TIMEOUT_COLETAS = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS";
+    private static final String PROP_BACKFILL_MAX_EXPANSAO_COLETAS =
+        "ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS";
     private static final long TIMEOUT_FRETES_INTERVALO_MS = 10_800_000L;
     private static final LoggerConsole log = LoggerConsole.getLogger(ExtracaoPorIntervaloUseCase.class);
     private static final int TAMANHO_BLOCO_DIAS = 30;
@@ -93,8 +96,18 @@ public class ExtracaoPorIntervaloUseCase {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
         final String pruneFretesAnterior = System.getProperty(PROP_PRUNE_AUSENTES_FRETES);
         final String timeoutFretesAnterior = System.getProperty(PROP_TIMEOUT_FRETES);
+        final String timeoutColetasAnterior = System.getProperty(PROP_TIMEOUT_COLETAS);
+        final String backfillMaxExpansaoAnterior = System.getProperty(PROP_BACKFILL_MAX_EXPANSAO_COLETAS);
         System.setProperty(PROP_PRUNE_AUSENTES_FRETES, Boolean.TRUE.toString());
         aplicarTimeoutMinimo(PROP_TIMEOUT_FRETES, TIMEOUT_FRETES_INTERVALO_MS);
+        aplicarTimeoutMinimo(
+            PROP_TIMEOUT_COLETAS,
+            ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo().toMillis()
+        );
+        aplicarInteiroMinimo(
+            PROP_BACKFILL_MAX_EXPANSAO_COLETAS,
+            ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo()
+        );
         try {
         final LocalDate dataInicio = request.dataInicio();
         final LocalDate dataFim = request.dataFim();
@@ -165,6 +178,10 @@ public class ExtracaoPorIntervaloUseCase {
         final LocalDateTime inicioExecucao = LocalDateTime.now();
         int blocosCompletos = 0;
         int blocosFalhados = 0;
+        int falhasCriticasConsecutivasColetas = 0;
+        final int limiteFalhasCriticasColetas = ConfigEtl.obterEtlIntervaloColetasMaxConsecutiveFailures();
+        boolean abortadoPorFalhasCriticasColetas = false;
+        String motivoAbortoColetas = null;
         final List<String> blocosFalhadosLista = new ArrayList<>();
 
         for (int i = 0; i < blocos.size(); i++) {
@@ -246,6 +263,20 @@ public class ExtracaoPorIntervaloUseCase {
                 }
             }
 
+            final boolean falhaCriticaColetas = houveFalhaCriticaColetas(pipelineReport, falhasBloco);
+            if (falhaCriticaColetas) {
+                falhasCriticasConsecutivasColetas++;
+                log.warn(
+                    "Bloco {}/{} contabilizado como falha critica de coletas (sequencia atual: {}/{}).",
+                    numeroBloco,
+                    totalBlocos,
+                    falhasCriticasConsecutivasColetas,
+                    limiteFalhasCriticasColetas
+                );
+            } else {
+                falhasCriticasConsecutivasColetas = 0;
+            }
+
             if (blocoComFalha) {
                 blocosFalhados++;
                 if (falhasBloco.isEmpty()) {
@@ -255,6 +286,22 @@ public class ExtracaoPorIntervaloUseCase {
                 }
             } else {
                 blocosCompletos++;
+            }
+
+            if (falhaCriticaColetas && falhasCriticasConsecutivasColetas >= limiteFalhasCriticasColetas) {
+                abortadoPorFalhasCriticasColetas = true;
+                motivoAbortoColetas = String.format(
+                    "Extracao por intervalo abortada apos %d falhas criticas consecutivas de coletas. "
+                        + "Ultimo bloco processado: %d/%d (%s a %s). Blocos falhados acumulados: %s",
+                    falhasCriticasConsecutivasColetas,
+                    numeroBloco,
+                    totalBlocos,
+                    FormatadorData.formatBR(bloco.dataInicio),
+                    FormatadorData.formatBR(bloco.dataFim),
+                    String.join(", ", blocosFalhadosLista)
+                );
+                log.error("{}", motivoAbortoColetas);
+                break;
             }
         }
 
@@ -272,6 +319,11 @@ public class ExtracaoPorIntervaloUseCase {
         }
         log.console("Duracao total: {} minutos", duracaoMinutos);
         log.console("=".repeat(60));
+
+        if (abortadoPorFalhasCriticasColetas) {
+            BannerUtil.exibirBannerErro();
+            throw new PartialExecutionException(motivoAbortoColetas);
+        }
 
         if (blocosFalhados == 0) {
             BannerUtil.exibirBannerSucesso();
@@ -296,6 +348,8 @@ public class ExtracaoPorIntervaloUseCase {
             } else {
                 System.setProperty(PROP_TIMEOUT_FRETES, timeoutFretesAnterior);
             }
+            restaurarProperty(PROP_TIMEOUT_COLETAS, timeoutColetasAnterior);
+            restaurarProperty(PROP_BACKFILL_MAX_EXPANSAO_COLETAS, backfillMaxExpansaoAnterior);
         }
         }
     }
@@ -312,6 +366,28 @@ public class ExtracaoPorIntervaloUseCase {
             }
         }
         System.setProperty(propriedade, Long.toString(timeoutMinimoMs));
+    }
+
+    private void aplicarInteiroMinimo(final String propriedade, final int valorMinimo) {
+        final String atual = System.getProperty(propriedade);
+        if (atual != null) {
+            try {
+                if (Integer.parseInt(atual) >= valorMinimo) {
+                    return;
+                }
+            } catch (final NumberFormatException ignored) {
+                // Valor invalido atual sera substituido pelo minimo seguro para backfill.
+            }
+        }
+        System.setProperty(propriedade, Integer.toString(valorMinimo));
+    }
+
+    private void restaurarProperty(final String propriedade, final String valorAnterior) {
+        if (valorAnterior == null) {
+            System.clearProperty(propriedade);
+        } else {
+            System.setProperty(propriedade, valorAnterior);
+        }
     }
 
     private List<BlocoPeriodo> dividirEmBlocos(final LocalDate dataInicio, final LocalDate dataFim) {
@@ -397,6 +473,43 @@ public class ExtracaoPorIntervaloUseCase {
             log.error("Pipeline do bloco {}/{} abortado pelo step {}", numeroBloco, totalBlocos, abortadoPor);
         }
         return blocoComFalha;
+    }
+
+    private boolean houveFalhaCriticaColetas(
+        final PipelineReport pipelineReport,
+        final List<String> falhasBloco
+    ) {
+        final boolean falhaDiretaColetas = pipelineReport.getResultados().stream()
+            .anyMatch(this::isFalhaDiretaColetas);
+        if (falhaDiretaColetas) {
+            return true;
+        }
+        if (pipelineReport.isAborted() && referenciaColetas(pipelineReport.getAbortedBy())) {
+            return true;
+        }
+        return falhasBloco.stream().anyMatch(this::isFalhaCriticaColetas);
+    }
+
+    private boolean isFalhaDiretaColetas(final StepExecutionResult result) {
+        return result != null
+            && result.getStatus() == StepStatus.FAILED
+            && (referenciaColetas(result.obterNomeEntidade()) || referenciaColetas(result.obterNomeEtapa()));
+    }
+
+    private boolean isFalhaCriticaColetas(final String falha) {
+        final String falhaNormalizada = falha == null ? "" : falha.toLowerCase(Locale.ROOT);
+        if (falhaNormalizada.contains("audit_ausente") && falhaNormalizada.contains("coletas")) {
+            return true;
+        }
+        if (falhaNormalizada.contains("coletas sem log")) {
+            return true;
+        }
+        return falhaNormalizada.contains("integridade_referencial_manifestos")
+            && falhaNormalizada.contains("contexto_coletas={sem_auditoria}");
+    }
+
+    private boolean referenciaColetas(final String valor) {
+        return valor != null && valor.toLowerCase(Locale.ROOT).contains("coletas");
     }
 
     private List<String> validarResultadosCriticosDoBloco(

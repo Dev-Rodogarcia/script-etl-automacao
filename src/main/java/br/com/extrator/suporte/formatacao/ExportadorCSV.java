@@ -58,6 +58,8 @@ public class ExportadorCSV {
     private static final String ENTIDADE_FRETES = "fretes";
     private static final String ENTIDADE_MANIFESTOS = "manifestos";
     private static final String ENTIDADE_LOCALIZACAO_CARGAS = "localizacao_cargas";
+    private static final String ENTIDADE_INVENTARIO = "inventario";
+    private static final String ENTIDADE_SINISTROS = "sinistros";
 
     // PROBLEMA #9 CORRIGIDO: Usar LoggerConsole para log duplo (arquivo + console)
     private static final LoggerConsole log = LoggerConsole.getLogger(ExportadorCSV.class);
@@ -71,6 +73,8 @@ public class ExportadorCSV {
         ENTIDADE_FRETES,
         ENTIDADE_MANIFESTOS,
         ENTIDADE_LOCALIZACAO_CARGAS,
+        ENTIDADE_INVENTARIO,
+        ENTIDADE_SINISTROS,
         "dim_usuarios",  // Tabela dimensão de usuários do sistema
         "page_audit"     // Entidade especial de auditoria, não precisa de constante
     };
@@ -213,7 +217,7 @@ public class ExportadorCSV {
                 }
             } else {
                 switch (entidade) {
-                    case ENTIDADE_MANIFESTOS, ENTIDADE_COTACOES, ENTIDADE_CONTAS_A_PAGAR -> query += " ORDER BY sequence_code";
+                    case ENTIDADE_MANIFESTOS, ENTIDADE_COTACOES, ENTIDADE_CONTAS_A_PAGAR, ENTIDADE_INVENTARIO, ENTIDADE_SINISTROS -> query += " ORDER BY sequence_code";
                     case ENTIDADE_LOCALIZACAO_CARGAS -> query += " ORDER BY sequence_number";
                     case ENTIDADE_COLETAS, ENTIDADE_FRETES -> query += " ORDER BY id";
                     case ENTIDADE_FATURAS_POR_CLIENTE -> query += " ORDER BY unique_id";

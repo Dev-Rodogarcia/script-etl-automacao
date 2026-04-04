@@ -113,7 +113,9 @@ public class AuditoriaService {
                 ConstantesEntidades.FRETES,
                 ConstantesEntidades.FATURAS_GRAPHQL,
                 ConstantesEntidades.MANIFESTOS,
-                ConstantesEntidades.LOCALIZACAO_CARGAS
+                ConstantesEntidades.LOCALIZACAO_CARGAS,
+                ConstantesEntidades.INVENTARIO,
+                ConstantesEntidades.SINISTROS
             );
 
             for (final String e : ents) {

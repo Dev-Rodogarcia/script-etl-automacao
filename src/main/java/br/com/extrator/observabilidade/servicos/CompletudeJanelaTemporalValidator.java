@@ -142,7 +142,9 @@ final class CompletudeJanelaTemporalValidator {
                 ConstantesEntidades.COTACOES,
                 ConstantesEntidades.LOCALIZACAO_CARGAS,
                 ConstantesEntidades.CONTAS_A_PAGAR,
-                ConstantesEntidades.FATURAS_POR_CLIENTE ->
+                ConstantesEntidades.FATURAS_POR_CLIENTE,
+                ConstantesEntidades.INVENTARIO,
+                ConstantesEntidades.SINISTROS ->
                 contarRegistrosApiDataExport(entidade, timestamps, dataReferencia);
             default -> {
                 logger.warn("⚠️ Entidade {} nao mapeada para validacao temporal", entidade);

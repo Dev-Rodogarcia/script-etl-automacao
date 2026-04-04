@@ -21,6 +21,8 @@ class FreteMapperTest {
         dto.setCreatedAt("2026-03-01T10:15:30Z");
         dto.setDeliveryPredictionDate("outra-data-invalida");
         dto.setServiceDate("2026-03-01");
+        dto.setFinishedAt("2026-03-01T12:00:00Z");
+        dto.setCorporationSequenceNumber(456L);
 
         final FreteMapper mapper = new FreteMapper();
         final var entity = mapper.toEntity(dto);
@@ -28,6 +30,8 @@ class FreteMapperTest {
         assertNotNull(entity);
         assertNull(entity.getServicoEm());
         assertEquals(OffsetDateTime.parse("2026-03-01T10:15:30Z"), entity.getCriadoEm());
+        assertEquals(OffsetDateTime.parse("2026-03-01T12:00:00Z"), entity.getFinishedAt());
+        assertEquals(456L, entity.getCorporationSequenceNumber());
         assertNull(entity.getDataPrevisaoEntrega());
         assertEquals(LocalDate.of(2026, 3, 1), entity.getServiceDate());
     }

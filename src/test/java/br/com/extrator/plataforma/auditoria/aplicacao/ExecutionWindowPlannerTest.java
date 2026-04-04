@@ -2,6 +2,7 @@ package br.com.extrator.plataforma.auditoria.aplicacao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,6 +59,16 @@ class ExecutionWindowPlannerTest {
         final var planos = planner.planejarFluxoCompleto(LocalDate.of(2026, 3, 25), false);
 
         assertFalse(planos.containsKey(ConstantesEntidades.FATURAS_GRAPHQL));
+    }
+
+    @Test
+    void deveIncluirInventarioESinistrosNoFluxoCompleto() {
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        final var planos = planner.planejarFluxoCompleto(LocalDate.of(2026, 3, 25), false);
+
+        assertTrue(planos.containsKey(ConstantesEntidades.INVENTARIO));
+        assertTrue(planos.containsKey(ConstantesEntidades.SINISTROS));
     }
 
     private static final class StubExecutionAuditPort implements ExecutionAuditPort {

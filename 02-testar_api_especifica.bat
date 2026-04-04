@@ -41,7 +41,7 @@ REM Parametros (opcionais):
 REM   %1  Nome da API a testar: graphql | dataexport
 REM   %2  Entidade (opcional):
 REM       GraphQL -> coletas | fretes | faturas_graphql
-REM       DataExport -> manifestos | cotacoes | localizacao_carga | contas_a_pagar | faturas_por_cliente
+REM       DataExport -> manifestos | cotacoes | localizacao_cargas | contas_a_pagar | faturas_por_cliente | inventario | sinistros
 REM   %3  Flag opcional: --sem-faturas-graphql (somente para GraphQL sem entidade especifica)
 REM
 REM Se nenhum parametro for informado, exibe menu interativo.
@@ -78,7 +78,7 @@ echo ================================================================
 echo.
 echo Escolha a API:
 echo   1. GraphQL
-echo   2. DataExport
+echo   2. DataExport ^(inclui inventario e sinistros^)
 echo.
 set /p "OPCAO_API=Digite sua opcao (1 ou 2): "
 
@@ -156,17 +156,21 @@ if /i "%API%"=="dataexport" (
     echo Entidades disponiveis:
     echo   1. Manifestos
     echo   2. Cotacoes
-    echo   3. Localizacao de Carga
+    echo   3. Localizacao de Cargas
     echo   4. Contas a Pagar
     echo   5. Faturas por Cliente
+    echo   6. Inventario
+    echo   7. Sinistros
     echo.
-    set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2, 3, 4 ou 5^): "
+    set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2, 3, 4, 5, 6 ou 7^): "
     
     if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=manifestos"
     if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=cotacoes"
-    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=localizacao_carga"
+    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=localizacao_cargas"
     if "!OPCAO_ENTIDADE!"=="4" set "ENTIDADE=contas_a_pagar"
     if "!OPCAO_ENTIDADE!"=="5" set "ENTIDADE=faturas_por_cliente"
+    if "!OPCAO_ENTIDADE!"=="6" set "ENTIDADE=inventario"
+    if "!OPCAO_ENTIDADE!"=="7" set "ENTIDADE=sinistros"
     
     if "!ENTIDADE!"=="" (
         echo.
@@ -211,13 +215,18 @@ if /i "%ENTIDADE%"=="manifestos" goto :RUN
 if /i "%ENTIDADE%"=="cotacoes" goto :RUN
 if /i "%ENTIDADE%"=="localizacao_carga" goto :RUN
 if /i "%ENTIDADE%"=="localizacao_de_carga" goto :RUN
+if /i "%ENTIDADE%"=="localizacao_cargas" goto :RUN
 if /i "%ENTIDADE%"=="contas_a_pagar" goto :RUN
 if /i "%ENTIDADE%"=="contasapagar" goto :RUN
 if /i "%ENTIDADE%"=="faturas_por_cliente" goto :RUN
 if /i "%ENTIDADE%"=="faturasporcliente" goto :RUN
+if /i "%ENTIDADE%"=="inventario" goto :RUN
+if /i "%ENTIDADE%"=="inventário" goto :RUN
+if /i "%ENTIDADE%"=="sinistros" goto :RUN
+if /i "%ENTIDADE%"=="sinistro" goto :RUN
 echo ERRO: Entidade '%ENTIDADE%' invalida para API DataExport!
 echo.
-echo Entidades suportadas: manifestos, cotacoes, localizacao_carga, contas_a_pagar, faturas_por_cliente
+echo Entidades suportadas: manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 pause
 exit /b 1
@@ -227,6 +236,9 @@ cls
 echo ================================================================
 echo TESTANDO API: %API%
 if not "%ENTIDADE%"=="" echo ENTIDADE: %ENTIDADE%
+if /i "%API%"=="dataexport" (
+    echo COBERTURA DATAEXPORT: manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
+)
 if /i "%API%"=="graphql" if "%ENTIDADE%"=="" (
     if defined FLAG_FATURAS_GRAPHQL (
         echo FATURAS GRAPHQL: DESABILITADO
@@ -299,6 +311,7 @@ echo.
 echo ================================================================
 echo TESTE CONCLUIDO COM SUCESSO!
 echo ================================================================
+if /i "%API%"=="dataexport" echo Verifique no log a trilha executada, incluindo inventario/sinistros quando selecionados.
 goto :END
 
 :FAIL

@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.persistencia.entidade.FreteEntity;
+import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.mapeamento.NumeroUtil;
 
@@ -86,6 +87,7 @@ public class FreteMapper {
         entity.setPesoNotas(dto.getInvoicesWeight());
         entity.setIdCorporacao(dto.getCorporationId());
         entity.setIdCidadeDestino(dto.getDestinationCityId());
+        entity.setCorporationSequenceNumber(dto.getCorporationSequenceNumber());
 
         // 1.1. Mapeamento dos campos expandidos (22 campos do CSV)
         if (dto.getPayer() != null) {
@@ -259,6 +261,21 @@ public class FreteMapper {
         if (createdAt != null) {
             entity.setCriadoEm(createdAt);
         }
+        final OffsetDateTime finishedAt = parseOffsetDateTimeCampo(dto.getFinishedAt(), "finishedAt", dto.getId());
+        if (finishedAt != null) {
+            entity.setFinishedAt(finishedAt);
+        }
+        final OffsetDateTime performanceFinishedAt = parseOffsetDateTimeCampo(
+            extrairStringOptional(
+                dto.getOtherProperties().get("fit_dpn_performance_finished_at"),
+                dto.getOtherProperties().get("fitDpnPerformanceFinishedAt")
+            ),
+            "fit_dpn_performance_finished_at",
+            dto.getId()
+        );
+        if (performanceFinishedAt != null) {
+            entity.setFitDpnPerformanceFinishedAt(performanceFinishedAt);
+        }
         if (dto.getCte() != null) {
             final OffsetDateTime cteIssuedAt = parseOffsetDateTimeCampo(dto.getCte().getIssuedAt(), "cte.issuedAt", dto.getId());
             if (cteIssuedAt != null) {
@@ -289,12 +306,11 @@ public class FreteMapper {
         if (valor == null || valor.trim().isEmpty()) {
             return null;
         }
-        try {
-            return OffsetDateTime.parse(valor);
-        } catch (final DateTimeParseException e) {
-            logger.warn("Falha ao converter {} para frete ID {}: valor='{}' | erro={}", campo, freteId, valor, e.getMessage());
-            return null;
+        final OffsetDateTime parsed = FormatadorData.parseOffsetDateTime(valor);
+        if (parsed == null) {
+            logger.warn("Falha ao converter {} para frete ID {}: valor='{}'", campo, freteId, valor);
         }
+        return parsed;
     }
 
     private LocalDate parseLocalDateCampo(final String valor, final String campo, final Long freteId) {
@@ -307,5 +323,17 @@ public class FreteMapper {
             logger.warn("Falha ao converter {} para frete ID {}: valor='{}' | erro={}", campo, freteId, valor, e.getMessage());
             return null;
         }
+    }
+
+    private String extrairStringOptional(final Object... candidatos) {
+        if (candidatos == null) {
+            return null;
+        }
+        for (final Object candidato : candidatos) {
+            if (candidato instanceof String valor && !valor.isBlank()) {
+                return valor;
+            }
+        }
+        return null;
     }
 }

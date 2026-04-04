@@ -19,7 +19,9 @@ class IsolatedStepProcessExecutorTest {
     @AfterEach
     void limparSystemProperties() {
         System.clearProperty("API_THROTTLING_MINIMO_MS");
+        System.clearProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS");
         System.clearProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS");
+        System.clearProperty("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS");
         System.clearProperty("etl.parent.execution.id");
         System.clearProperty("etl.process.isolation.enabled");
     }
@@ -48,7 +50,9 @@ class IsolatedStepProcessExecutorTest {
     @Test
     void devePropagarOverridesApiEEtlParaProcessoFilho() throws Exception {
         System.setProperty("API_THROTTLING_MINIMO_MS", "500");
+        System.setProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS", "1800000");
         System.setProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS", "5400000");
+        System.setProperty("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS", "400");
         System.setProperty("etl.process.isolation.enabled", "true");
 
         final InspectingExecutor executor = new InspectingExecutor();
@@ -60,7 +64,9 @@ class IsolatedStepProcessExecutorTest {
         );
 
         assertTrue(comando.contains("-DAPI_THROTTLING_MINIMO_MS=500"));
+        assertTrue(comando.contains("-DETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS=1800000"));
         assertTrue(comando.contains("-DETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS=5400000"));
+        assertTrue(comando.contains("-DETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS=400"));
         assertFalse(comando.contains("-Detl.process.isolation.enabled=true"));
     }
 

@@ -3,7 +3,7 @@ context:
   - ETL
   - Persistencia
   - SQLServer
-updated_at: 2026-03-18T00:00:32.1501533-03:00
+updated_at: 2026-04-03T17:05:00-03:00
 source_of_truth: code
 classification: atual
 related_files:
@@ -43,6 +43,8 @@ O ETL moderno persiste principalmente em SQL Server. O banco contem:
 - `localizacao_cargas`
 - `contas_a_pagar`
 - `faturas_por_cliente`
+- `inventario`
+- `sinistros`
 
 ### Observabilidade
 
@@ -72,13 +74,39 @@ O ETL moderno persiste principalmente em SQL Server. O banco contem:
 
 - PK: `id`
 
+### `inventario`
+
+- PK: `identificador_unico`
+- chave operacional recorrente: `sequence_code`
+- correlacao com frete: `numero_minuta`
+
+### `sinistros`
+
+- PK: `identificador_unico`
+- chave operacional recorrente: `sequence_code`
+- correlacao com frete: `corporation_sequence_number`
+
 ## Relacoes operacionais criticas
 
 ```text
 manifestos.pick_sequence_code -> coletas.sequence_code
 fretes.accounting_credit_id   -> faturas_graphql.id
 faturas_por_cliente.fit_ant_document -> faturas_graphql.document
+inventario.numero_minuta -> fretes.corporation_sequence_number
+sinistros.corporation_sequence_number -> fretes.corporation_sequence_number
 ```
+
+## Views Power BI relevantes
+
+O runtime moderno registra as views analiticas centrais em `ConstantesViewsPowerBI`.
+
+Para a frente operacional atual, as views mais importantes sao:
+
+- `vw_fretes_powerbi`
+- `vw_localizacao_cargas_powerbi`
+- `vw_manifestos_powerbi`
+- `vw_inventario_powerbi`
+- `vw_sinistros_powerbi`
 
 ## Como a gravacao e feita
 

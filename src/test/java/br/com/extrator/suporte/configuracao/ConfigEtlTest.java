@@ -34,6 +34,50 @@ class ConfigEtlTest {
         }
     }
 
+    @Test
+    void deveUsarDefaultsDoModoIntervaloParaColetas() {
+        final String timeoutIntervaloAnterior = System.getProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms");
+        final String expansaoAnterior =
+            System.getProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
+        final String falhasAnterior = System.getProperty("etl.intervalo.coletas.max_consecutive_failures");
+        try {
+            System.clearProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms");
+            System.clearProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
+            System.clearProperty("etl.intervalo.coletas.max_consecutive_failures");
+
+            assertEquals(Duration.ofMinutes(30), ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo());
+            assertEquals(400, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo());
+            assertEquals(2, ConfigEtl.obterEtlIntervaloColetasMaxConsecutiveFailures());
+            assertEquals(Duration.ofMinutes(10), ConfigEtl.obterTimeoutEntidadeGraphQL("coletas"));
+            assertEquals(30, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDias());
+        } finally {
+            restaurarPropriedade("etl.graphql.timeout.entidade.coletas.intervalo.ms", timeoutIntervaloAnterior);
+            restaurarPropriedade("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", expansaoAnterior);
+            restaurarPropriedade("etl.intervalo.coletas.max_consecutive_failures", falhasAnterior);
+        }
+    }
+
+    @Test
+    void deveRespeitarOverridesDoModoIntervaloParaColetas() {
+        final String timeoutIntervaloAnterior = System.getProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms");
+        final String expansaoAnterior =
+            System.getProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
+        final String falhasAnterior = System.getProperty("etl.intervalo.coletas.max_consecutive_failures");
+        try {
+            System.setProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms", "2400000");
+            System.setProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", "730");
+            System.setProperty("etl.intervalo.coletas.max_consecutive_failures", "5");
+
+            assertEquals(Duration.ofMinutes(40), ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo());
+            assertEquals(730, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo());
+            assertEquals(5, ConfigEtl.obterEtlIntervaloColetasMaxConsecutiveFailures());
+        } finally {
+            restaurarPropriedade("etl.graphql.timeout.entidade.coletas.intervalo.ms", timeoutIntervaloAnterior);
+            restaurarPropriedade("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", expansaoAnterior);
+            restaurarPropriedade("etl.intervalo.coletas.max_consecutive_failures", falhasAnterior);
+        }
+    }
+
     private void restaurarPropriedade(final String chave, final String valorAnterior) {
         if (valorAnterior == null) {
             System.clearProperty(chave);

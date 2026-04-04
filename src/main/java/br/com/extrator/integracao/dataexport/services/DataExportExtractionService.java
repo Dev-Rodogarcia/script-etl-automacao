@@ -53,22 +53,28 @@ import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.persistencia.repositorio.ContasAPagarRepository;
 import br.com.extrator.persistencia.repositorio.CotacaoRepository;
 import br.com.extrator.persistencia.repositorio.FaturaPorClienteRepository;
+import br.com.extrator.persistencia.repositorio.InventarioRepository;
 import br.com.extrator.persistencia.repositorio.LocalizacaoCargaRepository;
 import br.com.extrator.persistencia.repositorio.LogExtracaoRepository;
 import br.com.extrator.persistencia.repositorio.ManifestoRepository;
+import br.com.extrator.persistencia.repositorio.SinistroRepository;
 import br.com.extrator.integracao.mapeamento.dataexport.contasapagar.ContasAPagarMapper;
 import br.com.extrator.integracao.mapeamento.dataexport.cotacao.CotacaoMapper;
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
+import br.com.extrator.integracao.mapeamento.dataexport.inventario.InventarioMapper;
 import br.com.extrator.integracao.mapeamento.dataexport.localizacaocarga.LocalizacaoCargaMapper;
 import br.com.extrator.integracao.mapeamento.dataexport.manifestos.ManifestoMapper;
+import br.com.extrator.integracao.mapeamento.dataexport.sinistros.SinistroMapper;
 import br.com.extrator.integracao.comum.ExtractionHelper;
 import br.com.extrator.integracao.comum.ExtractionLogger;
 import br.com.extrator.integracao.comum.ExtractionResult;
 import br.com.extrator.integracao.dataexport.extractors.ContasAPagarExtractor;
 import br.com.extrator.integracao.dataexport.extractors.CotacaoExtractor;
 import br.com.extrator.integracao.dataexport.extractors.FaturaPorClienteExtractor;
+import br.com.extrator.integracao.dataexport.extractors.InventarioExtractor;
 import br.com.extrator.integracao.dataexport.extractors.LocalizacaoCargaExtractor;
 import br.com.extrator.integracao.dataexport.extractors.ManifestoExtractor;
+import br.com.extrator.integracao.dataexport.extractors.SinistroExtractor;
 import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionAuditRecorder;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
@@ -154,6 +160,10 @@ public class DataExportExtractionService {
             || "constas a pagar".equals(ent) || "constas-a-pagar".equals(ent);
         final boolean executarFaturasPorCliente = ent.isEmpty() || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(ent) 
             || Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_CLIENTE).anyMatch(alias -> alias.equals(ent));
+        final boolean executarInventario = ent.isEmpty() || ConstantesEntidades.INVENTARIO.equals(ent)
+            || Arrays.stream(ConstantesEntidades.ALIASES_INVENTARIO).anyMatch(alias -> alias.equals(ent));
+        final boolean executarSinistros = ent.isEmpty() || ConstantesEntidades.SINISTROS.equals(ent)
+            || Arrays.stream(ConstantesEntidades.ALIASES_SINISTROS).anyMatch(alias -> alias.equals(ent));
         
         if (executarManifestos) {
             try {
@@ -270,6 +280,44 @@ public class DataExportExtractionService {
             }
             ExtractionHelper.aplicarDelay();
         }
+
+        if (executarInventario) {
+            try {
+                final ExtractionResult result = executarComTimeout(
+                    ConstantesEntidades.INVENTARIO,
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.INVENTARIO, dataInicio, dataFim);
+                        return extractInventario(datas.inicio(), datas.fim());
+                    }
+                );
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                registrarFalhaEntidade(resultados, ConstantesEntidades.INVENTARIO, "Inventario", e, dataInicio, dataFim);
+            }
+            ExtractionHelper.aplicarDelay();
+        }
+
+        if (executarSinistros) {
+            try {
+                final ExtractionResult result = executarComTimeout(
+                    ConstantesEntidades.SINISTROS,
+                    () -> {
+                        final ExecutionDates datas =
+                            resolverDatasExecucao(ConstantesEntidades.SINISTROS, dataInicio, dataFim);
+                        return extractSinistros(datas.inicio(), datas.fim());
+                    }
+                );
+                if (result != null) {
+                    resultados.add(result);
+                }
+            } catch (final Exception e) {
+                registrarFalhaEntidade(resultados, ConstantesEntidades.SINISTROS, "Sinistros", e, dataInicio, dataFim);
+            }
+            ExtractionHelper.aplicarDelay();
+        }
         
         // Resumo consolidado final
         exibirResumoConsolidado(resultados, inicioExecucao);
@@ -352,6 +400,34 @@ public class DataExportExtractionService {
             log
         );
         
+        final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
+        logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        return result;
+    }
+
+    private ExtractionResult extractInventario(final LocalDate dataInicio, final LocalDate dataFim) {
+        final InventarioExtractor extractor = new InventarioExtractor(
+            apiClient,
+            new InventarioRepository(),
+            new InventarioMapper(),
+            log
+        );
+
+        final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
+        logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        return result;
+    }
+
+    private ExtractionResult extractSinistros(final LocalDate dataInicio, final LocalDate dataFim) {
+        final SinistroExtractor extractor = new SinistroExtractor(
+            apiClient,
+            new SinistroRepository(),
+            new SinistroMapper(),
+            log
+        );
+
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         logRepository.gravarLogExtracao(result.toLogEntity());
         ExecutionAuditRecorder.registrar(executionAuditPort, result);

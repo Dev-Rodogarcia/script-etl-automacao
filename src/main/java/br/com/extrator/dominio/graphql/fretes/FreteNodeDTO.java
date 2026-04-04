@@ -111,6 +111,12 @@ public class FreteNodeDTO {
     @JsonProperty("serviceDate")
     private String serviceDate; // Recebe como String para ser convertido para LocalDate
 
+    @JsonProperty("finishedAt")
+    private String finishedAt;
+
+    @JsonProperty("corporationSequenceNumber")
+    private Long corporationSequenceNumber;
+
     // --- Campos Expandidos (Objetos Aninhados) ---
     @JsonProperty("payer")
     private PayerDTO payer;
@@ -417,6 +423,22 @@ public class FreteNodeDTO {
 
     public void setServiceDate(final String serviceDate) {
         this.serviceDate = serviceDate;
+    }
+
+    public String getFinishedAt() {
+        return finishedAt;
+    }
+
+    public void setFinishedAt(final String finishedAt) {
+        this.finishedAt = finishedAt;
+    }
+
+    public Long getCorporationSequenceNumber() {
+        return corporationSequenceNumber;
+    }
+
+    public void setCorporationSequenceNumber(final Long corporationSequenceNumber) {
+        this.corporationSequenceNumber = corporationSequenceNumber;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

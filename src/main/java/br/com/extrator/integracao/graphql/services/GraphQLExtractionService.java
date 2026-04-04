@@ -51,6 +51,7 @@ import java.util.List;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
+import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
 import br.com.extrator.persistencia.repositorio.FreteRepository;
@@ -465,10 +466,19 @@ public class GraphQLExtractionService {
     }
 
     protected ExtractionResult extractFretes(final LocalDate dataInicio, final LocalDate dataFim) {
+        final ClienteApiDataExport indicadoresApiClient = new ClienteApiDataExport();
+        final String pipelineExecutionId =
+            br.com.extrator.suporte.observabilidade.ExecutionContext.currentExecutionId();
+        indicadoresApiClient.setExecutionUuid(
+            "n/a".equals(pipelineExecutionId)
+                ? java.util.UUID.randomUUID().toString()
+                : pipelineExecutionId
+        );
         final FreteExtractor extractor = new FreteExtractor(
             apiClient,
             new FreteRepository(),
-            new FreteMapper()
+            new FreteMapper(),
+            indicadoresApiClient::buscarFretesIndicadores
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());

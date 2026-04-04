@@ -61,6 +61,8 @@ public final class ConstantesEntidades {
     public static final String LOCALIZACAO_CARGAS = "localizacao_cargas";
     public static final String CONTAS_A_PAGAR = "contas_a_pagar";
     public static final String FATURAS_POR_CLIENTE = "faturas_por_cliente";
+    public static final String INVENTARIO = "inventario";
+    public static final String SINISTROS = "sinistros";
     
     // ========== ALIASES PARA COMPATIBILIDADE ==========
     /** Aliases para input do usuário (múltiplas formas aceitas) */
@@ -68,6 +70,8 @@ public final class ConstantesEntidades {
     public static final String[] ALIASES_LOCALIZACAO = {"localizacao_carga", "localizacao_de_carga", "localizacao-carga", "localizacao de carga"};
     public static final String[] ALIASES_CONTAS_PAGAR = {"contas_a_pagar", "contasapagar", "contas a pagar", "contas-a-pagar"};
     public static final String[] ALIASES_FATURAS_CLIENTE = {"faturas_por_cliente", "faturasporcliente", "faturas por cliente", "faturas-por-cliente"};
+    public static final String[] ALIASES_INVENTARIO = {"inventario", "inventário"};
+    public static final String[] ALIASES_SINISTROS = {"sinistros", "sinistro"};
     public static final String[] ALIASES_FATURAS_GRAPHQL = {"faturas_graphql", "faturas"};
     
     // ========== STATUS DE EXTRAÇÃO ==========

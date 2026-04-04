@@ -32,6 +32,10 @@ echo ================================================================
 echo   EXPORTADOR CSV - TODOS OS DADOS
 echo ================================================================
 echo.
+echo Escopo atual de exportacao:
+echo   Views/tabelas operacionais, incluindo inventario e sinistros
+echo   Referencias BI: vw_inventario_powerbi e vw_sinistros_powerbi
+echo.
 
 REM Compilar e gerar JAR antes de executar
 if /i "%PROD_MODE%"=="1" (
@@ -123,8 +127,10 @@ if "%OPCAO%"=="2" (
     echo   6. fretes                ^(Fretes^)
     echo   7. manifestos            ^(Manifestos^)
     echo   8. localizacao_cargas    ^(Localizacao de Cargas^)
-    echo   9. dim_usuarios          ^(Usuarios do Sistema - Dimensao^)
-    echo  10. page_audit            ^(Auditoria de Paginas^)
+    echo   9. inventario            ^(Inventario / vw_inventario_powerbi^)
+    echo  10. sinistros             ^(Sinistros / vw_sinistros_powerbi^)
+    echo  11. dim_usuarios          ^(Usuarios do Sistema - Dimensao^)
+    echo  12. page_audit            ^(Auditoria de Paginas^)
     echo   0. Voltar ao menu anterior
     echo.
     set /p TABELA_NUM="Digite o numero da tabela: "
@@ -144,8 +150,10 @@ if "%OPCAO%"=="2" (
     if "!TABELA_NUM!"=="6" set "TABELA=fretes"
     if "!TABELA_NUM!"=="7" set "TABELA=manifestos"
     if "!TABELA_NUM!"=="8" set "TABELA=localizacao_cargas"
-    if "!TABELA_NUM!"=="9" set "TABELA=dim_usuarios"
-    if "!TABELA_NUM!"=="10" set "TABELA=page_audit"
+    if "!TABELA_NUM!"=="9" set "TABELA=inventario"
+    if "!TABELA_NUM!"=="10" set "TABELA=sinistros"
+    if "!TABELA_NUM!"=="11" set "TABELA=dim_usuarios"
+    if "!TABELA_NUM!"=="12" set "TABELA=page_audit"
     
     if not defined TABELA (
         echo ERRO: Numero invalido!
@@ -191,15 +199,15 @@ echo   EXPORTACAO CONCLUIDA COM SUCESSO!
 echo ================================================================
 echo.
 
-REM Verificar se a pasta exports existe e tem arquivos
-if exist "exports\*.csv" (
+REM Verificar se a pasta runtime\exports existe e tem arquivos
+if exist "runtime\exports\*.csv" (
     echo Arquivos CSV gerados:
-    dir /B exports\*.csv
+    dir /B runtime\exports\*.csv
     echo.
-    echo Abrindo pasta exports...
-    start "" "exports"
+    echo Abrindo pasta runtime\exports...
+    start "" "runtime\exports"
 ) else (
-    echo AVISO: Nenhum arquivo CSV encontrado em exports/
+    echo AVISO: Nenhum arquivo CSV encontrado em runtime\exports\
     echo Verifique se ha dados nas tabelas
 )
 
@@ -218,10 +226,12 @@ echo   - coletas.csv                         (Coletas)
 echo   - manifestos.csv                      (Manifestos)
 echo   - cotacoes.csv                        (Cotacoes)
 echo   - localizacao_cargas.csv              (Localizacao da Carga)
+echo   - inventario.csv                      (Inventario / vw_inventario_powerbi)
+echo   - sinistros.csv                       (Sinistros / vw_sinistros_powerbi)
 echo   - dim_usuarios.csv                    (Usuarios do Sistema - Dimensao)
 echo   - page_audit.csv                      (Auditoria de Paginas)
 echo.
-echo Verifique a pasta 'exports' para os arquivos gerados.
+echo Verifique a pasta 'runtime\exports' para os arquivos gerados.
 echo.
 pause
 endlocal

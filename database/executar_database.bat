@@ -150,6 +150,8 @@ for %%F in (
     "migrations\002_corrigir_constraint_manifestos.sql"
     "migrations\003_corrigir_tipo_datetime_faturas_graphql.sql"
     "migrations\004_adicionar_request_hour_coletas.sql"
+    "migrations\005_alinhar_sys_execution_history_schema.sql"
+    "migrations\006_alterar_fretes_indicadores_gestao.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -192,6 +194,8 @@ for %%F in (
     "views\016_criar_view_contas_a_pagar_powerbi.sql"
     "views\017_criar_view_localizacao_cargas_powerbi.sql"
     "views\018_criar_view_manifestos_powerbi.sql"
+    "views\020_criar_view_inventario_powerbi.sql"
+    "views\021_criar_view_sinistros_powerbi.sql"
     "views\019_criar_view_bi_monitoramento.sql"
     "views-dimensao\019_criar_view_dim_filiais.sql"
     "views-dimensao\020_criar_view_dim_clientes.sql"
@@ -261,6 +265,10 @@ for %%F in (
     "tabelas\015_criar_tabela_sys_execution_watermark.sql"
     "tabelas\016_alter_tabela_dim_usuarios_estado.sql"
     "tabelas\017_criar_tabela_dim_usuarios_historico.sql"
+    "tabelas\018_criar_tabela_schema_migrations.sql"
+    "tabelas\019_criar_tabela_etl_invalid_records.sql"
+    "tabelas\020_criar_tabela_inventario.sql"
+    "tabelas\021_criar_tabela_sinistros.sql"
 ) do (
     if not exist %%F (
         echo [ERRO] Script nao encontrado: %%~F

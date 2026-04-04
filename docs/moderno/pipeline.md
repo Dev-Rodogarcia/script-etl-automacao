@@ -3,7 +3,7 @@ context:
   - ETL
   - Pipeline
   - Runtime
-updated_at: 2026-03-18T00:00:32.1501533-03:00
+updated_at: 2026-04-03T17:05:00-03:00
 source_of_truth: code
 classification: atual
 related_files:
@@ -41,7 +41,7 @@ Detalhe critico:
 ### Step `dataexport`
 
 - Quando recebe entidade `dataexport`, executa o bloco DataExport principal.
-- Cobre `manifestos`, `cotacoes`, `localizacao_cargas`, `contas_a_pagar` e `faturas_por_cliente`.
+- Cobre `manifestos`, `cotacoes`, `localizacao_cargas`, `contas_a_pagar`, `faturas_por_cliente`, `inventario` e `sinistros`.
 
 ### Step `faturas_graphql`
 

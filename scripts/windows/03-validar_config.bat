@@ -38,6 +38,9 @@ REM ================================================================
 echo ================================================================
 echo VALIDANDO CONFIGURACOES DO SISTEMA
 echo ================================================================
+echo Cobertura esperada: GraphQL + DataExport, incluindo inventario e sinistros.
+echo Validacao tambem confirma prontidao das views e logs operacionais dessas trilhas.
+echo.
 
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.

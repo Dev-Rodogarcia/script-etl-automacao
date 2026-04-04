@@ -39,6 +39,11 @@ Pode existir pre-backfill referencial:
 
 Se `usuarios_sistema` for necessario, ele roda antes.
 
+No modo `--extracao-intervalo`, o runtime aplica um timeout maior para `coletas`
+e amplia temporariamente o limite de expansao do backfill referencial. Isso evita
+que blocos longos de backfill dependam de variavel de ambiente manual para caber
+no orçamento do step.
+
 ### Depois do pipeline principal
 
 Pode existir pos-hidratacao:
@@ -77,13 +82,27 @@ if nao for loop daemon e nao houver falha nos runners:
 validar manifestos x coletas
 ```
 
+## Fail-fast no modo intervalo
+
+Backfill por intervalo agora aborta cedo quando `coletas` acumula 2 falhas
+criticas consecutivas. Entram nessa contagem:
+
+- falha direta do step `graphql:coletas`;
+- `AUDIT_AUSENTE` para `coletas`;
+- `coletas sem log no bloco ...`;
+- quebra referencial de `manifestos` com `contexto_coletas={sem_auditoria}`.
+
+Se um bloco intermediario termina saudavel, o contador zera.
+
 ## Erro comum de interpretacao
 
 Erro:
 
 - assumir que a janela principal sozinha define toda a integridade de `coletas`.
+- assumir que o problema de backfill longo esta na busca por dia.
 
 Interpretacao correta:
 
 - a janela principal mede o ciclo oficial;
 - as janelas auxiliares existem para fechar referencia sem adulterar essa medicao.
+- o gargalo do incidente analisado era o orçamento total do step/bloco, nao a divisao diaria em si.

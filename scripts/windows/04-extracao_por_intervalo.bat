@@ -37,6 +37,26 @@ set "FINAL_EXIT_CODE=0"
 set "FLAG_FATURAS_GRAPHQL="
 set "PARAM_FLAG_FATURAS="
 
+REM Configurar JAVA_HOME automaticamente (Java 17+)
+if not defined JAVA_HOME (
+    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :JAVA_HOME_FOUND
+    )
+    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-*" 2^>nul') do (
+        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
+        goto :JAVA_HOME_FOUND
+    )
+)
+:JAVA_HOME_FOUND
+if defined JAVA_HOME (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        set "PATH=%JAVA_HOME%\bin;%PATH%"
+    ) else (
+        set "JAVA_HOME="
+    )
+)
+
 REM ================================================================
 REM Script: 04-extracao_por_intervalo.bat
 REM Finalidade:
@@ -58,6 +78,8 @@ REM Exemplos:
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport localizacao_cargas
+REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport inventario
+REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 dataexport sinistros
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 --sem-faturas-graphql
 REM   04-extracao_por_intervalo.bat 2024-10-26 2024-12-26 --com-faturas-graphql
 REM
@@ -170,6 +192,7 @@ echo ================================================================
 echo.
 echo Este script permite extrair dados de um periodo especifico.
 echo O sistema dividira automaticamente em blocos de 31 dias.
+echo Escopo DataExport atual: manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario e sinistros.
 echo.
 echo Formato de data: YYYY-MM-DD ^(exemplo: 2024-11-01^)
 echo.
@@ -236,7 +259,7 @@ if "%OPCAO_API%"=="2" (
     echo ================================================================
     echo.
     echo   1. GraphQL ^(Coletas, Fretes, Faturas GraphQL^)
-    echo   2. DataExport ^(Manifestos, Cotacoes, Localizacao de Cargas, Contas a Pagar, Faturas por Cliente^)
+    echo   2. DataExport ^(Manifestos, Cotacoes, Localizacao de Cargas, Contas a Pagar, Faturas por Cliente, Inventario, Sinistros^)
     echo   0. Voltar
     echo.
     set /p API_NUM="Digite o numero da API: "
@@ -295,6 +318,8 @@ if "%OPCAO_API%"=="2" (
         echo   3. localizacao_cargas
         echo   4. contas_a_pagar
         echo   5. faturas_por_cliente
+        echo   6. inventario
+        echo   7. sinistros
         echo.
         set /p ENTIDADE_NUM="Digite o numero da entidade (0 = todas): "
         
@@ -310,6 +335,10 @@ if "%OPCAO_API%"=="2" (
             set "ENTIDADE_ESCOLHIDA=contas_a_pagar"
         ) else if "!ENTIDADE_NUM!"=="5" (
             set "ENTIDADE_ESCOLHIDA=faturas_por_cliente"
+        ) else if "!ENTIDADE_NUM!"=="6" (
+            set "ENTIDADE_ESCOLHIDA=inventario"
+        ) else if "!ENTIDADE_NUM!"=="7" (
+            set "ENTIDADE_ESCOLHIDA=sinistros"
         ) else (
             echo ERRO: Numero invalido!
             pause
@@ -421,6 +450,9 @@ if not "%API_ESCOLHIDA%"=="" (
     echo API: TODAS
     echo Entidade: TODAS
 )
+if /i "%API_ESCOLHIDA%"=="dataexport" if "%ENTIDADE_ESCOLHIDA%"=="" (
+    echo Escopo DataExport: manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
+)
 if defined FLAG_FATURAS_GRAPHQL (
     echo Faturas GraphQL: DESABILITADO
 ) else (
@@ -469,6 +501,7 @@ if "%JAVA_EXIT_CODE%"=="0" (
 :END
 echo.
 echo Verifique os logs na pasta 'logs' para mais detalhes.
+echo Referencia de entidades novas nos logs: dataexport:inventario e dataexport:sinistros.
 echo.
 pause
 set "RET_CODE=%FINAL_EXIT_CODE%"

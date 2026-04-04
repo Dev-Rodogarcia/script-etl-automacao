@@ -24,10 +24,10 @@ echo            suporte: lucasmac.dev@gmail.com
 echo            by: @valentelucass
 echo ================================================================
 echo.
-echo 01. Extracao completa ultimas 24h
-echo 02. Loop de extracao 30 minutos
-echo 03. Extracao por intervalo
-echo 04. Testar API especifica
+echo 01. Extracao completa ultimas 24h ^(inclui inventario e sinistros^)
+echo 02. Loop de extracao 30 minutos ^(inclui inventario e sinistros^)
+echo 03. Extracao por intervalo ^(inclui inventario e sinistros^)
+echo 04. Testar API especifica ^(inventario e sinistros disponiveis^)
 echo 05. Validar configuracoes
 echo 06. Bateria extrema e relatorio de saude do ETL
 echo 07. Exportar CSV
@@ -35,6 +35,10 @@ echo 08. Auditar estrutura das APIs
 echo 09. Ver ajuda de comandos
 echo 10. Gerenciar usuarios de acesso ^(tecla U^)
 echo 00. Sair
+echo.
+echo Cobertura atual do ETL:
+echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 if not "%STARTUP_READY%"=="1" (
     echo Ambiente sera validado ao executar a primeira opcao.
@@ -169,6 +173,9 @@ if exist "%~dp0database\executar_database.bat" (
     if errorlevel 1 (
         echo [AVISO] Pipeline de banco retornou erro. Veja logs\database_startup.log
         timeout /t 3 /nobreak >nul 2>&1
+    ) else (
+        echo [OK] Ambiente de banco preparado, incluindo inventario/sinistros e views do BI.
+        echo [INFO] Referencia: logs\database_startup.log
     )
 )
 set "STARTUP_READY=1"

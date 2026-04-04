@@ -228,6 +228,8 @@ public class FluxoCompletoUseCase {
                 ConstantesEntidades.MANIFESTOS,
                 ConstantesEntidades.COTACOES,
                 ConstantesEntidades.LOCALIZACAO_CARGAS,
+                ConstantesEntidades.INVENTARIO,
+                ConstantesEntidades.SINISTROS,
                 ConstantesEntidades.CONTAS_A_PAGAR,
                 ConstantesEntidades.FATURAS_POR_CLIENTE,
                 ConstantesEntidades.FATURAS_GRAPHQL

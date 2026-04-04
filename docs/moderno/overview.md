@@ -3,7 +3,7 @@ context:
   - ETL
   - Overview
   - Onboarding
-updated_at: 2026-03-18T00:00:32.1501533-03:00
+updated_at: 2026-04-03T17:05:00-03:00
 source_of_truth: code
 classification: atual
 related_files:
@@ -105,6 +105,8 @@ Esses comandos nao sao apenas "relatorios"; eles fazem parte do modelo operacion
 - `localizacao_cargas`
 - `contas_a_pagar`
 - `faturas_por_cliente`
+- `inventario`
+- `sinistros`
 
 ## Evolucao resumida
 
@@ -123,6 +125,7 @@ Na pratica, a fase atual reescreveu a explicacao do sistema a partir do runtime 
 - `faturas_graphql` e um step separado e mais custoso.
 - `coletas` tem papel referencial central para `manifestos`.
 - `fretes` depende de `faturas_graphql` para fechar referencias financeiras.
+- `fretes` entra por GraphQL, mas pode ser enriquecido com Data Export `6389` para preencher performance oficial.
 - o daemon pode continuar vivo mesmo quando a validacao final gera alerta operacional.
 
 ## O que um dev novo deve ler primeiro

@@ -28,6 +28,7 @@ REM Script: 08-auditar_api.bat
 REM Finalidade:
 REM   Audita a estrutura das APIs (GraphQL e DataExport).
 REM   Gera relatorio CSV com todos os campos disponiveis em cada entidade.
+REM   Inclui as trilhas atuais de inventario e sinistros na cobertura DataExport.
 REM
 REM Uso:
 REM   08-auditar_api.bat
@@ -41,6 +42,10 @@ REM ================================================================
 echo ================================================================
 echo AUDITAR ESTRUTURA DA API
 echo ================================================================
+echo.
+echo Cobertura atual:
+echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 
 if /i "%PROD_MODE%"=="1" (
@@ -117,6 +122,7 @@ if %EXITCODE% NEQ 0 (
 
 echo.
 echo Saida em pasta 'relatorios'.
+echo Referencias esperadas no inventario de campos: inventario e sinistros.
 echo.
 pause
 endlocal

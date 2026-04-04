@@ -30,13 +30,13 @@ package br.com.extrator.integracao.mapeamento.dataexport.manifestos;
 import br.com.extrator.dominio.dataexport.manifestos.ManifestoDTO;
 
 import br.com.extrator.persistencia.entidade.ManifestoEntity;
+import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.validacao.ValidadorDTO;
 import br.com.extrator.suporte.validacao.ValidadorDTO.ResultadoValidacao;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
 /**
@@ -158,25 +158,25 @@ public class ManifestoMapper {
         // 2. Conversão segura de tipos de dados
         try {
             if (dto.getCreatedAt() != null && !dto.getCreatedAt().trim().isEmpty()) {
-                entity.setCreatedAt(OffsetDateTime.parse(dto.getCreatedAt()));
+                entity.setCreatedAt(FormatadorData.parseOffsetDateTime(dto.getCreatedAt()));
             }
             if (dto.getDeparturedAt() != null && !dto.getDeparturedAt().trim().isEmpty()) {
-                entity.setDeparturedAt(OffsetDateTime.parse(dto.getDeparturedAt()));
+                entity.setDeparturedAt(FormatadorData.parseOffsetDateTime(dto.getDeparturedAt()));
             }
             if (dto.getClosedAt() != null && !dto.getClosedAt().trim().isEmpty()) {
-                entity.setClosedAt(OffsetDateTime.parse(dto.getClosedAt()));
+                entity.setClosedAt(FormatadorData.parseOffsetDateTime(dto.getClosedAt()));
             }
             if (dto.getFinishedAt() != null && !dto.getFinishedAt().trim().isEmpty()) {
-                entity.setFinishedAt(OffsetDateTime.parse(dto.getFinishedAt()));
+                entity.setFinishedAt(FormatadorData.parseOffsetDateTime(dto.getFinishedAt()));
             }
             if (dto.getMobileReadAt() != null && !dto.getMobileReadAt().trim().isEmpty()) {
-                entity.setMobileReadAt(OffsetDateTime.parse(dto.getMobileReadAt()));
+                entity.setMobileReadAt(FormatadorData.parseOffsetDateTime(dto.getMobileReadAt()));
             }
             if (dto.getProgramacaoStartingAt() != null && !dto.getProgramacaoStartingAt().trim().isEmpty()) {
-                entity.setProgramacaoStartingAt(OffsetDateTime.parse(dto.getProgramacaoStartingAt()));
+                entity.setProgramacaoStartingAt(FormatadorData.parseOffsetDateTime(dto.getProgramacaoStartingAt()));
             }
             if (dto.getProgramacaoEndingAt() != null && !dto.getProgramacaoEndingAt().trim().isEmpty()) {
-                entity.setProgramacaoEndingAt(OffsetDateTime.parse(dto.getProgramacaoEndingAt()));
+                entity.setProgramacaoEndingAt(FormatadorData.parseOffsetDateTime(dto.getProgramacaoEndingAt()));
             }
         } catch (final DateTimeParseException e) {
             logger.error("❌ Erro ao converter datas para manifesto {}: createdAt='{}', departuredAt='{}', closedAt='{}', finishedAt='{}' - {}", 

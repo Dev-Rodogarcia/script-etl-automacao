@@ -152,6 +152,30 @@ public final class ConstantesApiDataExport {
             Duration.ofSeconds(60),         // timeout
             "unique_id asc",                // orderBy (diferente!)
             false                           // usaSearchNested
+        ),
+
+        // INVENTARIO - Template 10633
+        ConstantesEntidades.INVENTARIO,
+        new ConfiguracaoEntidade(
+            10633,
+            "started_at",
+            "check_in_orders",
+            "100",
+            Duration.ofSeconds(90),
+            "sequence_code asc",
+            false
+        ),
+
+        // SINISTROS - Template 6392
+        ConstantesEntidades.SINISTROS,
+        new ConfiguracaoEntidade(
+            6392,
+            "opening_at_date",
+            "insurance_claims",
+            "100",
+            Duration.ofSeconds(60),
+            "sequence_code asc",
+            false
         )
     );
 

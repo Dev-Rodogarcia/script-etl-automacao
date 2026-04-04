@@ -83,6 +83,20 @@ final class IntegridadeEtlSpecCatalog {
             List.of("unique_id"),
             List.of("unique_id", "metadata", "data_extracao")
         ));
+        specs.put(ConstantesEntidades.INVENTARIO, new IntegridadeEtlSpec(
+            ConstantesEntidades.INVENTARIO,
+            ConstantesEntidades.INVENTARIO,
+            "data_extracao",
+            List.of("identificador_unico"),
+            List.of("identificador_unico", "metadata", "data_extracao")
+        ));
+        specs.put(ConstantesEntidades.SINISTROS, new IntegridadeEtlSpec(
+            ConstantesEntidades.SINISTROS,
+            ConstantesEntidades.SINISTROS,
+            "data_extracao",
+            List.of("identificador_unico"),
+            List.of("identificador_unico", "metadata", "data_extracao")
+        ));
         specs.put(ConstantesEntidades.FATURAS_GRAPHQL, new IntegridadeEtlSpec(
             ConstantesEntidades.FATURAS_GRAPHQL,
             ConstantesEntidades.FATURAS_GRAPHQL,

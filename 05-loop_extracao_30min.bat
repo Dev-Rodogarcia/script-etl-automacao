@@ -33,6 +33,10 @@ echo ================================================================
 echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos^)
 echo ================================================================
 echo.
+echo Cobertura do loop:
+echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
+echo.
 
 pushd "%~dp0"
 
@@ -119,9 +123,11 @@ if errorlevel 1 goto :MENU
 
 if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
   echo Iniciando loop daemon com Faturas GraphQL DESABILITADO...
+  echo As trilhas DataExport de inventario e sinistros permanecem ativas no loop.
   java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
 ) else (
   echo Iniciando loop daemon com Faturas GraphQL INCLUIDO...
+  echo As trilhas DataExport de inventario e sinistros permanecem ativas no loop.
   java --enable-native-access=ALL-UNNAMED -jar "%~dp0target\extrator.jar" --loop-daemon-start
 )
 echo.
@@ -185,6 +191,7 @@ if not exist "%~dp0logs\daemon\loop_daemon_console.log" (
 echo.
 echo Acompanhando logs em tempo real...
 echo Arquivo: %~dp0logs\daemon\loop_daemon_console.log
+echo Referencias esperadas: dataexport:inventario e dataexport:sinistros entre os steps do ciclo.
 echo Pressione CTRL+C para encerrar a visualizacao e voltar ao menu.
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Path '%~dp0logs\daemon\loop_daemon_console.log' -Encoding UTF8 -Tail 60 -Wait"

@@ -10,6 +10,8 @@ echo.
 echo Este script executa a validacao completa do ETL sem alterar producao
 echo por padrao. Testes que reescrevem dados ^(idempotencia e hidratacao^)
 echo so rodam com confirmacao explicita.
+echo Cobertura operacional considerada: coletas, fretes, faturas_graphql, manifestos, cotacoes,
+echo localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario e sinistros.
 echo.
 
 if /i "%PROD_MODE%"=="1" (
@@ -82,7 +84,7 @@ echo.
 if "%RET_CODE%"=="0" (
     echo ================================================================
     echo BATERIA EXTREMA CONCLUIDA COM SUCESSO
-    echo ================================================================
+echo ================================================================
 ) else (
     echo ================================================================
     echo BATERIA EXTREMA IDENTIFICOU PROBLEMAS ^(Exit Code: %RET_CODE%^)
@@ -90,6 +92,7 @@ if "%RET_CODE%"=="0" (
 )
 echo.
 echo Verifique os relatorios gerados na pasta logs\.
+echo Referencias novas esperadas nos relatorios: inventario e sinistros.
 echo.
 pause
 endlocal & exit /b %RET_CODE%

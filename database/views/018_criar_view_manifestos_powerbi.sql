@@ -19,6 +19,7 @@ SELECT
     END                                                 AS [Status],
     classification                                      AS [Classificação],
     branch_nickname                                     AS [Filial],
+    branch_nickname                                     AS [Filial Emissora],
     created_at                                          AS [Data criação],
     departured_at                                       AS [Saída],
     closed_at                                           AS [Fechamento],
@@ -124,8 +125,10 @@ SELECT
     vehicle_weight_capacity                             AS [Veículo/Capacidade Peso],
     vehicle_cubic_weight                                AS [Veículo/Peso Cubado],
     capacidade_kg                                       AS [Capacidade Lotação Kg],
-    REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', '')
+    REPLACE(REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', ''), '"', '')
                                                         AS [Descarregamento/Destinatários],
+    REPLACE(REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', ''), '"', '')
+                                                        AS [Local de Descarregamento],
     REPLACE(REPLACE(REPLACE(delivery_region_names, '[', ''), ']', ''), '"', '')
                                                         AS [Entrega/Regiões],
     programacao_cliente                                 AS [Programação/Cliente],

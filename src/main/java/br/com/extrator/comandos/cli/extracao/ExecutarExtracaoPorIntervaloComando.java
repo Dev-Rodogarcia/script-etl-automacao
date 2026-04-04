@@ -167,6 +167,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 graphql");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 dataexport manifestos");
+        log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 inventario");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 --sem-faturas-graphql");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 --modo-loop-daemon");
     }
@@ -175,7 +176,9 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         final String entidadeLower = entidadeEspecifica.toLowerCase(Locale.ROOT);
         if (entidadeLower.equals(ConstantesEntidades.COLETAS)
             || entidadeLower.equals(ConstantesEntidades.FRETES)
-            || entidadeLower.equals(ConstantesEntidades.FATURAS_GRAPHQL)) {
+            || entidadeLower.equals(ConstantesEntidades.FATURAS_GRAPHQL)
+            || entidadeLower.equals(ConstantesEntidades.USUARIOS_SISTEMA)
+            || "usuarios".equals(entidadeLower)) {
             log.info("API inferida: GraphQL (baseado na entidade: {})", entidadeEspecifica);
             return "graphql";
         }
@@ -183,7 +186,11 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
             || entidadeLower.equals(ConstantesEntidades.COTACOES)
             || entidadeLower.equals(ConstantesEntidades.LOCALIZACAO_CARGAS)
             || entidadeLower.equals(ConstantesEntidades.CONTAS_A_PAGAR)
-            || entidadeLower.equals(ConstantesEntidades.FATURAS_POR_CLIENTE)) {
+            || entidadeLower.equals(ConstantesEntidades.FATURAS_POR_CLIENTE)
+            || entidadeLower.equals(ConstantesEntidades.INVENTARIO)
+            || entidadeLower.equals(ConstantesEntidades.SINISTROS)
+            || "inventário".equals(entidadeLower)
+            || "sinistro".equals(entidadeLower)) {
             log.info("API inferida: DataExport (baseado na entidade: {})", entidadeEspecifica);
             return "dataexport";
         }

@@ -35,6 +35,8 @@ public final class ConstantesViewsPowerBI {
         VIEWS.put("contas_a_pagar", "vw_contas_a_pagar_powerbi");
         VIEWS.put("localizacao_cargas", "vw_localizacao_cargas_powerbi");
         VIEWS.put("manifestos", "vw_manifestos_powerbi");
+        VIEWS.put("inventario", "vw_inventario_powerbi");
+        VIEWS.put("sinistros", "vw_sinistros_powerbi");
     }
 
     private ConstantesViewsPowerBI() {

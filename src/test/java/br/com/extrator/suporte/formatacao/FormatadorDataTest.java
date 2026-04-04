@@ -63,4 +63,15 @@ class FormatadorDataTest {
 
         assertNull(resultado);
     }
+
+    @Test
+    void deveParsearFormatoMmDdYyyyComHoraDoDataExport() {
+        final OffsetDateTime resultado = FormatadorData.parseOffsetDateTime("03/05/2026 23:59:00");
+
+        assertNotNull(resultado);
+        assertEquals(2026, resultado.getYear());
+        assertEquals(3, resultado.getMonthValue());
+        assertEquals(5, resultado.getDayOfMonth());
+        assertEquals(23, resultado.getHour());
+    }
 }

@@ -95,7 +95,9 @@ public class CompletudeValidator {
         ConstantesEntidades.COTACOES, ConstantesEntidades.COTACOES,
         ConstantesEntidades.LOCALIZACAO_CARGAS, ConstantesEntidades.LOCALIZACAO_CARGAS,
         ConstantesEntidades.CONTAS_A_PAGAR, ConstantesEntidades.CONTAS_A_PAGAR,
-        ConstantesEntidades.FATURAS_POR_CLIENTE, ConstantesEntidades.FATURAS_POR_CLIENTE
+        ConstantesEntidades.FATURAS_POR_CLIENTE, ConstantesEntidades.FATURAS_POR_CLIENTE,
+        ConstantesEntidades.INVENTARIO, ConstantesEntidades.INVENTARIO,
+        ConstantesEntidades.SINISTROS, ConstantesEntidades.SINISTROS
     );
     
     /**
@@ -197,6 +199,14 @@ public class CompletudeValidator {
             final int contagemFaturasPorCliente = clienteApiDataExport.obterContagemFaturasPorCliente(dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.FATURAS_POR_CLIENTE, contagemFaturasPorCliente);
             logger.info("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Faturas por Cliente: {} registros", contagemFaturasPorCliente);
+
+            final int contagemInventario = clienteApiDataExport.obterContagemInventario(dataReferencia);
+            totaisEslCloud.put(ConstantesEntidades.INVENTARIO, contagemInventario);
+            logger.info("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Inventario: {} registros", contagemInventario);
+
+            final int contagemSinistros = clienteApiDataExport.obterContagemSinistros(dataReferencia);
+            totaisEslCloud.put(ConstantesEntidades.SINISTROS, contagemSinistros);
+            logger.info("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Sinistros: {} registros", contagemSinistros);
 
             
             // Log do resumo final

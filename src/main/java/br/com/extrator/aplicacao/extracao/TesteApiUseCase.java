@@ -320,6 +320,8 @@ public class TesteApiUseCase {
             entidades.add(ConstantesEntidades.LOCALIZACAO_CARGAS);
             entidades.add(ConstantesEntidades.CONTAS_A_PAGAR);
             entidades.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
+            entidades.add(ConstantesEntidades.INVENTARIO);
+            entidades.add(ConstantesEntidades.SINISTROS);
         }
 
         return new ArrayList<>(entidades);
@@ -349,6 +351,8 @@ public class TesteApiUseCase {
             case "localizacao_carga", "localizacao_de_carga" -> ConstantesEntidades.LOCALIZACAO_CARGAS;
             case "contasapagar" -> ConstantesEntidades.CONTAS_A_PAGAR;
             case "faturasporcliente" -> ConstantesEntidades.FATURAS_POR_CLIENTE;
+            case "inventário" -> ConstantesEntidades.INVENTARIO;
+            case "sinistro" -> ConstantesEntidades.SINISTROS;
             default -> valor;
         };
     }

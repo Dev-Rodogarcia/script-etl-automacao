@@ -69,6 +69,12 @@ public final class ConstantesExtracao {
     
     /** Emoji para Faturas por Cliente */
     public static final String EMOJI_FATURAS_CLIENTE = "💸";
+
+    /** Emoji para Inventario */
+    public static final String EMOJI_INVENTARIO = "📚";
+
+    /** Emoji para Sinistros */
+    public static final String EMOJI_SINISTROS = "🛡️";
     
     /** Emoji para Usuários do Sistema */
     public static final String EMOJI_USUARIOS = "👥";

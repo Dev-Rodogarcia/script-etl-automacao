@@ -120,6 +120,7 @@ public final class GraphQLQueries {
                     referenceNumber
                     serviceAt
                     createdAt
+                    finishedAt
                     cte { id key number series issuedAt createdAt emissionType }
                     total
                     subtotal
@@ -141,6 +142,7 @@ public final class GraphQLQueries {
                     serviceDate
                     serviceType
                     deliveryPredictionDate
+                    corporationSequenceNumber
                     corporation { id nickname cnpj }
                     customerPriceTable { name }
                     freightClassification { name }

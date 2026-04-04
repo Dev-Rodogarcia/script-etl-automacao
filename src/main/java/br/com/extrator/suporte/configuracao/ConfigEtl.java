@@ -204,6 +204,20 @@ public final class ConfigEtl {
         );
     }
 
+    public static int obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS_INTERVALO",
+                "etl.referencial.coletas.backfill.max_expansao_dias.intervalo"
+            ),
+            400,
+            value -> value >= 0,
+            null,
+            null,
+            null
+        );
+    }
+
     public static int obterEtlReferencialColetasLookaheadDias() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao(
@@ -300,6 +314,14 @@ public final class ConfigEtl {
         ));
     }
 
+    public static Duration obterTimeoutEntidadeGraphQLColetasIntervalo() {
+        return Duration.ofMillis(obterLongComFallback(
+            "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_INTERVALO_MS",
+            "etl.graphql.timeout.entidade.coletas.intervalo.ms",
+            1_800_000L
+        ));
+    }
+
     public static Duration obterTimeoutEntidadeGraphQL(final String entidade) {
         final String chave = normalizarChaveEntidade(entidade);
         final long padrao;
@@ -327,6 +349,20 @@ public final class ConfigEtl {
             "etl.graphql.timeout.entidade.coletas_referencial.ms",
             padrao
         ));
+    }
+
+    public static int obterEtlIntervaloColetasMaxConsecutiveFailures() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_INTERVALO_COLETAS_MAX_CONSECUTIVE_FAILURES",
+                "etl.intervalo.coletas.max_consecutive_failures"
+            ),
+            2,
+            value -> value > 0,
+            null,
+            null,
+            null
+        );
     }
 
     public static Duration obterTimeoutEntidadeDataExport(final String entidade) {
