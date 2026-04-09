@@ -141,13 +141,15 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
         return "v1";
     }
 
-    private String resolverNomeTabela(final String entidade) {
+    static String resolverNomeTabela(final String entidade) {
         return switch (entidade) {
             case "fretes"              -> "fretes";
             case "cotacoes"            -> "cotacoes";
             case "localizacao_cargas"  -> "localizacao_cargas";
             case "contas_a_pagar"      -> "contas_a_pagar";
             case "faturas_por_cliente" -> "faturas_por_cliente";
+            case "inventario"          -> "inventario";
+            case "sinistros"           -> "sinistros";
             case "faturas_graphql"     -> "faturas_graphql";
             default                    -> null;
         };
@@ -191,4 +193,3 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
         void bind(PreparedStatement statement) throws SQLException;
     }
 }
-

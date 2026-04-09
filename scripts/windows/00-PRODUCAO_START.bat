@@ -20,6 +20,21 @@ REM ----------------------------------------------------------------
 set "PROD_MODE=1"
 
 if /i "%~1"=="--auto-intervalo" goto :RUN_AUTO_INTERVALO
+if /i "%~1"=="--auto-extracao-completa" (
+    call :PREPARE_SECURITY
+    if errorlevel 1 (
+        set "AUTO_EXIT=1"
+        goto :END_WITH_CODE
+    )
+    call :PREPARE_DATABASE
+    if errorlevel 1 (
+        set "AUTO_EXIT=1"
+        goto :END_WITH_CODE
+    )
+    call :RUN_SCRIPT_AUTHORIZED "01-executar_extracao_completa.bat" "%~2"
+    set "AUTO_EXIT=!ERRORLEVEL!"
+    goto :END_WITH_CODE
+)
 
 :MENU
 cls
@@ -316,6 +331,7 @@ exit /b 2
 
 :RUN_SCRIPT
 set "TARGET_SCRIPT=%~1"
+set "TARGET_ARG1=%~2"
 if not defined TARGET_SCRIPT exit /b 1
 if not exist "%SCRIPT_ROOT%%TARGET_SCRIPT%" (
     echo.
@@ -324,7 +340,11 @@ if not exist "%SCRIPT_ROOT%%TARGET_SCRIPT%" (
     pause
     exit /b 1
 )
-call "%SCRIPT_ROOT%%TARGET_SCRIPT%"
+if defined TARGET_ARG1 (
+    call "%SCRIPT_ROOT%%TARGET_SCRIPT%" "%TARGET_ARG1%"
+) else (
+    call "%SCRIPT_ROOT%%TARGET_SCRIPT%"
+)
 set "TARGET_EXIT=!ERRORLEVEL!"
 if not "!TARGET_EXIT!"=="0" (
     echo.
@@ -335,9 +355,14 @@ exit /b 0
 
 :RUN_SCRIPT_AUTHORIZED
 set "TARGET_SCRIPT=%~1"
+set "TARGET_ARG1=%~2"
 set "PREV_SKIP_AUTH_CHECK=%EXTRATOR_SKIP_AUTH_CHECK%"
 set "EXTRATOR_SKIP_AUTH_CHECK=1"
-call :RUN_SCRIPT "%TARGET_SCRIPT%"
+if defined TARGET_ARG1 (
+    call :RUN_SCRIPT "%TARGET_SCRIPT%" "%TARGET_ARG1%"
+) else (
+    call :RUN_SCRIPT "%TARGET_SCRIPT%"
+)
 set "TARGET_EXIT=!ERRORLEVEL!"
 if defined PREV_SKIP_AUTH_CHECK (
     set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"
