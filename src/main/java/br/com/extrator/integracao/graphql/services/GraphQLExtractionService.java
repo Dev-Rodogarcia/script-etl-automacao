@@ -51,6 +51,7 @@ import java.util.List;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
+import br.com.extrator.dominio.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
@@ -63,6 +64,7 @@ import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
+import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.comum.ExtractionHelper;
 import br.com.extrator.integracao.comum.ExtractionLogger;
 import br.com.extrator.integracao.comum.ExtractionResult;
@@ -368,9 +370,9 @@ public class GraphQLExtractionService {
         final ExtractionResult resultado;
         try {
             resultado = executarComTimeout(
-                "coletas_referencial",
+                ConstantesEntidades.COLETAS_REFERENCIAL,
                 ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial(),
-                () -> extractColetas(dataInicio, dataFim)
+                () -> extractColetasReferencial(dataInicio, dataFim)
             );
         } catch (final Exception e) {
             if (e instanceof ExecutionTimeoutException) {
@@ -426,6 +428,13 @@ public class GraphQLExtractionService {
     }
 
     protected void registrarLogExtracao(final ExtractionResult result) {
+        if (result == null || ConstantesEntidades.isEntidadeAuxiliarLogExtracao(result.getEntityName())) {
+            log.info(
+                "Log operacional em banco ignorado para entidade auxiliar {}. O resultado permanece apenas nos logs de arquivo.",
+                result != null ? result.getEntityName() : "n/a"
+            );
+            return;
+        }
         logRepository.gravarLogExtracao(result.toLogEntity());
         if (auditoriaEstruturadaAtiva) {
             ExecutionAuditRecorder.registrar(executionAuditPort, result);
@@ -462,6 +471,51 @@ public class GraphQLExtractionService {
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
         registrarLogExtracao(result);
         
+        return result;
+    }
+
+    protected ExtractionResult extractColetasReferencial(final LocalDate dataInicio, final LocalDate dataFim) {
+        final ColetaExtractor extractor = new ColetaExtractor(
+            apiClient,
+            new ColetaRepository(),
+            new ColetaMapper()
+        );
+        final EntityExtractor<ColetaNodeDTO> extractorAuxiliar = new EntityExtractor<>() {
+            @Override
+            public br.com.extrator.integracao.ResultadoExtracao<ColetaNodeDTO> extract(final LocalDate inicio,
+                                                                                        final LocalDate fim) {
+                return extractor.extract(inicio, fim);
+            }
+
+            @Override
+            public int save(final List<ColetaNodeDTO> dtos) throws java.sql.SQLException {
+                return extractor.save(dtos);
+            }
+
+            @Override
+            public SaveMetrics saveWithMetrics(final List<ColetaNodeDTO> dtos) throws java.sql.SQLException {
+                return extractor.saveWithMetrics(dtos);
+            }
+
+            @Override
+            public String getEntityName() {
+                return ConstantesEntidades.COLETAS_REFERENCIAL;
+            }
+
+            @Override
+            public String getEmoji() {
+                return extractor.getEmoji();
+            }
+
+            @Override
+            public boolean permiteConcluirComInvalidosAuditados() {
+                return extractor.permiteConcluirComInvalidosAuditados();
+            }
+        };
+
+        final ExtractionResult result =
+            logger.executeWithLogging(extractorAuxiliar, dataInicio, dataFim, extractorAuxiliar.getEmoji());
+        registrarLogExtracao(result);
         return result;
     }
 

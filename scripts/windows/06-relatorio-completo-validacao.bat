@@ -1,5 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
 
 if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 65001 >nul
 
@@ -18,7 +23,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto...
-    call "%~dp0mvn.bat" -q -DskipTests package
+    call "%MVN_CMD%" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -27,7 +32,7 @@ if /i "%PROD_MODE%"=="1" (
     )
 )
 
-if not exist "target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -75,16 +80,16 @@ if defined FLAG_EXECUTAR_IDEMPOTENCIA set "CMD_FLAGS=!CMD_FLAGS! --executar-idem
 if defined FLAG_EXECUTAR_HIDRATACAO set "CMD_FLAGS=!CMD_FLAGS! --executar-hidratacao-orfaos"
 
 echo.
-echo Executando: java -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --validar-etl-extremo !CMD_FLAGS!
 echo.
-java -jar "target\extrator.jar" --validar-etl-extremo !CMD_FLAGS!
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --validar-etl-extremo !CMD_FLAGS!
 set "RET_CODE=%ERRORLEVEL%"
 
 echo.
 if "%RET_CODE%"=="0" (
     echo ================================================================
     echo BATERIA EXTREMA CONCLUIDA COM SUCESSO
-    echo ================================================================
+echo ================================================================
 ) else (
     echo ================================================================
     echo BATERIA EXTREMA IDENTIFICOU PROBLEMAS ^(Exit Code: %RET_CODE%^)
@@ -157,7 +162,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

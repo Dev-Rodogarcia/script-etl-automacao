@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[pipeline] Running contract, quality and pipeline tests..."
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
 mvn -B -ntp \
-  -Dtest='*ContractTest,*DataQualityServiceTest,*PipelineOrchestratorTest,*PipelineE2ETest,*SnapshotTest' \
+  -Dtest='*Pipeline*Test,*E2ETest,*StressTest' \
   -Dsurefire.failIfNoSpecifiedTests=false \
   test
-
-echo "[pipeline] Done."

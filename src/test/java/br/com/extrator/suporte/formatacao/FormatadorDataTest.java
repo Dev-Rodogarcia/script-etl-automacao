@@ -30,9 +30,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.time.OffsetDateTime;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class FormatadorDataTest {
+
+    @AfterEach
+    void limparOverrides() {
+        System.clearProperty("api.dataexport.timezone");
+        System.clearProperty("etl.integridade.modo");
+    }
 
     @Test
     void deveParsearOffsetDateTimeIsoComTimezone() {
@@ -73,5 +80,16 @@ class FormatadorDataTest {
         assertEquals(3, resultado.getMonthValue());
         assertEquals(5, resultado.getDayOfMonth());
         assertEquals(23, resultado.getHour());
+    }
+
+    @Test
+    void deveUsarTimezoneConfiguradaQuandoOrigemNaoTrouxerOffset() {
+        System.setProperty("etl.integridade.modo", "STRICT_INTEGRITY");
+        System.setProperty("api.dataexport.timezone", "America/Manaus");
+
+        final OffsetDateTime resultado = FormatadorData.parseOffsetDateTime("2026-03-05 23:59:00");
+
+        assertNotNull(resultado);
+        assertEquals(-4, resultado.getOffset().getTotalSeconds() / 3600);
     }
 }

@@ -53,6 +53,8 @@ import br.com.extrator.comandos.cli.extracao.daemon.DaemonResilienceHarness;
 import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonRunHandler;
 import br.com.extrator.integracao.GraphQLPaginatorChaosHarness;
 import br.com.extrator.integracao.ResultadoExtracao;
+import br.com.extrator.observabilidade.LogRetentionPolicy;
+import br.com.extrator.observabilidade.LogStoragePaths;
 import br.com.extrator.observabilidade.pipeline.InMemoryPipelineMetrics;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.concorrencia.ThreadLeakDetector;
@@ -71,7 +73,7 @@ public class ValidacaoEtlResilienciaUseCase {
     private final IsolatedStepProcessExecutor isolatedStepExecutor;
 
     public ValidacaoEtlResilienciaUseCase() {
-        this(Path.of("logs"), new IsolatedStepProcessExecutor());
+        this(LogStoragePaths.REPORTS_DIR, new IsolatedStepProcessExecutor());
     }
 
     ValidacaoEtlResilienciaUseCase(final Path logsDir) {
@@ -875,6 +877,7 @@ public class ValidacaoEtlResilienciaUseCase {
     }
 
     private ReportFiles persistirReport(final FinalReport report) throws IOException {
+        LogStoragePaths.ensureBaseDirectories();
         final String suffix = FILE_TS.format(report.finishedAt());
         final Path json = logsDir.resolve("etl_resilience_report_" + suffix + ".json");
         final Path markdown = logsDir.resolve("etl_resilience_report_" + suffix + ".md");
@@ -884,6 +887,12 @@ public class ValidacaoEtlResilienciaUseCase {
             StandardCharsets.UTF_8
         );
         Files.writeString(markdown, renderMarkdown(report), StandardCharsets.UTF_8);
+        LogRetentionPolicy.retainRecentFiles(
+            logsDir,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".json", ".md")
+                && path.getFileName().toString().startsWith("etl_resilience_report_")
+        );
         return new ReportFiles(json, markdown);
     }
 

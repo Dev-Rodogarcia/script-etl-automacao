@@ -29,12 +29,17 @@ import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaT
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao;
 
 import java.sql.Connection;
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 
 public class ValidacaoApiBanco24hDetalhadaUseCase {
     private final LoggerConsole log;
@@ -100,6 +105,7 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
     public void executar(final ValidacaoApiBanco24hDetalhadaRequest request) throws Exception {
         final List<ResultadoComparacao> resultados = new ArrayList<>();
         comparator.definirPeriodoFechado(request.periodoFechado());
+        final LocalDateTime inicioValidacao = RelogioSistema.agora();
 
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             final LocalDate dataReferencia = repository.resolverDataReferenciaLogs(conexao, request.dataReferenciaSistema());
@@ -119,14 +125,25 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             log.info("Data de referencia dos logs: {}", dataReferencia);
             log.console("=".repeat(88));
 
-            for (final EntidadeValidacao entidade : apiCollector.criarEntidades(
+            final List<EntidadeValidacao> entidadesValidacao = apiCollector.criarEntidades(
                 conexao,
                 dataReferencia,
                 dataInicio,
                 dataFim,
                 request.incluirFaturasGraphQL(),
                 request.permitirFallbackJanela()
-            )) {
+            );
+            final Set<String> entidadesSolicitadas = new LinkedHashSet<>();
+            for (final EntidadeValidacao entidade : entidadesValidacao) {
+                entidadesSolicitadas.add(entidade.entidade());
+            }
+            final Optional<String> executionUuidAncora =
+                repository.resolverExecutionUuidAncora(conexao, entidadesSolicitadas, inicioValidacao);
+            executionUuidAncora.ifPresent(executionUuid ->
+                log.info("Execution UUID ancora da validacao detalhada: {}", executionUuid)
+            );
+
+            for (final EntidadeValidacao entidade : entidadesValidacao) {
                 final ResultadoApiChaves api = entidade.fornecedor().get();
                 resultados.add(
                     comparator.compararEntidade(
@@ -137,7 +154,8 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
                         dataInicio,
                         dataFim,
                         request.periodoFechado(),
-                        request.permitirFallbackJanela()
+                        request.permitirFallbackJanela(),
+                        executionUuidAncora
                     )
                 );
             }

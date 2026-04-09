@@ -36,6 +36,8 @@ import java.util.stream.Collectors;
 import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest;
 import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloUseCase;
 import br.com.extrator.aplicacao.extracao.PreBackfillReferencialColetasUseCase;
+import br.com.extrator.observabilidade.LogRetentionPolicy;
+import br.com.extrator.observabilidade.LogStoragePaths;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
@@ -700,11 +702,13 @@ public class ValidacaoEtlExtremaUseCase {
             SELECT entidade, status_final, paginas_processadas, mensagem
             FROM dbo.log_extracoes
             WHERE CAST(timestamp_inicio AS DATE) IN (?, ?)
+              AND entidade <> ?
             ORDER BY timestamp_fim DESC
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setDate(1, java.sql.Date.valueOf(dataReferencia));
             stmt.setDate(2, java.sql.Date.valueOf(dataReferencia.minusDays(1)));
+            stmt.setString(3, ConstantesEntidades.COLETAS_REFERENCIAL);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String mensagem = rs.getString("mensagem");
@@ -726,7 +730,7 @@ public class ValidacaoEtlExtremaUseCase {
             }
         }
 
-        final Path logDir = Path.of("logs");
+        final Path logDir = LogStoragePaths.APP_OPERATIONS_DIR;
         if (Files.isDirectory(logDir)) {
             try (var stream = Files.list(logDir)) {
                 final List<Path> arquivos = stream
@@ -1219,7 +1223,8 @@ public class ValidacaoEtlExtremaUseCase {
     }
 
     private ReportFiles persistirReport(final FinalReport report) throws IOException {
-        final Path logsDir = Path.of("logs");
+        LogStoragePaths.ensureBaseDirectories();
+        final Path logsDir = LogStoragePaths.REPORTS_DIR;
         Files.createDirectories(logsDir);
         final String suffix = FILE_TS.format(report.finishedAt());
         final Path json = logsDir.resolve("etl_extreme_report_" + suffix + ".json");
@@ -1230,6 +1235,12 @@ public class ValidacaoEtlExtremaUseCase {
             StandardCharsets.UTF_8
         );
         Files.writeString(markdown, renderMarkdown(report), StandardCharsets.UTF_8);
+        LogRetentionPolicy.retainRecentFiles(
+            logsDir,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".json", ".md")
+                && path.getFileName().toString().startsWith("etl_extreme_report_")
+        );
         return new ReportFiles(json, markdown);
     }
 

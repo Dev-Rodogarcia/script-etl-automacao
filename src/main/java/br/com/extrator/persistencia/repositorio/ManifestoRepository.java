@@ -55,6 +55,32 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     private static final Logger logger = LoggerFactory.getLogger(ManifestoRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.MANIFESTOS;
+    private static final String NOME_TABELA_STAGING = "#stg_manifestos";
+    private static final java.util.List<String> COLUNAS_PROMOCAO = java.util.List.of(
+        "sequence_code", "identificador_unico", "status", "created_at", "departured_at", "closed_at", "finished_at",
+        "mdfe_number", "mdfe_key", "mdfe_status", "distribution_pole", "classification", "vehicle_plate",
+        "vehicle_type", "vehicle_owner", "driver_name", "branch_nickname", "vehicle_departure_km", "closing_km",
+        "traveled_km", "invoices_count", "invoices_volumes", "invoices_weight", "total_taxed_weight",
+        "total_cubic_volume", "invoices_value", "manifest_freights_total", "pick_sequence_code", "contract_number",
+        "contract_type", "calculation_type", "cargo_type", "daily_subtotal", "total_cost", "freight_subtotal",
+        "fuel_subtotal", "toll_subtotal", "driver_services_total", "operational_expenses_total", "inss_value",
+        "sest_senat_value", "ir_value", "paying_total", "manual_km", "generate_mdfe", "monitoring_request",
+        "uniq_destinations_count", "creation_user_name", "adjustment_user_name", "metadata", "data_extracao",
+        "mobile_read_at", "km", "delivery_manifest_items_count", "transfer_manifest_items_count",
+        "pick_manifest_items_count", "dispatch_draft_manifest_items_count", "consolidation_manifest_items_count",
+        "reverse_pick_manifest_items_count", "manifest_items_count", "finalized_manifest_items_count",
+        "calculated_pick_count", "calculated_delivery_count", "calculated_dispatch_count",
+        "calculated_consolidation_count", "calculated_reverse_pick_count", "pick_subtotal", "delivery_subtotal",
+        "dispatch_subtotal", "consolidation_subtotal", "reverse_pick_subtotal", "advance_subtotal",
+        "fleet_costs_subtotal", "additionals_subtotal", "discounts_subtotal", "discount_value",
+        "adjustment_comments", "contract_status", "iks_id", "programacao_sequence_code", "programacao_starting_at",
+        "programacao_ending_at", "trailer1_license_plate", "trailer1_weight_capacity", "trailer2_license_plate",
+        "trailer2_weight_capacity", "vehicle_weight_capacity", "vehicle_cubic_weight", "capacidade_kg",
+        "obs_operacional", "obs_financeira", "unloading_recipient_names", "delivery_region_names",
+        "programacao_cliente", "programacao_tipo_servico"
+    );
+    private static final java.util.List<String> COLUNAS_PROMOCAO_ATUALIZAVEIS =
+        java.util.List.copyOf(COLUNAS_PROMOCAO.subList(1, COLUNAS_PROMOCAO.size()));
 
     @Override
     protected String getNomeTabela() {
@@ -64,6 +90,40 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     @Override
     protected boolean aceitarMergeSemAlteracoesComoSucesso(final ManifestoEntity manifesto) {
         return true;
+    }
+
+    @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao,
+                                                   final ManifestoEntity manifesto) throws SQLException {
+        return executarMergeEmTabela(conexao, manifesto, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.finished_at AS datetime2), CAST(target.closed_at AS datetime2), CAST(target.departured_at AS datetime2), CAST(target.created_at AS datetime2))",
+            "COALESCE(CAST(source.finished_at AS datetime2), CAST(source.closed_at AS datetime2), CAST(source.departured_at AS datetime2), CAST(source.created_at AS datetime2))"
+        );
+        return promoverStagingComMerge(
+            conexao,
+            NOME_TABELA_STAGING,
+            "target.sequence_code = source.sequence_code "
+                + "AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1) "
+                + "AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)",
+            freshnessGuard,
+            COLUNAS_PROMOCAO,
+            COLUNAS_PROMOCAO_ATUALIZAVEIS
+        );
     }
     
     /**
@@ -93,6 +153,12 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
      */
     @Override
     protected int executarMerge(final Connection conexao, final ManifestoEntity manifesto) throws SQLException {
+        return executarMergeEmTabela(conexao, manifesto, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final ManifestoEntity manifesto,
+                                      final String tabelaAlvo) throws SQLException {
         // ✅ VALIDAÇÃO INICIAL
         if (manifesto == null) {
             logger.error("❌ Tentativa de salvar ManifestoEntity NULL");
@@ -100,11 +166,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         }
         
         // ✅ CORREÇÃO CRÍTICA #2: Validar nome da tabela (prevenir SQL injection)
-        final String nomeTabela = getNomeTabela();
-        if (!nomeTabela.matches("^[a-zA-Z0-9_]+$")) {
-            logger.error("❌ Nome de tabela inválido detectado: {}", nomeTabela);
-            throw new SQLException("Nome de tabela contém caracteres inválidos: " + nomeTabela);
-        }
+        validarNomeTabela(getNomeTabela());
         
         // Para Manifestos, o 'sequence_code' é a chave de negócio primária.
         if (manifesto.getSequenceCode() == null) {
@@ -140,7 +202,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             "COALESCE(CAST(source.finished_at AS datetime2), CAST(source.closed_at AS datetime2), CAST(source.departured_at AS datetime2), CAST(source.created_at AS datetime2))"
         );
         final String sql = String.format("""
-            MERGE %s AS target
+            MERGE %s WITH (HOLDLOCK) AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
                 AS source (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao)
             ON target.sequence_code = source.sequence_code
@@ -201,7 +263,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             WHEN NOT MATCHED THEN
                 INSERT (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao)
                 VALUES (source.sequence_code, source.identificador_unico, source.status, source.created_at, source.departured_at, source.closed_at, source.finished_at, source.mdfe_number, source.mdfe_key, source.mdfe_status, source.distribution_pole, source.classification, source.vehicle_plate, source.vehicle_type, source.vehicle_owner, source.driver_name, source.branch_nickname, source.vehicle_departure_km, source.closing_km, source.traveled_km, source.invoices_count, source.invoices_volumes, source.invoices_weight, source.total_taxed_weight, source.total_cubic_volume, source.invoices_value, source.manifest_freights_total, source.pick_sequence_code, source.contract_number, source.contract_type, source.calculation_type, source.cargo_type, source.daily_subtotal, source.total_cost, source.freight_subtotal, source.fuel_subtotal, source.toll_subtotal, source.driver_services_total, source.operational_expenses_total, source.inss_value, source.sest_senat_value, source.ir_value, source.paying_total, source.manual_km, source.generate_mdfe, source.monitoring_request, source.uniq_destinations_count, source.creation_user_name, source.adjustment_user_name, source.metadata, source.data_extracao);
-            """, NOME_TABELA, freshnessGuard);
+            """, tabelaAlvo, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
@@ -311,7 +373,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                         capacidade_kg = ?, obs_operacional = ?, obs_financeira = ?, \
                         unloading_recipient_names = ?, delivery_region_names = ?, programacao_cliente = ?, programacao_tipo_servico = ? \
                         WHERE sequence_code = ? AND COALESCE(pick_sequence_code, -1) = COALESCE(?, -1) AND COALESCE(mdfe_number, -1) = COALESCE(?, -1)""",
-                    NOME_TABELA);
+                    tabelaAlvo);
                 try (PreparedStatement upd = conexao.prepareStatement(sqlUpdateExtras)) {
                     int i = 1;
                     if (manifesto.getMobileReadAt() != null) { upd.setObject(i++, manifesto.getMobileReadAt(), Types.TIMESTAMP_WITH_TIMEZONE); } else { upd.setNull(i++, Types.TIMESTAMP_WITH_TIMEZONE); }

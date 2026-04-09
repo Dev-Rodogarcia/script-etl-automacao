@@ -19,7 +19,13 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +43,7 @@ import br.com.extrator.dominio.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.dominio.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.dominio.dataexport.sinistros.SinistroDTO;
 import br.com.extrator.suporte.configuracao.ConfigApi;
+import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.http.GerenciadorRequisicaoHttp;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -56,6 +63,17 @@ public class ClienteApiDataExport {
     private final DataExportPaginator paginator;
     private final DataExportTimeWindowSupport timeWindowSupport;
     private String executionUuid;
+
+    protected ClienteApiDataExport(final boolean testMode) {
+        this.urlBase = null;
+        this.timeoutRequisicao = Duration.ZERO;
+        this.retryConfigFactory = null;
+        this.adaptiveRetrySupport = null;
+        this.csvCountSupport = null;
+        this.paginationSupport = null;
+        this.paginator = null;
+        this.timeWindowSupport = null;
+    }
 
     public ClienteApiDataExport() {
         logger.info("Inicializando cliente da API Data Export");
@@ -230,31 +248,46 @@ public class ClienteApiDataExport {
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar(final LocalDate dataInicio, final LocalDate dataFim) {
         logger.info("Buscando Faturas a Pagar da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
-        final Instant inicio = timeWindowSupport.inicioDoDia(dataInicio);
-        final Instant fim = timeWindowSupport.fimDoDia(dataFim);
         final List<ConfiguracaoEntidade> tentativas = retryConfigFactory.criarTentativasContasAPagar(config);
+        final Instant inicioBusiness = timeWindowSupport.inicioDoDia(dataInicio);
+        final Instant fimBusiness = timeWindowSupport.fimDoDia(dataFim);
+        final List<ResultadoExtracao<ContasAPagarDTO>> resultadosSegmentados = new ArrayList<>();
 
-        return adaptiveRetrySupport.executar(
-            "Contas a Pagar",
-            null,
-            tentativas,
-            configTentativa -> paginator.buscarDadosGenericos(
-                this.executionUuid,
-                configTentativa.templateId(),
-                configTentativa.tabelaApi(),
-                configTentativa.campoData(),
-                new TypeReference<List<ContasAPagarDTO>>() {},
-                inicio,
-                fim,
-                configTentativa
-            ),
-            paginationSupport::deveRetentarResultadoIncompleto,
-            paginationSupport::selecionarMelhorResultadoParcial,
-            paginationSupport::ehErroTimeoutOu422,
-            null,
-            null,
-            null
-        );
+        for (final LocalDate diaSegmento : listarSegmentosDiarios(dataInicio, dataFim)) {
+            final Instant inicioSegmento = timeWindowSupport.inicioDoDia(diaSegmento);
+            final Instant fimSegmento = timeWindowSupport.fimDoDia(diaSegmento);
+            final Map<String, String> filtrosExtras = Map.of(
+                "created_at",
+                timeWindowSupport.formatarRange(inicioSegmento, fimSegmento)
+            );
+
+            final ResultadoExtracao<ContasAPagarDTO> resultadoSegmento = adaptiveRetrySupport.executar(
+                "Contas a Pagar",
+                "Template-" + config.templateId() + "-created-at-" + diaSegmento,
+                tentativas,
+                configTentativa -> paginator.buscarDadosGenericos(
+                    this.executionUuid,
+                    configTentativa.templateId(),
+                    configTentativa.tabelaApi(),
+                    configTentativa.campoData(),
+                    new TypeReference<List<ContasAPagarDTO>>() {},
+                    inicioBusiness,
+                    fimBusiness,
+                    configTentativa,
+                    false,
+                    filtrosExtras
+                ),
+                paginationSupport::deveRetentarResultadoIncompleto,
+                paginationSupport::selecionarMelhorResultadoParcial,
+                paginationSupport::ehErroTimeoutOu422,
+                null,
+                null,
+                null
+            );
+            resultadosSegmentados.add(resultadoSegmento);
+        }
+
+        return consolidarResultadosContasAPagar(resultadosSegmentados);
     }
 
     public ResultadoExtracao<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente(final LocalDate dataInicio, final LocalDate dataFim) {
@@ -356,6 +389,109 @@ public class ClienteApiDataExport {
         return obterContagemGenericaCsv(config.templateId(), config.tabelaApi(), config.campoData(), dataReferencia, "sinistros");
     }
 
+    static ResultadoExtracao<ContasAPagarDTO> consolidarResultadosContasAPagar(
+        final List<ResultadoExtracao<ContasAPagarDTO>> resultadosSegmentados
+    ) {
+        if (resultadosSegmentados == null || resultadosSegmentados.isEmpty()) {
+            return ResultadoExtracao.completo(List.of(), 0, 0);
+        }
+
+        final List<ContasAPagarDTO> bruto = new ArrayList<>();
+        int paginasProcessadas = 0;
+        int registrosExtraidos = 0;
+        boolean completo = true;
+        String motivoInterrupcao = null;
+
+        for (final ResultadoExtracao<ContasAPagarDTO> resultado : resultadosSegmentados) {
+            if (resultado == null) {
+                continue;
+            }
+            bruto.addAll(resultado.getDados());
+            paginasProcessadas += resultado.getPaginasProcessadas();
+            registrosExtraidos += resultado.getRegistrosExtraidos();
+            if (!resultado.isCompleto()) {
+                completo = false;
+                motivoInterrupcao = selecionarMotivoInterrupcao(motivoInterrupcao, resultado.getMotivoInterrupcao());
+            }
+        }
+
+        final List<ContasAPagarDTO> deduplicado = consolidarContasAPagarPorSequenceCode(bruto);
+        return completo
+            ? ResultadoExtracao.completo(deduplicado, paginasProcessadas, registrosExtraidos)
+            : ResultadoExtracao.incompleto(
+                deduplicado,
+                motivoInterrupcao != null ? motivoInterrupcao : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
+                paginasProcessadas,
+                registrosExtraidos
+            );
+    }
+
+    static List<ContasAPagarDTO> consolidarContasAPagarPorSequenceCode(final List<ContasAPagarDTO> registros) {
+        if (registros == null || registros.isEmpty()) {
+            return List.of();
+        }
+
+        final Map<String, ContasAPagarDTO> unicos = new LinkedHashMap<>();
+        int sequencialSemChave = 0;
+        for (final ContasAPagarDTO registro : registros) {
+            if (registro == null) {
+                continue;
+            }
+            final String sequenceCode = registro.getSequenceCode();
+            if (sequenceCode == null || sequenceCode.isBlank()) {
+                unicos.put("__SEM_SEQUENCE_CODE__:" + sequencialSemChave++, registro);
+                continue;
+            }
+            unicos.merge(sequenceCode.trim(), registro, ClienteApiDataExport::preferirContaMaisFresca);
+        }
+        return List.copyOf(unicos.values());
+    }
+
+    static ContasAPagarDTO preferirContaMaisFresca(final ContasAPagarDTO atual,
+                                                   final ContasAPagarDTO candidata) {
+        final int comparacao = compararFrescorConta(candidata, atual);
+        if (comparacao > 0) {
+            return candidata;
+        }
+        if (comparacao < 0) {
+            return atual;
+        }
+        return fingerprintConta(atual).compareTo(fingerprintConta(candidata)) >= 0 ? atual : candidata;
+    }
+
+    static int compararFrescorConta(final ContasAPagarDTO esquerda, final ContasAPagarDTO direita) {
+        final int createdAt = compararDataHora(parseDataHora(esquerda == null ? null : esquerda.getCreatedAt()),
+            parseDataHora(direita == null ? null : direita.getCreatedAt()));
+        if (createdAt != 0) {
+            return createdAt;
+        }
+        final int transactionDate = compararDataHora(parseData(esquerda == null ? null : esquerda.getTransactionDate()),
+            parseData(direita == null ? null : direita.getTransactionDate()));
+        if (transactionDate != 0) {
+            return transactionDate;
+        }
+        final int liquidationDate = compararDataHora(parseData(esquerda == null ? null : esquerda.getLiquidationDate()),
+            parseData(direita == null ? null : direita.getLiquidationDate()));
+        if (liquidationDate != 0) {
+            return liquidationDate;
+        }
+        return compararDataHora(parseData(esquerda == null ? null : esquerda.getIssueDate()),
+            parseData(direita == null ? null : direita.getIssueDate()));
+    }
+
+    static List<LocalDate> listarSegmentosDiarios(final LocalDate dataInicio, final LocalDate dataFim) {
+        if (dataInicio == null || dataFim == null || dataFim.isBefore(dataInicio)) {
+            return List.of();
+        }
+        final List<LocalDate> segmentos = new ArrayList<>();
+        LocalDate cursor = dataInicio;
+        while (!cursor.isAfter(dataFim)) {
+            segmentos.add(cursor);
+            cursor = cursor.plusDays(1);
+        }
+        return List.copyOf(segmentos);
+    }
+
     private <T> ResultadoExtracao<T> buscarDadosDiretos(final LocalDate dataInicio,
                                                         final LocalDate dataFim,
                                                         final ConfiguracaoEntidade config,
@@ -380,5 +516,47 @@ public class ClienteApiDataExport {
                                          final LocalDate dataReferencia,
                                          final String tipoAmigavel) {
         return csvCountSupport.obterContagemGenericaCsv(templateId, nomeTabela, campoData, dataReferencia, tipoAmigavel);
+    }
+
+    private static OffsetDateTime parseDataHora(final String valor) {
+        return FormatadorData.parseOffsetDateTime(valor);
+    }
+
+    private static OffsetDateTime parseData(final String valor) {
+        return FormatadorData.parseOffsetDateTime(valor);
+    }
+
+    private static int compararDataHora(final OffsetDateTime esquerda, final OffsetDateTime direita) {
+        if (esquerda == null && direita == null) {
+            return 0;
+        }
+        if (esquerda == null) {
+            return -1;
+        }
+        if (direita == null) {
+            return 1;
+        }
+        return esquerda.compareTo(direita);
+    }
+
+    private static String selecionarMotivoInterrupcao(final String atual, final String candidato) {
+        if (candidato == null || candidato.isBlank()) {
+            return atual;
+        }
+        if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(candidato)) {
+            return candidato;
+        }
+        return (atual == null || atual.isBlank()) ? candidato : atual;
+    }
+
+    private static String fingerprintConta(final ContasAPagarDTO registro) {
+        if (registro == null) {
+            return "";
+        }
+        final Map<String, String> ordenado = new TreeMap<>();
+        registro.getAllProperties().forEach((chave, valor) -> ordenado.put(chave, Objects.toString(valor, "")));
+        return ordenado.toString();
     }
 }

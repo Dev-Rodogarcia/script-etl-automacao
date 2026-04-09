@@ -2,6 +2,7 @@ package br.com.extrator.plataforma.auditoria.aplicacao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
@@ -31,11 +32,16 @@ class ExecutionWindowPlannerTest {
             ConstantesEntidades.MANIFESTOS,
             LocalDate.of(2026, 3, 25)
         );
+        final ExecutionWindowPlan planoCotacoes = planner.planejarEntidade(
+            ConstantesEntidades.COTACOES,
+            LocalDate.of(2026, 3, 25)
+        );
 
-        assertEquals(LocalDate.of(2026, 3, 24), planoColetas.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 19), planoColetas.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), planoColetas.consultaDataFim());
-        assertEquals(LocalDate.of(2026, 3, 24), planoManifestos.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 19), planoManifestos.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), planoManifestos.consultaDataFim());
+        assertEquals(LocalDate.of(2026, 3, 19), planoCotacoes.consultaDataInicio());
     }
 
     @Test
@@ -49,6 +55,7 @@ class ExecutionWindowPlannerTest {
         );
 
         assertEquals(watermark, plano.confirmacaoInicio());
+        assertEquals(LocalDate.of(2026, 3, 19), plano.consultaDataInicio());
         assertEquals(LocalDateTime.of(2026, 3, 25, LocalTime.MAX.getHour(), LocalTime.MAX.getMinute(), LocalTime.MAX.getSecond(), LocalTime.MAX.getNano()), plano.confirmacaoFim());
     }
 
@@ -69,6 +76,32 @@ class ExecutionWindowPlannerTest {
 
         assertTrue(planos.containsKey(ConstantesEntidades.INVENTARIO));
         assertTrue(planos.containsKey(ConstantesEntidades.SINISTROS));
+        assertTrue(planos.containsKey(ConstantesEntidades.CONTAS_A_PAGAR));
+        assertTrue(planos.containsKey(ConstantesEntidades.FATURAS_POR_CLIENTE));
+    }
+
+    @Test
+    void deveUsarWatermarkMaisAntigoQueReplayComoInicioDaConsulta() {
+        final LocalDateTime watermark = LocalDateTime.of(2026, 3, 10, 5, 30);
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.COLETAS,
+            LocalDate.of(2026, 3, 25)
+        );
+
+        assertEquals(LocalDate.of(2026, 3, 10), plano.consultaDataInicio());
+        assertEquals(watermark, plano.confirmacaoInicio());
+    }
+
+    @Test
+    void deveFalharQuandoEntidadeNaoPossuirStrategyRegistrada() {
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> planner.planejarEntidade("entidade_desconhecida", LocalDate.of(2026, 3, 25))
+        );
     }
 
     private static final class StubExecutionAuditPort implements ExecutionAuditPort {

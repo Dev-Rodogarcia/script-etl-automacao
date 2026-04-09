@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[unit] Running unit tests..."
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT_DIR"
+
 mvn -B -ntp \
-  -Dtest='*Test,!*IT,!*IntegrationTest,!*ContractTest,!*PipelineE2ETest,!*ChaosTest' \
+  -Dtest='*Test,!*ContractTest,!*ChaosTest,!*Pipeline*Test,!*E2ETest,!*IT,!*StressTest' \
   -Dsurefire.failIfNoSpecifiedTests=false \
   test
-
-echo "[unit] Done."

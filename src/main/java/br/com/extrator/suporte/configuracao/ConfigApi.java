@@ -322,11 +322,17 @@ public final class ConfigApi {
             ? valorSystemProperty
             : ConfigSource.obterConfiguracao("API_DATAEXPORT_TIMEZONE", "api.dataexport.timezone");
         if (valorConfigurado == null || valorConfigurado.isBlank()) {
+            if (ConfigEtl.isModoIntegridadeEstrito()) {
+                throw new IllegalStateException("Timezone DataExport obrigatoria em STRICT_INTEGRITY.");
+            }
             return ZoneId.systemDefault();
         }
         try {
             return ZoneId.of(valorConfigurado.trim());
         } catch (final RuntimeException ex) {
+            if (ConfigEtl.isModoIntegridadeEstrito()) {
+                throw new IllegalStateException("Timezone DataExport invalida: " + valorConfigurado, ex);
+            }
             logger.warn("Timezone DataExport invalido '{}'. Usando timezone do sistema '{}'.", valorConfigurado, ZoneId.systemDefault());
             return ZoneId.systemDefault();
         }

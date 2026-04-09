@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 
@@ -86,7 +87,8 @@ final class DataExportPaginator {
             dataInicio,
             dataFim,
             config,
-            true
+            true,
+            Map.of()
         );
     }
 
@@ -99,6 +101,30 @@ final class DataExportPaginator {
                                                   final Instant dataFim,
                                                   final ConfiguracaoEntidade config,
                                                   final boolean permitirParticionamento) {
+        return buscarDadosGenericos(
+            executionUuid,
+            templateId,
+            nomeTabela,
+            campoData,
+            typeReference,
+            dataInicio,
+            dataFim,
+            config,
+            permitirParticionamento,
+            Map.of()
+        );
+    }
+
+    <T> ResultadoExtracao<T> buscarDadosGenericos(final String executionUuid,
+                                                  final int templateId,
+                                                  final String nomeTabela,
+                                                  final String campoData,
+                                                  final TypeReference<List<T>> typeReference,
+                                                  final Instant dataInicio,
+                                                  final Instant dataFim,
+                                                  final ConfiguracaoEntidade config,
+                                                  final boolean permitirParticionamento,
+                                                  final Map<String, String> filtrosExtras) {
         final String tipoAmigavel = obterNomeAmigavelTipo(templateId, nomeTabela);
         final String chaveTemplate = "Template-" + templateId;
         final String executionId = (executionUuid == null || executionUuid.isBlank())
@@ -165,7 +191,8 @@ final class DataExportPaginator {
                     inicioDia,
                     fimDia,
                     config,
-                    false
+                    false,
+                    filtrosExtras
                 );
                 consolidados.addAll(resultadoDia.getDados());
                 paginasConsolidadas += resultadoDia.getPaginasProcessadas();
@@ -241,7 +268,8 @@ final class DataExportPaginator {
                     dataInicio,
                     dataFim,
                     paginaAtual,
-                    config
+                    config,
+                    filtrosExtras
                 );
                 final String reqHash = PayloadHashUtil.sha256Hex(corpoJson);
 

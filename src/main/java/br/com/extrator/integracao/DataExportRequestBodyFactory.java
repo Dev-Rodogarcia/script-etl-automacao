@@ -16,6 +16,7 @@ Atributos: [PENDENTE]
 
 
 import java.time.Instant;
+import java.util.Map;
 
 import org.slf4j.Logger;
 
@@ -39,6 +40,16 @@ final class DataExportRequestBodyFactory {
                                     final Instant dataFim,
                                     final int pagina,
                                     final ConfiguracaoEntidade config) {
+        return construirCorpoRequisicao(nomeTabela, campoData, dataInicio, dataFim, pagina, config, Map.of());
+    }
+
+    String construirCorpoRequisicao(final String nomeTabela,
+                                    final String campoData,
+                                    final Instant dataInicio,
+                                    final Instant dataFim,
+                                    final int pagina,
+                                    final ConfiguracaoEntidade config,
+                                    final Map<String, String> filtrosExtras) {
         try {
             final ObjectNode corpo = MapperUtil.sharedJson().createObjectNode();
             final ObjectNode search = MapperUtil.sharedJson().createObjectNode();
@@ -48,10 +59,11 @@ final class DataExportRequestBodyFactory {
             if (config.usaSearchNested()) {
                 final ObjectNode searchNested = MapperUtil.sharedJson().createObjectNode();
                 searchNested.put(campoData, range);
-                searchNested.put("created_at", "");
+                aplicarFiltrosExtras(searchNested, filtrosExtras);
                 search.set(nomeTabela, searchNested);
             } else {
                 table.put(campoData, range);
+                aplicarFiltrosExtras(table, filtrosExtras);
                 search.set(nomeTabela, table);
             }
 
@@ -106,5 +118,21 @@ final class DataExportRequestBodyFactory {
 
     private String formatarRange(final Instant dataInicio, final Instant dataFim) {
         return timeWindowSupport.formatarRange(dataInicio, dataFim);
+    }
+
+    private void aplicarFiltrosExtras(final ObjectNode destino, final Map<String, String> filtrosExtras) {
+        if (destino == null || filtrosExtras == null || filtrosExtras.isEmpty()) {
+            return;
+        }
+        for (final Map.Entry<String, String> entry : filtrosExtras.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank()) {
+                continue;
+            }
+            final String valor = entry.getValue();
+            if (valor == null || valor.isBlank()) {
+                continue;
+            }
+            destino.put(entry.getKey(), valor);
+        }
     }
 }

@@ -1,5 +1,11 @@
 @echo off
 setlocal EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
+set "EXPORT_DIR=%REPO_ROOT%\runtime\exports"
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 07-exportar_csv.bat
 REM Tipo    : Script operacional Windows (.bat)
@@ -42,7 +48,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto ^(se necessario^)...
-    call "%~dp0mvn.bat" -q -DskipTests package
+    call "%MVN_CMD%" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -52,7 +58,7 @@ if /i "%PROD_MODE%"=="1" (
 )
 
 REM Verificar se o JAR existe
-if not exist "target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -109,7 +115,7 @@ if "%OPCAO%"=="1" (
     echo.
     echo Exportando TODAS as tabelas...
     echo.
-    java -jar "target\extrator.jar" --exportar-csv
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --exportar-csv
     goto :END
 )
 
@@ -164,7 +170,7 @@ if "%OPCAO%"=="2" (
     echo.
     echo Exportando tabela: !TABELA!
     echo.
-    java -jar "target\extrator.jar" --exportar-csv "!TABELA!"
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --exportar-csv "!TABELA!"
     goto :END
 )
 
@@ -200,12 +206,12 @@ echo ================================================================
 echo.
 
 REM Verificar se a pasta runtime\exports existe e tem arquivos
-if exist "runtime\exports\*.csv" (
+if exist "%EXPORT_DIR%\*.csv" (
     echo Arquivos CSV gerados:
-    dir /B runtime\exports\*.csv
+    dir /B "%EXPORT_DIR%\*.csv"
     echo.
     echo Abrindo pasta runtime\exports...
-    start "" "runtime\exports"
+    start "" "%EXPORT_DIR%"
 ) else (
     echo AVISO: Nenhum arquivo CSV encontrado em runtime\exports\
     echo Verifique se ha dados nas tabelas
@@ -241,7 +247,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

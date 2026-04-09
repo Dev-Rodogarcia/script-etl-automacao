@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import br.com.extrator.aplicacao.extracao.PartialExecutionException;
 import br.com.extrator.bootstrap.pipeline.PipelineCompositionRoot;
+import br.com.extrator.observabilidade.LogStoragePaths;
 import br.com.extrator.observabilidade.execucao.ExecutionAuditor;
 import br.com.extrator.comandos.cli.CommandRegistry;
 import br.com.extrator.comandos.cli.base.Comando;
@@ -66,7 +67,8 @@ import br.com.extrator.suporte.tempo.RelogioSistema;
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
-    private static final Path ARQUIVO_FALLBACK_HISTORICO = Path.of("logs", "execution_history_fallback.ndjson");
+    private static final Path ARQUIVO_FALLBACK_HISTORICO =
+        LogStoragePaths.EXECUTION_HISTORY_DIR.resolve("execution_history_fallback.ndjson");
     private static final AtomicBoolean CONTEXTO_INICIALIZADO = new AtomicBoolean(false);
     private static final Map<String, Comando> COMANDOS = CommandRegistry.criarMapaComandos();
 

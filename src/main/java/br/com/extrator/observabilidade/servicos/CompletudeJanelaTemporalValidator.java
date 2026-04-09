@@ -87,12 +87,14 @@ final class CompletudeJanelaTemporalValidator {
             FROM log_extracoes
             WHERE CAST(timestamp_inicio AS DATE) = ?
             AND status_final = 'COMPLETO'
+            AND entidade <> ?
             ORDER BY timestamp_inicio DESC
             """;
 
         final Map<String, TimestampsExtracao> timestamps = new HashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setDate(1, java.sql.Date.valueOf(dataReferencia));
+            stmt.setString(2, ConstantesEntidades.COLETAS_REFERENCIAL);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String entidade = rs.getString("entidade");

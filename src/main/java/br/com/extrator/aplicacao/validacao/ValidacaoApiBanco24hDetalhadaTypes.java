@@ -76,8 +76,38 @@ final class ValidacaoApiBanco24hDetalhadaTypes {
         int divergenciasDados,
         boolean apiCompleta,
         String motivoInterrupcaoApi,
-        String detalhe
+        String detalhe,
+        int idadeJanelaMinutos
     ) {
+        ResultadoComparacao(
+            final String entidade,
+            final int apiBruto,
+            final int apiUnico,
+            final int invalidos,
+            final int banco,
+            final int faltantes,
+            final int excedentes,
+            final int divergenciasDados,
+            final boolean apiCompleta,
+            final String motivoInterrupcaoApi,
+            final String detalhe
+        ) {
+            this(
+                entidade,
+                apiBruto,
+                apiUnico,
+                invalidos,
+                banco,
+                faltantes,
+                excedentes,
+                divergenciasDados,
+                apiCompleta,
+                motivoInterrupcaoApi,
+                detalhe,
+                0
+            );
+        }
+
         boolean ok() {
             return apiCompleta && faltantes == 0 && excedentes == 0 && divergenciasDados == 0;
         }

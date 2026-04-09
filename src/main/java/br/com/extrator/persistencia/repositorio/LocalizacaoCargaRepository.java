@@ -45,6 +45,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCargaEntity> {
     private static final Logger logger = LoggerFactory.getLogger(LocalizacaoCargaRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.LOCALIZACAO_CARGAS;
+    private static final String NOME_TABELA_STAGING = "#stg_localizacao_cargas";
 
     @Override
     protected String getNomeTabela() {
@@ -56,12 +57,50 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
         return true;
     }
 
+    @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao,
+                                                   final LocalizacaoCargaEntity carga) throws SQLException {
+        return executarMergeEmTabela(conexao, carga, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.predicted_delivery_at AS datetime2), CAST(target.service_at AS datetime2))",
+            "COALESCE(CAST(source.predicted_delivery_at AS datetime2), CAST(source.service_at AS datetime2))"
+        );
+        final String sql = construirSqlMerge(
+            qualificarTabelaDestino(),
+            NOME_TABELA_STAGING + " AS source",
+            freshnessGuard
+        );
+        try (PreparedStatement statement = conexao.prepareStatement(sql)) {
+            return statement.executeUpdate();
+        }
+    }
+
     /**
      * Executa a operação MERGE (UPSERT) para inserir ou atualizar um registro de localização no banco.
      * A lógica é segura e baseada na nova arquitetura de Entidade.
      */
     @Override
     protected int executarMerge(final Connection conexao, final LocalizacaoCargaEntity carga) throws SQLException {
+        return executarMergeEmTabela(conexao, carga, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final LocalizacaoCargaEntity carga,
+                                      final String tabelaAlvo) throws SQLException {
         // Para Localização de Cargas, o 'sequence_number' é a chave de negócio primária.
         if (carga.getSequenceNumber() == null) {
             throw new SQLException("Não é possível executar o MERGE para Localização de Carga sem um 'sequence_number'.");
@@ -71,36 +110,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             "COALESCE(CAST(target.predicted_delivery_at AS datetime2), CAST(target.service_at AS datetime2))",
             "COALESCE(CAST(source.predicted_delivery_at AS datetime2), CAST(source.service_at AS datetime2))"
         );
-        final String sql = String.format("""
-            MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
-            ON target.sequence_number = source.sequence_number
-            WHEN MATCHED AND %s THEN
-                UPDATE SET
-                    type = source.type,
-                    service_at = source.service_at,
-                    invoices_volumes = source.invoices_volumes,
-                    taxed_weight = source.taxed_weight,
-                    invoices_value = source.invoices_value,
-                    total_value = source.total_value,
-                    service_type = source.service_type,
-                    branch_nickname = source.branch_nickname,
-                    predicted_delivery_at = source.predicted_delivery_at,
-                    destination_location_name = source.destination_location_name,
-                    destination_branch_nickname = source.destination_branch_nickname,
-                    classification = source.classification,
-                    status = source.status,
-                    status_branch_nickname = source.status_branch_nickname,
-                    origin_location_name = source.origin_location_name,
-                    origin_branch_nickname = source.origin_branch_nickname,
-                    fit_fln_cln_nickname = source.fit_fln_cln_nickname,
-                    metadata = source.metadata,
-                    data_extracao = source.data_extracao
-            WHEN NOT MATCHED THEN
-                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
-                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.data_extracao);
-            """, NOME_TABELA, freshnessGuard);
+        final String sql = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
@@ -144,5 +154,46 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             logger.debug("MERGE executado para Localização de Carga sequence_number {}: {} linha(s) afetada(s)", carga.getSequenceNumber(), rowsAffected);
             return rowsAffected;
         }
+    }
+
+    private String construirSqlMerge(final String tabelaAlvo,
+                                     final String sourceClause,
+                                     final String freshnessGuard) {
+        return """
+            MERGE %s WITH (HOLDLOCK) AS target
+            USING %s
+            ON target.sequence_number = source.sequence_number
+            WHEN MATCHED AND %s THEN
+                UPDATE SET
+                    type = source.type,
+                    service_at = source.service_at,
+                    invoices_volumes = source.invoices_volumes,
+                    taxed_weight = source.taxed_weight,
+                    invoices_value = source.invoices_value,
+                    total_value = source.total_value,
+                    service_type = source.service_type,
+                    branch_nickname = source.branch_nickname,
+                    predicted_delivery_at = source.predicted_delivery_at,
+                    destination_location_name = source.destination_location_name,
+                    destination_branch_nickname = source.destination_branch_nickname,
+                    classification = source.classification,
+                    status = source.status,
+                    status_branch_nickname = source.status_branch_nickname,
+                    origin_location_name = source.origin_location_name,
+                    origin_branch_nickname = source.origin_branch_nickname,
+                    fit_fln_cln_nickname = source.fit_fln_cln_nickname,
+                    metadata = source.metadata,
+                    data_extracao = source.data_extracao
+            WHEN NOT MATCHED THEN
+                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
+                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.data_extracao);
+            """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
+
+    private String construirSourceClauseValues() {
+        return """
+            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
+            """;
     }
 }

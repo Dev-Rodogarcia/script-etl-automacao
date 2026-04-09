@@ -67,11 +67,11 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
     void deveTolerarUsuariosSistemaComDriftPequeno() {
         final ResultadoComparacao resultado = new ResultadoComparacao(
             ConstantesEntidades.USUARIOS_SISTEMA,
-            43625,
-            43618,
+            235,
+            235,
             0,
-            43575,
-            43,
+            227,
+            8,
             0,
             0,
             true,
@@ -287,7 +287,7 @@ class ValidacaoApiBanco24hDetalhadaReporterTest {
             773,
             0,
             1,
-            63,
+            20,
             true,
             null,
             "snapshot vivo da origem"

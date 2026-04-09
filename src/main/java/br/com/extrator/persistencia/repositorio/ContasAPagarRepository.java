@@ -45,6 +45,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataExportEntity> {
     private static final Logger logger = LoggerFactory.getLogger(ContasAPagarRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.CONTAS_A_PAGAR;
+    private static final String NOME_TABELA_STAGING = "#stg_contas_a_pagar";
 
     @Override
     protected String getNomeTabela() {
@@ -56,12 +57,50 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
         return true;
     }
 
+    @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao,
+                                                   final ContasAPagarDataExportEntity entity) throws SQLException {
+        return executarMergeEmTabela(conexao, entity, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.data_transacao AS datetime2), CAST(target.data_liquidacao AS datetime2), CAST(target.data_criacao AS datetime2))",
+            "COALESCE(CAST(source.data_transacao AS datetime2), CAST(source.data_liquidacao AS datetime2), CAST(source.data_criacao AS datetime2))"
+        );
+        final String sql = construirSqlMerge(
+            qualificarTabelaDestino(),
+            NOME_TABELA_STAGING + " AS source",
+            freshnessGuard
+        );
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            return ps.executeUpdate();
+        }
+    }
+
     /**
      * Executa a operaÃ§Ã£o MERGE (UPSERT) para inserir ou atualizar uma conta a pagar no banco.
      * Usa sequence_code como chave de negÃ³cio.
      */
     @Override
     protected int executarMerge(final Connection conexao, final ContasAPagarDataExportEntity entity) throws SQLException {
+        return executarMergeEmTabela(conexao, entity, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final ContasAPagarDataExportEntity entity,
+                                      final String tabelaAlvo) throws SQLException {
         if (entity.getSequenceCode() == null) {
             logger.warn("Entidade com sequence_code null ignorada");
             throw new SQLException("NÃ£o Ã© possÃ­vel executar o MERGE para Contas a Pagar sem um 'sequence_code'.");
@@ -71,40 +110,61 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             "COALESCE(CAST(target.data_transacao AS datetime2), CAST(target.data_liquidacao AS datetime2), CAST(target.data_criacao AS datetime2))",
             "COALESCE(CAST(source.data_transacao AS datetime2), CAST(source.data_liquidacao AS datetime2), CAST(source.data_criacao AS datetime2))"
         );
-        final String sqlMerge = """
-            MERGE INTO contas_a_pagar AS target
-            USING (
-                SELECT
-                    ? AS sequence_code,
-                    ? AS document_number,
-                    ? AS issue_date,
-                    ? AS tipo_lancamento,
-                    ? AS valor_original,
-                    ? AS valor_juros,
-                    ? AS valor_desconto,
-                    ? AS valor_a_pagar,
-                    ? AS valor_pago,
-                    ? AS status_pagamento,
-                    ? AS mes_competencia,
-                    ? AS ano_competencia,
-                    ? AS data_criacao,
-                    ? AS data_liquidacao,
-                    ? AS data_transacao,
-                    ? AS nome_fornecedor,
-                    ? AS nome_filial,
-                    ? AS nome_centro_custo,
-                    ? AS valor_centro_custo,
-                    ? AS classificacao_contabil,
-                    ? AS descricao_contabil,
-                    ? AS valor_contabil,
-                    ? AS area_lancamento,
-                    ? AS observacoes,
-                    ? AS descricao_despesa,
-                    ? AS nome_usuario,
-                    ? AS reconciliado,
-                    ? AS metadata,
-                    ? AS data_extracao
-            ) AS source
+        final String sqlMerge = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard);
+
+        try (PreparedStatement ps = conexao.prepareStatement(sqlMerge)) {
+            int paramIndex = 1;
+            ps.setLong(paramIndex++, entity.getSequenceCode());
+            setStringParameter(ps, paramIndex++, entity.getDocumentNumber());
+            setDateParameter(ps, paramIndex++, entity.getIssueDate());
+            setStringParameter(ps, paramIndex++, entity.getTipoLancamento());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorOriginal());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorJuros());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorDesconto());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorAPagar());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorPago());
+            setStringParameter(ps, paramIndex++, entity.getStatusPagamento());
+            setIntegerParameter(ps, paramIndex++, entity.getMesCompetencia());
+            setIntegerParameter(ps, paramIndex++, entity.getAnoCompetencia());
+            setOffsetDateTimeParameter(ps, paramIndex++, entity.getDataCriacao());
+            setDateParameter(ps, paramIndex++, entity.getDataLiquidacao());
+            setDateParameter(ps, paramIndex++, entity.getDataTransacao());
+            setStringParameter(ps, paramIndex++, entity.getNomeFornecedor());
+            setStringParameter(ps, paramIndex++, entity.getNomeFilial());
+            setStringParameter(ps, paramIndex++, entity.getNomeCentroCusto());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorCentroCusto());
+            setStringParameter(ps, paramIndex++, entity.getClassificacaoContabil());
+            setStringParameter(ps, paramIndex++, entity.getDescricaoContabil());
+            setBigDecimalParameter(ps, paramIndex++, entity.getValorContabil());
+            setStringParameter(ps, paramIndex++, entity.getAreaLancamento());
+            setStringParameter(ps, paramIndex++, entity.getObservacoes());
+            setStringParameter(ps, paramIndex++, entity.getDescricaoDespesa());
+            setStringParameter(ps, paramIndex++, entity.getNomeUsuario());
+            setBooleanParameter(ps, paramIndex++, entity.getReconciliado());
+            setStringParameter(ps, paramIndex++, entity.getMetadata());
+            setDateTimeParameter(ps, paramIndex++, entity.getDataExtracao());
+
+            final int rowsAffected = ps.executeUpdate();
+
+            if (rowsAffected == 0) {
+                logger.warn("âš ï¸ MERGE retornou 0 linhas para conta a pagar sequence_code={}", entity.getSequenceCode());
+                return 0;
+            }
+
+            return rowsAffected;
+        } catch (final SQLException e) {
+            logger.error("âŒ SQLException ao salvar conta a pagar sequence_code={}: {}",
+                entity.getSequenceCode(), e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    private String construirSqlMerge(final String tabelaAlvo,
+                                     final String sourceClause,
+                                     final String freshnessGuard) {
+        return """
+            MERGE INTO %s WITH (HOLDLOCK) AS target
+            USING %s
             ON target.sequence_code = source.sequence_code
             WHEN MATCHED AND %s THEN
                 UPDATE SET
@@ -157,52 +217,43 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     source.observacoes, source.descricao_despesa, source.nome_usuario, source.reconciliado,
                     source.metadata, source.data_extracao
                 );
-            """.formatted(freshnessGuard);
+            """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
 
-        try (PreparedStatement ps = conexao.prepareStatement(sqlMerge)) {
-            int paramIndex = 1;
-            ps.setLong(paramIndex++, entity.getSequenceCode());
-            setStringParameter(ps, paramIndex++, entity.getDocumentNumber());
-            setDateParameter(ps, paramIndex++, entity.getIssueDate());
-            setStringParameter(ps, paramIndex++, entity.getTipoLancamento());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorOriginal());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorJuros());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorDesconto());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorAPagar());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorPago());
-            setStringParameter(ps, paramIndex++, entity.getStatusPagamento());
-            setIntegerParameter(ps, paramIndex++, entity.getMesCompetencia());
-            setIntegerParameter(ps, paramIndex++, entity.getAnoCompetencia());
-            setOffsetDateTimeParameter(ps, paramIndex++, entity.getDataCriacao());
-            setDateParameter(ps, paramIndex++, entity.getDataLiquidacao());
-            setDateParameter(ps, paramIndex++, entity.getDataTransacao());
-            setStringParameter(ps, paramIndex++, entity.getNomeFornecedor());
-            setStringParameter(ps, paramIndex++, entity.getNomeFilial());
-            setStringParameter(ps, paramIndex++, entity.getNomeCentroCusto());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorCentroCusto());
-            setStringParameter(ps, paramIndex++, entity.getClassificacaoContabil());
-            setStringParameter(ps, paramIndex++, entity.getDescricaoContabil());
-            setBigDecimalParameter(ps, paramIndex++, entity.getValorContabil());
-            setStringParameter(ps, paramIndex++, entity.getAreaLancamento());
-            setStringParameter(ps, paramIndex++, entity.getObservacoes());
-            setStringParameter(ps, paramIndex++, entity.getDescricaoDespesa());
-            setStringParameter(ps, paramIndex++, entity.getNomeUsuario());
-            setBooleanParameter(ps, paramIndex++, entity.getReconciliado());
-            setStringParameter(ps, paramIndex++, entity.getMetadata());
-            setDateTimeParameter(ps, paramIndex++, entity.getDataExtracao());
-
-            final int rowsAffected = ps.executeUpdate();
-
-            if (rowsAffected == 0) {
-                logger.warn("âš ï¸ MERGE retornou 0 linhas para conta a pagar sequence_code={}", entity.getSequenceCode());
-                return 0;
-            }
-
-            return rowsAffected;
-        } catch (final SQLException e) {
-            logger.error("âŒ SQLException ao salvar conta a pagar sequence_code={}: {}",
-                entity.getSequenceCode(), e.getMessage(), e);
-            throw e;
-        }
+    private String construirSourceClauseValues() {
+        return """
+            (
+                SELECT
+                    ? AS sequence_code,
+                    ? AS document_number,
+                    ? AS issue_date,
+                    ? AS tipo_lancamento,
+                    ? AS valor_original,
+                    ? AS valor_juros,
+                    ? AS valor_desconto,
+                    ? AS valor_a_pagar,
+                    ? AS valor_pago,
+                    ? AS status_pagamento,
+                    ? AS mes_competencia,
+                    ? AS ano_competencia,
+                    ? AS data_criacao,
+                    ? AS data_liquidacao,
+                    ? AS data_transacao,
+                    ? AS nome_fornecedor,
+                    ? AS nome_filial,
+                    ? AS nome_centro_custo,
+                    ? AS valor_centro_custo,
+                    ? AS classificacao_contabil,
+                    ? AS descricao_contabil,
+                    ? AS valor_contabil,
+                    ? AS area_lancamento,
+                    ? AS observacoes,
+                    ? AS descricao_despesa,
+                    ? AS nome_usuario,
+                    ? AS reconciliado,
+                    ? AS metadata,
+                    ? AS data_extracao
+            ) AS source
+            """;
     }
 }

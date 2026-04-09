@@ -58,6 +58,7 @@ import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.persistencia.entidade.FreteEntity;
 import br.com.extrator.persistencia.repositorio.FreteRepository;
+import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -364,9 +365,10 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
     }
 
     private OffsetDateTime parseOffsetDateTimeBr(final String valor) {
+        final java.time.ZoneId zoneId = ConfigApi.obterZoneIdDataExport();
         for (final DateTimeFormatter formatter : FORMATOS_BR_DATA_HORA) {
             try {
-                return java.time.LocalDateTime.parse(valor, formatter).atOffset(java.time.ZoneOffset.of("-03:00"));
+                return java.time.LocalDateTime.parse(valor, formatter).atZone(zoneId).toOffsetDateTime();
             } catch (final DateTimeParseException ignored) {
                 // tenta o proximo formato BR
             }

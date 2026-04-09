@@ -10,10 +10,10 @@
     
     <!-- Configuração de saída para arquivo -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/extrator-esl.log</file>
+        <file>logs/aplicacao/runtime/extrator-esl.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>logs/extrator-esl.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
+            <fileNamePattern>logs/aplicacao/runtime/extrator-esl.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>20</maxHistory>
         </rollingPolicy>
         <encoder>
             <charset>UTF-8</charset>

@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import br.com.extrator.observabilidade.LogRetentionPolicy;
+import br.com.extrator.observabilidade.LogStoragePaths;
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
@@ -203,13 +205,14 @@ public class IsolatedStepProcessExecutor {
     private Path criarArquivoLog(final ApiType apiType,
                                  final String entidade,
                                  final FaultMode faultMode) throws IOException {
-        final Path dir = Path.of("logs", "isolated_steps");
+        LogStoragePaths.ensureBaseDirectories();
+        final Path dir = LogStoragePaths.ISOLATED_STEPS_DIR;
         Files.createDirectories(dir);
         final String nomeEntidade = entidade == null || entidade.isBlank()
             ? "all"
             : entidade.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
         final String nomeFault = faultMode == null ? FaultMode.NONE.cliValue() : faultMode.cliValue();
-        return dir.resolve(
+        final Path arquivo = dir.resolve(
             "isolated_step_"
                 + apiType.name().toLowerCase(Locale.ROOT)
                 + "_"
@@ -220,6 +223,16 @@ public class IsolatedStepProcessExecutor {
                 + FILE_TS.format(LocalDateTime.now())
                 + ".log"
         );
+        if (!Files.exists(arquivo)) {
+            Files.createFile(arquivo);
+        }
+        LogRetentionPolicy.retainRecentFiles(
+            dir,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".log")
+                && path.getFileName().toString().startsWith("isolated_step_")
+        );
+        return arquivo;
     }
 
     private void destruirProcesso(final Process process) {

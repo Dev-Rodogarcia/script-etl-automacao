@@ -143,3 +143,48 @@ BEGIN
     PRINT 'Índice IX_manifestos_sequence_code já existe. Pulando criação.';
 END
 GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_manifestos_pick_sequence_code' AND object_id = OBJECT_ID('dbo.manifestos'))
+BEGIN
+    CREATE INDEX IX_manifestos_pick_sequence_code ON dbo.manifestos(pick_sequence_code);
+    PRINT 'Índice IX_manifestos_pick_sequence_code criado com sucesso!';
+END
+ELSE
+BEGIN
+    PRINT 'Índice IX_manifestos_pick_sequence_code já existe. Pulando criação.';
+END
+GO
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.foreign_keys
+    WHERE name = 'FK_manifestos_pick_sequence_code_coletas'
+      AND parent_object_id = OBJECT_ID('dbo.manifestos')
+)
+BEGIN
+    PRINT 'FK_manifestos_pick_sequence_code_coletas já existe. Pulando criação.';
+END
+ELSE IF EXISTS (
+    SELECT 1
+    FROM dbo.manifestos m
+    WHERE m.pick_sequence_code IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1
+          FROM dbo.coletas c
+          WHERE c.sequence_code = m.pick_sequence_code
+      )
+)
+BEGIN
+    PRINT 'AVISO: FK seletiva manifestos -> coletas não criada porque existem manifestos órfãos.';
+END
+ELSE
+BEGIN
+    ALTER TABLE dbo.manifestos WITH CHECK
+        ADD CONSTRAINT FK_manifestos_pick_sequence_code_coletas
+            FOREIGN KEY (pick_sequence_code)
+            REFERENCES dbo.coletas(sequence_code);
+
+    ALTER TABLE dbo.manifestos CHECK CONSTRAINT FK_manifestos_pick_sequence_code_coletas;
+    PRINT 'FK_manifestos_pick_sequence_code_coletas criada com sucesso!';
+END
+GO

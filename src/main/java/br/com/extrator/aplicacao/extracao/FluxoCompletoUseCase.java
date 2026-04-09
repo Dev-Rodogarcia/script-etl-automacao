@@ -46,8 +46,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
 import br.com.extrator.aplicacao.pipeline.PipelineOrchestrator;
@@ -59,12 +62,14 @@ import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
 import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionWindowPlanner;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.console.BannerUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.formatacao.FormatadorData;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -553,12 +558,18 @@ public class FluxoCompletoUseCase {
             return;
         }
 
-        for (final String entidade : List.of(
-            ConstantesEntidades.COLETAS,
-            ConstantesEntidades.MANIFESTOS,
-            ConstantesEntidades.FRETES,
-            ConstantesEntidades.USUARIOS_SISTEMA
-        )) {
+        final String executionUuid = ExecutionContext.currentExecutionId();
+        if (executionUuid == null || executionUuid.isBlank() || "n/a".equalsIgnoreCase(executionUuid)) {
+            log.warn("WATERMARK_EXECUCAO | auditoria estruturada indisponivel para a execucao corrente.");
+            return;
+        }
+
+        final Set<String> entidadesConfirmadas = resolverEntidadesComWatermarkConfirmado(
+            planosExecucao,
+            executionAuditPort.listarResultados(executionUuid)
+        );
+
+        for (final String entidade : entidadesConfirmadas) {
             final ExecutionWindowPlan plano = planosExecucao.get(entidade);
             if (plano == null) {
                 continue;
@@ -570,5 +581,42 @@ public class FluxoCompletoUseCase {
                 FormatadorData.formatBR(plano.confirmacaoFim())
             );
         }
+    }
+
+    static Set<String> resolverEntidadesComWatermarkConfirmado(final Map<String, ExecutionWindowPlan> planosExecucao,
+                                                               final List<ExecutionAuditRecord> auditoriaExecucao) {
+        if (planosExecucao == null || planosExecucao.isEmpty() || auditoriaExecucao == null || auditoriaExecucao.isEmpty()) {
+            return Set.of();
+        }
+
+        final Map<String, ExecutionAuditRecord> auditoriaPorEntidade = auditoriaExecucao.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toMap(
+                ExecutionAuditRecord::entidade,
+                Function.identity(),
+                FluxoCompletoUseCase::registroMaisRecente
+            ));
+
+        final Set<String> entidades = new LinkedHashSet<>();
+        for (final String entidade : planosExecucao.keySet()) {
+            final ExecutionAuditRecord audit = auditoriaPorEntidade.get(entidade);
+            if (audit != null && audit.apiCompleta() && audit.isStatusConfirmavel()) {
+                entidades.add(entidade);
+            }
+        }
+        return Set.copyOf(entidades);
+    }
+
+    private static ExecutionAuditRecord registroMaisRecente(final ExecutionAuditRecord atual,
+                                                            final ExecutionAuditRecord candidata) {
+        final LocalDateTime fimAtual = atual == null ? null : atual.finishedAt();
+        final LocalDateTime fimCandidata = candidata == null ? null : candidata.finishedAt();
+        if (fimAtual == null) {
+            return candidata;
+        }
+        if (fimCandidata == null) {
+            return atual;
+        }
+        return fimCandidata.isAfter(fimAtual) ? candidata : atual;
     }
 }

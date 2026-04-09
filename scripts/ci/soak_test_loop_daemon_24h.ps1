@@ -22,9 +22,32 @@ if (-not (Test-Path $reportScript)) {
     throw "ERRO: Script de relatorio nao encontrado em $reportScript"
 }
 
-$daemonDir = Join-Path $repoRoot "logs\daemon"
-New-Item -ItemType Directory -Force -Path $daemonDir | Out-Null
-$statusLog = Join-Path $daemonDir ("soak_status_{0}.log" -f (Get-Date -Format "yyyy-MM-dd_HH-mm-ss"))
+$daemonRuntimeDir = Join-Path $repoRoot "logs\daemon\runtime"
+New-Item -ItemType Directory -Force -Path $daemonRuntimeDir | Out-Null
+$statusLog = Join-Path $daemonRuntimeDir ("soak_status_{0}.log" -f (Get-Date -Format "yyyy-MM-dd_HH-mm-ss"))
+
+function Limit-RecentFiles {
+    param(
+        [string]$Directory,
+        [string]$Filter,
+        [int]$MaxFiles = 20
+    )
+
+    if (-not (Test-Path $Directory)) {
+        return
+    }
+
+    $files = Get-ChildItem -Path $Directory -File -Filter $Filter |
+        Sort-Object LastWriteTime, Name -Descending
+
+    if ($files.Count -le $MaxFiles) {
+        return
+    }
+
+    $files | Select-Object -Skip $MaxFiles | Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
+Limit-RecentFiles -Directory $daemonRuntimeDir -Filter "soak_status_*.log" -MaxFiles 20
 
 $flagFaturas = if ($ComFaturasGraphql) { @() } else { @("--sem-faturas-graphql") }
 $modoFaturas = if ($ComFaturasGraphql) { "com faturas GraphQL" } else { "sem faturas GraphQL" }
@@ -51,7 +74,7 @@ function Invoke-Extrator {
 }
 
 function Get-DaemonState {
-    $stateFile = Join-Path $repoRoot "logs\daemon\loop_daemon.state"
+    $stateFile = Join-Path $daemonRuntimeDir "loop_daemon.state"
     $map = @{}
     if (-not (Test-Path $stateFile)) {
         return $map

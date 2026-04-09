@@ -81,6 +81,17 @@ class GraphQLExtractionServiceTest {
         assertEquals(ConstantesEntidades.COLETAS, auditPort.records.get(0).entidade());
     }
 
+    @Test
+    void execucaoAuxiliarDeColetasNaoDeveGravarLogOperacionalNoBanco() {
+        final AuxiliaryColetasGraphQLExtractionService service = new AuxiliaryColetasGraphQLExtractionService();
+
+        service.executarSomenteColetasReferencial(LocalDate.of(2026, 4, 7), LocalDate.of(2026, 4, 8));
+
+        assertTrue(service.coletasReferencialExecutado, "Execucao auxiliar deve usar o fluxo dedicado.");
+        assertFalse(service.coletasPrincipalExecutado, "Execucao auxiliar nao deve registrar Coletas no namespace principal.");
+        assertEquals(0, service.logRepository.logs.size(), "Namespace auxiliar nao deve persistir em log_extracoes.");
+    }
+
     private static ExtractionResult resultado(final String entidade,
                                               final String status,
                                               final boolean sucesso,
@@ -166,6 +177,50 @@ class GraphQLExtractionServiceTest {
 
         private void registrar(final ExtractionResult result) {
             registrarLogExtracao(result);
+        }
+    }
+
+    private static final class AuxiliaryColetasGraphQLExtractionService extends GraphQLExtractionService {
+        private final RecordingLogExtracaoRepository logRepository;
+        private boolean coletasPrincipalExecutado;
+        private boolean coletasReferencialExecutado;
+
+        private AuxiliaryColetasGraphQLExtractionService() {
+            this(new RecordingLogExtracaoRepository());
+        }
+
+        private AuxiliaryColetasGraphQLExtractionService(final RecordingLogExtracaoRepository logRepository) {
+            super(
+                null,
+                logRepository,
+                AplicacaoContexto.executionAuditPort(),
+                new ExtractionLogger(AuxiliaryColetasGraphQLExtractionService.class),
+                LoggerConsole.getLogger(AuxiliaryColetasGraphQLExtractionService.class),
+                false
+            );
+            this.logRepository = logRepository;
+        }
+
+        @Override
+        protected void validarInfraestrutura() {
+            // no-op
+        }
+
+        @Override
+        protected ExtractionResult extractColetas(final LocalDate dataInicio, final LocalDate dataFim) {
+            coletasPrincipalExecutado = true;
+            final ExtractionResult result = resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas principal");
+            registrarLogExtracao(result);
+            return result;
+        }
+
+        @Override
+        protected ExtractionResult extractColetasReferencial(final LocalDate dataInicio, final LocalDate dataFim) {
+            coletasReferencialExecutado = true;
+            final ExtractionResult result =
+                resultado(ConstantesEntidades.COLETAS_REFERENCIAL, ConstantesEntidades.STATUS_COMPLETO, true, "coletas auxiliar");
+            registrarLogExtracao(result);
+            return result;
         }
     }
 

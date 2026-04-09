@@ -43,12 +43,14 @@ package br.com.extrator.suporte.formatacao;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import br.com.extrator.suporte.configuracao.ConfigApi;
 
 /**
  * Classe utilitária centralizada para formatação e parsing de datas.
@@ -86,9 +88,6 @@ public final class FormatadorData {
 
     /** Formato para filtro de intervalo da API ESL Cloud GraphQL: yyyy-MM-dd HH:mm */
     public static final DateTimeFormatter ESL_CLOUD_INTERVAL = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-
-    /** Fallback para datas sem timezone explícito (padrão operacional da integração). */
-    private static final ZoneOffset OFFSET_PADRAO_SEM_TIMEZONE = ZoneOffset.of("-03:00");
 
     /** Formatos comuns de data/hora sem timezone que já apareceram em integrações. */
     private static final DateTimeFormatter[] FORMATOS_DATA_HORA_SEM_OFFSET = {
@@ -179,6 +178,7 @@ public final class FormatadorData {
             return null;
         }
         final String valor = dateTimeStr.trim();
+        final ZoneId zoneId = ConfigApi.obterZoneIdDataExport();
 
         // Formato ISO completo com offset (ex.: 2025-10-02T00:00:00.000-03:00)
         try {
@@ -189,7 +189,7 @@ public final class FormatadorData {
 
         // ISO local sem offset (ex.: 2025-10-02T00:00:00)
         try {
-            return LocalDateTime.parse(valor, ISO_DATE_TIME).atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
+            return LocalDateTime.parse(valor, ISO_DATE_TIME).atZone(zoneId).toOffsetDateTime();
         } catch (final DateTimeParseException ignored) {
             // Tentativas de fallback abaixo.
         }
@@ -197,7 +197,7 @@ public final class FormatadorData {
         // Formatos legados sem timezone (ex.: 2025-10-02 00:00:00)
         for (final DateTimeFormatter formatter : FORMATOS_DATA_HORA_SEM_OFFSET) {
             try {
-                return LocalDateTime.parse(valor, formatter).atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
+                return LocalDateTime.parse(valor, formatter).atZone(zoneId).toOffsetDateTime();
             } catch (final DateTimeParseException ignored) {
                 // Tenta próximo formatter
             }
@@ -205,7 +205,7 @@ public final class FormatadorData {
 
         // Apenas data (ex.: 2025-10-07) -> início do dia no offset padrão
         try {
-            return LocalDate.parse(valor, ISO_DATE).atStartOfDay().atOffset(OFFSET_PADRAO_SEM_TIMEZONE);
+            return LocalDate.parse(valor, ISO_DATE).atStartOfDay(zoneId).toOffsetDateTime();
         } catch (final DateTimeParseException e) {
             logger.warn("Erro ao parsear OffsetDateTime '{}': {}", dateTimeStr, e.getMessage());
             return null;

@@ -95,9 +95,11 @@ public final class DaemonStateStore {
     }
 
     public void ensureDaemonDirectory() throws IOException {
-        if (!Files.exists(daemonDir)) {
-            Files.createDirectories(daemonDir);
-        }
+        ensureParentDirectory(daemonDir);
+        ensureParentDirectory(stateFile.getParent());
+        ensureParentDirectory(pidFile.getParent());
+        ensureParentDirectory(stopFile.getParent());
+        ensureParentDirectory(forceRunFile.getParent());
     }
 
     public void clearFileIfExists(final Path path) throws IOException {
@@ -107,10 +109,12 @@ public final class DaemonStateStore {
     }
 
     public void requestStop() throws IOException {
+        ensureDaemonDirectory();
         Files.writeString(stopFile, "stop@" + LocalDateTime.now(), StandardCharsets.UTF_8);
     }
 
     public void requestForceRun() throws IOException {
+        ensureDaemonDirectory();
         Files.writeString(forceRunFile, "force-run@" + LocalDateTime.now(), StandardCharsets.UTF_8);
     }
 
@@ -177,6 +181,12 @@ public final class DaemonStateStore {
         properties.setProperty("last_run_at", lastRunAt == null ? "" : lastRunAt);
         properties.setProperty("next_run_at", nextRunAt == null ? "" : nextRunAt);
 
+        try {
+            ensureDaemonDirectory();
+        } catch (final IOException e) {
+            throw new RuntimeException("Falha ao preparar diretorio de estado do loop daemon.", e);
+        }
+
         try (var out = Files.newOutputStream(
             stateFile,
             StandardOpenOption.CREATE,
@@ -194,9 +204,16 @@ public final class DaemonStateStore {
             return;
         }
         try {
+            ensureDaemonDirectory();
             Files.writeString(pidFile, String.valueOf(pid), StandardCharsets.UTF_8);
         } catch (final IOException ignored) {
             logger.warn("Falha ao sincronizar PID file '{}': {}", pidFile, ignored.getMessage());
+        }
+    }
+
+    private void ensureParentDirectory(final Path directory) throws IOException {
+        if (directory != null && !Files.exists(directory)) {
+            Files.createDirectories(directory);
         }
     }
 }

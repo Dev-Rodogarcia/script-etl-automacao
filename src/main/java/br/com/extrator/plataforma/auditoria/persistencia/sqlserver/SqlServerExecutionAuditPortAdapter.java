@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
 
 public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditPort {
     private static final Logger logger = LoggerFactory.getLogger(SqlServerExecutionAuditPortAdapter.class);
@@ -74,6 +75,7 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
 
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             if (!tabelaExiste(conexao, "sys_execution_audit")) {
+                tratarFalhaEscrita("Tabela dbo.sys_execution_audit ausente; auditoria estruturada nao pode ser persistida.");
                 return;
             }
             try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -102,7 +104,7 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
                 stmt.executeUpdate();
             }
         } catch (final SQLException e) {
-            logger.warn("Falha ao gravar sys_execution_audit: {}", e.getMessage());
+            tratarFalhaEscrita("Falha ao gravar sys_execution_audit: " + e.getMessage(), e);
         }
     }
 
@@ -203,6 +205,9 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
             """;
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             if (!tabelaExiste(conexao, "sys_execution_watermark")) {
+                tratarFalhaEscrita(
+                    "Tabela dbo.sys_execution_watermark ausente; watermark confirmado de '" + entidade + "' nao pode ser atualizado."
+                );
                 return;
             }
             try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -211,7 +216,7 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
                 stmt.executeUpdate();
             }
         } catch (final SQLException e) {
-            logger.warn("Falha ao atualizar watermark de {}: {}", entidade, e.getMessage());
+            tratarFalhaEscrita("Falha ao atualizar watermark de " + entidade + ": " + e.getMessage(), e);
         }
     }
 
@@ -270,5 +275,20 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
 
     private LocalDateTime toLocalDateTime(final Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toLocalDateTime();
+    }
+
+    private void tratarFalhaEscrita(final String mensagem) {
+        tratarFalhaEscrita(mensagem, null);
+    }
+
+    private void tratarFalhaEscrita(final String mensagem, final Exception causa) {
+        if (ConfigEtl.isModoIntegridadeEstrito()) {
+            throw causa == null ? new IllegalStateException(mensagem) : new IllegalStateException(mensagem, causa);
+        }
+        if (causa == null) {
+            logger.warn(mensagem);
+            return;
+        }
+        logger.warn(mensagem, causa);
     }
 }

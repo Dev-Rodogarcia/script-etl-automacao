@@ -35,6 +35,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO;
+import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -42,6 +44,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
     private static final LoggerConsole log =
         LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaMetadataHasher.class);
+    private final FaturaPorClienteMapper faturaPorClienteMapper = new FaturaPorClienteMapper();
 
     String hashMetadata(final String entidade, final String metadata) {
         final String normalizado = normalizarMetadataParaComparacao(entidade, metadata);
@@ -86,6 +89,10 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
     }
 
     private ObjectNode projetarCamposEstaveis(final String entidade, final ObjectNode origem) {
+        if (ConstantesEntidades.FATURAS_POR_CLIENTE.equals(entidade)) {
+            return projetarFaturaPorCliente(origem);
+        }
+
         final List<String> caminhos = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS -> List.of(
                 "sequence_code",
@@ -196,26 +203,9 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
                 "ant_aln_name",
                 "ant_ils_expense_description"
             );
-            case ConstantesEntidades.FATURAS_POR_CLIENTE -> List.of(
-                "fit_nse_number",
-                "nfse_number",
-                "fit_fhe_cte_number",
-                "fit_fhe_cte_issued_at",
-                "fit_fhe_cte_key",
-                "fit_ant_document",
-                "fit_ant_issue_date",
-                "fit_ant_value",
-                "fit_ant_ils_due_date",
-                "fit_ant_ils_original_due_date",
-                "total",
-                "third_party_ctes_value",
-                "type",
-                "fit_crn_psn_nickname",
-                "fit_diy_sae_name",
-                "fit_fsn_name",
-                "fit_pyr_document",
-                "fit_rpt_document",
-                "fit_sdr_document"
+            case ConstantesEntidades.USUARIOS_SISTEMA -> List.of(
+                "id",
+                "name"
             );
             default -> null;
         };
@@ -277,6 +267,16 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
             default -> {
                 // Sem tratamento especial para outras entidades.
             }
+        }
+    }
+
+    private ObjectNode projetarFaturaPorCliente(final ObjectNode origem) {
+        try {
+            final FaturaPorClienteDTO dto = MapperUtil.sharedJson().treeToValue(origem, FaturaPorClienteDTO.class);
+            return faturaPorClienteMapper.projetarCamposPersistidosEstaveis(dto);
+        } catch (JsonProcessingException e) {
+            log.debug("Fallback de projecao persistida de faturas_por_cliente por erro de parse: {}", e.getOriginalMessage());
+            return null;
         }
     }
 }

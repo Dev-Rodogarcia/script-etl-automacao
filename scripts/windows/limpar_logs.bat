@@ -139,8 +139,8 @@ exit /b 0
 set "DAEMON_STATUS="
 set "DAEMON_PID="
 set "DAEMON_RUNNING=0"
-set "STATE_FILE=%LOGS_DIR%\daemon\loop_daemon.state"
-set "PID_FILE=%LOGS_DIR%\daemon\loop_daemon.pid"
+set "STATE_FILE=%LOGS_DIR%\daemon\runtime\loop_daemon.state"
+set "PID_FILE=%LOGS_DIR%\daemon\runtime\loop_daemon.pid"
 
 if exist "%STATE_FILE%" call :READ_PROPERTY "%STATE_FILE%" "status" DAEMON_STATUS
 if exist "%STATE_FILE%" if not defined DAEMON_PID call :READ_PROPERTY "%STATE_FILE%" "pid" DAEMON_PID
@@ -185,13 +185,18 @@ exit /b 0
 
 :ENSURE_LOG_STRUCTURE
 mkdir "%LOGS_DIR%" 2>nul
-mkdir "%LOGS_DIR%\history" 2>nul
-mkdir "%LOGS_DIR%\isolated_steps" 2>nul
+mkdir "%LOGS_DIR%\aplicacao" 2>nul
+mkdir "%LOGS_DIR%\aplicacao\runtime" 2>nul
+mkdir "%LOGS_DIR%\aplicacao\operacoes" 2>nul
+mkdir "%LOGS_DIR%\auditoria" 2>nul
+mkdir "%LOGS_DIR%\auditoria\execucao" 2>nul
 mkdir "%LOGS_DIR%\daemon" 2>nul
-mkdir "%LOGS_DIR%\daemon\ciclos" 2>nul
-mkdir "%LOGS_DIR%\daemon\history" 2>nul
-mkdir "%LOGS_DIR%\daemon\reconciliacao" 2>nul
 mkdir "%LOGS_DIR%\daemon\runtime" 2>nul
+mkdir "%LOGS_DIR%\daemon\ciclos" 2>nul
+mkdir "%LOGS_DIR%\daemon\historico" 2>nul
+mkdir "%LOGS_DIR%\daemon\reconciliacao" 2>nul
+mkdir "%LOGS_DIR%\processos_isolados" 2>nul
+mkdir "%LOGS_DIR%\relatorios" 2>nul
 exit /b 0
 
 :FULL_CLEAN_EXTRA

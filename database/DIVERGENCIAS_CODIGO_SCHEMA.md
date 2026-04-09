@@ -33,6 +33,17 @@ Este arquivo registra o que foi encontrado ao comparar entidades/repositórios J
   - recriação do zero já nasce correta pelo script-base
   - bancos existentes podem ser normalizados pela migration `005`
 
+### `dbo.manifestos` -> `dbo.coletas`
+
+- Situação encontrada: a FK seletiva `manifestos.pick_sequence_code -> coletas.sequence_code` existia apenas como migration (`database/migrations/007_adicionar_fk_seletiva_manifestos_coletas.sql`), e não no script-base de criação da tabela.
+- Ajuste aplicado:
+  - alinhado `database/tabelas/003_criar_tabela_manifestos.sql`
+  - o script-base agora também cria `IX_manifestos_pick_sequence_code`
+  - o script-base agora tenta criar `FK_manifestos_pick_sequence_code_coletas` quando não houver órfãos
+- Estado atual:
+  - recriação do zero já nasce com o índice e a FK seletiva
+  - bancos existentes continuam podendo ser alinhados pela migration `007`
+
 ### `dbo.etl_invalid_records`
 
 - Origem da divergência: `src/main/java/br/com/extrator/persistencia/repositorio/InvalidRecordAuditRepository.java`

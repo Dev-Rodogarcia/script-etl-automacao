@@ -1,5 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 03-validar_config.bat
 REM Tipo    : Script operacional Windows (.bat)
@@ -46,7 +51,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto...
-    call "%~dp0mvn.bat" -q -DskipTests package
+    call "%MVN_CMD%" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -55,7 +60,7 @@ if /i "%PROD_MODE%"=="1" (
     )
 )
 
-if not exist "target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -67,30 +72,13 @@ if not exist "target\extrator.jar" (
     exit /b 1
 )
 
-if not defined JAVA_HOME (
-    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Java\jdk-17*" 2^>nul') do (
-        set "JAVA_HOME=C:\Program Files\Java\%%D"
-        goto :javahomefound
-    )
-    for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
-        set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
-        goto :javahomefound
-    )
-)
-:javahomefound
-if defined JAVA_HOME (
-    if exist "%JAVA_HOME%\bin\java.exe" (
-        set "PATH=%JAVA_HOME%\bin;%PATH%"
-    )
-)
-
 call :AUTH_CHECK RUN_VALIDAR_CONFIG "Validar configuracoes"
 if errorlevel 1 exit /b 1
 
-echo Executando: java -jar "target\extrator.jar" --validar
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --validar
 echo.
 
-java -jar "target\extrator.jar" --validar
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --validar
 
 if !ERRORLEVEL! equ 0 (
     echo.
@@ -112,7 +100,7 @@ exit /b 0
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

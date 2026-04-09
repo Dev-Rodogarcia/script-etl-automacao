@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-final class IntegridadeEtlSqlSupport {
+class IntegridadeEtlSqlSupport {
 
     boolean tabelaExiste(final Connection conexao, final String tabela) throws SQLException {
         final String sql = """

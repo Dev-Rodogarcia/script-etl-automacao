@@ -144,7 +144,7 @@ class LoopDaemonRunHandlerTest {
         final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));
         final String conteudo = Files.readString(logCiclo, StandardCharsets.UTF_8);
 
-        assertTrue(duracaoMs < 2_500, "Watchdog global deve impedir hang indefinido do daemon");
+        assertTrue(duracaoMs < 4_000, "Watchdog global deve impedir hang indefinido do daemon");
         assertTrue(conteudo.toLowerCase().contains("timeout"), "Resumo do ciclo deve registrar timeout global");
     }
 

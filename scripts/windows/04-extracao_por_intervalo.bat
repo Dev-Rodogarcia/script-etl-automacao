@@ -1,5 +1,10 @@
 @echo off
 setlocal EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 04-extracao_por_intervalo.bat
 REM Tipo    : Script operacional Windows (.bat)
@@ -94,16 +99,15 @@ REM   - Gera logs detalhados
 REM ================================================================
 
 if /i not "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" (
-    if not exist "target\extrator.jar" (
+    if not exist "%JAR_PATH%" (
         echo ERRO: Arquivo target\extrator.jar nao encontrado para autenticacao.
         echo.
         pause
         exit /b 1
     )
-    call :ENSURE_JAVA_17
     echo.
     echo Autenticacao obrigatoria para executar esta acao.
-    java -jar "target\extrator.jar" --auth-check RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
     if errorlevel 1 (
         echo Acesso negado.
         echo.
@@ -411,7 +415,7 @@ echo ================================================================
 if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
-    call "%~dp0mvn.bat" -DskipTests package
+    call "%MVN_CMD%" -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -420,7 +424,7 @@ if /i "%PROD_MODE%"=="1" (
     )
 )
 
-if not exist "target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -431,8 +435,6 @@ if not exist "target\extrator.jar" (
     pause
     exit /b 1
 )
-
-call :ENSURE_JAVA_17
 
 echo.
 echo ================================================================
@@ -477,7 +479,7 @@ if defined FLAG_FATURAS_GRAPHQL (
 )
 
 REM Executar comando
-java -jar "target\extrator.jar" --extracao-intervalo !CMD_ARGS!
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --extracao-intervalo !CMD_ARGS!
 set "JAVA_EXIT_CODE=%ERRORLEVEL%"
 set "FINAL_EXIT_CODE=%JAVA_EXIT_CODE%"
 
@@ -593,21 +595,4 @@ if not "%DATA_TESTE:~10,1%"=="" exit /b 1
 set "DATA_NUMERICA=%DATA_TESTE:-=%"
 if not "%DATA_NUMERICA:~8,1%"=="" exit /b 1
 for /f "delims=0123456789" %%A in ("%DATA_NUMERICA%") do exit /b 1
-exit /b 0
-
-:ENSURE_JAVA_17
-if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" (
-    set "PATH=%JAVA_HOME%\bin;%PATH%"
-    exit /b 0
-)
-for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Java\jdk-17*" 2^>nul') do (
-    set "JAVA_HOME=C:\Program Files\Java\%%D"
-    set "PATH=%JAVA_HOME%\bin;%PATH%"
-    exit /b 0
-)
-for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
-    set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
-    set "PATH=%JAVA_HOME%\bin;%PATH%"
-    exit /b 0
-)
 exit /b 0

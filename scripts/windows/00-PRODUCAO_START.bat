@@ -4,8 +4,11 @@ setlocal EnableExtensions EnableDelayedExpansion
 if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 65001 >nul
 pushd "%~dp0"
 
-set "JAR_PATH=%~dp0target\extrator.jar"
 set "SCRIPT_ROOT=%~dp0"
+for %%I in ("%~dp0..\..") do set "REPO_ROOT=%%~fI"
+set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+set "DB_STARTUP_LOG=%REPO_ROOT%\logs\aplicacao\operacoes\database_startup.log"
+set "BASICS_READY=0"
 set "STARTUP_READY=0"
 set "SQLITE_AUTH_DB="
 
@@ -15,6 +18,8 @@ REM Nao compila, nao testa, nao empacota.
 REM Para compilar, use o ambiente de desenvolvimento separadamente.
 REM ----------------------------------------------------------------
 set "PROD_MODE=1"
+
+if /i "%~1"=="--auto-intervalo" goto :RUN_AUTO_INTERVALO
 
 :MENU
 cls
@@ -40,8 +45,11 @@ echo Cobertura atual do ETL:
 echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
-if not "%STARTUP_READY%"=="1" (
+if not "%BASICS_READY%"=="1" (
     echo Ambiente sera validado ao executar a primeira opcao.
+    echo.
+) else if not "%STARTUP_READY%"=="1" (
+    echo Banco e objetos operacionais serao preparados apos a autenticacao da primeira acao que exigir escrita.
     echo.
 )
 call :READ_MENU_OPTION
@@ -75,70 +83,146 @@ echo Opcao invalida.
 timeout /t 2 /nobreak >nul 2>&1
 goto :MENU
 
+:RUN_AUTO_INTERVALO
+call :PREPARE_SECURITY
+if errorlevel 1 (
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+call :PREPARE_DATABASE
+if errorlevel 1 (
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+if "%~2"=="" (
+    echo.
+    echo ERRO: Data de inicio nao informada para o modo automatico.
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql]
+    echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport inventario
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+if "%~3"=="" (
+    echo.
+    echo ERRO: Data de fim nao informada para o modo automatico.
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql]
+    echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport sinistros
+    set "AUTO_EXIT=1"
+    goto :END_WITH_CODE
+)
+call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "%~2" "%~3" "%~4" "%~5" "%~6"
+set "AUTO_EXIT=!ERRORLEVEL!"
+goto :END_WITH_CODE
+
 :RUN_01
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "01-executar_extracao_completa.bat"
+call :AUTH_CHECK RUN_EXTRACAO_COMPLETA "Executar extracao completa"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :PREPARE_DATABASE
+if errorlevel 1 goto :MENU
+call :RUN_SCRIPT_AUTHORIZED "01-executar_extracao_completa.bat"
 goto :MENU
 
 :RUN_02
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "02-testar_api_especifica.bat"
+call :AUTH_CHECK RUN_TESTAR_API "Testar API especifica"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :RUN_SCRIPT_AUTHORIZED "02-testar_api_especifica.bat"
 goto :MENU
 
 :RUN_03
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "03-validar_config.bat"
+call :AUTH_CHECK RUN_VALIDAR_CONFIG "Validar configuracoes"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :RUN_SCRIPT_AUTHORIZED "03-validar_config.bat"
 goto :MENU
 
 :RUN_04
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "04-extracao_por_intervalo.bat"
+call :AUTH_CHECK RUN_EXTRACAO_INTERVALO "Executar extracao por intervalo"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :PREPARE_DATABASE
+if errorlevel 1 goto :MENU
+call :RUN_SCRIPT_AUTHORIZED "04-extracao_por_intervalo.bat"
 goto :MENU
 
 :RUN_05
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
+if errorlevel 1 goto :MENU
+call :PREPARE_DATABASE
 if errorlevel 1 goto :MENU
 call :RUN_SCRIPT "05-loop_extracao_30min.bat"
 goto :MENU
 
 :RUN_06
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "06-relatorio-completo-validacao.bat"
+call :AUTH_CHECK RUN_BATERIA_EXTREMA "Executar bateria extrema e relatorio de saude do ETL"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :PREPARE_DATABASE
+if errorlevel 1 goto :MENU
+call :RUN_SCRIPT_AUTHORIZED "06-relatorio-completo-validacao.bat"
 goto :MENU
 
 :RUN_07
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "07-exportar_csv.bat"
+call :AUTH_CHECK RUN_EXPORTAR_CSV "Exportar dados para CSV"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :PREPARE_DATABASE
+if errorlevel 1 goto :MENU
+call :RUN_SCRIPT_AUTHORIZED "07-exportar_csv.bat"
 goto :MENU
 
 :RUN_08
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
-call :RUN_SCRIPT "08-auditar_api.bat"
+call :AUTH_CHECK RUN_AUDITORIA_API "Auditar estrutura das APIs"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :RUN_SCRIPT_AUTHORIZED "08-auditar_api.bat"
 goto :MENU
 
 :RUN_09
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
 call :RUN_SCRIPT "09-gerenciar_usuarios.bat"
 goto :MENU
 
 :RUN_AJUDA
-call :PREPARE_PRODUCTION
+call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
 call :AUTH_CHECK RUN_AJUDA "Visualizar ajuda"
 if errorlevel 1 (
     timeout /t 2 /nobreak >nul 2>&1
     goto :MENU
 )
-echo Executando: java -jar "%JAR_PATH%" --ajuda
-java -jar "%JAR_PATH%" --ajuda
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --ajuda
 echo.
 pause
 goto :MENU
@@ -153,9 +237,8 @@ if "%STARTUP_READY%"=="1" if exist "%JAR_PATH%" (
 )
 goto :END
 
-:PREPARE_PRODUCTION
-if "%STARTUP_READY%"=="1" exit /b 0
-
+:PREPARE_SECURITY
+if "%BASICS_READY%"=="1" exit /b 0
 call :ensure_java
 call :check_jar
 if errorlevel 1 exit /b 1
@@ -163,19 +246,25 @@ if errorlevel 1 exit /b 1
 call :check_sqlite_auth_db
 if errorlevel 1 exit /b 1
 
-if exist "%~dp0database\executar_database.bat" (
+set "BASICS_READY=1"
+exit /b 0
+
+:PREPARE_DATABASE
+if "%STARTUP_READY%"=="1" exit /b 0
+
+if exist "%REPO_ROOT%\database\executar_database.bat" (
     echo.
     echo Preparando ambiente do banco...
     set "EXTRATOR_DB_SILENT=1"
-    if not exist "%~dp0logs" mkdir "%~dp0logs" >nul 2>&1
-    call "%~dp0database\executar_database.bat" > "%~dp0logs\database_startup.log" 2>&1
+    if not exist "%REPO_ROOT%\logs\aplicacao\operacoes" mkdir "%REPO_ROOT%\logs\aplicacao\operacoes" >nul 2>&1
+    call "%REPO_ROOT%\database\executar_database.bat" > "%DB_STARTUP_LOG%" 2>&1
     set "EXTRATOR_DB_SILENT="
     if errorlevel 1 (
-        echo [AVISO] Pipeline de banco retornou erro. Veja logs\database_startup.log
+        echo [AVISO] Pipeline de banco retornou erro. Veja logs\aplicacao\operacoes\database_startup.log
         timeout /t 3 /nobreak >nul 2>&1
     ) else (
         echo [OK] Ambiente de banco preparado, incluindo inventario/sinistros e views do BI.
-        echo [INFO] Referencia: logs\database_startup.log
+        echo [INFO] Referencia: logs\aplicacao\operacoes\database_startup.log
     )
 )
 set "STARTUP_READY=1"
@@ -203,7 +292,7 @@ echo.
 echo   Caminho verificado: !SQLITE_AUTH_DB!
 echo.
 echo   Para inicializar o banco de autenticacao, execute:
-echo     java -jar "%JAR_PATH%" --auth-bootstrap
+echo     java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-bootstrap
 echo.
 echo   Para usar caminho customizado, defina a variavel de ambiente:
 echo     EXTRATOR_SECURITY_DB_PATH=C:\caminho\customizado\users.db
@@ -244,11 +333,24 @@ if not "!TARGET_EXIT!"=="0" (
 )
 exit /b 0
 
+:RUN_SCRIPT_AUTHORIZED
+set "TARGET_SCRIPT=%~1"
+set "PREV_SKIP_AUTH_CHECK=%EXTRATOR_SKIP_AUTH_CHECK%"
+set "EXTRATOR_SKIP_AUTH_CHECK=1"
+call :RUN_SCRIPT "%TARGET_SCRIPT%"
+set "TARGET_EXIT=!ERRORLEVEL!"
+if defined PREV_SKIP_AUTH_CHECK (
+    set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"
+) else (
+    set "EXTRATOR_SKIP_AUTH_CHECK="
+)
+exit /b !TARGET_EXIT!
+
 :AUTH_CHECK
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "%JAR_PATH%" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     exit /b 1
@@ -272,12 +374,12 @@ if defined JAVA_HOME (
         goto :eof
     )
 )
-for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-17*" 2^>nul') do (
+for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-25.0.2.10-hotspot" 2^>nul') do (
     set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
     set "PATH=%JAVA_HOME%\bin;%PATH%"
     goto :eof
 )
-for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-*" 2^>nul') do (
+for /f "delims=" %%D in ('dir /b /ad /o-n "C:\Program Files\Eclipse Adoptium\jdk-25.0.2.10-hotspot" 2^>nul') do (
     set "JAVA_HOME=C:\Program Files\Eclipse Adoptium\%%D"
     set "PATH=%JAVA_HOME%\bin;%PATH%"
     goto :eof
@@ -288,3 +390,7 @@ goto :eof
 popd
 endlocal
 exit /b 0
+
+:END_WITH_CODE
+popd
+endlocal & exit /b %AUTO_EXIT%

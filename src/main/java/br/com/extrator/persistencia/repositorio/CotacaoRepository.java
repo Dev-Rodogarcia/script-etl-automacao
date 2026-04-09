@@ -46,6 +46,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
     private static final Logger logger = LoggerFactory.getLogger(CotacaoRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.COTACOES;
+    private static final String NOME_TABELA_STAGING = "#stg_cotacoes";
 
     @Override
     protected String getNomeTabela() {
@@ -57,6 +58,37 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
         return true;
     }
 
+    @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao, final CotacaoEntity cotacao) throws SQLException {
+        return executarMergeEmTabela(conexao, cotacao, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.nfse_issued_at AS datetime2), CAST(target.cte_issued_at AS datetime2), CAST(target.requested_at AS datetime2))",
+            "COALESCE(CAST(source.nfse_issued_at AS datetime2), CAST(source.cte_issued_at AS datetime2), CAST(source.requested_at AS datetime2))"
+        );
+        final String sql = construirSqlMerge(
+            qualificarTabelaDestino(),
+            NOME_TABELA_STAGING + " AS source",
+            freshnessGuard
+        );
+        try (PreparedStatement statement = conexao.prepareStatement(sql)) {
+            return statement.executeUpdate();
+        }
+    }
+
     /**
      * Executa a operação MERGE (UPSERT) para inserir ou atualizar uma cotação no
      * banco.
@@ -64,6 +96,12 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
      */
     @Override
     protected int executarMerge(final Connection conexao, final CotacaoEntity cotacao) throws SQLException {
+        return executarMergeEmTabela(conexao, cotacao, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final CotacaoEntity cotacao,
+                                      final String tabelaAlvo) throws SQLException {
         // Para Cotações, o 'sequence_code' é a chave de negócio primária.
         if (cotacao.getSequenceCode() == null) {
             throw new SQLException("Não é possível executar o MERGE para Cotação sem um 'sequence_code'.");
@@ -73,84 +111,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                 "COALESCE(CAST(target.nfse_issued_at AS datetime2), CAST(target.cte_issued_at AS datetime2), CAST(target.requested_at AS datetime2))",
                 "COALESCE(CAST(source.nfse_issued_at AS datetime2), CAST(source.cte_issued_at AS datetime2), CAST(source.requested_at AS datetime2))"
         );
-        final String sql = String.format(
-                """
-                        MERGE %s AS target
-                        USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                            AS source (
-                                sequence_code, requested_at, operation_type, customer_doc, customer_name,
-                                origin_city, origin_state, destination_city, destination_state, price_table,
-                                volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname,
-                                company_name, requester_name, real_weight, origin_postal_code, destination_postal_code,
-                                customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
-                                disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
-                                collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
-                                metadata, data_extracao
-                            )
-                        ON target.sequence_code = source.sequence_code
-                        WHEN MATCHED AND %s THEN
-                            UPDATE SET
-                                requested_at = source.requested_at,
-                                operation_type = source.operation_type,
-                                customer_doc = source.customer_doc,
-                                customer_name = source.customer_name,
-                                origin_city = source.origin_city,
-                                origin_state = source.origin_state,
-                                destination_city = source.destination_city,
-                                destination_state = source.destination_state,
-                                price_table = source.price_table,
-                                volumes = source.volumes,
-                                taxed_weight = source.taxed_weight,
-                                invoices_value = source.invoices_value,
-                                total_value = source.total_value,
-                                user_name = source.user_name,
-                                branch_nickname = source.branch_nickname,
-                                company_name = source.company_name,
-                                requester_name = source.requester_name,
-                                real_weight = source.real_weight,
-                                origin_postal_code = source.origin_postal_code,
-                                destination_postal_code = source.destination_postal_code,
-                                customer_nickname = source.customer_nickname,
-                                sender_document = source.sender_document,
-                                sender_nickname = source.sender_nickname,
-                                receiver_document = source.receiver_document,
-                                receiver_nickname = source.receiver_nickname,
-                                disapprove_comments = source.disapprove_comments,
-                                freight_comments = source.freight_comments,
-                                discount_subtotal = source.discount_subtotal,
-                                itr_subtotal = source.itr_subtotal,
-                                tde_subtotal = source.tde_subtotal,
-                                collect_subtotal = source.collect_subtotal,
-                                delivery_subtotal = source.delivery_subtotal,
-                                other_fees = source.other_fees,
-                                cte_issued_at = source.cte_issued_at,
-                                nfse_issued_at = source.nfse_issued_at,
-                                metadata = source.metadata,
-                                data_extracao = source.data_extracao
-                        WHEN NOT MATCHED THEN
-                            INSERT (
-                                sequence_code, requested_at, operation_type, customer_doc, customer_name,
-                                origin_city, origin_state, destination_city, destination_state, price_table,
-                                volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname,
-                                company_name, requester_name, real_weight, origin_postal_code, destination_postal_code,
-                                customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
-                                disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
-                                collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
-                                metadata, data_extracao
-                            )
-                            VALUES (
-                                source.sequence_code, source.requested_at, source.operation_type, source.customer_doc, source.customer_name,
-                                source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.price_table,
-                                source.volumes, source.taxed_weight, source.invoices_value, source.total_value, source.user_name, source.branch_nickname,
-                                source.company_name, source.requester_name, source.real_weight, source.origin_postal_code, source.destination_postal_code,
-                                source.customer_nickname, source.sender_document, source.sender_nickname, source.receiver_document, source.receiver_nickname,
-                                source.disapprove_comments, source.freight_comments, source.discount_subtotal, source.itr_subtotal, source.tde_subtotal,
-                                source.collect_subtotal, source.delivery_subtotal, source.other_fees, source.cte_issued_at, source.nfse_issued_at,
-                                source.metadata, source.data_extracao
-                            );
-                        """,
-                NOME_TABELA,
-                freshnessGuard);
+        final String sql = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
@@ -234,5 +195,91 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     cotacao.getSequenceCode(), e.getMessage(), e.getSQLState(), e.getErrorCode(), e);
             throw e;
         }
+    }
+
+    private String construirSqlMerge(final String tabelaAlvo,
+                                     final String sourceClause,
+                                     final String freshnessGuard) {
+        return """
+            MERGE %s WITH (HOLDLOCK) AS target
+            USING %s
+            ON target.sequence_code = source.sequence_code
+            WHEN MATCHED AND %s THEN
+                UPDATE SET
+                    requested_at = source.requested_at,
+                    operation_type = source.operation_type,
+                    customer_doc = source.customer_doc,
+                    customer_name = source.customer_name,
+                    origin_city = source.origin_city,
+                    origin_state = source.origin_state,
+                    destination_city = source.destination_city,
+                    destination_state = source.destination_state,
+                    price_table = source.price_table,
+                    volumes = source.volumes,
+                    taxed_weight = source.taxed_weight,
+                    invoices_value = source.invoices_value,
+                    total_value = source.total_value,
+                    user_name = source.user_name,
+                    branch_nickname = source.branch_nickname,
+                    company_name = source.company_name,
+                    requester_name = source.requester_name,
+                    real_weight = source.real_weight,
+                    origin_postal_code = source.origin_postal_code,
+                    destination_postal_code = source.destination_postal_code,
+                    customer_nickname = source.customer_nickname,
+                    sender_document = source.sender_document,
+                    sender_nickname = source.sender_nickname,
+                    receiver_document = source.receiver_document,
+                    receiver_nickname = source.receiver_nickname,
+                    disapprove_comments = source.disapprove_comments,
+                    freight_comments = source.freight_comments,
+                    discount_subtotal = source.discount_subtotal,
+                    itr_subtotal = source.itr_subtotal,
+                    tde_subtotal = source.tde_subtotal,
+                    collect_subtotal = source.collect_subtotal,
+                    delivery_subtotal = source.delivery_subtotal,
+                    other_fees = source.other_fees,
+                    cte_issued_at = source.cte_issued_at,
+                    nfse_issued_at = source.nfse_issued_at,
+                    metadata = source.metadata,
+                    data_extracao = source.data_extracao
+            WHEN NOT MATCHED THEN
+                INSERT (
+                    sequence_code, requested_at, operation_type, customer_doc, customer_name,
+                    origin_city, origin_state, destination_city, destination_state, price_table,
+                    volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname,
+                    company_name, requester_name, real_weight, origin_postal_code, destination_postal_code,
+                    customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
+                    disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
+                    collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
+                    metadata, data_extracao
+                )
+                VALUES (
+                    source.sequence_code, source.requested_at, source.operation_type, source.customer_doc, source.customer_name,
+                    source.origin_city, source.origin_state, source.destination_city, source.destination_state, source.price_table,
+                    source.volumes, source.taxed_weight, source.invoices_value, source.total_value, source.user_name, source.branch_nickname,
+                    source.company_name, source.requester_name, source.real_weight, source.origin_postal_code, source.destination_postal_code,
+                    source.customer_nickname, source.sender_document, source.sender_nickname, source.receiver_document, source.receiver_nickname,
+                    source.disapprove_comments, source.freight_comments, source.discount_subtotal, source.itr_subtotal, source.tde_subtotal,
+                    source.collect_subtotal, source.delivery_subtotal, source.other_fees, source.cte_issued_at, source.nfse_issued_at,
+                    source.metadata, source.data_extracao
+                );
+            """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
+
+    private String construirSourceClauseValues() {
+        return """
+            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (
+                    sequence_code, requested_at, operation_type, customer_doc, customer_name,
+                    origin_city, origin_state, destination_city, destination_state, price_table,
+                    volumes, taxed_weight, invoices_value, total_value, user_name, branch_nickname,
+                    company_name, requester_name, real_weight, origin_postal_code, destination_postal_code,
+                    customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
+                    disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
+                    collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
+                    metadata, data_extracao
+                )
+            """;
     }
 }

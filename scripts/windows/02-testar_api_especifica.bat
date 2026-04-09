@@ -1,5 +1,10 @@
 @echo off
 setlocal EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 02-testar_api_especifica.bat
 REM Tipo    : Script operacional Windows (.bat)
@@ -254,11 +259,11 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto ^(se necessario^)...
-    call "%~dp0mvn.bat" -q -DskipTests package
+    call "%MVN_CMD%" -q -DskipTests package
     if errorlevel 1 goto :COMPILE_FAIL
 )
 
-if not exist "target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -299,10 +304,10 @@ if errorlevel 1 exit /b 1
 set "CMD_ARGS=--testar-api %API%"
 if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
 if defined FLAG_FATURAS_GRAPHQL set "CMD_ARGS=%CMD_ARGS% %FLAG_FATURAS_GRAPHQL%"
-echo Executando: java -jar "target\extrator.jar" %CMD_ARGS%
+echo Executando: java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" %CMD_ARGS%
 echo.
 
-java -jar "target\extrator.jar" %CMD_ARGS%
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" %CMD_ARGS%
 if errorlevel 1 goto :FAIL
 goto :SUCCESS
 
@@ -368,7 +373,7 @@ goto :PERGUNTAR_FATURAS_GRAPHQL
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "target\extrator.jar" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
     echo Acesso negado.
     echo.

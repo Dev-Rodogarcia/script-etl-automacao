@@ -310,14 +310,16 @@ public class ValidacaoApiBanco24hUseCase {
             SELECT TOP 1 1
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
               AND CAST(timestamp_inicio AS DATE) = ?
               AND mensagem LIKE ?
               AND mensagem LIKE ?
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setDate(1, java.sql.Date.valueOf(data));
-            stmt.setString(2, "%" + dataInicio + "%");
-            stmt.setString(3, "%" + data + "%");
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            stmt.setDate(2, java.sql.Date.valueOf(data));
+            stmt.setString(3, "%" + dataInicio + "%");
+            stmt.setString(4, "%" + data + "%");
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -329,10 +331,12 @@ public class ValidacaoApiBanco24hUseCase {
             SELECT TOP 1 1
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
               AND CAST(timestamp_inicio AS DATE) = ?
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setDate(1, java.sql.Date.valueOf(data));
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            stmt.setDate(2, java.sql.Date.valueOf(data));
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -344,12 +348,15 @@ public class ValidacaoApiBanco24hUseCase {
             SELECT TOP 1 CAST(timestamp_inicio AS DATE) AS data_ref
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
             ORDER BY timestamp_fim DESC
             """;
-        try (PreparedStatement stmt = conexao.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            if (rs.next()) {
-                return Optional.of(rs.getDate("data_ref").toLocalDate());
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(rs.getDate("data_ref").toLocalDate());
+                }
             }
         }
         return Optional.empty();

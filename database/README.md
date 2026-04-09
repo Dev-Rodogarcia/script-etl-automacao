@@ -66,6 +66,7 @@ ORDER BY data_extracao DESC;
 ## Relações úteis para pesquisa
 
 - `dbo.manifestos.pick_sequence_code = dbo.coletas.sequence_code`
+  - relação já endurecida no schema por FK seletiva `FK_manifestos_pick_sequence_code_coletas` quando não há órfãos
 - `dbo.fretes.accounting_credit_id = dbo.faturas_graphql.id`
 - `dbo.inventario.numero_minuta = dbo.fretes.corporation_sequence_number`
 - `dbo.sinistros.corporation_sequence_number = dbo.fretes.corporation_sequence_number`

@@ -65,6 +65,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.observabilidade.execucao.ExecutionAuditor;
+import br.com.extrator.observabilidade.LogRetentionPolicy;
+import br.com.extrator.observabilidade.LogStoragePaths;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
 import br.com.extrator.persistencia.repositorio.ExecutionHistoryRepository;
 import br.com.extrator.suporte.log.SensitiveDataSanitizer;
@@ -115,6 +117,7 @@ public final class DaemonHistoryWriter {
     }
 
     public void ensureDirectories() throws IOException {
+        LogStoragePaths.ensureBaseDirectories();
         if (!Files.exists(daemonDir)) {
             Files.createDirectories(daemonDir);
         }
@@ -129,6 +132,7 @@ public final class DaemonHistoryWriter {
             Files.createDirectories(reconciliacaoHistoryDir);
         }
         organizarCiclosLegadosPorData();
+        aplicarRetencao();
     }
 
     public Path createCycleLogFile(final LocalDateTime inicio) throws IOException {
@@ -143,6 +147,7 @@ public final class DaemonHistoryWriter {
         if (!Files.exists(arquivo)) {
             Files.createFile(arquivo);
         }
+        aplicarRetencao();
         return arquivo;
     }
 
@@ -267,7 +272,9 @@ public final class DaemonHistoryWriter {
             writer.newLine();
         } catch (final IOException e) {
             logger.warn("Falha ao registrar historico de ciclo {}: {}", arquivoCsv, sanitize(e.getMessage()));
+            return;
         }
+        aplicarRetencao();
     }
 
     public void registerCompatibilityHistory(final CycleSummary resumo) {
@@ -335,7 +342,9 @@ public final class DaemonHistoryWriter {
             writer.newLine();
         } catch (final IOException e) {
             logger.warn("Falha ao registrar historico de reconciliacao {}: {}", arquivoCsv, sanitize(e.getMessage()));
+            return;
         }
+        aplicarRetencao();
     }
 
     public String summarizeMessage(final String msg) {
@@ -374,6 +383,27 @@ public final class DaemonHistoryWriter {
         } catch (final IOException e) {
             logger.warn("Falha ao mover ciclo legado {} para {}: {}", arquivo, destino, sanitize(e.getMessage()));
         }
+    }
+
+    private void aplicarRetencao() {
+        LogRetentionPolicy.retainRecentFilesRecursively(
+            cyclesDir,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".log")
+                && path.getFileName().toString().startsWith("extracao_daemon_")
+        );
+        LogRetentionPolicy.retainRecentFiles(
+            daemonHistoryDir,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".csv")
+                && path.getFileName().toString().startsWith("execucao_daemon_")
+        );
+        LogRetentionPolicy.retainRecentFiles(
+            resolveReconciliationHistoryDir(),
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".csv")
+                && path.getFileName().toString().startsWith("reconciliacao_daemon_")
+        );
     }
 
     private int calculateTotalRecords(final LocalDateTime inicio, final LocalDateTime fim) {

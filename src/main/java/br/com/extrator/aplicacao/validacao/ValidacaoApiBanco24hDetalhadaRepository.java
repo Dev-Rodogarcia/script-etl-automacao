@@ -31,8 +31,6 @@ package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -40,27 +38,23 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Set;
 
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 final class ValidacaoApiBanco24hDetalhadaRepository {
-    private static final Path ARQUIVO_ULTIMO_RUN = Path.of("runtime", "state", "last_run.properties");
-    private static final String PROPRIEDADE_ULTIMO_RUN = "last_successful_run";
     private final LoggerConsole log;
     private final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher;
-    private final UltimoFluxoCompletoProvider ultimoFluxoCompletoProvider;
+    private final JanelaAbertaCeilingProvider janelaAbertaCeilingProvider;
 
     ValidacaoApiBanco24hDetalhadaRepository(
         final LoggerConsole log,
@@ -69,18 +63,18 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         this(
             log,
             metadataHasher,
-            () -> carregarUltimoFluxoCompletoDoArquivo(log)
+            criarAnchorValidacaoAtual()
         );
     }
 
     ValidacaoApiBanco24hDetalhadaRepository(
         final LoggerConsole log,
         final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher,
-        final UltimoFluxoCompletoProvider ultimoFluxoCompletoProvider
+        final JanelaAbertaCeilingProvider janelaAbertaCeilingProvider
     ) {
         this.log = log;
         this.metadataHasher = metadataHasher;
-        this.ultimoFluxoCompletoProvider = ultimoFluxoCompletoProvider;
+        this.janelaAbertaCeilingProvider = janelaAbertaCeilingProvider;
     }
 
     LocalDate resolverDataReferenciaLogs(final Connection conexao, final LocalDate dataPreferida) throws SQLException {
@@ -169,8 +163,8 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate periodoFim,
         final boolean permitirFallbackJanela
     ) throws SQLException {
-        final Optional<LocalDateTime> tetoFluxoCompleto =
-            resolverTetoFluxoCompletoAberto(dataReferencia, periodoInicio, periodoFim);
+        final Optional<LocalDateTime> tetoJanelaAberta =
+            resolverTetoValidacaoAberta(dataReferencia, periodoInicio, periodoFim);
 
         final Optional<JanelaExecucao> janelaComPeriodo = buscarJanelaPorPeriodo(
             conexao,
@@ -178,7 +172,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             dataReferencia,
             periodoInicio,
             periodoFim,
-            tetoFluxoCompleto
+            tetoJanelaAberta
         );
         if (janelaComPeriodo.isPresent()) {
             return janelaComPeriodo;
@@ -188,7 +182,97 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             return Optional.empty();
         }
 
-        return buscarJanelaFallback(conexao, entidade, dataReferencia, tetoFluxoCompleto);
+        return buscarJanelaFallback(conexao, entidade, dataReferencia, tetoJanelaAberta);
+    }
+
+    Optional<String> resolverExecutionUuidAncora(final Connection conexao,
+                                                 final Set<String> entidades,
+                                                 final LocalDateTime validacaoIniciadaEm) throws SQLException {
+        if (conexao == null || entidades == null || entidades.isEmpty() || validacaoIniciadaEm == null) {
+            return Optional.empty();
+        }
+        if (!tabelaExiste(conexao, "sys_execution_audit")) {
+            return Optional.empty();
+        }
+
+        final String placeholders = String.join(",", Collections.nCopies(entidades.size(), "?"));
+        final String sql = """
+            WITH candidatos AS (
+                SELECT
+                    execution_uuid,
+                    COUNT(DISTINCT entidade) AS entidades_cobertas,
+                    MAX(finished_at) AS ultimo_fim
+                FROM dbo.sys_execution_audit
+                WHERE finished_at IS NOT NULL
+                  AND finished_at <= ?
+                  AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
+                  AND api_completa = 1
+                  AND command_name IN ('--fluxo-completo', '--extracao-intervalo', '--executar-step-isolado')
+                  AND entidade IN (%s)
+                GROUP BY execution_uuid
+            )
+            SELECT TOP 1 execution_uuid
+            FROM candidatos
+            ORDER BY entidades_cobertas DESC, ultimo_fim DESC
+            """.formatted(placeholders);
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            int parametro = 1;
+            stmt.setTimestamp(parametro++, Timestamp.valueOf(validacaoIniciadaEm));
+            for (final String entidade : entidades) {
+                stmt.setString(parametro++, entidade);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    final String executionUuid = rs.getString("execution_uuid");
+                    return executionUuid == null || executionUuid.isBlank()
+                        ? Optional.empty()
+                        : Optional.of(executionUuid.trim());
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    Optional<JanelaExecucao> buscarJanelaEstruturadaDaExecucao(final Connection conexao,
+                                                               final String executionUuid,
+                                                               final String entidade) throws SQLException {
+        if (conexao == null
+            || executionUuid == null
+            || executionUuid.isBlank()
+            || entidade == null
+            || entidade.isBlank()
+            || !tabelaExiste(conexao, "sys_execution_audit")) {
+            return Optional.empty();
+        }
+
+        final String sql = """
+            SELECT TOP 1 started_at, finished_at
+            FROM dbo.sys_execution_audit
+            WHERE execution_uuid = ?
+              AND entidade = ?
+              AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
+              AND api_completa = 1
+              AND started_at IS NOT NULL
+              AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC
+            """;
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, executionUuid);
+            stmt.setString(2, entidade);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(new JanelaExecucao(
+                        rs.getTimestamp("started_at").toLocalDateTime(),
+                        rs.getTimestamp("finished_at").toLocalDateTime(),
+                        true
+                    ));
+                }
+            }
+        }
+
+        return Optional.empty();
     }
 
     private Optional<JanelaExecucao> buscarJanelaPorPeriodo(
@@ -197,7 +281,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate dataReferencia,
         final LocalDate periodoInicio,
         final LocalDate periodoFim,
-        final Optional<LocalDateTime> tetoFluxoCompleto
+        final Optional<LocalDateTime> tetoJanelaAberta
     ) throws SQLException {
         final String sqlComPeriodo = """
             SELECT TOP 1 timestamp_inicio, timestamp_fim
@@ -207,7 +291,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
               AND CAST(timestamp_inicio AS DATE) = ?
               AND (mensagem LIKE ? OR mensagem LIKE ?)
             """
-            + (tetoFluxoCompleto.isPresent() ? "  AND timestamp_fim <= ?\n" : "")
+            + (tetoJanelaAberta.isPresent() ? "  AND timestamp_fim <= ?\n" : "")
             + "ORDER BY timestamp_fim DESC";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sqlComPeriodo)) {
@@ -216,8 +300,8 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             stmt.setDate(parametro++, java.sql.Date.valueOf(dataReferencia));
             stmt.setString(parametro++, "%" + periodoInicio + " a " + periodoFim + "%");
             stmt.setString(parametro++, "%" + "Data: " + periodoInicio + "%");
-            if (tetoFluxoCompleto.isPresent()) {
-                stmt.setTimestamp(parametro, Timestamp.valueOf(tetoFluxoCompleto.get()));
+            if (tetoJanelaAberta.isPresent()) {
+                stmt.setTimestamp(parametro, Timestamp.valueOf(tetoJanelaAberta.get()));
             }
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -234,7 +318,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final Connection conexao,
         final String entidade,
         final LocalDate dataReferencia,
-        final Optional<LocalDateTime> tetoFluxoCompleto
+        final Optional<LocalDateTime> tetoJanelaAberta
     ) throws SQLException {
         final String sqlFallback = """
             SELECT TOP 1 timestamp_inicio, timestamp_fim
@@ -243,15 +327,15 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
               AND status_final = 'COMPLETO'
               AND CAST(timestamp_inicio AS DATE) = ?
             """
-            + (tetoFluxoCompleto.isPresent() ? "  AND timestamp_fim <= ?\n" : "")
+            + (tetoJanelaAberta.isPresent() ? "  AND timestamp_fim <= ?\n" : "")
             + "ORDER BY timestamp_fim DESC";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sqlFallback)) {
             int parametro = 1;
             stmt.setString(parametro++, entidade);
             stmt.setDate(parametro++, java.sql.Date.valueOf(dataReferencia));
-            if (tetoFluxoCompleto.isPresent()) {
-                stmt.setTimestamp(parametro, Timestamp.valueOf(tetoFluxoCompleto.get()));
+            if (tetoJanelaAberta.isPresent()) {
+                stmt.setTimestamp(parametro, Timestamp.valueOf(tetoJanelaAberta.get()));
             }
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -265,7 +349,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         return Optional.empty();
     }
 
-    private Optional<LocalDateTime> resolverTetoFluxoCompletoAberto(
+    private Optional<LocalDateTime> resolverTetoValidacaoAberta(
         final LocalDate dataReferencia,
         final LocalDate periodoInicio,
         final LocalDate periodoFim
@@ -276,31 +360,13 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             return Optional.empty();
         }
 
-        return ultimoFluxoCompletoProvider.obter()
-            .filter(instante -> instante.toLocalDate().equals(dataReferencia));
+        return janelaAbertaCeilingProvider.obter()
+            .filter(instante -> !instante.toLocalDate().isBefore(dataReferencia));
     }
 
-    private static Optional<LocalDateTime> carregarUltimoFluxoCompletoDoArquivo(final LoggerConsole log) {
-        if (!Files.exists(ARQUIVO_ULTIMO_RUN)) {
-            return Optional.empty();
-        }
-
-        final Properties properties = new Properties();
-        try (InputStream in = Files.newInputStream(ARQUIVO_ULTIMO_RUN)) {
-            properties.load(in);
-            final String valor = properties.getProperty(PROPRIEDADE_ULTIMO_RUN);
-            if (valor == null || valor.isBlank()) {
-                return Optional.empty();
-            }
-            return Optional.of(LocalDateTime.parse(valor.trim()));
-        } catch (IOException | DateTimeParseException e) {
-            log.warn(
-                "Falha ao ler {} para ancorar validacao aberta no ultimo fluxo completo: {}",
-                ARQUIVO_ULTIMO_RUN,
-                e.getMessage()
-            );
-            return Optional.empty();
-        }
+    private static JanelaAbertaCeilingProvider criarAnchorValidacaoAtual() {
+        final LocalDateTime inicioValidacao = RelogioSistema.agora();
+        return () -> Optional.of(inicioValidacao);
     }
 
     Set<String> carregarChavesBancoNaJanela(
@@ -661,13 +727,15 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             SELECT TOP 1 1
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
               AND CAST(timestamp_inicio AS DATE) = ?
               AND (mensagem LIKE ? OR mensagem LIKE ?)
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setDate(1, java.sql.Date.valueOf(data));
-            stmt.setString(2, "%" + dataInicio + " a " + data + "%");
-            stmt.setString(3, "%" + "Data: " + dataInicio + "%");
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            stmt.setDate(2, java.sql.Date.valueOf(data));
+            stmt.setString(3, "%" + dataInicio + " a " + data + "%");
+            stmt.setString(4, "%" + "Data: " + dataInicio + "%");
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -679,10 +747,12 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             SELECT TOP 1 1
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
               AND CAST(timestamp_inicio AS DATE) = ?
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setDate(1, java.sql.Date.valueOf(data));
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            stmt.setDate(2, java.sql.Date.valueOf(data));
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }
@@ -694,15 +764,29 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
             SELECT TOP 1 CAST(timestamp_inicio AS DATE) AS data_ref
             FROM dbo.log_extracoes
             WHERE status_final = 'COMPLETO'
+              AND entidade <> ?
             ORDER BY timestamp_fim DESC
             """;
-        try (PreparedStatement stmt = conexao.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            if (rs.next()) {
-                return Optional.of(rs.getDate("data_ref").toLocalDate());
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, ConstantesEntidades.COLETAS_REFERENCIAL);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return Optional.of(rs.getDate("data_ref").toLocalDate());
+                }
             }
         }
         return Optional.empty();
+    }
+
+    private boolean tabelaExiste(final Connection conexao, final String nomeTabela) throws SQLException {
+        final String sql = "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END";
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, "dbo." + nomeTabela);
+            try (ResultSet rs = stmt.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) == 1;
+            }
+        }
     }
 
     private String condicaoFiltroBanco(final String entidade) {
@@ -726,7 +810,9 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                  ConstantesEntidades.FATURAS_GRAPHQL ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
             case ConstantesEntidades.USUARIOS_SISTEMA ->
-                "(data_atualizacao >= ? AND data_atualizacao <= ?)";
+                "(ativo = 1 AND ((origem_atualizado_em >= ? AND origem_atualizado_em <= ?)"
+                    + " OR (origem_atualizado_em IS NULL AND COALESCE(ultima_extracao_em, data_atualizacao) >= ?"
+                    + " AND COALESCE(ultima_extracao_em, data_atualizacao) <= ?)))";
             default ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
         };
@@ -739,11 +825,18 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate periodoInicio,
         final LocalDate periodoFim
     ) throws SQLException {
+        if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade)) {
+            stmt.setTimestamp(1, Timestamp.valueOf(periodoInicio.atStartOfDay()));
+            stmt.setTimestamp(2, Timestamp.valueOf(periodoFim.atTime(java.time.LocalTime.MAX)));
+            stmt.setTimestamp(3, Timestamp.valueOf(janela.inicio()));
+            stmt.setTimestamp(4, Timestamp.valueOf(janela.fim()));
+            return;
+        }
+
         stmt.setTimestamp(1, Timestamp.valueOf(janela.inicio()));
         stmt.setTimestamp(2, Timestamp.valueOf(janela.fim()));
 
-        if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade)
-            || ConstantesEntidades.MANIFESTOS.equals(entidade)
+        if (ConstantesEntidades.MANIFESTOS.equals(entidade)
             || ConstantesEntidades.COTACOES.equals(entidade)
             || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(entidade)
             || ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)) {
@@ -755,7 +848,7 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
     }
 
     @FunctionalInterface
-    interface UltimoFluxoCompletoProvider {
+    interface JanelaAbertaCeilingProvider {
         Optional<LocalDateTime> obter();
     }
 }

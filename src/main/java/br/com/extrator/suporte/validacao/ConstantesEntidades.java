@@ -51,6 +51,7 @@ public final class ConstantesEntidades {
     
     // ========== ENTIDADES GRAPHQL ==========
     public static final String COLETAS = "coletas";
+    public static final String COLETAS_REFERENCIAL = "coletas_referencial";
     public static final String FRETES = "fretes";
     public static final String FATURAS_GRAPHQL = "faturas_graphql";
     public static final String USUARIOS_SISTEMA = "usuarios_sistema";
@@ -111,6 +112,10 @@ public final class ConstantesEntidades {
      */
     public static void aplicarDelayEntreExtracoes() throws InterruptedException {
         ThreadUtil.aguardar(obterDelayEntreExtracoes());
+    }
+
+    public static boolean isEntidadeAuxiliarLogExtracao(final String entidade) {
+        return COLETAS_REFERENCIAL.equalsIgnoreCase(entidade);
     }
     
     private ConstantesEntidades() {

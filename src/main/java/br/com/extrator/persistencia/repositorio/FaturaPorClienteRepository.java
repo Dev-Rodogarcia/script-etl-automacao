@@ -53,87 +53,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
     private static final Logger logger = LoggerFactory.getLogger(FaturaPorClienteRepository.class);
 
     private static final String NOME_TABELA = ConstantesEntidades.FATURAS_POR_CLIENTE;
-
-    /**
-     * SQL MERGE para INSERT ou UPDATE usando unique_id como chave.
-     */
-    private static final String SQL_MERGE = """
-        MERGE INTO faturas_por_cliente AS target
-        USING (
-            SELECT
-                ? AS unique_id,
-                ? AS valor_frete,
-                ? AS valor_fatura,
-                ? AS third_party_ctes_value,
-                ? AS numero_cte,
-                ? AS chave_cte,
-                ? AS numero_nfse,
-                ? AS status_cte,
-                ? AS status_cte_result,
-                ? AS data_emissao_cte,
-                ? AS numero_fatura,
-                ? AS data_emissao_fatura,
-                ? AS data_vencimento_fatura,
-                ? AS data_baixa_fatura,
-                ? AS fit_ant_ils_original_due_date,
-                ? AS fit_ant_document,
-                ? AS fit_ant_issue_date,
-                ? AS fit_ant_value,
-                ? AS filial,
-                ? AS tipo_frete,
-                ? AS classificacao,
-                ? AS estado,
-                ? AS pagador_nome,
-                ? AS pagador_documento,
-                ? AS remetente_nome,
-                ? AS remetente_documento,
-                ? AS destinatario_nome,
-                ? AS destinatario_documento,
-                ? AS vendedor_nome,
-                ? AS notas_fiscais,
-                ? AS pedidos_cliente,
-                ? AS metadata,
-                ? AS data_extracao
-        ) AS source
-        ON target.unique_id = source.unique_id
-        WHEN MATCHED AND %s THEN
-            UPDATE SET
-                valor_frete = source.valor_frete,
-                valor_fatura = source.valor_fatura,
-                third_party_ctes_value = source.third_party_ctes_value,
-                numero_cte = source.numero_cte,
-                chave_cte = source.chave_cte,
-                numero_nfse = source.numero_nfse,
-                status_cte = source.status_cte,
-                status_cte_result = source.status_cte_result,
-                data_emissao_cte = source.data_emissao_cte,
-                numero_fatura = source.numero_fatura,
-                data_emissao_fatura = source.data_emissao_fatura,
-                data_vencimento_fatura = source.data_vencimento_fatura,
-                data_baixa_fatura = source.data_baixa_fatura,
-                fit_ant_ils_original_due_date = source.fit_ant_ils_original_due_date,
-                fit_ant_document = source.fit_ant_document,
-                fit_ant_issue_date = source.fit_ant_issue_date,
-                fit_ant_value = source.fit_ant_value,
-                filial = source.filial,
-                tipo_frete = source.tipo_frete,
-                classificacao = source.classificacao,
-                estado = source.estado,
-                pagador_nome = source.pagador_nome,
-                pagador_documento = source.pagador_documento,
-                remetente_nome = source.remetente_nome,
-                remetente_documento = source.remetente_documento,
-                destinatario_nome = source.destinatario_nome,
-                destinatario_documento = source.destinatario_documento,
-                vendedor_nome = source.vendedor_nome,
-                notas_fiscais = source.notas_fiscais,
-                pedidos_cliente = source.pedidos_cliente,
-                metadata = source.metadata,
-                data_extracao = source.data_extracao
-        WHEN NOT MATCHED THEN
-            INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao)
-            VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao);
-        """;
+    private static final String NOME_TABELA_STAGING = "#stg_faturas_por_cliente";
 
     @Override
     protected String getNomeTabela() {
@@ -146,7 +66,45 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
     }
 
     @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao,
+                                                   final FaturaPorClienteEntity entity) throws SQLException {
+        return executarMergeEmTabela(conexao, entity, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.data_baixa_fatura AS datetime2), CAST(target.data_vencimento_fatura AS datetime2), CAST(target.data_emissao_fatura AS datetime2), CAST(target.data_emissao_cte AS datetime2), CAST(target.fit_ant_issue_date AS datetime2), CAST(target.fit_ant_ils_original_due_date AS datetime2))",
+            "COALESCE(CAST(source.data_baixa_fatura AS datetime2), CAST(source.data_vencimento_fatura AS datetime2), CAST(source.data_emissao_fatura AS datetime2), CAST(source.data_emissao_cte AS datetime2), CAST(source.fit_ant_issue_date AS datetime2), CAST(source.fit_ant_ils_original_due_date AS datetime2))"
+        );
+        final String sql = construirSqlMerge(
+            qualificarTabelaDestino(),
+            NOME_TABELA_STAGING + " AS source",
+            freshnessGuard
+        );
+        try (PreparedStatement pstmt = conexao.prepareStatement(sql)) {
+            return pstmt.executeUpdate();
+        }
+    }
+
+    @Override
     protected int executarMerge(final Connection conexao, final FaturaPorClienteEntity entity) throws SQLException {
+        return executarMergeEmTabela(conexao, entity, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final FaturaPorClienteEntity entity,
+                                      final String tabelaAlvo) throws SQLException {
         validarEntidade(entity);
         reconciliarAliasLegado(conexao, entity);
 
@@ -154,7 +112,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             "COALESCE(CAST(target.data_baixa_fatura AS datetime2), CAST(target.data_vencimento_fatura AS datetime2), CAST(target.data_emissao_fatura AS datetime2), CAST(target.data_emissao_cte AS datetime2), CAST(target.fit_ant_issue_date AS datetime2), CAST(target.fit_ant_ils_original_due_date AS datetime2))",
             "COALESCE(CAST(source.data_baixa_fatura AS datetime2), CAST(source.data_vencimento_fatura AS datetime2), CAST(source.data_emissao_fatura AS datetime2), CAST(source.data_emissao_cte AS datetime2), CAST(source.fit_ant_issue_date AS datetime2), CAST(source.fit_ant_ils_original_due_date AS datetime2))"
         );
-        try (PreparedStatement pstmt = conexao.prepareStatement(SQL_MERGE.formatted(freshnessGuard))) {
+        try (PreparedStatement pstmt = conexao.prepareStatement(
+            construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard)
+        )) {
             int idx = 1;
 
             pstmt.setString(idx++, entity.getUniqueId());
@@ -201,6 +161,94 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             }
             return rowsAffected;
         }
+    }
+
+    private String construirSqlMerge(final String tabelaAlvo,
+                                     final String sourceClause,
+                                     final String freshnessGuard) {
+        return """
+            MERGE INTO %s WITH (HOLDLOCK) AS target
+            USING %s
+            ON target.unique_id = source.unique_id
+            WHEN MATCHED AND %s THEN
+                UPDATE SET
+                    valor_frete = source.valor_frete,
+                    valor_fatura = source.valor_fatura,
+                    third_party_ctes_value = source.third_party_ctes_value,
+                    numero_cte = source.numero_cte,
+                    chave_cte = source.chave_cte,
+                    numero_nfse = source.numero_nfse,
+                    status_cte = source.status_cte,
+                    status_cte_result = source.status_cte_result,
+                    data_emissao_cte = source.data_emissao_cte,
+                    numero_fatura = source.numero_fatura,
+                    data_emissao_fatura = source.data_emissao_fatura,
+                    data_vencimento_fatura = source.data_vencimento_fatura,
+                    data_baixa_fatura = source.data_baixa_fatura,
+                    fit_ant_ils_original_due_date = source.fit_ant_ils_original_due_date,
+                    fit_ant_document = source.fit_ant_document,
+                    fit_ant_issue_date = source.fit_ant_issue_date,
+                    fit_ant_value = source.fit_ant_value,
+                    filial = source.filial,
+                    tipo_frete = source.tipo_frete,
+                    classificacao = source.classificacao,
+                    estado = source.estado,
+                    pagador_nome = source.pagador_nome,
+                    pagador_documento = source.pagador_documento,
+                    remetente_nome = source.remetente_nome,
+                    remetente_documento = source.remetente_documento,
+                    destinatario_nome = source.destinatario_nome,
+                    destinatario_documento = source.destinatario_documento,
+                    vendedor_nome = source.vendedor_nome,
+                    notas_fiscais = source.notas_fiscais,
+                    pedidos_cliente = source.pedidos_cliente,
+                    metadata = source.metadata,
+                    data_extracao = source.data_extracao
+            WHEN NOT MATCHED THEN
+                INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao)
+                VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao);
+            """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
+
+    private String construirSourceClauseValues() {
+        return """
+            (
+                SELECT
+                    ? AS unique_id,
+                    ? AS valor_frete,
+                    ? AS valor_fatura,
+                    ? AS third_party_ctes_value,
+                    ? AS numero_cte,
+                    ? AS chave_cte,
+                    ? AS numero_nfse,
+                    ? AS status_cte,
+                    ? AS status_cte_result,
+                    ? AS data_emissao_cte,
+                    ? AS numero_fatura,
+                    ? AS data_emissao_fatura,
+                    ? AS data_vencimento_fatura,
+                    ? AS data_baixa_fatura,
+                    ? AS fit_ant_ils_original_due_date,
+                    ? AS fit_ant_document,
+                    ? AS fit_ant_issue_date,
+                    ? AS fit_ant_value,
+                    ? AS filial,
+                    ? AS tipo_frete,
+                    ? AS classificacao,
+                    ? AS estado,
+                    ? AS pagador_nome,
+                    ? AS pagador_documento,
+                    ? AS remetente_nome,
+                    ? AS remetente_documento,
+                    ? AS destinatario_nome,
+                    ? AS destinatario_documento,
+                    ? AS vendedor_nome,
+                    ? AS notas_fiscais,
+                    ? AS pedidos_cliente,
+                    ? AS metadata,
+                    ? AS data_extracao
+            ) AS source
+            """;
     }
 
     

@@ -12,10 +12,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -99,13 +101,13 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
     }
 
     @Test
-    void deveAncorarValidacaoAbertaAoUltimoFluxoCompleto() throws SQLException {
-        final LocalDateTime ultimoFluxoCompleto = LocalDateTime.of(2026, 3, 27, 7, 47, 33);
+    void deveAncorarValidacaoAbertaAoInstanteInformado() throws SQLException {
+        final LocalDateTime tetoValidacaoAberta = LocalDateTime.of(2026, 3, 27, 7, 47, 33);
         final ValidacaoApiBanco24hDetalhadaRepository repositoryComAnchor =
             new ValidacaoApiBanco24hDetalhadaRepository(
                 LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaRepositoryTest.class),
                 new ValidacaoApiBanco24hDetalhadaMetadataHasher(),
-                () -> Optional.of(ultimoFluxoCompleto)
+                () -> Optional.of(tetoValidacaoAberta)
             );
         final Map<Integer, Object> captured = new LinkedHashMap<>();
         final LocalDateTime inicio = LocalDateTime.of(2026, 3, 27, 7, 44, 30);
@@ -137,7 +139,71 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
         assertTrue(janela.isPresent());
         assertEquals(inicio, janela.get().inicio());
         assertEquals(fim, janela.get().fim());
-        assertEquals(Timestamp.valueOf(ultimoFluxoCompleto), captured.get(5));
+        assertEquals(Timestamp.valueOf(tetoValidacaoAberta), captured.get(5));
+    }
+
+    @Test
+    void deveFiltrarUsuariosSistemaPorOrigemNoPeriodoEPorJanelaDeExecucaoQuandoNaoHouverOrigem() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> criarPreparedStatement(captured, criarResultSet(List.of())));
+        final JanelaExecucao janela = new JanelaExecucao(
+            LocalDateTime.of(2026, 4, 8, 13, 12, 2),
+            LocalDateTime.of(2026, 4, 8, 13, 12, 33),
+            true
+        );
+        final LocalDate periodoInicio = LocalDate.of(2026, 4, 7);
+        final LocalDate periodoFim = LocalDate.of(2026, 4, 8);
+
+        repository.carregarChavesBancoNaJanela(
+            conexao,
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            janela,
+            periodoInicio,
+            periodoFim
+        );
+
+        assertEquals(Timestamp.valueOf(periodoInicio.atStartOfDay()), captured.get(1));
+        assertEquals(Timestamp.valueOf(periodoFim.atTime(java.time.LocalTime.MAX)), captured.get(2));
+        assertEquals(Timestamp.valueOf(janela.inicio()), captured.get(3));
+        assertEquals(Timestamp.valueOf(janela.fim()), captured.get(4));
+    }
+
+    @Test
+    void deveResolverExecutionUuidAncoraAPartirDaAuditoriaEstruturada() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            if (sql.contains("OBJECT_ID")) {
+                return criarPreparedStatement(
+                    new LinkedHashMap<>(),
+                    criarResultSet(List.of(Map.of("", 1, "1", 1)))
+                );
+            }
+            assertTrue(sql.contains("FROM dbo.sys_execution_audit"));
+            assertTrue(sql.contains("COUNT(DISTINCT entidade)"));
+            return criarPreparedStatement(
+                captured,
+                criarResultSet(List.of(Map.of("execution_uuid", "exec-intervalo-mais-recente")))
+            );
+        });
+        final Set<String> entidades = new LinkedHashSet<>(List.of(
+            ConstantesEntidades.FRETES,
+            ConstantesEntidades.COLETAS,
+            ConstantesEntidades.COTACOES
+        ));
+        final LocalDateTime inicioValidacao = LocalDateTime.of(2026, 4, 8, 14, 29, 37);
+
+        final Optional<String> executionUuid = repository.resolverExecutionUuidAncora(
+            conexao,
+            entidades,
+            inicioValidacao
+        );
+
+        assertTrue(executionUuid.isPresent());
+        assertEquals("exec-intervalo-mais-recente", executionUuid.get());
+        assertEquals(Timestamp.valueOf(inicioValidacao), captured.get(1));
+        assertEquals(ConstantesEntidades.FRETES, captured.get(2));
+        assertEquals(ConstantesEntidades.COLETAS, captured.get(3));
+        assertEquals(ConstantesEntidades.COTACOES, captured.get(4));
     }
 
     private Connection criarConexao(final StatementFactory factory) {
@@ -203,8 +269,27 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
                         wasNull[0] = value == null;
                         return wasNull[0] ? 0L : ((Number) value).longValue();
                     }
+                    case "getInt" -> {
+                        final Object chave = args[0];
+                        final Object value = chave instanceof String
+                            ? rows.get(index[0]).get((String) chave)
+                            : rows.get(index[0]).get(String.valueOf(chave));
+                        wasNull[0] = value == null;
+                        return wasNull[0] ? 0 : ((Number) value).intValue();
+                    }
+                    case "getString" -> {
+                        final Object chave = args[0];
+                        final Object value = chave instanceof String
+                            ? rows.get(index[0]).get((String) chave)
+                            : rows.get(index[0]).get(String.valueOf(chave));
+                        wasNull[0] = value == null;
+                        return value == null ? null : value.toString();
+                    }
                     case "getTimestamp" -> {
-                        final Object value = rows.get(index[0]).get((String) args[0]);
+                        final Object chave = args[0];
+                        final Object value = chave instanceof String
+                            ? rows.get(index[0]).get((String) chave)
+                            : rows.get(index[0]).get(String.valueOf(chave));
                         wasNull[0] = value == null;
                         return value;
                     }

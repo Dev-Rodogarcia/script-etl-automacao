@@ -34,6 +34,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
 
 class FaturaPorClienteMapperTest {
@@ -195,6 +197,46 @@ class FaturaPorClienteMapperTest {
             ),
             aliases
         );
+    }
+
+    @Test
+    void devePriorizarNfseAntesDeCteFaturaEBillingNaIdentidadeCanonica() {
+        final FaturaPorClienteDTO dtoBase = criarDtoSemChaveNatural();
+        dtoBase.setNfseNumber(123456L);
+        dtoBase.setCteNumber(99999L);
+        dtoBase.setFaturaDocument("DOC-7788");
+        dtoBase.setBillingId("9988");
+
+        final FaturaPorClienteDTO dtoAlterado = criarDtoSemChaveNatural();
+        dtoAlterado.setNfseNumber(123456L);
+        dtoAlterado.setCteNumber(11111L);
+        dtoAlterado.setFaturaDocument("DOC-9999");
+        dtoAlterado.setBillingId("5544");
+
+        assertEquals(
+            mapper.calcularIdentificadorUnico(dtoBase),
+            mapper.calcularIdentificadorUnico(dtoAlterado)
+        );
+    }
+
+    @Test
+    void deveProjetarRepresentacaoPersistidaEstavelComListasCanonicas() {
+        final FaturaPorClienteDTO dtoA = criarDtoSemChaveNatural();
+        dtoA.setBillingId("9988");
+        dtoA.setNotasFiscais(List.of("NF-2", "NF-1"));
+        dtoA.setPedidosCliente(List.of("PED-2", "PED-1"));
+
+        final FaturaPorClienteDTO dtoB = criarDtoSemChaveNatural();
+        dtoB.setBillingId("9988");
+        dtoB.setNotasFiscais(List.of("NF-1", "NF-2"));
+        dtoB.setPedidosCliente(List.of("PED-1", "PED-2"));
+
+        final JsonNode projecaoA = mapper.projetarCamposPersistidosEstaveis(dtoA);
+        final JsonNode projecaoB = mapper.projetarCamposPersistidosEstaveis(dtoB);
+
+        assertEquals(projecaoA, projecaoB);
+        assertEquals("NF-1, NF-2", projecaoA.get("notas_fiscais").asText());
+        assertEquals("PED-1, PED-2", projecaoA.get("pedidos_cliente").asText());
     }
 
     private FaturaPorClienteDTO criarDtoSemChaveNatural() {

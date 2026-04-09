@@ -38,6 +38,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,6 +164,112 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
         return false;
     }
 
+    protected boolean usarStagingPorExecucao() {
+        return false;
+    }
+
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        // Implementacao opcional nos repositorios que usam staging temporario por execucao.
+    }
+
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao, final T entidade) throws SQLException {
+        return executarMerge(conexao, entidade);
+    }
+
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        // Implementacao opcional nos repositorios que promovem staging para a tabela final.
+        return 0;
+    }
+
+    protected void recriarTabelaTemporariaPorExecucao(final Connection conexao,
+                                                      final String nomeTabelaTemporaria) throws SQLException {
+        final String stagingValidado = validarNomeTabelaTemporaria(nomeTabelaTemporaria);
+        final String tabelaDestino = validarNomeTabela(getNomeTabela());
+        final String sql = """
+            IF OBJECT_ID('tempdb..%1$s') IS NOT NULL
+                DROP TABLE %1$s;
+            SELECT TOP 0 *
+            INTO %1$s
+            FROM dbo.%2$s;
+            """.formatted(stagingValidado, tabelaDestino);
+        try (Statement stmt = conexao.createStatement()) {
+            stmt.execute(sql);
+        }
+    }
+
+    protected String qualificarTabelaDestino() throws SQLException {
+        return "dbo." + validarNomeTabela(getNomeTabela());
+    }
+
+    protected String validarNomeTabela(final String nomeTabela) throws SQLException {
+        if (nomeTabela == null || !nomeTabela.matches("^[a-zA-Z0-9_]+$")) {
+            throw new SQLException("Nome de tabela invalido para operacao de persistencia: " + nomeTabela);
+        }
+        return nomeTabela;
+    }
+
+    protected String validarNomeTabelaTemporaria(final String nomeTabelaTemporaria) throws SQLException {
+        if (nomeTabelaTemporaria == null || !nomeTabelaTemporaria.matches("^#[a-zA-Z0-9_]+$")) {
+            throw new SQLException("Nome de tabela temporaria invalido para staging: " + nomeTabelaTemporaria);
+        }
+        return nomeTabelaTemporaria;
+    }
+
+    protected int promoverStagingComMerge(final Connection conexao,
+                                          final String nomeTabelaTemporaria,
+                                          final String condicaoMerge,
+                                          final String freshnessGuard,
+                                          final List<String> colunasInsert,
+                                          final List<String> colunasUpdate) throws SQLException {
+        final String stagingValidado = validarNomeTabelaTemporaria(nomeTabelaTemporaria);
+        final String tabelaDestino = qualificarTabelaDestino();
+        final List<String> colunasInsertValidas = validarListaColunas(colunasInsert);
+        final List<String> colunasUpdateValidas = validarListaColunas(colunasUpdate);
+        final String updateSet = colunasUpdateValidas.stream()
+            .map(coluna -> coluna + " = source." + coluna)
+            .collect(Collectors.joining(",\n                "));
+        final String insertColumns = String.join(", ", colunasInsertValidas);
+        final String insertValues = colunasInsertValidas.stream()
+            .map(coluna -> "source." + coluna)
+            .collect(Collectors.joining(", "));
+        final String sql = """
+            MERGE %s WITH (HOLDLOCK) AS target
+            USING %s AS source
+            ON %s
+            WHEN MATCHED AND %s THEN
+                UPDATE SET
+                %s
+            WHEN NOT MATCHED THEN
+                INSERT (%s)
+                VALUES (%s);
+            """.formatted(
+            tabelaDestino,
+            stagingValidado,
+            condicaoMerge,
+            freshnessGuard,
+            updateSet,
+            insertColumns,
+            insertValues
+        );
+        try (PreparedStatement statement = conexao.prepareStatement(sql)) {
+            return statement.executeUpdate();
+        }
+    }
+
+    private List<String> validarListaColunas(final List<String> colunas) throws SQLException {
+        if (colunas == null || colunas.isEmpty()) {
+            throw new SQLException("Lista de colunas para staging/merge nao pode ser vazia.");
+        }
+        final List<String> colunasValidas = new ArrayList<>();
+        for (final String coluna : colunas) {
+            if (coluna == null || !coluna.matches("^[a-zA-Z0-9_]+$")) {
+                throw new SQLException("Nome de coluna invalido para staging/merge: " + coluna);
+            }
+            colunasValidas.add(coluna);
+        }
+        return List.copyOf(colunasValidas);
+    }
+
     public SaveSummary getUltimoResumoSalvamento() {
         return ultimoResumoSalvamento;
     }
@@ -219,6 +326,9 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
             try {
                 // Verificar que a tabela existe (NÃO criar - schema deve ser gerenciado via scripts SQL)
                 verificarTabelaExisteOuLancarErro(conexao);
+                if (usarStagingPorExecucao()) {
+                    prepararStagingPorExecucao(conexao);
+                }
 
                 // Processar cada entidade individualmente
                 for (final T entidade : entidades) {
@@ -226,7 +336,7 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
                     
                     try {
                         // Tenta executar o MERGE para este registro
-                        final int rowsAffected = executarMerge(conexao, entidade);
+                        final int rowsAffected = executarMergeNoDestinoDaExecucao(conexao, entidade);
                         
                         if (rowsAffected > 0) {
                             totalSucesso++;
@@ -279,6 +389,13 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
                     }
                 }
 
+                final int registrosPersistidosPromovidos;
+                if (usarStagingPorExecucao()) {
+                    registrosPersistidosPromovidos = promoverStagingPorExecucao(conexao);
+                } else {
+                    registrosPersistidosPromovidos = totalPersistidos;
+                }
+
                 // Commit final dos registros restantes
                 conexao.commit();
                 logger.debug("✅ Commit final executado com sucesso");
@@ -288,11 +405,17 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
                 // UPDATEs não adicionam novas linhas, apenas atualizam existentes
                 // Por isso, o número de registros no banco pode ser menor que "totalSucesso"
                 // quando há UPDATEs (comportamento esperado em execuções periódicas)
+                final int totalPersistidosResumo = usarStagingPorExecucao()
+                    ? registrosPersistidosPromovidos
+                    : totalPersistidos;
+                final int totalNoOpResumo = usarStagingPorExecucao()
+                    ? Math.max(0, totalSucesso - totalPersistidosResumo)
+                    : totalNoOpIdempotente;
                 final int registrosNaoSalvos = Math.max(0, totalRegistros - totalSucesso - totalFalhas);
                 ultimoResumoSalvamento = new SaveSummary(
                     totalSucesso,
-                    totalPersistidos,
-                    totalNoOpIdempotente,
+                    totalPersistidosResumo,
+                    totalNoOpResumo,
                     totalFalhas,
                     registrosNaoSalvos
                 );
@@ -303,7 +426,7 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
                         registrosNaoSalvos,
                         totalRegistros,
                         String.format("%.1f", (totalSucesso * 100.0 / totalRegistros)),
-                        totalNoOpIdempotente);
+                        totalNoOpResumo);
                     logger.info("💡 Nota: 'Operações bem-sucedidas' inclui INSERTs (novos registros) e UPDATEs (registros atualizados). " +
                                "UPDATEs não adicionam novas linhas ao banco, apenas atualizam existentes. " +
                                "No-op idempotente indica payload reconhecido como não mais novo pelo MERGE.");

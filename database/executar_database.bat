@@ -152,6 +152,7 @@ for %%F in (
     "migrations\004_adicionar_request_hour_coletas.sql"
     "migrations\005_alinhar_sys_execution_history_schema.sql"
     "migrations\006_alterar_fretes_indicadores_gestao.sql"
+    "migrations\007_adicionar_fk_seletiva_manifestos_coletas.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -221,6 +222,8 @@ for %%F in (
     "validacao\026_validar_tipo_destroy_user_id.sql"
     "validacao\028_validacao_rapida_extracao.sql"
     "validacao\029_verificar_duplicacao_faturas.sql"
+    "validacao\032_validar_orfaos_manifestos_coletas.sql"
+    "validacao\033_validar_orfaos_fretes_faturas_graphql.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F

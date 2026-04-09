@@ -48,14 +48,12 @@ Atributos-chave:
 package br.com.extrator.observabilidade;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -70,10 +68,8 @@ import br.com.extrator.suporte.tempo.RelogioSistema;
 public class LoggingService {
     
     private static final Logger logger = LoggerFactory.getLogger(LoggingService.class);
-    private static final String DIRETORIO_LOGS = "logs";
     private static final DateTimeFormatter FORMATTER_ARQUIVO = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
     private static final DateTimeFormatter FORMATTER_LOG = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final int MAX_LOG_FILES = 20;
     private static final String SEPARADOR = "=".repeat(80);
     private static final String SEPARADOR_SECAO = "-".repeat(80);
     
@@ -120,7 +116,7 @@ public class LoggingService {
         System.out.println(SEPARADOR);
         System.out.println("Operacao: " + nomeOperacao);
         System.out.println("Data/Hora de Inicio: " + inicioOperacao.format(FORMATTER_LOG));
-        System.out.println("Diretorio de Logs: " + Paths.get(DIRETORIO_LOGS).toAbsolutePath());
+        System.out.println("Diretorio de Logs: " + LogStoragePaths.APP_OPERATIONS_DIR.toAbsolutePath());
         System.out.println(SEPARADOR_SECAO);
         System.out.println();
     }
@@ -200,7 +196,7 @@ public class LoggingService {
     private void salvarLogsEmArquivo(final LocalDateTime fimOperacao, final java.time.Duration duracao) {
         try {
             final String nomeArquivo = gerarNomeArquivoLog();
-            final Path caminhoArquivo = Paths.get(DIRETORIO_LOGS, nomeArquivo);
+            final Path caminhoArquivo = LogStoragePaths.APP_OPERATIONS_DIR.resolve(nomeArquivo);
             
             final StringBuilder conteudoLog = new StringBuilder();
             
@@ -344,11 +340,7 @@ public class LoggingService {
      */
     private void criarDiretorioLogs() {
         try {
-            Path diretorio = Paths.get(DIRETORIO_LOGS);
-            if (!Files.exists(diretorio)) {
-                Files.createDirectories(diretorio);
-                System.out.println("[INFO] Diretorio de logs criado: " + diretorio.toAbsolutePath());
-            }
+            LogStoragePaths.ensureBaseDirectories();
         } catch (IOException e) {
             System.err.println("[ERRO] Erro ao criar diretorio de logs: " + e.getMessage());
         }
@@ -359,31 +351,11 @@ public class LoggingService {
      * Mantém apenas os MAX_LOG_FILES mais recentes, removendo os demais (mais antigos).
      */
     private static void aplicarRetencaoLogs() {
-        try {
-            final File pastaLogs = new File(DIRETORIO_LOGS);
-            if (!pastaLogs.exists()) {
-                return;
-            }
-            final File[] arquivosLog = pastaLogs.listFiles((dir, name) -> name.toLowerCase().endsWith(".log"));
-            if (arquivosLog == null) {
-                return;
-            }
-            if (arquivosLog.length <= MAX_LOG_FILES) {
-                return;
-            }
-            java.util.Arrays.sort(arquivosLog, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
-            final int excedente = arquivosLog.length - MAX_LOG_FILES;
-            for (int i = 0; i < excedente; i++) {
-                try {
-                    Files.deleteIfExists(arquivosLog[i].toPath());
-                    logger.debug("Log antigo removido por retencao: {}", arquivosLog[i].getName());
-                } catch (final IOException | SecurityException e) {
-                    logger.warn("Falha ao remover log antigo {}: {}", arquivosLog[i].getName(), e.getMessage());
-                }
-            }
-        } catch (final SecurityException e) {
-            logger.warn("Não foi possível aplicar retenção de logs: {}", e.getMessage());
-        }
+        LogRetentionPolicy.retainRecentFiles(
+            LogStoragePaths.APP_OPERATIONS_DIR,
+            LogStoragePaths.MAX_FILES_PER_BUCKET,
+            path -> LogRetentionPolicy.hasExtension(path, ".log")
+        );
     }
     
     /**
@@ -435,26 +407,41 @@ public class LoggingService {
      */
     public static void organizarLogsTxtNaPastaLogs() {
         try {
-            final File pastaRaiz = new File(".");
-            final File pastaLogs = new File(DIRETORIO_LOGS);
-            
-            if (!pastaLogs.exists()) {
-                pastaLogs.mkdirs();
-            }
-            
-            final File[] arquivosTxt = pastaRaiz.listFiles((dir, name) -> 
-                name.toLowerCase().endsWith(".txt") && !"README.txt".equals(name));
-            
-            if (arquivosTxt != null) {
-                for (final File arquivo : arquivosTxt) {
-                    final File destino = new File(pastaLogs, arquivo.getName());
-                    if (arquivo.renameTo(destino)) {
-                        logger.debug("Log movido: {} -> logs/{}", arquivo.getName(), arquivo.getName());
+            LogStoragePaths.ensureBaseDirectories();
+            try (var arquivos = Files.list(Path.of("."))) {
+                for (final Path arquivo : arquivos.toList()) {
+                    if (!Files.isRegularFile(arquivo)) {
+                        continue;
+                    }
+                    final String nome = arquivo.getFileName().toString();
+                    final String nomeNormalizado = nome.toLowerCase();
+                    final boolean elegivel =
+                        (nomeNormalizado.endsWith(".txt")
+                            || nomeNormalizado.endsWith(".md")
+                            || nomeNormalizado.endsWith(".out")
+                            || nomeNormalizado.endsWith(".err"))
+                            && !"readme.txt".equals(nomeNormalizado);
+                    if (!elegivel) {
+                        continue;
+                    }
+                    final Path destino = LogStoragePaths.REPORTS_DIR.resolve(nome);
+                    if (!arquivo.toAbsolutePath().normalize().equals(destino.toAbsolutePath().normalize())) {
+                        Files.move(
+                            arquivo,
+                            destino,
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                        );
+                        logger.debug("Arquivo operacional movido: {} -> {}", nome, destino);
                     }
                 }
             }
-        } catch (final SecurityException e) {
-            logger.warn("Não foi possível organizar logs .txt: {}", e.getMessage());
+            LogRetentionPolicy.retainRecentFiles(
+                LogStoragePaths.REPORTS_DIR,
+                LogStoragePaths.MAX_FILES_PER_BUCKET,
+                path -> LogRetentionPolicy.hasExtension(path, ".txt", ".md", ".out", ".err")
+            );
+        } catch (final IOException | SecurityException e) {
+            logger.warn("Não foi possível organizar artefatos operacionais: {}", e.getMessage());
         }
     }
 }

@@ -20,7 +20,8 @@ Atributos-chave:
 - repository: ValidacaoApiBanco24hDetalhadaRepository (para queries BD).
 - AMOSTRA_MAX: limite de amostras em detalhe (15).
 Metodos principais:
-- compararEntidade(Connection, String, ResultadoApiChaves, LocalDate, LocalDate, LocalDate, boolean, boolean): comparacao principal.
+- compararEntidade(Connection, String, ResultadoApiChaves, LocalDate, LocalDate, LocalDate, boolean, boolean, Optional<String>): comparacao principal.
+- compararEntidade(Connection, String, ResultadoApiChaves, LocalDate, LocalDate, LocalDate, boolean, boolean): overload retrocompativel sem ancora estruturada explicita.
 - somenteDivergenciaDadosTolerada(ResultadoComparacao): verifica se tolerancia aplica (COTACOES, LOCALIZACAO_CARGAS, FRETES, COLETAS).
 - completudeDinamicaTolerada(ResultadoComparacao): identifica pequenos desvios de snapshot em entidades dinamicas.
 - construirDetalheComparacao(): monta string detalhe com amostras.
@@ -35,22 +36,48 @@ import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaT
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 final class ValidacaoApiBanco24hDetalhadaComparator {
     private static final int AMOSTRA_MAX = 15;
-    private static final int LIMIAR_USUARIOS_FALTANTES_ABSOLUTO = 100;
-    private static final double LIMIAR_USUARIOS_FALTANTES_PERCENTUAL = 0.005d;
     private static final int LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO = 5;
     private static final double LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL = 0.02d;
     private static final int LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO_ABERTO = 20;
     private static final double LIMIAR_MANIFESTOS_VARIACAO_PERCENTUAL_ABERTO = 0.05d;
+    private static final int LIMIAR_USUARIOS_FALTANTES_ABSOLUTO_ABERTO = 30;
+    private static final double LIMIAR_USUARIOS_FALTANTES_PERCENTUAL_ABERTO = 0.10d;
+    private static final int LIMIAR_COLETAS_VARIACAO_ABSOLUTO_ABERTO = 40;
+    private static final double LIMIAR_COLETAS_VARIACAO_PERCENTUAL_ABERTO = 0.08d;
+    private static final int LIMIAR_COLETAS_DIVERGENCIA_ABSOLUTO_ABERTO = 60;
+    private static final double LIMIAR_COLETAS_DIVERGENCIA_PERCENTUAL_ABERTO = 0.12d;
+    private static final int LIMIAR_FRETES_VARIACAO_ABSOLUTO_ABERTO = 250;
+    private static final double LIMIAR_FRETES_VARIACAO_PERCENTUAL_ABERTO = 0.18d;
+    private static final int LIMIAR_FRETES_DIVERGENCIA_ABSOLUTO_ABERTO = 50;
+    private static final double LIMIAR_FRETES_DIVERGENCIA_PERCENTUAL_ABERTO = 0.04d;
+    private static final int LIMIAR_CONTAS_A_PAGAR_VARIACAO_ABSOLUTO_ABERTO = 5;
+    private static final double LIMIAR_CONTAS_A_PAGAR_VARIACAO_PERCENTUAL_ABERTO = 0.03d;
+    private static final int LIMIAR_CONTAS_A_PAGAR_DIVERGENCIA_ABSOLUTO_ABERTO = 5;
+    private static final double LIMIAR_CONTAS_A_PAGAR_DIVERGENCIA_PERCENTUAL_ABERTO = 0.03d;
+    private static final int LIMIAR_COTACOES_VARIACAO_ABSOLUTO_ABERTO = 30;
+    private static final double LIMIAR_COTACOES_VARIACAO_PERCENTUAL_ABERTO = 0.05d;
+    private static final int LIMIAR_COTACOES_DIVERGENCIA_ABSOLUTO_ABERTO = 12;
+    private static final double LIMIAR_COTACOES_DIVERGENCIA_PERCENTUAL_ABERTO = 0.02d;
+    private static final int LIMIAR_LOCALIZACAO_CARGAS_VARIACAO_ABSOLUTO_ABERTO = 160;
+    private static final double LIMIAR_LOCALIZACAO_CARGAS_VARIACAO_PERCENTUAL_ABERTO = 0.10d;
+    private static final int LIMIAR_LOCALIZACAO_CARGAS_DIVERGENCIA_ABSOLUTO_ABERTO = 180;
+    private static final double LIMIAR_LOCALIZACAO_CARGAS_DIVERGENCIA_PERCENTUAL_ABERTO = 0.12d;
+    private static final int LIMIAR_FATURAS_POR_CLIENTE_VARIACAO_ABSOLUTO_ABERTO = 160;
+    private static final double LIMIAR_FATURAS_POR_CLIENTE_VARIACAO_PERCENTUAL_ABERTO = 0.10d;
+    private static final int LIMIAR_FATURAS_POR_CLIENTE_DIVERGENCIA_ABSOLUTO_ABERTO = 60;
+    private static final double LIMIAR_FATURAS_POR_CLIENTE_DIVERGENCIA_PERCENTUAL_ABERTO = 0.04d;
 
     private final ValidacaoApiBanco24hDetalhadaRepository repository;
     private boolean periodoFechadoContexto;
@@ -73,14 +100,51 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         final boolean periodoFechado,
         final boolean permitirFallbackJanela
     ) throws SQLException {
-        final Optional<JanelaExecucao> janelaOpt = repository.buscarUltimaJanelaCompletaDoDia(
+        return compararEntidade(
             conexao,
             entidade,
+            api,
             dataReferencia,
             periodoInicio,
             periodoFim,
-            permitirFallbackJanela
+            periodoFechado,
+            permitirFallbackJanela,
+            Optional.empty()
         );
+    }
+
+    ResultadoComparacao compararEntidade(
+        final Connection conexao,
+        final String entidade,
+        final ResultadoApiChaves api,
+        final LocalDate dataReferencia,
+        final LocalDate periodoInicio,
+        final LocalDate periodoFim,
+        final boolean periodoFechado,
+        final boolean permitirFallbackJanela,
+        final Optional<String> executionUuidAncora
+    ) throws SQLException {
+        final Optional<JanelaExecucao> janelaEstruturada = executionUuidAncora
+            .flatMap(executionUuid -> {
+                try {
+                    return repository.buscarJanelaEstruturadaDaExecucao(conexao, executionUuid, entidade);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        final Optional<JanelaExecucao> janelaOpt;
+        if (janelaEstruturada.isPresent()) {
+            janelaOpt = janelaEstruturada;
+        } else {
+            janelaOpt = repository.buscarUltimaJanelaCompletaDoDia(
+                conexao,
+                entidade,
+                dataReferencia,
+                periodoInicio,
+                periodoFim,
+                permitirFallbackJanela
+            );
+        }
         if (janelaOpt.isEmpty()) {
             return new ResultadoComparacao(
                 entidade,
@@ -93,11 +157,15 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
                 0,
                 api.extracaoCompleta(),
                 api.motivoInterrupcao(),
-                "INCONCLUSIVO: sem janela COMPLETA compativel para comparar"
+                "INCONCLUSIVO: sem janela COMPLETA compativel para comparar",
+                0
             );
         }
 
         final JanelaExecucao janela = janelaOpt.get();
+        final int idadeJanelaMinutos = janela.fim() == null
+            ? 0
+            : (int) Math.max(0, ChronoUnit.MINUTES.between(janela.fim(), RelogioSistema.agora()));
         final Set<String> chavesBanco = repository.carregarChavesBancoNaJanela(
             conexao,
             entidade,
@@ -187,6 +255,10 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         if (excedentesTolerados > 0) {
             detalhe.append(" | excedentes_tolerados_referenciais=").append(excedentesTolerados);
         }
+        if (janelaEstruturada.isPresent() && executionUuidAncora.isPresent()) {
+            detalhe.append(" | origem_janela=EXECUTION_AUDIT");
+            detalhe.append(" | execution_uuid=").append(executionUuidAncora.get());
+        }
 
         return new ResultadoComparacao(
             entidade,
@@ -199,7 +271,8 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             divergenciasDados.size(),
             api.extracaoCompleta(),
             api.motivoInterrupcao(),
-            detalhe.toString()
+            detalhe.toString(),
+            idadeJanelaMinutos
         );
     }
 
@@ -239,24 +312,43 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
 
     private boolean usuariosSistemaDinamicosTolerados(final ResultadoComparacao resultado) {
         if (!ConstantesEntidades.USUARIOS_SISTEMA.equals(resultado.entidade())
+            || periodoFechadoContexto
             || resultado.divergenciasDados() != 0
             || resultado.excedentes() != 0
-            || resultado.faltantes() <= 0
-            || resultado.apiUnico() < resultado.banco()) {
+            || resultado.faltantes() <= 0) {
             return false;
         }
         final int base = Math.max(resultado.apiUnico(), resultado.banco());
-        final int limitePercentual = (int) Math.ceil(base * LIMIAR_USUARIOS_FALTANTES_PERCENTUAL);
-        final int limite = Math.min(LIMIAR_USUARIOS_FALTANTES_ABSOLUTO, Math.max(10, limitePercentual));
+        final int limitePercentual = (int) Math.ceil(base * LIMIAR_USUARIOS_FALTANTES_PERCENTUAL_ABERTO);
+        final int limite = Math.min(
+            LIMIAR_USUARIOS_FALTANTES_ABSOLUTO_ABERTO,
+            Math.max(10, limitePercentual)
+        );
         return resultado.faltantes() <= limite;
     }
 
     private boolean coletasMarginaisToleradas(final ResultadoComparacao resultado) {
-        return ConstantesEntidades.COLETAS.equals(resultado.entidade())
-            && resultado.faltantes() <= 2
-            && resultado.excedentes() <= 2
-            && resultado.divergenciasDados() <= 10
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+        if (periodoFechadoContexto || !ConstantesEntidades.COLETAS.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = calcularLimite(
+            base,
+            LIMIAR_COLETAS_VARIACAO_PERCENTUAL_ABERTO,
+            2,
+            LIMIAR_COLETAS_VARIACAO_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergencia = calcularLimite(
+            base,
+            LIMIAR_COLETAS_DIVERGENCIA_PERCENTUAL_ABERTO,
+            10,
+            LIMIAR_COLETAS_DIVERGENCIA_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergenciaComIdade = ajustarLimitePorIdade(resultado, limiteDivergencia, 5, 50);
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergenciaComIdade
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
     }
 
     private boolean manifestosMarginaisTolerados(final ResultadoComparacao resultado) {
@@ -277,16 +369,31 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             : LIMIAR_MANIFESTOS_VARIACAO_ABSOLUTO_ABERTO;
         final int limitePercentual = (int) Math.ceil(base * limitePercentualBase);
         final int limite = Math.max(2, Math.min(limiteAbsoluto, limitePercentual));
-        return delta <= limite;
+        final int limiteComIdade = ajustarLimitePorIdade(resultado, limite, 5, 35);
+        return delta <= limiteComIdade;
     }
 
     private boolean cotacoesMarginalmenteDinamicas(final ResultadoComparacao resultado) {
-        return !periodoFechadoContexto
-            && ConstantesEntidades.COTACOES.equals(resultado.entidade())
-            && resultado.faltantes() <= 2
-            && resultado.excedentes() <= 1
-            && resultado.divergenciasDados() <= 2
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+        if (periodoFechadoContexto || !ConstantesEntidades.COTACOES.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = calcularLimite(
+            base,
+            LIMIAR_COTACOES_VARIACAO_PERCENTUAL_ABERTO,
+            2,
+            LIMIAR_COTACOES_VARIACAO_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergencia = calcularLimite(
+            base,
+            LIMIAR_COTACOES_DIVERGENCIA_PERCENTUAL_ABERTO,
+            2,
+            LIMIAR_COTACOES_DIVERGENCIA_ABSOLUTO_ABERTO
+        );
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergencia
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
     }
 
     private boolean manifestosDivergenciaMarginalTolerada(final ResultadoComparacao resultado) {
@@ -299,37 +406,138 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
     }
 
     private boolean localizacaoCargasMarginalmenteDinamicas(final ResultadoComparacao resultado) {
-        return !periodoFechadoContexto
-            && ConstantesEntidades.LOCALIZACAO_CARGAS.equals(resultado.entidade())
-            && resultado.faltantes() <= 2
-            && resultado.excedentes() <= 1
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+        if (periodoFechadoContexto || !ConstantesEntidades.LOCALIZACAO_CARGAS.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = calcularLimite(
+            base,
+            LIMIAR_LOCALIZACAO_CARGAS_VARIACAO_PERCENTUAL_ABERTO,
+            2,
+            LIMIAR_LOCALIZACAO_CARGAS_VARIACAO_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergencia = ajustarLimitePorIdade(
+            resultado,
+            calcularLimite(
+                base,
+                LIMIAR_LOCALIZACAO_CARGAS_DIVERGENCIA_PERCENTUAL_ABERTO,
+                4,
+                LIMIAR_LOCALIZACAO_CARGAS_DIVERGENCIA_ABSOLUTO_ABERTO
+            ),
+            8,
+            80
+        );
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergencia
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
     }
 
     private boolean fretesMarginalmenteDinamicos(final ResultadoComparacao resultado) {
-        return !periodoFechadoContexto
-            && ConstantesEntidades.FRETES.equals(resultado.entidade())
-            && resultado.faltantes() <= 1
-            && resultado.excedentes() <= 1
-            && resultado.divergenciasDados() == 0
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 1;
+        if (periodoFechadoContexto || !ConstantesEntidades.FRETES.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = calcularLimite(
+            base,
+            LIMIAR_FRETES_VARIACAO_PERCENTUAL_ABERTO,
+            1,
+            LIMIAR_FRETES_VARIACAO_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergencia = ajustarLimitePorIdade(
+            resultado,
+            calcularLimite(
+                base,
+                LIMIAR_FRETES_DIVERGENCIA_PERCENTUAL_ABERTO,
+                4,
+                LIMIAR_FRETES_DIVERGENCIA_ABSOLUTO_ABERTO
+            ),
+            6,
+            40
+        );
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergencia
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
     }
 
     private boolean faturasPorClienteMarginalmenteDinamicas(final ResultadoComparacao resultado) {
-        return !periodoFechadoContexto
-            && ConstantesEntidades.FATURAS_POR_CLIENTE.equals(resultado.entidade())
-            && resultado.faltantes() <= 2
-            && resultado.excedentes() <= 1
-            && resultado.divergenciasDados() <= 1
-            && Math.abs(resultado.banco() - resultado.apiUnico()) <= 2;
+        if (periodoFechadoContexto || !ConstantesEntidades.FATURAS_POR_CLIENTE.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = ajustarLimitePorIdade(
+            resultado,
+            calcularLimite(
+                base,
+                LIMIAR_FATURAS_POR_CLIENTE_VARIACAO_PERCENTUAL_ABERTO,
+                2,
+                LIMIAR_FATURAS_POR_CLIENTE_VARIACAO_ABSOLUTO_ABERTO
+            ),
+            6,
+            60
+        );
+        final int limiteDivergencia = ajustarLimitePorIdade(
+            resultado,
+            calcularLimite(
+                base,
+                LIMIAR_FATURAS_POR_CLIENTE_DIVERGENCIA_PERCENTUAL_ABERTO,
+                1,
+                LIMIAR_FATURAS_POR_CLIENTE_DIVERGENCIA_ABSOLUTO_ABERTO
+            ),
+            4,
+            40
+        );
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergencia
+            && Math.abs(resultado.banco() - resultado.apiUnico()) <= limiteCompletude;
     }
 
     private boolean contasAPagarMarginaisToleradas(final ResultadoComparacao resultado) {
-        return ConstantesEntidades.CONTAS_A_PAGAR.equals(resultado.entidade())
-            && resultado.divergenciasDados() == 0
-            && resultado.excedentes() == 0
-            && resultado.faltantes() <= 2
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= 2;
+        if (periodoFechadoContexto || !ConstantesEntidades.CONTAS_A_PAGAR.equals(resultado.entidade())) {
+            return false;
+        }
+        final int base = Math.max(resultado.apiUnico(), resultado.banco());
+        final int limiteCompletude = calcularLimite(
+            base,
+            LIMIAR_CONTAS_A_PAGAR_VARIACAO_PERCENTUAL_ABERTO,
+            1,
+            LIMIAR_CONTAS_A_PAGAR_VARIACAO_ABSOLUTO_ABERTO
+        );
+        final int limiteDivergencia = calcularLimite(
+            base,
+            LIMIAR_CONTAS_A_PAGAR_DIVERGENCIA_PERCENTUAL_ABERTO,
+            1,
+            LIMIAR_CONTAS_A_PAGAR_DIVERGENCIA_ABSOLUTO_ABERTO
+        );
+        return resultado.faltantes() <= limiteCompletude
+            && resultado.excedentes() <= limiteCompletude
+            && resultado.divergenciasDados() <= limiteDivergencia
+            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
+    }
+
+    private int calcularLimite(final int base,
+                               final double percentual,
+                               final int minimo,
+                               final int maximo) {
+        final int limitePercentual = (int) Math.ceil(base * percentual);
+        return Math.min(maximo, Math.max(minimo, limitePercentual));
+    }
+
+    private int ajustarLimitePorIdade(final ResultadoComparacao resultado,
+                                      final int base,
+                                      final int acrescimoPorBlocoDezMinutos,
+                                      final int acrescimoMaximo) {
+        if (resultado == null || resultado.idadeJanelaMinutos() <= 0 || acrescimoPorBlocoDezMinutos <= 0) {
+            return base;
+        }
+        final int blocos = resultado.idadeJanelaMinutos() / 10;
+        if (blocos <= 0) {
+            return base;
+        }
+        final int acrescimo = Math.min(acrescimoMaximo, blocos * acrescimoPorBlocoDezMinutos);
+        return base + acrescimo;
     }
 
     private String construirDetalheComparacao(

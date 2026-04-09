@@ -73,26 +73,35 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
         }
 
         final String freshnessGuard =
-            "(T.data_atualizacao IS NULL OR S.data_atualizacao >= T.data_atualizacao)";
+            "(COALESCE(T.origem_atualizado_em, T.data_atualizacao) IS NULL "
+                + "OR COALESCE(S.origem_atualizado_em, S.data_atualizacao) >= COALESCE(T.origem_atualizado_em, T.data_atualizacao))";
         final String sql = String.format("""
             MERGE dbo.%s AS T
-            USING (VALUES (?, ?, ?)) AS S (id, nome, data_atualizacao)
+            USING (VALUES (?, ?, ?, ?, ?, ?)) AS S (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
             ON T.user_id = S.id
             WHEN MATCHED AND %s THEN
-                UPDATE SET T.nome = S.nome, T.data_atualizacao = S.data_atualizacao
+                UPDATE SET
+                    T.nome = S.nome,
+                    T.ativo = S.ativo,
+                    T.origem_atualizado_em = S.origem_atualizado_em,
+                    T.data_atualizacao = S.data_atualizacao,
+                    T.ultima_extracao_em = S.ultima_extracao_em
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, data_atualizacao)
-                VALUES (S.id, S.nome, S.data_atualizacao);
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
+                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em);
             """, NOME_TABELA, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             int paramIndex = 1;
             setLongParameter(statement, paramIndex++, usuario.getUserId());
             setStringParameter(statement, paramIndex++, usuario.getNome());
+            statement.setBoolean(paramIndex++, usuario.isAtivo());
+            setDateTimeParameter(statement, paramIndex++, usuario.getOrigemAtualizadoEm());
             setDateTimeParameter(statement, paramIndex++, usuario.getDataAtualizacao());
+            setDateTimeParameter(statement, paramIndex++, usuario.getUltimaExtracaoEm());
             
-            if (paramIndex != 4) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 3, definido %d", paramIndex - 1));
+            if (paramIndex != 7) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 6, definido %d", paramIndex - 1));
             }
 
             final int rowsAffected = statement.executeUpdate();

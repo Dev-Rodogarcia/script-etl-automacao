@@ -34,24 +34,25 @@ Atributos-chave:
 package br.com.extrator.comandos.cli.extracao.daemon;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
+
+import br.com.extrator.observabilidade.LogStoragePaths;
 
 /**
  * Caminhos padrao utilizados pelo loop daemon.
  */
 public final class DaemonPaths {
-    public static final Path DAEMON_DIR = Paths.get("logs", "daemon");
-    public static final Path CYCLES_DIR = DAEMON_DIR.resolve("ciclos");
-    public static final Path DAEMON_HISTORY_DIR = DAEMON_DIR.resolve("history");
-    public static final Path RECONCILIACAO_HISTORY_DIR_DEFAULT = DAEMON_DIR.resolve("reconciliacao");
+    public static final Path DAEMON_DIR = LogStoragePaths.DAEMON_DIR;
+    public static final Path CYCLES_DIR = LogStoragePaths.DAEMON_CYCLES_DIR;
+    public static final Path DAEMON_HISTORY_DIR = LogStoragePaths.DAEMON_HISTORY_DIR;
+    public static final Path RECONCILIACAO_HISTORY_DIR_DEFAULT = LogStoragePaths.DAEMON_RECONCILIATION_DIR;
     public static final String RECONCILIACAO_HISTORY_DIR_OVERRIDE_KEY = "extrator.loop.reconciliacao.history.dir";
-    public static final Path RUNTIME_DIR = DAEMON_DIR.resolve("runtime");
-    public static final Path PID_FILE = DAEMON_DIR.resolve("loop_daemon.pid");
-    public static final Path STATE_FILE = DAEMON_DIR.resolve("loop_daemon.state");
-    public static final Path RECONCILIACAO_STATE_FILE = DAEMON_DIR.resolve("loop_reconciliation.state");
-    public static final Path STOP_FILE = DAEMON_DIR.resolve("loop_daemon.stop");
-    public static final Path FORCE_RUN_FILE = DAEMON_DIR.resolve("loop_daemon.force_run");
-    public static final Path DAEMON_STDOUT_FILE = DAEMON_DIR.resolve("loop_daemon_console.log");
+    public static final Path RUNTIME_DIR = LogStoragePaths.DAEMON_RUNTIME_DIR;
+    public static final Path PID_FILE = RUNTIME_DIR.resolve("loop_daemon.pid");
+    public static final Path STATE_FILE = RUNTIME_DIR.resolve("loop_daemon.state");
+    public static final Path RECONCILIACAO_STATE_FILE = RUNTIME_DIR.resolve("loop_reconciliation.state");
+    public static final Path STOP_FILE = RUNTIME_DIR.resolve("loop_daemon.stop");
+    public static final Path FORCE_RUN_FILE = RUNTIME_DIR.resolve("loop_daemon.force_run");
+    public static final Path DAEMON_STDOUT_FILE = RUNTIME_DIR.resolve("loop_daemon_console.log");
 
     private DaemonPaths() {
         // utility class

@@ -43,15 +43,21 @@ public class IntegridadeEtlValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(IntegridadeEtlValidator.class);
     private static final Map<String, IntegridadeEtlSpec> SPECS = IntegridadeEtlSpecCatalog.carregarSpecs();
-    private final IntegridadeEtlSqlSupport sqlSupport = new IntegridadeEtlSqlSupport();
+    private final IntegridadeEtlSqlSupport sqlSupport;
     private final ExecutionAuditPort executionAuditPort;
 
     public IntegridadeEtlValidator() {
-        this(new SqlServerExecutionAuditPortAdapter());
+        this(new SqlServerExecutionAuditPortAdapter(), new IntegridadeEtlSqlSupport());
     }
 
     IntegridadeEtlValidator(final ExecutionAuditPort executionAuditPort) {
+        this(executionAuditPort, new IntegridadeEtlSqlSupport());
+    }
+
+    IntegridadeEtlValidator(final ExecutionAuditPort executionAuditPort,
+                            final IntegridadeEtlSqlSupport sqlSupport) {
         this.executionAuditPort = executionAuditPort;
+        this.sqlSupport = sqlSupport;
     }
 
     public static final class ResultadoValidacao {

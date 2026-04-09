@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.suporte.ThreadUtil;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.log.SensitiveDataSanitizer;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
  * Repository for sys_execution_history.
@@ -181,6 +182,7 @@ public class ExecutionHistoryRepository {
             SELECT COALESCE(SUM(registros_extraidos), 0) AS total
             FROM dbo.log_extracoes
             WHERE timestamp_fim >= ? AND timestamp_inicio <= ?
+              AND entidade <> ?
               AND (status_final = 'COMPLETO' OR status_final LIKE 'INCOMPLETO%')
             """;
 
@@ -193,6 +195,7 @@ public class ExecutionHistoryRepository {
 
             stmt.setTimestamp(1, Timestamp.valueOf(inicio));
             stmt.setTimestamp(2, Timestamp.valueOf(fim));
+            stmt.setString(3, ConstantesEntidades.COLETAS_REFERENCIAL);
 
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {

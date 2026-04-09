@@ -52,11 +52,11 @@ class ValidacaoApiBanco24hDetalhadaComparatorTest {
 
         assertTrue(comparator.completudeDinamicaTolerada(resultado(
             ConstantesEntidades.COTACOES,
-            301,
-            299,
-            2,
+            540,
+            517,
+            23,
             0,
-            2
+            7
         )));
     }
 
@@ -66,11 +66,11 @@ class ValidacaoApiBanco24hDetalhadaComparatorTest {
 
         assertTrue(comparator.completudeDinamicaTolerada(resultado(
             ConstantesEntidades.LOCALIZACAO_CARGAS,
-            953,
-            951,
-            2,
-            0,
-            4
+            1401,
+            1350,
+            61,
+            10,
+            143
         )));
         assertTrue(comparator.completudeDinamicaTolerada(resultado(
             ConstantesEntidades.CONTAS_A_PAGAR,
@@ -82,12 +82,170 @@ class ValidacaoApiBanco24hDetalhadaComparatorTest {
         )));
         assertTrue(comparator.completudeDinamicaTolerada(resultado(
             ConstantesEntidades.FATURAS_POR_CLIENTE,
-            953,
-            951,
-            2,
+            1453,
+            1343,
+            136,
+            26,
+            44
+        )));
+    }
+
+    @Test
+    void deveTolerarDriftAbertoObservadoEmColetasFretesContasEUsuarios() {
+        comparator.definirPeriodoFechado(false);
+
+        assertTrue(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.COLETAS,
+            429,
+            408,
+            29,
+            8,
+            45
+        )));
+        assertTrue(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.FRETES,
+            1401,
+            1314,
+            91,
+            4,
+            22
+        )));
+        assertTrue(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.CONTAS_A_PAGAR,
+            114,
+            114,
+            1,
+            1,
+            1
+        )));
+        assertTrue(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            216,
+            195,
+            21,
             0,
             0
         )));
+    }
+
+    @Test
+    void naoDeveTolerarDerivaAbertaAcimaDosLimitesConfigurados() {
+        comparator.definirPeriodoFechado(false);
+
+        assertFalse(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.COLETAS,
+            429,
+            408,
+            41,
+            8,
+            45
+        )));
+        assertFalse(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.FRETES,
+            1211,
+            1070,
+            251,
+            0,
+            13
+        )));
+        assertFalse(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.COTACOES,
+            540,
+            517,
+            23,
+            0,
+            13
+        )));
+        assertFalse(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            1401,
+            1350,
+            61,
+            10,
+            181
+        )));
+        assertFalse(comparator.completudeDinamicaTolerada(resultado(
+            ConstantesEntidades.FATURAS_POR_CLIENTE,
+            1453,
+            1343,
+            161,
+            26,
+            61
+        )));
+    }
+
+    @Test
+    void deveEscalarToleranciaPelaIdadeDaJanelaAberta() {
+        comparator.definirPeriodoFechado(false);
+
+        final var resultadoRecente = new ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            1455,
+            1455,
+            0,
+            1350,
+            115,
+            10,
+            176,
+            true,
+            null,
+            "janela aberta recente",
+            0
+        );
+        final var resultadoEnvelhecido = new ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            1455,
+            1455,
+            0,
+            1350,
+            115,
+            10,
+            176,
+            true,
+            null,
+            "janela aberta envelhecida",
+            50
+        );
+
+        assertFalse(comparator.completudeDinamicaTolerada(resultadoRecente));
+        assertTrue(comparator.completudeDinamicaTolerada(resultadoEnvelhecido));
+    }
+
+    @Test
+    void deveTolerarManifestosMarginaisQuandoJanelaAbertaEnvelhece() {
+        comparator.definirPeriodoFechado(false);
+
+        final var resultadoRecente = new ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao(
+            ConstantesEntidades.MANIFESTOS,
+            651,
+            651,
+            0,
+            632,
+            22,
+            3,
+            0,
+            true,
+            null,
+            "manifestos recentes",
+            0
+        );
+        final var resultadoEnvelhecido = new ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao(
+            ConstantesEntidades.MANIFESTOS,
+            651,
+            651,
+            0,
+            632,
+            22,
+            3,
+            0,
+            true,
+            null,
+            "manifestos envelhecidos",
+            60
+        );
+
+        assertFalse(comparator.completudeDinamicaTolerada(resultadoRecente));
+        assertTrue(comparator.completudeDinamicaTolerada(resultadoEnvelhecido));
     }
 
     private ValidacaoApiBanco24hDetalhadaTypes.ResultadoComparacao resultado(

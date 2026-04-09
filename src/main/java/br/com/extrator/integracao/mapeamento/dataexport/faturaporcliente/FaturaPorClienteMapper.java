@@ -58,6 +58,8 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import br.com.extrator.persistencia.entidade.FaturaPorClienteEntity;
 import br.com.extrator.suporte.mapeamento.DataUtil;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
@@ -202,6 +204,50 @@ public class FaturaPorClienteMapper {
             .filter(Objects::nonNull)
             .distinct()
             .toList();
+    }
+
+    public String gerarRepresentacaoPersistidaEstavel(final FaturaPorClienteDTO dto) {
+        return MapperUtil.toJson(projetarCamposPersistidosEstaveis(dto));
+    }
+
+    public ObjectNode projetarCamposPersistidosEstaveis(final FaturaPorClienteDTO dto) {
+        if (dto == null) {
+            return MapperUtil.sharedJson().createObjectNode();
+        }
+        return projetarCamposPersistidosEstaveis(toEntity(dto));
+    }
+
+    public ObjectNode projetarCamposPersistidosEstaveis(final FaturaPorClienteEntity entity) {
+        final ObjectNode node = MapperUtil.sharedJson().createObjectNode();
+        if (entity == null) {
+            return node;
+        }
+
+        putString(node, "unique_id", entity.getUniqueId());
+        putLong(node, "numero_nfse", entity.getNumeroNfse());
+        putLong(node, "numero_cte", entity.getNumeroCte());
+        putString(node, "chave_cte", entity.getChaveCte());
+        putOffsetDateTime(node, "data_emissao_cte", entity.getDataEmissaoCte());
+        putString(node, "numero_fatura", entity.getNumeroFatura());
+        putLocalDate(node, "data_emissao_fatura", entity.getDataEmissaoFatura());
+        putLocalDate(node, "data_vencimento_fatura", entity.getDataVencimentoFatura());
+        putLocalDate(node, "fit_ant_ils_original_due_date", entity.getFitAntOriginalDueDate());
+        putString(node, "fit_ant_document", entity.getFitAntDocument());
+        putLocalDate(node, "fit_ant_issue_date", entity.getFitAntIssueDate());
+        putBigDecimal(node, "fit_ant_value", entity.getFitAntValue());
+        putBigDecimal(node, "valor_frete", entity.getValorFrete());
+        putBigDecimal(node, "valor_fatura", entity.getValorFatura());
+        putBigDecimal(node, "third_party_ctes_value", entity.getThirdPartyCtesValue());
+        putString(node, "filial", entity.getFilial());
+        putString(node, "tipo_frete", entity.getTipoFrete());
+        putString(node, "classificacao", entity.getClassificacao());
+        putString(node, "estado", entity.getEstado());
+        putString(node, "pagador_documento", entity.getPagadorDocumento());
+        putString(node, "remetente_documento", entity.getRemetenteDocumento());
+        putString(node, "destinatario_documento", entity.getDestinatarioDocumento());
+        putString(node, "notas_fiscais", entity.getNotasFiscais());
+        putString(node, "pedidos_cliente", entity.getPedidosCliente());
+        return node;
     }
 
     private String calcularAliasNfse(final FaturaPorClienteDTO dto) {
@@ -395,6 +441,40 @@ public class FaturaPorClienteMapper {
         if (lista == null || lista.isEmpty()) {
             return null;
         }
-        return String.join(", ", lista);
+        final String normalizada = normalizarLista(lista);
+        if ("<null>".equals(normalizada) || "<empty>".equals(normalizada)) {
+            return null;
+        }
+        return String.join(", ", List.of(normalizada.split(",")));
+    }
+
+    private void putString(final ObjectNode node, final String campo, final String valor) {
+        if (valor != null && !valor.isBlank()) {
+            node.put(campo, valor);
+        }
+    }
+
+    private void putLong(final ObjectNode node, final String campo, final Long valor) {
+        if (valor != null) {
+            node.put(campo, valor);
+        }
+    }
+
+    private void putLocalDate(final ObjectNode node, final String campo, final LocalDate valor) {
+        if (valor != null) {
+            node.put(campo, valor.toString());
+        }
+    }
+
+    private void putOffsetDateTime(final ObjectNode node, final String campo, final OffsetDateTime valor) {
+        if (valor != null) {
+            node.put(campo, valor.toString());
+        }
+    }
+
+    private void putBigDecimal(final ObjectNode node, final String campo, final BigDecimal valor) {
+        if (valor != null) {
+            node.put(campo, valor.toPlainString());
+        }
     }
 }

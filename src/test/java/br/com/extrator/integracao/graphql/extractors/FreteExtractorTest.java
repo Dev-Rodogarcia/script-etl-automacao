@@ -27,6 +27,7 @@ class FreteExtractorTest {
     @AfterEach
     void limparFlagDePrune() {
         System.clearProperty("ETL_FRETES_PRUNE_AUSENTES");
+        System.clearProperty("api.dataexport.timezone");
     }
 
     @Test
@@ -59,6 +60,7 @@ class FreteExtractorTest {
 
     @Test
     void deveEnriquecerPerformanceOficialComDataExport6389() throws SQLException {
+        System.setProperty("api.dataexport.timezone", "America/Sao_Paulo");
         final FakeFreteRepository repository = new FakeFreteRepository();
         final FreteExtractor extractor = new FreteExtractor(
             null,
@@ -83,6 +85,7 @@ class FreteExtractorTest {
 
     @Test
     void deveCorrigirDataAmbiguaDdMmQuandoParserPadraoGerarDataAnteriorAoFrete() throws SQLException {
+        System.setProperty("api.dataexport.timezone", "America/Sao_Paulo");
         final FakeFreteRepository repository = new FakeFreteRepository();
         final FreteExtractor extractor = new FreteExtractor(
             null,

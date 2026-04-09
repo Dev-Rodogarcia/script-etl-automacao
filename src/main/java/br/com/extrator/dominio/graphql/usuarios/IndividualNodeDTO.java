@@ -40,6 +40,9 @@ public class IndividualNodeDTO {
     @JsonProperty("name")
     private String name;
 
+    @JsonProperty("updatedAt")
+    private String updatedAt;
+
     public Long getId() {
         return id;
     }
@@ -54,5 +57,13 @@ public class IndividualNodeDTO {
 
     public void setName(final String name) {
         this.name = name;
+    }
+
+    public String getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(final String updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

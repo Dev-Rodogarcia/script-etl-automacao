@@ -29,6 +29,12 @@ REM Em cmd.exe, set /p com entrada redirecionada falha com CP 65001.
 REM CP 1252 preserva compatibilidade em execucao interativa e automatizada.
 if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 1252 >nul
 
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+set "LOOP_LOG=%REPO_ROOT%\logs\daemon\runtime\loop_daemon_console.log"
+
 echo ================================================================
 echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos^)
 echo ================================================================
@@ -38,12 +44,12 @@ echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 
-pushd "%~dp0"
+pushd "%REPO_ROOT%"
 
 if /i "%PROD_MODE%"=="1" (
   echo Modo producao: pulando compilacao.
 ) else (
-  call "%~dp0mvn.bat" -q -DskipTests package
+  call "%REPO_ROOT%\mvn.bat" -q -DskipTests package
   if errorlevel 1 (
     echo ERRO: Compilacao falhou
     popd
@@ -51,7 +57,7 @@ if /i "%PROD_MODE%"=="1" (
   )
 )
 
-if not exist "%~dp0target\extrator.jar" (
+if not exist "%JAR_PATH%" (
   echo ERRO: target\extrator.jar nao encontrado
   if /i "%PROD_MODE%"=="1" (
     echo Modo producao requer JAR precompilado.
@@ -124,11 +130,11 @@ if errorlevel 1 goto :MENU
 if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
   echo Iniciando loop daemon com Faturas GraphQL DESABILITADO...
   echo As trilhas DataExport de inventario e sinistros permanecem ativas no loop.
-  java -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+  java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-start --sem-faturas-graphql
 ) else (
   echo Iniciando loop daemon com Faturas GraphQL INCLUIDO...
   echo As trilhas DataExport de inventario e sinistros permanecem ativas no loop.
-  java -jar "%~dp0target\extrator.jar" --loop-daemon-start
+  java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-start
 )
 echo.
 pause
@@ -137,7 +143,7 @@ goto :MENU
 :STATUS
 call :AUTH_CHECK LOOP_STATUS "Consultar status do loop daemon"
 if errorlevel 1 goto :MENU
-java -jar "%~dp0target\extrator.jar" --loop-daemon-status
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-status
 echo.
 pause
 goto :MENU
@@ -146,7 +152,7 @@ goto :MENU
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" goto :DO_STOP
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "%~dp0target\extrator.jar" --auth-check LOOP_STOP "Parar loop daemon"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check LOOP_STOP "Parar loop daemon"
 if errorlevel 1 (
   echo Acesso negado.
   echo.
@@ -154,7 +160,7 @@ if errorlevel 1 (
   goto :MENU
 )
 :DO_STOP
-java -jar "%~dp0target\extrator.jar" --loop-daemon-stop
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-stop
 echo.
 pause
 goto :MENU
@@ -166,11 +172,11 @@ call :ASK_FATURAS_GRAPHQL_LOOP
 if errorlevel 1 goto :MENU
 
 echo Reiniciando loop daemon com nova configuracao de Faturas GraphQL...
-java -jar "%~dp0target\extrator.jar" --loop-daemon-stop >nul 2>&1
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-stop >nul 2>&1
 if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
-  java -jar "%~dp0target\extrator.jar" --loop-daemon-start --sem-faturas-graphql
+  java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-start --sem-faturas-graphql
 ) else (
-  java -jar "%~dp0target\extrator.jar" --loop-daemon-start
+  java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --loop-daemon-start
 )
 echo.
 pause
@@ -180,7 +186,7 @@ goto :MENU
 call :AUTH_CHECK LOOP_STATUS "Acompanhar logs do loop"
 if errorlevel 1 goto :MENU
 
-if not exist "%~dp0logs\daemon\loop_daemon_console.log" (
+if not exist "%LOOP_LOG%" (
   echo Arquivo de log do loop ainda nao encontrado.
   echo Inicie o loop e tente novamente.
   echo.
@@ -190,11 +196,11 @@ if not exist "%~dp0logs\daemon\loop_daemon_console.log" (
 
 echo.
 echo Acompanhando logs em tempo real...
-echo Arquivo: %~dp0logs\daemon\loop_daemon_console.log
+echo Arquivo: %LOOP_LOG%
 echo Referencias esperadas: dataexport:inventario e dataexport:sinistros entre os steps do ciclo.
 echo Pressione CTRL+C para encerrar a visualizacao e voltar ao menu.
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Path '%~dp0logs\daemon\loop_daemon_console.log' -Encoding UTF8 -Tail 60 -Wait"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Content -Path '%LOOP_LOG%' -Encoding UTF8 -Tail 60 -Wait"
 echo.
 pause
 goto :MENU
@@ -215,7 +221,7 @@ if /i "%AUTH_ACTION%"=="LOOP_EXIT_MENU" (
 )
 echo.
 echo Autenticacao obrigatoria para executar esta acao.
-java -jar "%~dp0target\extrator.jar" --auth-check %~1 "%~2"
+java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-check %~1 "%~2"
 if errorlevel 1 (
   echo Acesso negado.
   echo.

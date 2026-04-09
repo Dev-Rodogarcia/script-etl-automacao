@@ -22,11 +22,13 @@ Atributos-chave:
 
 package br.com.extrator.integracao.mapeamento.graphql.usuarios;
 
-import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
-
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
+import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
+import br.com.extrator.suporte.formatacao.FormatadorData;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 
 /**
  * Mapper responsável por converter IndividualNodeDTO (GraphQL) para UsuarioSistemaEntity (Banco de Dados).
@@ -44,13 +46,15 @@ public class UsuarioSistemaMapper {
             return null;
         }
 
+        final LocalDateTime observadoEm = RelogioSistema.agora();
+        final OffsetDateTime origemAtualizada = FormatadorData.parseOffsetDateTime(dto.getUpdatedAt());
         final UsuarioSistemaEntity entity = new UsuarioSistemaEntity();
         entity.setUserId(dto.getId());
         entity.setNome(dto.getName());
         entity.setAtivo(true);
-        entity.setOrigemAtualizadoEm(null);
-        entity.setDataAtualizacao(LocalDateTime.now());
-        entity.setUltimaExtracaoEm(LocalDateTime.now());
+        entity.setOrigemAtualizadoEm(origemAtualizada != null ? origemAtualizada.toLocalDateTime() : null);
+        entity.setDataAtualizacao(observadoEm);
+        entity.setUltimaExtracaoEm(observadoEm);
         return entity;
     }
 }

@@ -1,5 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
+for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
+if not defined JAR_PATH set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
+if not defined MVN_CMD set "MVN_CMD=%REPO_ROOT%\mvn.bat"
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 09-gerenciar_usuarios.bat
 REM Tipo    : Script operacional Windows (.bat)
@@ -33,7 +38,7 @@ if /i "%PROD_MODE%"=="1" (
     echo Modo producao: pulando compilacao.
 ) else (
     echo Compilando projeto...
-    call "%~dp0mvn.bat" -q -DskipTests package
+    call "%MVN_CMD%" -q -DskipTests package
     if errorlevel 1 (
         echo ERRO: Compilacao falhou
         echo.
@@ -42,7 +47,7 @@ if /i "%PROD_MODE%"=="1" (
     )
 )
 
-if not exist "%~dp0target\extrator.jar" (
+if not exist "%JAR_PATH%" (
     echo ERRO: Arquivo target\extrator.jar nao encontrado!
     if /i "%PROD_MODE%"=="1" (
         echo Modo producao requer JAR precompilado.
@@ -93,7 +98,7 @@ if "%OP%"=="0" goto :END
 
 if "%OP%"=="1" (
     echo.
-    java -jar "%~dp0target\extrator.jar" --auth-bootstrap
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-bootstrap
     echo.
     pause
     goto :MENU
@@ -101,7 +106,7 @@ if "%OP%"=="1" (
 
 if "%OP%"=="2" (
     echo.
-    java -jar "%~dp0target\extrator.jar" --auth-create-user
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-create-user
     echo.
     pause
     goto :MENU
@@ -109,7 +114,7 @@ if "%OP%"=="2" (
 
 if "%OP%"=="3" (
     echo.
-    java -jar "%~dp0target\extrator.jar" --auth-reset-password
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-reset-password
     echo.
     pause
     goto :MENU
@@ -117,7 +122,7 @@ if "%OP%"=="3" (
 
 if "%OP%"=="4" (
     echo.
-    java -jar "%~dp0target\extrator.jar" --auth-disable-user
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-disable-user
     echo.
     pause
     goto :MENU
@@ -125,7 +130,7 @@ if "%OP%"=="4" (
 
 if "%OP%"=="5" (
     echo.
-    java -jar "%~dp0target\extrator.jar" --auth-info
+    java --enable-native-access=ALL-UNNAMED -jar "%JAR_PATH%" --auth-info
     echo.
     pause
     goto :MENU

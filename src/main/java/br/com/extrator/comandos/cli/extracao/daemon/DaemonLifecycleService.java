@@ -92,6 +92,10 @@ public final class DaemonLifecycleService {
     }
 
     public Process startChildProcess(final List<String> comando) throws IOException {
+        final Path stdoutDir = daemonStdoutFile.getParent();
+        if (stdoutDir != null && !Files.exists(stdoutDir)) {
+            Files.createDirectories(stdoutDir);
+        }
         final ProcessBuilder processBuilder = new ProcessBuilder(comando);
         processBuilder.redirectOutput(Redirect.appendTo(daemonStdoutFile.toFile()));
         processBuilder.redirectError(Redirect.appendTo(daemonStdoutFile.toFile()));

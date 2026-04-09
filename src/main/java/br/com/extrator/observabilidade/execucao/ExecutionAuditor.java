@@ -34,13 +34,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import br.com.extrator.observabilidade.LogRetentionPolicy;
+import br.com.extrator.observabilidade.LogStoragePaths;
 
 /**
  * Utility to register execution audit entries in a monthly CSV file.
@@ -49,8 +51,6 @@ public final class ExecutionAuditor {
 
     private static final Logger logger = LoggerFactory.getLogger(ExecutionAuditor.class);
 
-    private static final String LOGS_DIR = "logs";
-    private static final String HISTORY_DIR = "history";
     private static final String HEADER = "DATA_HORA;STATUS;DURATION_S;TOTAL_RECORDS;TYPE;ERROR_MSG";
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy_MM");
     private static final DateTimeFormatter LINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
@@ -69,10 +69,8 @@ public final class ExecutionAuditor {
                                     final String type,
                                     final String errorMessage) {
         try {
-            final Path pastaHistory = Paths.get(LOGS_DIR, HISTORY_DIR);
-            if (!Files.exists(pastaHistory)) {
-                Files.createDirectories(pastaHistory);
-            }
+            LogStoragePaths.ensureBaseDirectories();
+            final Path pastaHistory = LogStoragePaths.EXECUTION_HISTORY_DIR;
 
             final String arquivoNome = "execucao_" + dataHora.format(MONTH_FORMAT) + ".csv";
             final Path arquivo = pastaHistory.resolve(arquivoNome);
@@ -101,6 +99,11 @@ public final class ExecutionAuditor {
                 writer.write(linha);
                 writer.newLine();
             }
+            LogRetentionPolicy.retainRecentFiles(
+                pastaHistory,
+                LogStoragePaths.MAX_FILES_PER_BUCKET,
+                path -> LogRetentionPolicy.hasExtension(path, ".csv", ".ndjson")
+            );
         } catch (final IOException e) {
             logger.warn("Falha ao gravar auditoria de execucao em CSV: {}", e.getMessage());
         }

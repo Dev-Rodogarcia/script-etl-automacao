@@ -10,12 +10,41 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Path $PSScriptRoot -Parent | Split-Path -Parent
 Set-Location $repoRoot
 
+$logsRoot = Join-Path $repoRoot "logs"
+$appRuntimeDir = Join-Path $logsRoot "aplicacao\runtime"
+$appOperationsDir = Join-Path $logsRoot "aplicacao\operacoes"
+$daemonRuntimeDir = Join-Path $logsRoot "daemon\runtime"
+$daemonHistoryDir = Join-Path $logsRoot "daemon\historico"
+$daemonCyclesDir = Join-Path $logsRoot "daemon\ciclos"
+$reportsDir = Join-Path $logsRoot "relatorios"
+
 $windowEnd = Get-Date
 $windowStart = $windowEnd.AddHours(-1 * [math]::Abs($Hours))
 
 if (-not $OutputPath) {
     $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-    $OutputPath = Join-Path $repoRoot ("logs\producao_validacao_24h_{0}.md" -f $stamp)
+    $OutputPath = Join-Path $reportsDir ("producao_validacao_24h_{0}.md" -f $stamp)
+}
+
+function Limit-RecentFiles {
+    param(
+        [string]$Directory,
+        [string]$Filter,
+        [int]$MaxFiles = 20
+    )
+
+    if (-not (Test-Path $Directory)) {
+        return
+    }
+
+    $files = Get-ChildItem -Path $Directory -File -Filter $Filter |
+        Sort-Object LastWriteTime, Name -Descending
+
+    if ($files.Count -le $MaxFiles) {
+        return
+    }
+
+    $files | Select-Object -Skip $MaxFiles | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 function Get-EnvMap {
@@ -86,7 +115,7 @@ function Invoke-SqlQuery {
 }
 
 function Get-DaemonState {
-    $statePath = Join-Path $repoRoot "logs\daemon\loop_daemon.state"
+    $statePath = Join-Path $daemonRuntimeDir "loop_daemon.state"
     $state = [ordered]@{}
     if (-not (Test-Path $statePath)) {
         return $state
@@ -127,7 +156,7 @@ function Get-DaemonCycles {
         [datetime]$WindowStart
     )
 
-    $historyDir = Join-Path $repoRoot "logs\daemon\history"
+    $historyDir = $daemonHistoryDir
     if (-not (Test-Path $historyDir)) {
         return @()
     }
@@ -161,7 +190,7 @@ function Get-CycleLogFilesInWindow {
         [datetime]$WindowStart
     )
 
-    $cycleRoot = Join-Path $repoRoot "logs\daemon\ciclos"
+    $cycleRoot = $daemonCyclesDir
     if (-not (Test-Path $cycleRoot)) {
         return @()
     }
@@ -240,8 +269,8 @@ function Get-LogSources {
     )
 
     $sources = @()
-    $rootLog = Join-Path $repoRoot "logs\extrator-esl.log"
-    $daemonConsole = Join-Path $repoRoot "logs\daemon\loop_daemon_console.log"
+    $rootLog = Join-Path $appRuntimeDir "extrator-esl.log"
+    $daemonConsole = Join-Path $daemonRuntimeDir "loop_daemon_console.log"
 
     if (Test-Path $rootLog) {
         $sources += $rootLog
@@ -250,9 +279,11 @@ function Get-LogSources {
         $sources += $daemonConsole
     }
 
-    Get-ChildItem (Join-Path $repoRoot "logs") -File -Filter "extracao_dados_*.log" |
+    if (Test-Path $appOperationsDir) {
+        Get-ChildItem $appOperationsDir -File -Filter "extracao_dados_*.log" |
         Where-Object { $_.LastWriteTime -ge $WindowStart } |
         ForEach-Object { $sources += $_.FullName }
+    }
 
     foreach ($cycle in $CycleLogs) {
         $sources += $cycle.path
@@ -319,7 +350,7 @@ function Get-GraphQlStepTimingReport {
         [datetime]$WindowStart
     )
 
-    $consolePath = Join-Path $repoRoot "logs\daemon\loop_daemon_console.log"
+    $consolePath = Join-Path $daemonRuntimeDir "loop_daemon_console.log"
     if (-not (Test-Path $consolePath)) {
         return @()
     }
@@ -578,7 +609,7 @@ else {
 
 Add-Section -Lines $report -Title "Estado Atual do Daemon"
 if ($daemonState.Count -eq 0) {
-    $report.Add("- Estado do daemon nao encontrado em logs\\daemon\\loop_daemon.state.")
+    $report.Add("- Estado do daemon nao encontrado em logs\\daemon\\runtime\\loop_daemon.state.")
 }
 else {
     foreach ($key in @("status", "last_run_at", "next_run_at", "pid", "detail")) {
@@ -749,6 +780,7 @@ if (-not (Test-Path $reportDir)) {
 }
 
 Set-Content -Path $OutputPath -Value $report -Encoding UTF8
+Limit-RecentFiles -Directory $reportDir -Filter "producao_validacao_24h_*.md" -MaxFiles 20
 
 Write-Output "Relatorio gerado: $OutputPath"
 Write-Output "Veredito: $verdict"

@@ -55,6 +55,28 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class FreteRepository extends AbstractRepository<FreteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FreteRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.FRETES;
+    private static final String NOME_TABELA_STAGING = "#stg_fretes";
+    private static final List<String> COLUNAS_MERGE = List.of(
+        "id", "servico_em", "criado_em", "status", "modal", "tipo_frete", "valor_total", "valor_notas", "peso_notas",
+        "id_corporacao", "id_cidade_destino", "data_previsao_entrega", "service_date", "finished_at",
+        "fit_dpn_performance_finished_at", "corporation_sequence_number", "pagador_id", "pagador_nome",
+        "remetente_id", "remetente_nome", "origem_cidade", "origem_uf", "destinatario_id", "destinatario_nome",
+        "destino_cidade", "destino_uf", "filial_nome", "numero_nota_fiscal", "tabela_preco_nome",
+        "classificacao_nome", "centro_custo_nome", "usuario_nome", "reference_number", "chave_cte", "numero_cte",
+        "serie_cte", "invoices_total_volumes", "taxed_weight", "real_weight", "total_cubic_volume", "subtotal",
+        "accounting_credit_id", "accounting_credit_installment_id", "service_type", "insurance_enabled",
+        "gris_subtotal", "tde_subtotal", "modal_cte", "redispatch_subtotal", "suframa_subtotal", "payment_type",
+        "previous_document_type", "products_value", "trt_subtotal", "nfse_series", "nfse_number", "insurance_id",
+        "other_fees", "km", "payment_accountable_type", "insured_value", "globalized", "sec_cat_subtotal",
+        "globalized_type", "price_table_accountable_type", "insurance_accountable_type", "pagador_documento",
+        "remetente_documento", "destinatario_documento", "filial_cnpj", "cte_issued_at", "cubages_cubed_weight",
+        "freight_weight_subtotal", "ad_valorem_subtotal", "toll_subtotal", "itr_subtotal", "fiscal_cst_type",
+        "fiscal_cfop_code", "fiscal_tax_value", "fiscal_pis_value", "fiscal_cofins_value", "filial_apelido",
+        "cte_id", "cte_emission_type", "cte_created_at", "fiscal_calculation_basis", "fiscal_tax_rate",
+        "fiscal_pis_rate", "fiscal_cofins_rate", "fiscal_has_difal", "fiscal_difal_origin",
+        "fiscal_difal_destination", "metadata", "data_extracao"
+    );
+    private static final List<String> COLUNAS_ATUALIZAVEIS = List.copyOf(COLUNAS_MERGE.subList(1, COLUNAS_MERGE.size()));
     private final FreteNfseUpdateSupport nfseUpdateSupport = new FreteNfseUpdateSupport(logger);
 
     @Override
@@ -65,6 +87,37 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     @Override
     protected boolean aceitarMergeSemAlteracoesComoSucesso(final FreteEntity frete) {
         return true;
+    }
+
+    @Override
+    protected boolean usarStagingPorExecucao() {
+        return true;
+    }
+
+    @Override
+    protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
+        recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+    }
+
+    @Override
+    protected int executarMergeNoDestinoDaExecucao(final Connection conexao, final FreteEntity frete) throws SQLException {
+        return executarMergeEmTabela(conexao, frete, validarNomeTabelaTemporaria(NOME_TABELA_STAGING));
+    }
+
+    @Override
+    protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String freshnessGuard = buildMonotonicUpdateGuard(
+            "COALESCE(CAST(target.cte_created_at AS datetime2), CAST(target.cte_issued_at AS datetime2), CAST(target.criado_em AS datetime2), CAST(target.servico_em AS datetime2))",
+            "COALESCE(CAST(source.cte_created_at AS datetime2), CAST(source.cte_issued_at AS datetime2), CAST(source.criado_em AS datetime2), CAST(source.servico_em AS datetime2))"
+        );
+        return promoverStagingComMerge(
+            conexao,
+            NOME_TABELA_STAGING,
+            "target.id = source.id",
+            freshnessGuard,
+            COLUNAS_MERGE,
+            COLUNAS_ATUALIZAVEIS
+        );
     }
 
     /**
@@ -201,6 +254,12 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
     @Override
     protected int executarMerge(final Connection conexao, final FreteEntity frete) throws SQLException {
+        return executarMergeEmTabela(conexao, frete, qualificarTabelaDestino());
+    }
+
+    private int executarMergeEmTabela(final Connection conexao,
+                                      final FreteEntity frete,
+                                      final String tabelaAlvo) throws SQLException {
         // Para Fretes, o 'id' ÃƒÂ© a ÃƒÂºnica chave confiÃƒÂ¡vel para o MERGE.
         if (frete.getId() == null) {
             throw new SQLException("NÃƒÂ£o ÃƒÂ© possÃƒÂ­vel executar o MERGE para Frete sem um ID.");
@@ -211,7 +270,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             "COALESCE(CAST(source.cte_created_at AS datetime2), CAST(source.cte_issued_at AS datetime2), CAST(source.criado_em AS datetime2), CAST(source.servico_em AS datetime2))"
         );
         final String sql = String.format("""
-            MERGE %s AS target
+            MERGE %s WITH (HOLDLOCK) AS target
             USING (VALUES (
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
@@ -362,7 +421,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         source.filial_apelido, source.cte_id, source.cte_emission_type, source.cte_created_at,
                         source.fiscal_calculation_basis, source.fiscal_tax_rate, source.fiscal_pis_rate, source.fiscal_cofins_rate, source.fiscal_has_difal, source.fiscal_difal_origin, source.fiscal_difal_destination,
                         source.metadata, source.data_extracao);
-            """, NOME_TABELA, freshnessGuard);
+            """, tabelaAlvo, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parÃƒÂ¢metros de forma segura e na ordem correta.
@@ -474,11 +533,6 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setBigDecimal(paramIndex++, frete.getFiscalDifalDestination());
             statement.setString(paramIndex++, frete.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now());
-            final int expected = statement.getParameterMetaData().getParameterCount();
-            if ((paramIndex - 1) != expected) {
-                throw new SQLException(String.format("NÃƒÂºmero incorreto de parÃƒÂ¢metros: esperado %d, definido %d", expected, (paramIndex - 1)));
-            }
-
             final int rowsAffected = statement.executeUpdate();
             logger.debug("MERGE executado para Frete ID {}: {} linha(s) afetada(s)", frete.getId(), rowsAffected);
             return rowsAffected;
