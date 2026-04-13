@@ -327,6 +327,8 @@ public final class ConfigEtl {
         final long padrao;
         if ("USUARIOS_SISTEMA".equals(chave)) {
             padrao = 1_800_000L;
+        } else if ("FRETES".equals(chave)) {
+            padrao = 900_000L;
         } else if ("FATURAS_GRAPHQL".equals(chave)) {
             padrao = 7_200_000L;
         } else {

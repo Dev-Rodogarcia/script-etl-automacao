@@ -22,6 +22,36 @@ class ConfigEtlTest {
     }
 
     @Test
+    void deveUsarTimeoutEspecificoParaFretes() {
+        final String propriedadeLegada = "etl.graphql.timeout.entidade.fretes.ms";
+        final String propriedadeEnv = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_FRETES_MS";
+        final String valorLegadoAnterior = System.getProperty(propriedadeLegada);
+        final String valorEnvAnterior = System.getProperty(propriedadeEnv);
+        try {
+            System.clearProperty(propriedadeLegada);
+            System.clearProperty(propriedadeEnv);
+
+            assertEquals(Duration.ofMinutes(15), ConfigEtl.obterTimeoutEntidadeGraphQL("fretes"));
+        } finally {
+            restaurarPropriedade(propriedadeLegada, valorLegadoAnterior);
+            restaurarPropriedade(propriedadeEnv, valorEnvAnterior);
+        }
+    }
+
+    @Test
+    void deveRespeitarOverrideDoTimeoutDeFretes() {
+        final String chave = "etl.graphql.timeout.entidade.fretes.ms";
+        final String valorAnterior = System.getProperty(chave);
+        try {
+            System.setProperty(chave, "1020000");
+
+            assertEquals(Duration.ofMinutes(17), ConfigEtl.obterTimeoutEntidadeGraphQL("fretes"));
+        } finally {
+            restaurarPropriedade(chave, valorAnterior);
+        }
+    }
+
+    @Test
     void deveRespeitarOverrideDoTimeoutReferencialDeColetas() {
         final String chave = "etl.graphql.timeout.entidade.coletas_referencial.ms";
         final String valorAnterior = System.getProperty(chave);

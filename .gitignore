@@ -11,6 +11,7 @@ database/config.bat
 
 # Ferramentas locais de desenvolvimento (machine-specific)
 .claude/settings.local.json
+.codex-local/
 .tmp/
 .maven-clean/
 .history/
