@@ -55,6 +55,8 @@ class DaemonStateStoreTest {
         assertEquals(321L, pidEstado.getAsLong());
         assertEquals("RUNNING", estado.getProperty("status"));
         assertEquals("detalhe", estado.getProperty("detail"));
+        assertEquals("0", estado.getProperty("consecutive_alert_cycles"));
+        assertEquals("0", estado.getProperty("consecutive_non_success_cycles"));
     }
 
     @Test
@@ -74,6 +76,27 @@ class DaemonStateStoreTest {
         store.clearFileIfExists(store.getForceRunFile());
         assertFalse(store.stopRequested());
         assertFalse(store.forceRunRequested());
+    }
+
+    @Test
+    void devePersistirContadoresOperacionaisDoDaemon() {
+        final DaemonStateStore store = novoStore();
+
+        store.saveState(
+            "WAITING_MANUAL_INTERVENTION",
+            111L,
+            "limite atingido",
+            "2026-04-13T00:10:00",
+            "2026-04-13T00:40:00",
+            3,
+            3
+        );
+
+        final Properties estado = store.loadState();
+        assertEquals("3", estado.getProperty("consecutive_alert_cycles"));
+        assertEquals("3", estado.getProperty("consecutive_non_success_cycles"));
+        assertEquals(3, store.readConsecutiveAlertCycles());
+        assertEquals(3, store.readConsecutiveNonSuccessCycles());
     }
 
     private DaemonStateStore novoStore() {

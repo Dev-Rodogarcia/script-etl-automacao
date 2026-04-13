@@ -173,6 +173,25 @@ public final class DaemonStateStore {
                           final String detalhe,
                           final String lastRunAt,
                           final String nextRunAt) {
+        final Properties estadoAtual = loadState();
+        saveState(
+            status,
+            pid,
+            detalhe,
+            lastRunAt,
+            nextRunAt,
+            parseIntProperty(estadoAtual, "consecutive_alert_cycles"),
+            parseIntProperty(estadoAtual, "consecutive_non_success_cycles")
+        );
+    }
+
+    public void saveState(final String status,
+                          final long pid,
+                          final String detalhe,
+                          final String lastRunAt,
+                          final String nextRunAt,
+                          final int consecutiveAlertCycles,
+                          final int consecutiveNonSuccessCycles) {
         final Properties properties = new Properties();
         properties.setProperty("status", status);
         properties.setProperty("pid", pid > 0 ? String.valueOf(pid) : "");
@@ -180,6 +199,8 @@ public final class DaemonStateStore {
         properties.setProperty("updated_at", LocalDateTime.now().toString());
         properties.setProperty("last_run_at", lastRunAt == null ? "" : lastRunAt);
         properties.setProperty("next_run_at", nextRunAt == null ? "" : nextRunAt);
+        properties.setProperty("consecutive_alert_cycles", String.valueOf(Math.max(0, consecutiveAlertCycles)));
+        properties.setProperty("consecutive_non_success_cycles", String.valueOf(Math.max(0, consecutiveNonSuccessCycles)));
 
         try {
             ensureDaemonDirectory();
@@ -199,6 +220,14 @@ public final class DaemonStateStore {
         }
     }
 
+    public int readConsecutiveAlertCycles() {
+        return parseIntProperty(loadState(), "consecutive_alert_cycles");
+    }
+
+    public int readConsecutiveNonSuccessCycles() {
+        return parseIntProperty(loadState(), "consecutive_non_success_cycles");
+    }
+
     public void syncPidFile(final long pid) {
         if (pid <= 0) {
             return;
@@ -214,6 +243,21 @@ public final class DaemonStateStore {
     private void ensureParentDirectory(final Path directory) throws IOException {
         if (directory != null && !Files.exists(directory)) {
             Files.createDirectories(directory);
+        }
+    }
+
+    private int parseIntProperty(final Properties properties, final String key) {
+        if (properties == null) {
+            return 0;
+        }
+        final String raw = properties.getProperty(key, "").trim();
+        if (raw.isEmpty()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(raw));
+        } catch (final NumberFormatException e) {
+            return 0;
         }
     }
 }

@@ -190,20 +190,26 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.COTACOES
         ));
+        final LocalDate periodoInicio = LocalDate.of(2026, 4, 7);
+        final LocalDate periodoFim = LocalDate.of(2026, 4, 8);
         final LocalDateTime inicioValidacao = LocalDateTime.of(2026, 4, 8, 14, 29, 37);
 
         final Optional<String> executionUuid = repository.resolverExecutionUuidAncora(
             conexao,
             entidades,
+            periodoInicio,
+            periodoFim,
             inicioValidacao
         );
 
         assertTrue(executionUuid.isPresent());
         assertEquals("exec-intervalo-mais-recente", executionUuid.get());
         assertEquals(Timestamp.valueOf(inicioValidacao), captured.get(1));
-        assertEquals(ConstantesEntidades.FRETES, captured.get(2));
-        assertEquals(ConstantesEntidades.COLETAS, captured.get(3));
-        assertEquals(ConstantesEntidades.COTACOES, captured.get(4));
+        assertEquals(Timestamp.valueOf(periodoInicio.atStartOfDay()), captured.get(2));
+        assertEquals(Timestamp.valueOf(periodoFim.plusDays(1).atStartOfDay()), captured.get(3));
+        assertEquals(ConstantesEntidades.FRETES, captured.get(4));
+        assertEquals(ConstantesEntidades.COLETAS, captured.get(5));
+        assertEquals(ConstantesEntidades.COTACOES, captured.get(6));
     }
 
     private Connection criarConexao(final StatementFactory factory) {

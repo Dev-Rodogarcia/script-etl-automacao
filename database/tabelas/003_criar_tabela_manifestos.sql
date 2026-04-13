@@ -175,9 +175,38 @@ ELSE IF EXISTS (
       )
 )
 BEGIN
-    PRINT 'AVISO: FK seletiva manifestos -> coletas não criada porque existem manifestos órfãos.';
+    UPDATE m
+       SET pick_sequence_code = NULL
+      FROM dbo.manifestos m
+     WHERE m.pick_sequence_code IS NOT NULL
+       AND NOT EXISTS (
+          SELECT 1
+            FROM dbo.coletas c
+           WHERE c.sequence_code = m.pick_sequence_code
+      );
+    PRINT 'Manifestos órfãos normalizados com pick_sequence_code = NULL antes da FK.';
 END
-ELSE
+
+IF EXISTS (
+    SELECT 1
+    FROM dbo.manifestos m
+    WHERE m.pick_sequence_code IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1
+            FROM dbo.coletas c
+           WHERE c.sequence_code = m.pick_sequence_code
+      )
+)
+BEGIN
+    THROW 51003, 'Persistem manifestos órfãos após normalização; abortando criação da FK.', 1;
+END
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.foreign_keys
+    WHERE name = 'FK_manifestos_pick_sequence_code_coletas'
+      AND parent_object_id = OBJECT_ID('dbo.manifestos')
+)
 BEGIN
     ALTER TABLE dbo.manifestos WITH CHECK
         ADD CONSTRAINT FK_manifestos_pick_sequence_code_coletas

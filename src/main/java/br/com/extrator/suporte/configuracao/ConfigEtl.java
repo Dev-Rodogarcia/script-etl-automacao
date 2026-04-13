@@ -243,6 +243,70 @@ public final class ConfigEtl {
         return valor != null && Boolean.parseBoolean(valor.trim().toLowerCase(Locale.ROOT));
     }
 
+    public static boolean isFretePruneGuardrailAtivo() {
+        return obterBooleanComFallback(
+            "ETL_FRETES_PRUNE_GUARDRAIL_ENABLED",
+            "etl.fretes.prune.guardrail.enabled",
+            true
+        );
+    }
+
+    public static int obterFretePruneBaselineMinRegistros() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_FRETES_PRUNE_GUARDRAIL_BASELINE_MIN_REGISTROS",
+                "etl.fretes.prune.guardrail.baseline.min_registros"
+            ),
+            100,
+            value -> value >= 0,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static double obterFretePruneGuardrailMinRatio() {
+        return ConfigValueParser.parseDouble(
+            ConfigSource.obterConfiguracao(
+                "ETL_FRETES_PRUNE_GUARDRAIL_MIN_RATIO",
+                "etl.fretes.prune.guardrail.min_ratio"
+            ),
+            0.30d,
+            value -> value >= 0.0d && value <= 1.0d,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static int obterFretePruneHistoricoExecucoes() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_FRETES_PRUNE_GUARDRAIL_HISTORICO_EXECUCOES",
+                "etl.fretes.prune.guardrail.historico_execucoes"
+            ),
+            7,
+            value -> value > 0,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static int obterFretePruneMinAusenciasConsecutivas() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_FRETES_PRUNE_MIN_AUSENCIAS_CONSECUTIVAS",
+                "etl.fretes.prune.min_ausencias_consecutivas"
+            ),
+            2,
+            value -> value > 0,
+            null,
+            null,
+            null
+        );
+    }
+
     public static int obterTimeoutLockExecucaoMs() {
         return ConfigValueParser.parseInt(
             System.getProperty("etl.execution.lock.timeout.ms") != null
@@ -388,6 +452,34 @@ public final class ConfigEtl {
             "ETL_DAEMON_CYCLE_TIMEOUT_MS",
             "etl.daemon.cycle.timeout.ms",
             3_600_000L
+        ));
+    }
+
+    public static int obterLoopDaemonMaxConsecutiveAlertCycles() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "LOOP_DAEMON_MAX_CONSECUTIVE_ALERT_CYCLES",
+                "loop.daemon.max_consecutive_alert_cycles"
+            ),
+            3,
+            value -> value > 0,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static Duration obterRecoveryReplayIdempotencyTtl() {
+        return Duration.ofHours(ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_RECOVERY_REPLAY_IDEMPOTENCY_TTL_HOURS",
+                "etl.recovery.replay.idempotency.ttl.hours"
+            ),
+            12,
+            value -> value > 0,
+            null,
+            null,
+            null
         ));
     }
 

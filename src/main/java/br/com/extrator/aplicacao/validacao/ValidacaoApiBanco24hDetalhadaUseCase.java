@@ -138,7 +138,13 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
                 entidadesSolicitadas.add(entidade.entidade());
             }
             final Optional<String> executionUuidAncora =
-                repository.resolverExecutionUuidAncora(conexao, entidadesSolicitadas, inicioValidacao);
+                repository.resolverExecutionUuidAncora(
+                    conexao,
+                    entidadesSolicitadas,
+                    dataInicio,
+                    dataFim,
+                    inicioValidacao
+                );
             executionUuidAncora.ifPresent(executionUuid ->
                 log.info("Execution UUID ancora da validacao detalhada: {}", executionUuid)
             );

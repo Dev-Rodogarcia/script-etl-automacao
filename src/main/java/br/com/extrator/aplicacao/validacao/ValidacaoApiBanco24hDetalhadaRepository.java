@@ -187,14 +187,23 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
 
     Optional<String> resolverExecutionUuidAncora(final Connection conexao,
                                                  final Set<String> entidades,
+                                                 final LocalDate periodoInicio,
+                                                 final LocalDate periodoFim,
                                                  final LocalDateTime validacaoIniciadaEm) throws SQLException {
-        if (conexao == null || entidades == null || entidades.isEmpty() || validacaoIniciadaEm == null) {
+        if (conexao == null
+            || entidades == null
+            || entidades.isEmpty()
+            || periodoInicio == null
+            || periodoFim == null
+            || validacaoIniciadaEm == null) {
             return Optional.empty();
         }
         if (!tabelaExiste(conexao, "sys_execution_audit")) {
             return Optional.empty();
         }
 
+        final LocalDateTime janelaConsultaInicio = periodoInicio.atStartOfDay();
+        final LocalDateTime janelaConsultaFim = periodoFim.plusDays(1).atStartOfDay();
         final String placeholders = String.join(",", Collections.nCopies(entidades.size(), "?"));
         final String sql = """
             WITH candidatos AS (
@@ -207,7 +216,9 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                   AND finished_at <= ?
                   AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
                   AND api_completa = 1
-                  AND command_name IN ('--fluxo-completo', '--extracao-intervalo', '--executar-step-isolado')
+                  AND command_name IN ('--fluxo-completo', '--extracao-intervalo', '--executar-step-isolado', '--loop-daemon-run', '--recovery')
+                  AND janela_consulta_inicio = ?
+                  AND janela_consulta_fim = ?
                   AND entidade IN (%s)
                 GROUP BY execution_uuid
             )
@@ -219,6 +230,8 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             int parametro = 1;
             stmt.setTimestamp(parametro++, Timestamp.valueOf(validacaoIniciadaEm));
+            stmt.setTimestamp(parametro++, Timestamp.valueOf(janelaConsultaInicio));
+            stmt.setTimestamp(parametro++, Timestamp.valueOf(janelaConsultaFim));
             for (final String entidade : entidades) {
                 stmt.setString(parametro++, entidade);
             }

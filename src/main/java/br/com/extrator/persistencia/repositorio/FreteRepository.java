@@ -36,14 +36,18 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.persistencia.entidade.FreteEntity;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
@@ -56,6 +60,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FreteRepository.class);
     private static final String NOME_TABELA = ConstantesEntidades.FRETES;
     private static final String NOME_TABELA_STAGING = "#stg_fretes";
+    private static final String NOME_TABELA_QUARENTENA = "dbo.sys_reconciliation_quarantine";
+    private static final String ENTIDADE_QUARENTENA = "fretes";
     private static final List<String> COLUNAS_MERGE = List.of(
         "id", "servico_em", "criado_em", "status", "modal", "tipo_frete", "valor_total", "valor_notas", "peso_notas",
         "id_corporacao", "id_cidade_destino", "data_previsao_entrega", "service_date", "finished_at",
@@ -176,23 +182,15 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 .distinct()
                 .toList();
 
-        final String sqlDelete = """
-            DELETE f
-            FROM dbo.fretes f
-            WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
-              AND NOT EXISTS (
-                    SELECT 1
-                    FROM #fretes_periodo_api_ids ids
-                    WHERE ids.id = f.id
-              )
-            """;
-
         try (Connection conexao = obterConexao()) {
             final boolean autoCommitOriginal = conexao.getAutoCommit();
             conexao.setAutoCommit(false);
             try {
+                final boolean tabelaQuarentenaDisponivel = tabelaExiste(conexao, NOME_TABELA_QUARENTENA);
                 try (Statement stmt = conexao.createStatement()) {
                     stmt.execute("CREATE TABLE #fretes_periodo_api_ids (id BIGINT NOT NULL PRIMARY KEY)");
+                    stmt.execute("CREATE TABLE #fretes_periodo_candidatos (id BIGINT NOT NULL PRIMARY KEY)");
+                    stmt.execute("CREATE TABLE #fretes_periodo_delete (id BIGINT NOT NULL PRIMARY KEY)");
                 }
 
                 if (!idsNormalizados.isEmpty()) {
@@ -214,11 +212,90 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     }
                 }
 
-                final int removidos;
-                try (PreparedStatement delete = conexao.prepareStatement(sqlDelete)) {
-                    delete.setObject(1, dataInicio, Types.DATE);
-                    delete.setObject(2, dataFim, Types.DATE);
-                    removidos = delete.executeUpdate();
+                final int candidatos = popularCandidatosAusentes(conexao, dataInicio, dataFim);
+                if (candidatos == 0) {
+                    if (tabelaQuarentenaDisponivel) {
+                        liberarRegistrosPresentesNaQuarentena(conexao, dataInicio, dataFim, now(), null, null);
+                    }
+                    conexao.commit();
+                    logger.info(
+                        "Reconciliacao de fretes por periodo concluida sem ausencias: periodo={}..{} | ids_api={} | removidos=0",
+                        dataInicio,
+                        dataFim,
+                        idsNormalizados.size()
+                    );
+                    return 0;
+                }
+
+                if (!tabelaQuarentenaDisponivel) {
+                    logger.error(
+                        "Prune de fretes bloqueado: tabela de quarentena {} ausente. periodo={}..{} | candidatos={}",
+                        NOME_TABELA_QUARENTENA,
+                        dataInicio,
+                        dataFim,
+                        candidatos
+                    );
+                    conexao.rollback();
+                    return 0;
+                }
+
+                final List<Integer> volumesHistoricos = buscarVolumesHistoricosComparaveis(
+                    conexao,
+                    diasDaJanela(dataInicio, dataFim),
+                    ConfigEtl.obterFretePruneHistoricoExecucoes()
+                );
+                final FretePruneGuardrailEvaluator.Decision decision = avaliarGuardrail(volumesHistoricos, idsNormalizados.size());
+                final LocalDateTime agora = now();
+                final String executionUuid = currentExecutionId();
+                final String cycleId = currentCycleId();
+
+                liberarRegistrosPresentesNaQuarentena(conexao, dataInicio, dataFim, agora, executionUuid, cycleId);
+
+                final boolean executarDelete = decision.allowDeletion() || !ConfigEtl.isFretePruneGuardrailAtivo();
+                registrarCandidatosNaQuarentena(
+                    conexao,
+                    dataInicio,
+                    dataFim,
+                    agora,
+                    executionUuid,
+                    cycleId,
+                    executarDelete,
+                    buildGuardrailReason(decision)
+                );
+
+                if (!executarDelete) {
+                    conexao.commit();
+                    logger.warn(
+                        "Prune de fretes bloqueado por guardrail: periodo={}..{} | ids_api={} | candidatos={} | baseline_mediana={} | ratio={}",
+                        dataInicio,
+                        dataFim,
+                        idsNormalizados.size(),
+                        candidatos,
+                        decision.baselineMedian(),
+                        String.format(Locale.US, "%.3f", decision.currentToBaselineRatio())
+                    );
+                    return 0;
+                }
+
+                final int removidos = deletarCandidatosElegiveis(
+                    conexao,
+                    dataInicio,
+                    dataFim,
+                    agora,
+                    executionUuid,
+                    cycleId,
+                    ConfigEtl.obterFretePruneMinAusenciasConsecutivas()
+                );
+
+                if (candidatos > removidos) {
+                    logger.info(
+                        "Quarentena de prune de fretes atualizada sem delete imediato: periodo={}..{} | candidatos={} | removidos={} | minimo_ausencias={}",
+                        dataInicio,
+                        dataFim,
+                        candidatos,
+                        removidos,
+                        ConfigEtl.obterFretePruneMinAusenciasConsecutivas()
+                    );
                 }
 
                 conexao.commit();
@@ -237,6 +314,286 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 conexao.setAutoCommit(autoCommitOriginal);
             }
         }
+    }
+
+    private FretePruneGuardrailEvaluator.Decision avaliarGuardrail(final List<Integer> volumesHistoricos,
+                                                                   final int volumeAtual) {
+        final FretePruneGuardrailEvaluator evaluator = new FretePruneGuardrailEvaluator(
+            ConfigEtl.obterFretePruneGuardrailMinRatio(),
+            ConfigEtl.obterFretePruneBaselineMinRegistros()
+        );
+        if (!ConfigEtl.isFretePruneGuardrailAtivo()) {
+            return new FretePruneGuardrailEvaluator.Decision(true, null, 0, 1.0d);
+        }
+        return evaluator.evaluate(volumesHistoricos, volumeAtual);
+    }
+
+    private List<Integer> buscarVolumesHistoricosComparaveis(final Connection conexao,
+                                                             final int diasJanela,
+                                                             final int limite) throws SQLException {
+        final String sql = """
+            SELECT TOP (?) api_total_unico
+              FROM dbo.sys_execution_audit
+             WHERE entidade = ?
+               AND api_completa = 1
+               AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
+               AND api_total_unico >= 0
+               AND janela_consulta_inicio IS NOT NULL
+               AND janela_consulta_fim IS NOT NULL
+               AND DATEDIFF(DAY, CAST(janela_consulta_inicio AS date), CAST(janela_consulta_fim AS date)) + 1 = ?
+             ORDER BY finished_at DESC
+            """;
+        final List<Integer> volumes = new ArrayList<>();
+        if (!tabelaExiste(conexao, "dbo.sys_execution_audit")) {
+            return volumes;
+        }
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            ps.setInt(1, Math.max(1, limite));
+            ps.setString(2, ConstantesEntidades.FRETES);
+            ps.setInt(3, Math.max(1, diasJanela));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    volumes.add(rs.getInt("api_total_unico"));
+                }
+            }
+        }
+        return volumes;
+    }
+
+    private int popularCandidatosAusentes(final Connection conexao,
+                                          final LocalDate dataInicio,
+                                          final LocalDate dataFim) throws SQLException {
+        final String sql = """
+            INSERT INTO #fretes_periodo_candidatos (id)
+            SELECT f.id
+              FROM dbo.fretes f
+             WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
+               AND NOT EXISTS (
+                     SELECT 1
+                       FROM #fretes_periodo_api_ids ids
+                      WHERE ids.id = f.id
+               )
+            """;
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            ps.setObject(1, dataInicio, Types.DATE);
+            ps.setObject(2, dataFim, Types.DATE);
+            return ps.executeUpdate();
+        }
+    }
+
+    private void liberarRegistrosPresentesNaQuarentena(final Connection conexao,
+                                                       final LocalDate dataInicio,
+                                                       final LocalDate dataFim,
+                                                       final LocalDateTime agora,
+                                                       final String executionUuid,
+                                                       final String cycleId) throws SQLException {
+        final String sql = """
+            UPDATE q
+               SET released_at = ?,
+                   release_reason = 'PRESENTE_NA_API',
+                   last_guardrail_reason = NULL,
+                   last_execution_uuid = COALESCE(?, last_execution_uuid),
+                   last_cycle_id = COALESCE(?, last_cycle_id),
+                   updated_at = SYSDATETIME()
+              FROM dbo.sys_reconciliation_quarantine q
+              JOIN #fretes_periodo_api_ids ids
+                ON ids.id = q.record_id
+             WHERE q.entity_name = ?
+               AND q.window_start = ?
+               AND q.window_end = ?
+               AND q.released_at IS NULL
+            """;
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            ps.setTimestamp(1, java.sql.Timestamp.valueOf(agora));
+            ps.setString(2, executionUuid);
+            ps.setString(3, cycleId);
+            ps.setString(4, ENTIDADE_QUARENTENA);
+            ps.setObject(5, dataInicio, Types.DATE);
+            ps.setObject(6, dataFim, Types.DATE);
+            ps.executeUpdate();
+        }
+    }
+
+    private void registrarCandidatosNaQuarentena(final Connection conexao,
+                                                 final LocalDate dataInicio,
+                                                 final LocalDate dataFim,
+                                                 final LocalDateTime agora,
+                                                 final String executionUuid,
+                                                 final String cycleId,
+                                                 final boolean contarAusencia,
+                                                 final String guardrailReason) throws SQLException {
+        final String sql = """
+            MERGE dbo.sys_reconciliation_quarantine AS target
+            USING (
+                SELECT id
+                  FROM #fretes_periodo_candidatos
+            ) AS source
+               ON target.entity_name = ?
+              AND target.record_id = source.id
+              AND target.window_start = ?
+              AND target.window_end = ?
+            WHEN MATCHED THEN
+                UPDATE SET
+                    first_seen_absent_at = CASE WHEN target.released_at IS NULL THEN target.first_seen_absent_at ELSE ? END,
+                    last_seen_absent_at = ?,
+                    absence_hits = CASE
+                        WHEN ? = 1 THEN CASE WHEN target.released_at IS NULL THEN target.absence_hits + 1 ELSE 1 END
+                        ELSE CASE WHEN target.released_at IS NULL THEN target.absence_hits ELSE 0 END
+                    END,
+                    first_execution_uuid = CASE WHEN target.released_at IS NULL THEN target.first_execution_uuid ELSE ? END,
+                    last_execution_uuid = ?,
+                    first_cycle_id = CASE WHEN target.released_at IS NULL THEN target.first_cycle_id ELSE ? END,
+                    last_cycle_id = ?,
+                    released_at = NULL,
+                    release_reason = NULL,
+                    last_guardrail_reason = ?,
+                    updated_at = SYSDATETIME()
+            WHEN NOT MATCHED THEN
+                INSERT (
+                    entity_name, record_id, window_start, window_end,
+                    first_seen_absent_at, last_seen_absent_at, absence_hits,
+                    first_execution_uuid, last_execution_uuid, first_cycle_id, last_cycle_id,
+                    released_at, release_reason, last_guardrail_reason
+                )
+                VALUES (
+                    ?, source.id, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?,
+                    NULL, NULL, ?
+                );
+            """;
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            int index = 1;
+            ps.setString(index++, ENTIDADE_QUARENTENA);
+            ps.setObject(index++, dataInicio, Types.DATE);
+            ps.setObject(index++, dataFim, Types.DATE);
+            ps.setTimestamp(index++, java.sql.Timestamp.valueOf(agora));
+            ps.setTimestamp(index++, java.sql.Timestamp.valueOf(agora));
+            ps.setInt(index++, contarAusencia ? 1 : 0);
+            ps.setString(index++, executionUuid);
+            ps.setString(index++, executionUuid);
+            ps.setString(index++, cycleId);
+            ps.setString(index++, cycleId);
+            ps.setString(index++, guardrailReason);
+            ps.setString(index++, ENTIDADE_QUARENTENA);
+            ps.setObject(index++, dataInicio, Types.DATE);
+            ps.setObject(index++, dataFim, Types.DATE);
+            ps.setTimestamp(index++, java.sql.Timestamp.valueOf(agora));
+            ps.setTimestamp(index++, java.sql.Timestamp.valueOf(agora));
+            ps.setInt(index++, contarAusencia ? 1 : 0);
+            ps.setString(index++, executionUuid);
+            ps.setString(index++, executionUuid);
+            ps.setString(index++, cycleId);
+            ps.setString(index++, cycleId);
+            ps.setString(index++, guardrailReason);
+            ps.executeUpdate();
+        }
+    }
+
+    private int deletarCandidatosElegiveis(final Connection conexao,
+                                           final LocalDate dataInicio,
+                                           final LocalDate dataFim,
+                                           final LocalDateTime agora,
+                                           final String executionUuid,
+                                           final String cycleId,
+                                           final int minimoAusencias) throws SQLException {
+        final String sqlPopularDelete = """
+            INSERT INTO #fretes_periodo_delete (id)
+            SELECT q.record_id
+              FROM dbo.sys_reconciliation_quarantine q
+              JOIN #fretes_periodo_candidatos c
+                ON c.id = q.record_id
+             WHERE q.entity_name = ?
+               AND q.window_start = ?
+               AND q.window_end = ?
+               AND q.released_at IS NULL
+               AND q.absence_hits >= ?
+            """;
+        try (PreparedStatement ps = conexao.prepareStatement(sqlPopularDelete)) {
+            ps.setString(1, ENTIDADE_QUARENTENA);
+            ps.setObject(2, dataInicio, Types.DATE);
+            ps.setObject(3, dataFim, Types.DATE);
+            ps.setInt(4, Math.max(1, minimoAusencias));
+            ps.executeUpdate();
+        }
+
+        final String sqlDelete = """
+            DELETE f
+              FROM dbo.fretes f
+              JOIN #fretes_periodo_delete d
+                ON d.id = f.id
+             WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
+            """;
+        final int removidos;
+        try (PreparedStatement ps = conexao.prepareStatement(sqlDelete)) {
+            ps.setObject(1, dataInicio, Types.DATE);
+            ps.setObject(2, dataFim, Types.DATE);
+            removidos = ps.executeUpdate();
+        }
+
+        if (removidos > 0) {
+            final String sqlAtualizarQuarentena = """
+                UPDATE q
+                   SET released_at = ?,
+                       release_reason = 'PRUNE_DELETE',
+                       last_guardrail_reason = NULL,
+                       last_execution_uuid = COALESCE(?, last_execution_uuid),
+                       last_cycle_id = COALESCE(?, last_cycle_id),
+                       updated_at = SYSDATETIME()
+                  FROM dbo.sys_reconciliation_quarantine q
+                  JOIN #fretes_periodo_delete d
+                    ON d.id = q.record_id
+                 WHERE q.entity_name = ?
+                   AND q.window_start = ?
+                   AND q.window_end = ?
+                   AND q.released_at IS NULL
+                """;
+            try (PreparedStatement ps = conexao.prepareStatement(sqlAtualizarQuarentena)) {
+                ps.setTimestamp(1, java.sql.Timestamp.valueOf(agora));
+                ps.setString(2, executionUuid);
+                ps.setString(3, cycleId);
+                ps.setString(4, ENTIDADE_QUARENTENA);
+                ps.setObject(5, dataInicio, Types.DATE);
+                ps.setObject(6, dataFim, Types.DATE);
+                ps.executeUpdate();
+            }
+        }
+        return removidos;
+    }
+
+    private String buildGuardrailReason(final FretePruneGuardrailEvaluator.Decision decision) {
+        if (decision == null || decision.blockReason() == null) {
+            return null;
+        }
+        return decision.blockReason().name();
+    }
+
+    private int diasDaJanela(final LocalDate dataInicio, final LocalDate dataFim) {
+        return (int) java.time.temporal.ChronoUnit.DAYS.between(dataInicio, dataFim) + 1;
+    }
+
+    private boolean tabelaExiste(final Connection conexao, final String nomeTabela) throws SQLException {
+        final String sql = "SELECT CASE WHEN OBJECT_ID(?, 'U') IS NULL THEN 0 ELSE 1 END";
+        try (PreparedStatement ps = conexao.prepareStatement(sql)) {
+            ps.setString(1, nomeTabela);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.now();
+    }
+
+    private String currentExecutionId() {
+        final String executionUuid = ExecutionContext.currentExecutionId();
+        return "n/a".equalsIgnoreCase(executionUuid) ? null : executionUuid;
+    }
+
+    private String currentCycleId() {
+        final String cycleId = ExecutionContext.currentCycleId();
+        return "n/a".equalsIgnoreCase(cycleId) ? null : cycleId;
     }
 
     /**

@@ -129,11 +129,12 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         LoopDaemonHandlerSupport.garantirDiretorioLogs(stateStore, historyWriter);
         stateStore.clearFileIfExists(stateStore.getStopFile());
         stateStore.clearFileIfExists(stateStore.getForceRunFile());
+        final int limiteAlertasConsecutivos = ConfigEtl.obterLoopDaemonMaxConsecutiveAlertCycles();
 
         final long pid = pidSupplier.getAsLong();
         final String modoFaturas = LoopDaemonHandlerSupport.descreverModoFaturas(incluirFaturasGraphQL);
         stateStore.syncPidFile(pid);
-        stateStore.saveState("RUNNING", pid, "Daemon iniciado e aguardando ciclos. " + modoFaturas, null, null);
+        stateStore.saveState("RUNNING", pid, "Daemon iniciado e aguardando ciclos. " + modoFaturas, null, null, 0, 0);
 
         if (registrarShutdownHook) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -167,6 +168,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             );
 
             boolean sucesso = true;
+            boolean cicloComAlertaIntegridade = false;
             String detalhe = "Ciclo concluido com sucesso.";
             try {
                 try (AutoCloseable ignored = teeFactory.abrir(cicloLog)) {
@@ -177,6 +179,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             } catch (final Exception e) {
                 if (LoopDaemonHandlerSupport.ehFalhaIntegridadeOperacional(e)) {
                     sucesso = true;
+                    cicloComAlertaIntegridade = true;
                     detalhe = "Ciclo concluido com alerta de integridade [cycle_id=" + cycleId + "]: "
                         + historyWriter.summarizeMessage(e.getMessage());
                     System.err.println("ALERTA LOOP: Falha de integridade detectada. O loop continuara no proximo ciclo.");
@@ -213,15 +216,42 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             historyWriter.registerCompatibilityHistory(resumoCiclo);
 
             final LocalDateTime proximo = fim.plusMinutes(intervaloMinutos);
-            final String statusDaemon = determinarStatusDaemon(sucesso, resumoReconciliacao);
+            final boolean falhaReconciliacao = houveFalhaReconciliacao(resumoReconciliacao);
+            final boolean cicloSaudavel = sucesso && !cicloComAlertaIntegridade && !falhaReconciliacao;
+            final int consecutiveAlertCycles = cicloComAlertaIntegridade
+                ? stateStore.readConsecutiveAlertCycles() + 1
+                : 0;
+            final int consecutiveNonSuccessCycles = cicloSaudavel
+                ? 0
+                : stateStore.readConsecutiveNonSuccessCycles() + 1;
+            final boolean waitingManualIntervention = consecutiveAlertCycles >= limiteAlertasConsecutivos
+                || consecutiveNonSuccessCycles >= limiteAlertasConsecutivos;
+            final String statusDaemon = waitingManualIntervention
+                ? "WAITING_MANUAL_INTERVENTION"
+                : determinarStatusDaemon(sucesso, cicloComAlertaIntegridade, resumoReconciliacao);
+            final String detalheOperacional = adicionarContadoresOperacionais(
+                resumoCiclo.getDetalhe(),
+                consecutiveAlertCycles,
+                consecutiveNonSuccessCycles,
+                limiteAlertasConsecutivos,
+                waitingManualIntervention
+            );
             stateStore.saveState(
                 statusDaemon,
                 pid,
-                resumoCiclo.getDetalhe() + " cycle_id=" + cycleId + " " + modoFaturas + " | log_ciclo=" + cicloLog.toAbsolutePath(),
+                detalheOperacional + " cycle_id=" + cycleId + " " + modoFaturas + " | log_ciclo=" + cicloLog.toAbsolutePath(),
                 fim.toString(),
-                proximo.toString()
+                proximo.toString(),
+                consecutiveAlertCycles,
+                consecutiveNonSuccessCycles
             );
             ExecutionContext.clearCycleId();
+            if (waitingManualIntervention) {
+                System.err.println(
+                    "ALERTA LOOP: limite de degradacao atingido. O daemon foi colocado em WAITING_MANUAL_INTERVENTION."
+                );
+                break;
+            }
 
             final WaitResult resultadoEspera = waitStrategy.aguardar(proximo, stateStore);
             if (resultadoEspera == WaitResult.STOP_REQUESTED) {
@@ -245,10 +275,16 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     }
 
     static String determinarStatusDaemon(final boolean sucesso, final ReconciliationSummary resumoReconciliacao) {
-        final boolean falhaReconciliacao = resumoReconciliacao != null
-            && resumoReconciliacao.isAtivo()
-            && resumoReconciliacao.getFalhas() > 0;
-        return (sucesso && !falhaReconciliacao) ? "WAITING_NEXT_CYCLE" : "WAITING_NEXT_CYCLE_WITH_ERROR";
+        return determinarStatusDaemon(sucesso, false, resumoReconciliacao);
+    }
+
+    static String determinarStatusDaemon(final boolean sucesso,
+                                         final boolean cicloComAlertaIntegridade,
+                                         final ReconciliationSummary resumoReconciliacao) {
+        final boolean falhaReconciliacao = houveFalhaReconciliacao(resumoReconciliacao);
+        return (sucesso && !falhaReconciliacao && !cicloComAlertaIntegridade)
+            ? "WAITING_NEXT_CYCLE"
+            : "WAITING_NEXT_CYCLE_WITH_ERROR";
     }
 
     private ReconciliationSummary processarReconciliacao(final LocalDateTime inicio,
@@ -287,6 +323,26 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         }
         detalhe.append("]");
         return detalhe.toString();
+    }
+
+    private String adicionarContadoresOperacionais(final String detalheBase,
+                                                   final int consecutiveAlertCycles,
+                                                   final int consecutiveNonSuccessCycles,
+                                                   final int limiteAlertasConsecutivos,
+                                                   final boolean waitingManualIntervention) {
+        final StringBuilder detalhe = new StringBuilder(detalheBase == null ? "Sem detalhes." : detalheBase);
+        detalhe.append(" | daemon_health[alert_cycles=").append(consecutiveAlertCycles);
+        detalhe.append(", non_success_cycles=").append(consecutiveNonSuccessCycles);
+        detalhe.append(", threshold=").append(limiteAlertasConsecutivos);
+        detalhe.append(", manual_intervention=").append(waitingManualIntervention);
+        detalhe.append("]");
+        return detalhe.toString();
+    }
+
+    private static boolean houveFalhaReconciliacao(final ReconciliationSummary resumoReconciliacao) {
+        return resumoReconciliacao != null
+            && resumoReconciliacao.isAtivo()
+            && resumoReconciliacao.getFalhas() > 0;
     }
 
     private static void executarFluxoCompletoPadrao(final boolean incluirFaturasGraphQL) throws Exception {

@@ -70,20 +70,32 @@ class ConfigEtlTest {
         final String expansaoAnterior =
             System.getProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
         final String falhasAnterior = System.getProperty("etl.intervalo.coletas.max_consecutive_failures");
+        final String pruneRatioAnterior = System.getProperty("etl.fretes.prune.guardrail.min_ratio");
+        final String replayTtlAnterior = System.getProperty("etl.recovery.replay.idempotency.ttl.hours");
+        final String daemonAlertsAnterior = System.getProperty("loop.daemon.max_consecutive_alert_cycles");
         try {
             System.clearProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms");
             System.clearProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
             System.clearProperty("etl.intervalo.coletas.max_consecutive_failures");
+            System.clearProperty("etl.fretes.prune.guardrail.min_ratio");
+            System.clearProperty("etl.recovery.replay.idempotency.ttl.hours");
+            System.clearProperty("loop.daemon.max_consecutive_alert_cycles");
 
             assertEquals(Duration.ofMinutes(30), ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo());
             assertEquals(400, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo());
             assertEquals(2, ConfigEtl.obterEtlIntervaloColetasMaxConsecutiveFailures());
             assertEquals(Duration.ofMinutes(10), ConfigEtl.obterTimeoutEntidadeGraphQL("coletas"));
             assertEquals(30, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDias());
+            assertEquals(0.30d, ConfigEtl.obterFretePruneGuardrailMinRatio());
+            assertEquals(Duration.ofHours(12), ConfigEtl.obterRecoveryReplayIdempotencyTtl());
+            assertEquals(3, ConfigEtl.obterLoopDaemonMaxConsecutiveAlertCycles());
         } finally {
             restaurarPropriedade("etl.graphql.timeout.entidade.coletas.intervalo.ms", timeoutIntervaloAnterior);
             restaurarPropriedade("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", expansaoAnterior);
             restaurarPropriedade("etl.intervalo.coletas.max_consecutive_failures", falhasAnterior);
+            restaurarPropriedade("etl.fretes.prune.guardrail.min_ratio", pruneRatioAnterior);
+            restaurarPropriedade("etl.recovery.replay.idempotency.ttl.hours", replayTtlAnterior);
+            restaurarPropriedade("loop.daemon.max_consecutive_alert_cycles", daemonAlertsAnterior);
         }
     }
 
@@ -93,18 +105,30 @@ class ConfigEtlTest {
         final String expansaoAnterior =
             System.getProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo");
         final String falhasAnterior = System.getProperty("etl.intervalo.coletas.max_consecutive_failures");
+        final String pruneRatioAnterior = System.getProperty("etl.fretes.prune.guardrail.min_ratio");
+        final String replayTtlAnterior = System.getProperty("etl.recovery.replay.idempotency.ttl.hours");
+        final String daemonAlertsAnterior = System.getProperty("loop.daemon.max_consecutive_alert_cycles");
         try {
             System.setProperty("etl.graphql.timeout.entidade.coletas.intervalo.ms", "2400000");
             System.setProperty("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", "730");
             System.setProperty("etl.intervalo.coletas.max_consecutive_failures", "5");
+            System.setProperty("etl.fretes.prune.guardrail.min_ratio", "0.55");
+            System.setProperty("etl.recovery.replay.idempotency.ttl.hours", "24");
+            System.setProperty("loop.daemon.max_consecutive_alert_cycles", "5");
 
             assertEquals(Duration.ofMinutes(40), ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo());
             assertEquals(730, ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo());
             assertEquals(5, ConfigEtl.obterEtlIntervaloColetasMaxConsecutiveFailures());
+            assertEquals(0.55d, ConfigEtl.obterFretePruneGuardrailMinRatio());
+            assertEquals(Duration.ofHours(24), ConfigEtl.obterRecoveryReplayIdempotencyTtl());
+            assertEquals(5, ConfigEtl.obterLoopDaemonMaxConsecutiveAlertCycles());
         } finally {
             restaurarPropriedade("etl.graphql.timeout.entidade.coletas.intervalo.ms", timeoutIntervaloAnterior);
             restaurarPropriedade("etl.referencial.coletas.backfill.max_expansao_dias.intervalo", expansaoAnterior);
             restaurarPropriedade("etl.intervalo.coletas.max_consecutive_failures", falhasAnterior);
+            restaurarPropriedade("etl.fretes.prune.guardrail.min_ratio", pruneRatioAnterior);
+            restaurarPropriedade("etl.recovery.replay.idempotency.ttl.hours", replayTtlAnterior);
+            restaurarPropriedade("loop.daemon.max_consecutive_alert_cycles", daemonAlertsAnterior);
         }
     }
 

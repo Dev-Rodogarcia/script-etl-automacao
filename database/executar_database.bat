@@ -153,6 +153,8 @@ for %%F in (
     "migrations\005_alinhar_sys_execution_history_schema.sql"
     "migrations\006_alterar_fretes_indicadores_gestao.sql"
     "migrations\007_adicionar_fk_seletiva_manifestos_coletas.sql"
+    "migrations\008_criar_tabela_sys_replay_idempotency.sql"
+    "migrations\009_criar_tabela_sys_reconciliation_quarantine.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -272,6 +274,8 @@ for %%F in (
     "tabelas\019_criar_tabela_etl_invalid_records.sql"
     "tabelas\020_criar_tabela_inventario.sql"
     "tabelas\021_criar_tabela_sinistros.sql"
+    "tabelas\022_criar_tabela_sys_replay_idempotency.sql"
+    "tabelas\023_criar_tabela_sys_reconciliation_quarantine.sql"
 ) do (
     if not exist %%F (
         echo [ERRO] Script nao encontrado: %%~F

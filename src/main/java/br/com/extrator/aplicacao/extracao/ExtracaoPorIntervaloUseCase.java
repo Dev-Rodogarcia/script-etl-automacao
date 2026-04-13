@@ -36,8 +36,10 @@ package br.com.extrator.aplicacao.extracao;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -53,6 +55,7 @@ import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.console.BannerUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.formatacao.FormatadorData;
+import br.com.extrator.suporte.configuracao.ScopedSystemPropertyOverride;
 public class ExtracaoPorIntervaloUseCase {
     private static final String EXECUTION_LOCK_RESOURCE = "etl-global-execution";
     private static final String PROP_PRUNE_AUSENTES_FRETES = "ETL_FRETES_PRUNE_AUSENTES";
@@ -94,21 +97,24 @@ public class ExtracaoPorIntervaloUseCase {
 
     public void executar(final ExtracaoPorIntervaloRequest request) throws Exception {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
-        final String pruneFretesAnterior = System.getProperty(PROP_PRUNE_AUSENTES_FRETES);
-        final String timeoutFretesAnterior = System.getProperty(PROP_TIMEOUT_FRETES);
-        final String timeoutColetasAnterior = System.getProperty(PROP_TIMEOUT_COLETAS);
-        final String backfillMaxExpansaoAnterior = System.getProperty(PROP_BACKFILL_MAX_EXPANSAO_COLETAS);
-        System.setProperty(PROP_PRUNE_AUSENTES_FRETES, Boolean.TRUE.toString());
-        aplicarTimeoutMinimo(PROP_TIMEOUT_FRETES, TIMEOUT_FRETES_INTERVALO_MS);
-        aplicarTimeoutMinimo(
+        final Map<String, String> overridesTemporarios = new LinkedHashMap<>();
+        overridesTemporarios.put(PROP_PRUNE_AUSENTES_FRETES, Boolean.TRUE.toString());
+        overridesTemporarios.put(PROP_TIMEOUT_FRETES, resolverTimeoutMinimo(PROP_TIMEOUT_FRETES, TIMEOUT_FRETES_INTERVALO_MS));
+        overridesTemporarios.put(
             PROP_TIMEOUT_COLETAS,
-            ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo().toMillis()
+            resolverTimeoutMinimo(
+                PROP_TIMEOUT_COLETAS,
+                ConfigEtl.obterTimeoutEntidadeGraphQLColetasIntervalo().toMillis()
+            )
         );
-        aplicarInteiroMinimo(
+        overridesTemporarios.put(
             PROP_BACKFILL_MAX_EXPANSAO_COLETAS,
-            ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo()
+            resolverInteiroMinimo(
+                PROP_BACKFILL_MAX_EXPANSAO_COLETAS,
+                ConfigEtl.obterEtlReferencialColetasBackfillMaxExpansaoDiasIntervalo()
+            )
         );
-        try {
+        try (ScopedSystemPropertyOverride scopedOverride = ScopedSystemPropertyOverride.apply(overridesTemporarios)) {
         final LocalDate dataInicio = request.dataInicio();
         final LocalDate dataFim = request.dataFim();
         final String apiEspecifica = request.apiEspecifica();
@@ -337,57 +343,36 @@ public class ExtracaoPorIntervaloUseCase {
                 + " - "
                 + String.join(", ", blocosFalhadosLista)
         );
-        } finally {
-            if (pruneFretesAnterior == null) {
-                System.clearProperty(PROP_PRUNE_AUSENTES_FRETES);
-            } else {
-                System.setProperty(PROP_PRUNE_AUSENTES_FRETES, pruneFretesAnterior);
-            }
-            if (timeoutFretesAnterior == null) {
-                System.clearProperty(PROP_TIMEOUT_FRETES);
-            } else {
-                System.setProperty(PROP_TIMEOUT_FRETES, timeoutFretesAnterior);
-            }
-            restaurarProperty(PROP_TIMEOUT_COLETAS, timeoutColetasAnterior);
-            restaurarProperty(PROP_BACKFILL_MAX_EXPANSAO_COLETAS, backfillMaxExpansaoAnterior);
         }
         }
     }
 
-    private void aplicarTimeoutMinimo(final String propriedade, final long timeoutMinimoMs) {
+    private String resolverTimeoutMinimo(final String propriedade, final long timeoutMinimoMs) {
         final String atual = System.getProperty(propriedade);
         if (atual != null) {
             try {
                 if (Long.parseLong(atual) >= timeoutMinimoMs) {
-                    return;
+                    return atual;
                 }
             } catch (final NumberFormatException ignored) {
                 // Valor invalido atual sera substituido pelo minimo seguro para backfill.
             }
         }
-        System.setProperty(propriedade, Long.toString(timeoutMinimoMs));
+        return Long.toString(timeoutMinimoMs);
     }
 
-    private void aplicarInteiroMinimo(final String propriedade, final int valorMinimo) {
+    private String resolverInteiroMinimo(final String propriedade, final int valorMinimo) {
         final String atual = System.getProperty(propriedade);
         if (atual != null) {
             try {
                 if (Integer.parseInt(atual) >= valorMinimo) {
-                    return;
+                    return atual;
                 }
             } catch (final NumberFormatException ignored) {
                 // Valor invalido atual sera substituido pelo minimo seguro para backfill.
             }
         }
-        System.setProperty(propriedade, Integer.toString(valorMinimo));
-    }
-
-    private void restaurarProperty(final String propriedade, final String valorAnterior) {
-        if (valorAnterior == null) {
-            System.clearProperty(propriedade);
-        } else {
-            System.setProperty(propriedade, valorAnterior);
-        }
+        return Integer.toString(valorMinimo);
     }
 
     private List<BlocoPeriodo> dividirEmBlocos(final LocalDate dataInicio, final LocalDate dataFim) {

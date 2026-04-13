@@ -62,6 +62,8 @@ public final class LoopDaemonStatusHandler implements LoopDaemonModeHandler {
         final String detalhe = state.getProperty("detail", "N/A");
         final String ultimoCiclo = state.getProperty("last_run_at", "N/A");
         final String proximoCiclo = state.getProperty("next_run_at", "N/A");
+        final String consecutiveAlertCycles = state.getProperty("consecutive_alert_cycles", "0");
+        final String consecutiveNonSuccessCycles = state.getProperty("consecutive_non_success_cycles", "0");
 
         System.out.println("Status do loop daemon");
         System.out.println("  PID: " + (pid > 0 ? pid : "N/A"));
@@ -70,6 +72,8 @@ public final class LoopDaemonStatusHandler implements LoopDaemonModeHandler {
         System.out.println("  Atualizado em: " + atualizadoEm);
         System.out.println("  Ultimo ciclo: " + ultimoCiclo);
         System.out.println("  Proximo ciclo: " + proximoCiclo);
+        System.out.println("  Alertas consecutivos: " + consecutiveAlertCycles);
+        System.out.println("  Ciclos nao saudaveis consecutivos: " + consecutiveNonSuccessCycles);
         System.out.println("  Detalhe: " + detalhe);
         System.out.println("  Log: " + DaemonPaths.DAEMON_STDOUT_FILE.toAbsolutePath());
 

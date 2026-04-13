@@ -108,6 +108,10 @@ class LoopDaemonRunHandlerTest {
             "WAITING_NEXT_CYCLE_WITH_ERROR",
             LoopDaemonRunHandler.determinarStatusDaemon(true, resumoComFalha)
         );
+        assertEquals(
+            "WAITING_NEXT_CYCLE_WITH_ERROR",
+            LoopDaemonRunHandler.determinarStatusDaemon(true, true, null)
+        );
         assertEquals("WAITING_NEXT_CYCLE", LoopDaemonRunHandler.determinarStatusDaemon(true, null));
     }
 
@@ -146,6 +150,47 @@ class LoopDaemonRunHandlerTest {
 
         assertTrue(duracaoMs < 4_000, "Watchdog global deve impedir hang indefinido do daemon");
         assertTrue(conteudo.toLowerCase().contains("timeout"), "Resumo do ciclo deve registrar timeout global");
+    }
+
+    @Test
+    void devePararEmIntervencaoManualAposTresAlertasConsecutivos() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final AtomicInteger ciclosExecutados = new AtomicInteger();
+
+        final String propriedadeAnterior = System.getProperty("loop.daemon.max_consecutive_alert_cycles");
+        try {
+            System.setProperty("loop.daemon.max_consecutive_alert_cycles", "3");
+            final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+                stateStore,
+                historyWriter,
+                incluirFaturas -> {
+                    ciclosExecutados.incrementAndGet();
+                    throw new RuntimeException(LoopDaemonHandlerSupport.MENSAGEM_FALHA_INTEGRIDADE + " em serie");
+                },
+                (inicio, fimExtracao, sucesso, incluirFaturas) -> null,
+                (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.TIME_ELAPSED,
+                cicloLog -> () -> { },
+                () -> 97531L,
+                30L,
+                false,
+                incluirFaturas -> java.time.Duration.ofSeconds(30)
+            );
+
+            handler.executar(true);
+
+            final var estado = stateStore.loadState();
+            assertEquals(3, ciclosExecutados.get());
+            assertEquals("WAITING_MANUAL_INTERVENTION", estado.getProperty("status"));
+            assertEquals("3", estado.getProperty("consecutive_alert_cycles"));
+            assertEquals("3", estado.getProperty("consecutive_non_success_cycles"));
+        } finally {
+            if (propriedadeAnterior == null) {
+                System.clearProperty("loop.daemon.max_consecutive_alert_cycles");
+            } else {
+                System.setProperty("loop.daemon.max_consecutive_alert_cycles", propriedadeAnterior);
+            }
+        }
     }
 
     private DaemonStateStore novoStore() {
