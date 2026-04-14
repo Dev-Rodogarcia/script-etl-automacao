@@ -19,12 +19,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
 
 import br.com.extrator.integracao.constantes.ConstantesApiGraphQL;
+import br.com.extrator.suporte.ThreadUtil;
 import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -101,6 +103,8 @@ final class GraphQLPaginator {
         final String runUuid = auditar ? java.util.UUID.randomUUID().toString() : null;
         final int perInt = 100;
         Integer tamanhoPaginaEsperado = null;
+        int tentativasAnomaliaPagina = 0;
+        final int maxTentativasAnomalia = ConfigApi.obterMaxTentativasAnomaliaPaginacaoGraphQL();
 
         LocalDate janelaInicio = null;
         LocalDate janelaFim = null;
@@ -146,7 +150,9 @@ final class GraphQLPaginator {
                     );
                 }
 
-                final Map<String, Object> variaveisComCursor = new java.util.HashMap<>(variaveis);
+                final Map<String, Object> variaveisComCursor = new HashMap<>(
+                    variaveis == null ? Map.of() : variaveis
+                );
                 if (cursor != null) {
                     variaveisComCursor.put("after", cursor);
                 }
@@ -164,6 +170,51 @@ final class GraphQLPaginator {
                     interrompido = true;
                     motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.ERRO_API;
                     break;
+                }
+
+                final int registrosRecebidos = resposta.getEntidades().size();
+                final String novoCursor = resposta.getEndCursor();
+                final AnomaliaPaginacao anomalia = detectarAnomaliaPaginacao(
+                    nomeEntidade,
+                    paginaAtual,
+                    cursor,
+                    novoCursor,
+                    resposta.getHasNextPage(),
+                    registrosRecebidos,
+                    tamanhoPaginaEsperado,
+                    perInt
+                );
+                if (anomalia != null) {
+                    if (tentativasAnomaliaPagina < maxTentativasAnomalia) {
+                        tentativasAnomaliaPagina++;
+                        logger.warn(
+                            "Anomalia de paginacao em {} na pagina {}. Retentativa curta {}/{} antes de marcar incompleto. detalhe={}",
+                            nomeEntidade,
+                            paginaAtual,
+                            tentativasAnomaliaPagina,
+                            maxTentativasAnomalia,
+                            anomalia.mensagem()
+                        );
+                        aguardarRetentativaAnomalia();
+                        continue;
+                    }
+                    interrompido = true;
+                    motivoInterrupcao = anomalia.motivo();
+                    logger.warn(
+                        "Anomalia de paginacao confirmada em {} na pagina {} apos {} retentativa(s). detalhe={}",
+                        nomeEntidade,
+                        paginaAtual,
+                        tentativasAnomaliaPagina,
+                        anomalia.mensagem()
+                    );
+                    break;
+                }
+                tentativasAnomaliaPagina = 0;
+
+                if (resposta.getHasNextPage() && registrosRecebidos > 0) {
+                    tamanhoPaginaEsperado = tamanhoPaginaEsperado == null
+                        ? registrosRecebidos
+                        : Math.max(tamanhoPaginaEsperado, registrosRecebidos);
                 }
 
                 todasEntidades.addAll(resposta.getEntidades());
@@ -184,60 +235,6 @@ final class GraphQLPaginator {
                 }
 
                 resetarEstadoFalhas(chaveEntidade);
-
-                final int registrosRecebidos = resposta.getEntidades().size();
-                final String novoCursor = resposta.getEndCursor();
-                if (resposta.getHasNextPage() && (novoCursor == null || novoCursor.isBlank())) {
-                    logger.warn("Paginacao inconsistente em {}: hasNextPage=true sem cursor de continuidade.", nomeEntidade);
-                    interrompido = true;
-                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE;
-                    break;
-                }
-
-                if (novoCursor != null && cursor != null && novoCursor.equals(cursor) && resposta.getHasNextPage()) {
-                    final int limiarPaginaCurta = tamanhoPaginaEsperado != null ? tamanhoPaginaEsperado : perInt;
-                    if (registrosRecebidos < limiarPaginaCurta) {
-                        logger.warn(
-                            "Cursor repetido em {} com pagina curta ({} < {}). Marcando extracao como inconsistente.",
-                            nomeEntidade,
-                            registrosRecebidos,
-                            limiarPaginaCurta
-                        );
-                        interrompido = true;
-                        motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE;
-                        break;
-                    }
-                    logger.warn("Cursor repetido com hasNextPage=true em {}. Interrompendo para evitar loop.", nomeEntidade);
-                    interrompido = true;
-                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LOOP_DETECTADO;
-                    break;
-                }
-
-                if (resposta.getEntidades().isEmpty() && resposta.getHasNextPage()) {
-                    logger.warn("Pagina vazia com hasNextPage=true em {}. Interrompendo por inconsistencia de paginacao.", nomeEntidade);
-                    interrompido = true;
-                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE;
-                    break;
-                }
-
-                if (resposta.getHasNextPage() && tamanhoPaginaEsperado != null && registrosRecebidos < tamanhoPaginaEsperado) {
-                    logger.warn(
-                        "Paginacao inconsistente em {}: pagina {} retornou {} registros (< {}) com hasNextPage=true.",
-                        nomeEntidade,
-                        paginaAtual,
-                        registrosRecebidos,
-                        tamanhoPaginaEsperado
-                    );
-                    interrompido = true;
-                    motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE;
-                    break;
-                }
-
-                if (resposta.getHasNextPage() && registrosRecebidos > 0) {
-                    tamanhoPaginaEsperado = tamanhoPaginaEsperado == null
-                        ? registrosRecebidos
-                        : Math.max(tamanhoPaginaEsperado, registrosRecebidos);
-                }
 
                 hasNextPage = resposta.getHasNextPage();
                 cursor = novoCursor;
@@ -284,6 +281,64 @@ final class GraphQLPaginator {
         return ResultadoExtracao.completo(todasEntidades, paginasProcessadas, totalRegistrosProcessados);
     }
 
+    private AnomaliaPaginacao detectarAnomaliaPaginacao(final String nomeEntidade,
+                                                        final int paginaAtual,
+                                                        final String cursorAtual,
+                                                        final String novoCursor,
+                                                        final boolean hasNextPage,
+                                                        final int registrosRecebidos,
+                                                        final Integer tamanhoPaginaEsperado,
+                                                        final int perInt) {
+        if (hasNextPage && (novoCursor == null || novoCursor.isBlank())) {
+            return new AnomaliaPaginacao(
+                ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
+                "hasNextPage=true sem cursor de continuidade"
+            );
+        }
+
+        if (novoCursor != null && cursorAtual != null && novoCursor.equals(cursorAtual) && hasNextPage) {
+            final int limiarPaginaCurta = tamanhoPaginaEsperado != null ? tamanhoPaginaEsperado : perInt;
+            if (registrosRecebidos < limiarPaginaCurta) {
+                return new AnomaliaPaginacao(
+                    ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
+                    "cursor repetido com pagina curta (" + registrosRecebidos + " < " + limiarPaginaCurta + ")"
+                );
+            }
+            return new AnomaliaPaginacao(
+                ResultadoExtracao.MotivoInterrupcao.LOOP_DETECTADO,
+                "cursor repetido com hasNextPage=true"
+            );
+        }
+
+        if (registrosRecebidos == 0 && hasNextPage) {
+            return new AnomaliaPaginacao(
+                ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
+                "pagina vazia com hasNextPage=true"
+            );
+        }
+
+        if (hasNextPage && tamanhoPaginaEsperado != null && registrosRecebidos < tamanhoPaginaEsperado) {
+            return new AnomaliaPaginacao(
+                ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
+                "pagina " + paginaAtual + " retornou " + registrosRecebidos + " registros (< " + tamanhoPaginaEsperado + ") com hasNextPage=true"
+            );
+        }
+        return null;
+    }
+
+    private void aguardarRetentativaAnomalia() {
+        final long delayMs = ConfigApi.obterDelayRetryAnomaliaPaginacaoGraphQLMs();
+        if (delayMs <= 0L) {
+            return;
+        }
+        try {
+            ThreadUtil.aguardar(delayMs);
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Thread interrompida durante retentativa de anomalia de paginacao GraphQL", e);
+        }
+    }
+
     private void incrementarContadorFalhas(final String chaveEntidade, final String nomeEntidade) {
         final int falhas = contadorFalhasConsecutivas.getOrDefault(chaveEntidade, 0) + 1;
         contadorFalhasConsecutivas.put(chaveEntidade, falhas);
@@ -318,5 +373,8 @@ final class GraphQLPaginator {
         contadorFalhasConsecutivas.put(chaveEntidade, 0);
         entidadesComCircuitAberto.remove(chaveEntidade);
         circuitosAbertosDesde.remove(chaveEntidade);
+    }
+
+    private record AnomaliaPaginacao(ResultadoExtracao.MotivoInterrupcao motivo, String mensagem) {
     }
 }

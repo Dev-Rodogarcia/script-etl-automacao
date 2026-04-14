@@ -166,19 +166,25 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         final int idadeJanelaMinutos = janela.fim() == null
             ? 0
             : (int) Math.max(0, ChronoUnit.MINUTES.between(janela.fim(), RelogioSistema.agora()));
+        final boolean usarFiltroEstritoDataExtracao =
+            periodoFechado
+                && janelaEstruturada.isPresent()
+                && ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade);
         final Set<String> chavesBanco = repository.carregarChavesBancoNaJanela(
             conexao,
             entidade,
             janela,
             periodoInicio,
-            periodoFim
+            periodoFim,
+            usarFiltroEstritoDataExtracao
         );
         final Map<String, String> hashesBanco = repository.carregarHashesMetadataBancoNaJanela(
             conexao,
             entidade,
             janela,
             periodoInicio,
-            periodoFim
+            periodoFim,
+            usarFiltroEstritoDataExtracao
         );
 
         final Set<String> faltantes = new HashSet<>(api.chaves());
@@ -258,6 +264,9 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         if (janelaEstruturada.isPresent() && executionUuidAncora.isPresent()) {
             detalhe.append(" | origem_janela=EXECUTION_AUDIT");
             detalhe.append(" | execution_uuid=").append(executionUuidAncora.get());
+        }
+        if (usarFiltroEstritoDataExtracao) {
+            detalhe.append(" | filtro_banco=janela_estruturada_estrita");
         }
 
         return new ResultadoComparacao(

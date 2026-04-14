@@ -68,7 +68,7 @@ public final class DaemonResilienceHarness {
             false,
             1,
             0,
-            (data, incluirFaturasGraphQL) -> {
+            (data, api, entidade, incluirFaturasGraphQL) -> {
                 // Reconciliacao desligada no harness.
             }
         );

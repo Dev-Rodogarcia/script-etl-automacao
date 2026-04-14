@@ -62,7 +62,7 @@ public final class DataExportGatewayAdapter implements DataExportGateway {
         final Long childPid;
         if (usarIsolamento) {
             final IsolatedStepProcessExecutor.ProcessExecutionResult processResult =
-                isolatedExecutor.executar(ApiType.DATAEXPORT, dataInicio, dataFim, filtroEntidade, ConfigEtl.obterTimeoutStepDataExport());
+                isolatedExecutor.executar(ApiType.DATAEXPORT, dataInicio, dataFim, filtroEntidade, resolverTimeoutIsolado(filtroEntidade));
             childPid = processResult.pid();
         } else {
             service.executar(dataInicio, dataFim, filtroEntidade);
@@ -79,6 +79,13 @@ public final class DataExportGatewayAdapter implements DataExportGateway {
             .metadata("forced_by_daemon", forcarIsolamentoNoDaemon)
             .metadata("child_pid", childPid)
             .build();
+    }
+
+    private java.time.Duration resolverTimeoutIsolado(final String filtroEntidade) {
+        if (filtroEntidade == null || filtroEntidade.isBlank()) {
+            return ConfigEtl.obterTimeoutStepDataExport();
+        }
+        return ConfigEtl.obterTimeoutEntidadeDataExport(filtroEntidade);
     }
 
     private String normalizeEntityFilter(final String entidade) {

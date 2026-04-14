@@ -82,14 +82,15 @@ class LoopReconciliationServiceTest {
             true,
             3,
             1,
-            (data, incluirFaturasGraphQL) -> datasExecutadas.add(data)
+            (data, api, entidade, incluirFaturasGraphQL) -> datasExecutadas.add(data)
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 9, 0),
             LocalDateTime.of(2026, 2, 20, 9, 30),
             true,
-            true
+            true,
+            null
         );
 
         assertTrue(resumo.isAtivo());
@@ -117,7 +118,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             0,
-            (data, incluirFaturasGraphQL) -> {
+            (data, api, entidade, incluirFaturasGraphQL) -> {
                 if (tentativas.incrementAndGet() == 1) {
                     throw new IllegalStateException("falha simulada");
                 }
@@ -128,7 +129,8 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 10, 0),
             LocalDateTime.of(2026, 2, 20, 10, 30),
             false,
-            true
+            true,
+            null
         );
 
         assertEquals(0, primeiroResumo.getReconciliacoesExecutadas());
@@ -140,7 +142,8 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 11, 0),
             LocalDateTime.of(2026, 2, 20, 11, 30),
             true,
-            true
+            true,
+            null
         );
 
         assertEquals(1, segundoResumo.getReconciliacoesExecutadas());
@@ -163,14 +166,15 @@ class LoopReconciliationServiceTest {
             true,
             2,
             0,
-            (data, incluirFaturasGraphQL) -> datasExecutadas.add(data)
+            (data, api, entidade, incluirFaturasGraphQL) -> datasExecutadas.add(data)
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 12, 0),
             LocalDateTime.of(2026, 2, 20, 12, 30),
             true,
-            false
+            false,
+            null
         );
 
         assertEquals(List.of(LocalDate.of(2026, 2, 17), LocalDate.of(2026, 2, 18)), datasExecutadas);
@@ -189,7 +193,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             2,
-            (data, incluirFaturasGraphQL) -> {
+            (data, api, entidade, incluirFaturasGraphQL) -> {
                 throw new IllegalStateException("falha simulada");
             }
         );
@@ -198,7 +202,8 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 0, 5),
             LocalDateTime.of(2026, 2, 20, 0, 35),
             false,
-            true
+            true,
+            null
         );
 
         assertEquals(0, resumo.getReconciliacoesExecutadas());
@@ -218,7 +223,7 @@ class LoopReconciliationServiceTest {
             false,
             2,
             1,
-            (data, incluirFaturasGraphQL) -> {
+            (data, api, entidade, incluirFaturasGraphQL) -> {
                 throw new IllegalStateException("nao deveria executar");
             }
         );
@@ -227,7 +232,8 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 9, 0),
             LocalDateTime.of(2026, 2, 20, 9, 30),
             false,
-            true
+            true,
+            null
         );
 
         assertFalse(resumo.isAtivo());
@@ -235,6 +241,41 @@ class LoopReconciliationServiceTest {
         assertEquals(0, resumo.getFalhas());
         assertTrue(resumo.getPendenciasRestantes().isEmpty());
         assertFalse(Files.exists(stateFile));
+    }
+
+    @Test
+    void deveAgendarReconciliacaoSegmentadaQuandoFalhaInformarRunnerEspecifico() {
+        salvarEstadoInicial(ONTEM.toString(), "");
+
+        final List<String> execucoes = new ArrayList<>();
+        final LoopReconciliationService service = new LoopReconciliationService(
+            stateFile,
+            clock,
+            true,
+            1,
+            0,
+            (data, api, entidade, incluirFaturasGraphQL) -> {
+                execucoes.add(data + "|" + api + "|" + entidade);
+                throw new IllegalStateException("falha segmentada");
+            }
+        );
+
+        final var resumo = service.processarPosCiclo(
+            LocalDateTime.of(2026, 2, 20, 6, 0),
+            LocalDateTime.of(2026, 2, 20, 6, 15),
+            false,
+            true,
+            "Fluxo completo concluido com falhas parciais. Runners falhados: GraphQL/fretes"
+        );
+
+        assertEquals(0, resumo.getReconciliacoesExecutadas());
+        assertEquals(1, resumo.getFalhas());
+        assertEquals(List.of(HOJE), resumo.getPendenciasRestantes());
+        assertEquals(List.of("2026-02-20|graphql|fretes"), execucoes);
+
+        final Properties estado = carregarEstado(stateFile);
+        assertEquals("2026-02-20|graphql|fretes", estado.getProperty("pending_targets"));
+        assertEquals(HOJE.toString(), estado.getProperty("pending_dates"));
     }
 
     private void salvarEstadoInicial(final String lastDailyScheduledDate, final String pendingDates) {

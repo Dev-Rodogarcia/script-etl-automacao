@@ -2,6 +2,7 @@ package br.com.extrator.integracao.graphql.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,6 +91,29 @@ class GraphQLExtractionServiceTest {
         assertTrue(service.coletasReferencialExecutado, "Execucao auxiliar deve usar o fluxo dedicado.");
         assertFalse(service.coletasPrincipalExecutado, "Execucao auxiliar nao deve registrar Coletas no namespace principal.");
         assertEquals(0, service.logRepository.logs.size(), "Namespace auxiliar nao deve persistir em log_extracoes.");
+    }
+
+    @Test
+    void modoOperacionalNaoDeveAceitarEntidadeCoreIncompletaComoSucesso() {
+        final String valorAnterior = System.getProperty("etl.integridade.modo");
+        System.setProperty("etl.integridade.modo", "OPERACIONAL");
+        try {
+            final TestableGraphQLExtractionService service = new TestableGraphQLExtractionService(
+                resultado(ConstantesEntidades.USUARIOS_SISTEMA, ConstantesEntidades.STATUS_COMPLETO, true, "usuarios ok"),
+                resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_INCOMPLETO_DADOS, false, "coletas incompleto"),
+                resultado(ConstantesEntidades.FRETES, ConstantesEntidades.STATUS_COMPLETO, true, "fretes ok")
+            );
+
+            final RuntimeException erro = assertThrows(
+                RuntimeException.class,
+                () -> service.execute(LocalDate.of(2026, 3, 18), LocalDate.of(2026, 3, 18), null)
+            );
+
+            assertNotNull(erro.getMessage());
+            assertTrue(erro.getMessage().contains(ConstantesEntidades.COLETAS));
+        } finally {
+            restaurarPropriedade("etl.integridade.modo", valorAnterior);
+        }
     }
 
     private static ExtractionResult resultado(final String entidade,
@@ -260,5 +284,13 @@ class GraphQLExtractionServiceTest {
         public void atualizarWatermarkConfirmado(final String entidade, final LocalDateTime watermarkConfirmado) {
             // no-op
         }
+    }
+
+    private void restaurarPropriedade(final String chave, final String valorAnterior) {
+        if (valorAnterior == null) {
+            System.clearProperty(chave);
+            return;
+        }
+        System.setProperty(chave, valorAnterior);
     }
 }

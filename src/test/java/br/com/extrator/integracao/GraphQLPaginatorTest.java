@@ -58,8 +58,9 @@ class GraphQLPaginatorTest {
 
         assertFalse(resultado.isCompleto());
         assertEquals(ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE.getCodigo(), resultado.getMotivoInterrupcao());
-        assertEquals(2, resultado.getPaginasProcessadas());
-        assertEquals(25, resultado.getDados().size());
+        assertEquals(1, resultado.getPaginasProcessadas());
+        assertEquals(20, resultado.getDados().size());
+        assertEquals(4, callCount.get(), "Pagina anomala deve ser retentada antes de marcar incompleto.");
     }
 
     @Test
@@ -100,8 +101,92 @@ class GraphQLPaginatorTest {
 
         assertFalse(resultado.isCompleto());
         assertEquals(ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE.getCodigo(), resultado.getMotivoInterrupcao());
+        assertEquals(1, resultado.getPaginasProcessadas());
+        assertEquals(20, resultado.getDados().size());
+        assertEquals(4, callCount.get(), "Pagina curta com hasNextPage=true deve receber retentativa curta.");
+    }
+
+    @Test
+    void deveRecuperarQuandoAnomaliaDePaginacaoEhTransitoria() {
+        final AtomicInteger callCount = new AtomicInteger();
+        final GraphQLPaginator paginator = new GraphQLPaginator(
+            LoggerFactory.getLogger(GraphQLPaginatorTest.class),
+            10,
+            3,
+            Duration.ofMinutes(10),
+            new HashMap<>(),
+            new HashSet<>(),
+            new HashMap<>(),
+            null,
+            new GraphQLPageFetcher() {
+                @Override
+                public <T> PaginatedGraphQLResponse<T> fetch(
+                    final String query,
+                    final String nomeEntidade,
+                    final Map<String, Object> variaveis,
+                    final Class<T> tipoClasse
+                ) {
+                    final int chamada = callCount.getAndIncrement();
+                    if (chamada == 0) {
+                        return cast(java.util.stream.IntStream.rangeClosed(1, 20).boxed().toList(), true, "cursor-1");
+                    }
+                    if (chamada == 1) {
+                        return cast(List.of(21, 22, 23, 24, 25), true, "cursor-1");
+                    }
+                    return cast(java.util.stream.IntStream.rangeClosed(21, 40).boxed().toList(), false, "cursor-2");
+                }
+            }
+        );
+
+        final ResultadoExtracao<Integer> resultado = paginator.executarQueryPaginada(
+            "exec-transient",
+            "query",
+            "freights",
+            Map.of(),
+            Integer.class
+        );
+
+        assertTrue(resultado.isCompleto());
         assertEquals(2, resultado.getPaginasProcessadas());
-        assertEquals(25, resultado.getDados().size());
+        assertEquals(40, resultado.getDados().size());
+        assertEquals(3, callCount.get());
+    }
+
+    @Test
+    void deveAceitarVariaveisNulasSemLancarNpe() {
+        final GraphQLPaginator paginator = new GraphQLPaginator(
+            LoggerFactory.getLogger(GraphQLPaginatorTest.class),
+            10,
+            3,
+            Duration.ofMinutes(10),
+            new HashMap<>(),
+            new HashSet<>(),
+            new HashMap<>(),
+            null,
+            new GraphQLPageFetcher() {
+                @Override
+                public <T> PaginatedGraphQLResponse<T> fetch(
+                    final String query,
+                    final String nomeEntidade,
+                    final Map<String, Object> variaveis,
+                    final Class<T> tipoClasse
+                ) {
+                    assertTrue(variaveis.isEmpty());
+                    return cast(List.of(1, 2, 3), false, "cursor-final");
+                }
+            }
+        );
+
+        final ResultadoExtracao<Integer> resultado = paginator.executarQueryPaginada(
+            "exec-null",
+            "query",
+            "freights",
+            null,
+            Integer.class
+        );
+
+        assertTrue(resultado.isCompleto());
+        assertEquals(3, resultado.getDados().size());
     }
 
     @Test

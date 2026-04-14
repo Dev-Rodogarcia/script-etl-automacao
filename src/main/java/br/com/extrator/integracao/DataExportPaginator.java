@@ -161,7 +161,7 @@ final class DataExportPaginator {
         }
 
         final LocalDate janelaInicio = timeWindowSupport.toLocalDate(dataInicio);
-        final LocalDate janelaFim = timeWindowSupport.toLocalDate(dataFim);
+        final LocalDate janelaFim = timeWindowSupport.toInclusiveEndDate(dataFim);
 
         if (permitirParticionamento && ConfigApi.isParticionamentoJanelaDataExportAtivo() && janelaInicio.isBefore(janelaFim)) {
             logger.info(

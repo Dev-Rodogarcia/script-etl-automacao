@@ -72,7 +72,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             "COALESCE(TRY_CONVERT(datetime2, source.status_updated_at), CAST(source.finish_date AS datetime2), CAST(source.service_date AS datetime2), CAST(source.request_date AS datetime2))"
         );
         final String sql = String.format("""
-            MERGE dbo.%s AS target
+            MERGE dbo.%s WITH (HOLDLOCK) AS target
             USING (
                 SELECT
                     ? AS id, ? AS sequence_code, ? AS request_date, ? AS request_hour, ? AS service_date, ? AS status, ? AS total_value, ? AS total_weight, ? AS total_volumes,

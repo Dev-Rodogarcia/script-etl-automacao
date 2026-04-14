@@ -26,9 +26,6 @@ Metodos principais:
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -38,6 +35,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.json.CanonicalJsonHasher;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -48,17 +46,7 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
 
     String hashMetadata(final String entidade, final String metadata) {
         final String normalizado = normalizarMetadataParaComparacao(entidade, metadata);
-        try {
-            final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            final byte[] hash = digest.digest(normalizado.getBytes(StandardCharsets.UTF_8));
-            final StringBuilder sb = new StringBuilder(hash.length * 2);
-            for (final byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 nao disponivel", e);
-        }
+        return CanonicalJsonHasher.sha256Hex(normalizado);
     }
 
     private String normalizarMetadataParaComparacao(final String entidade, final String metadata) {
@@ -74,10 +62,10 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
             final ObjectNode obj = (ObjectNode) parsed.deepCopy();
             final ObjectNode projetado = projetarCamposEstaveis(entidade, obj);
             if (projetado != null && projetado.size() > 0) {
-                return MapperUtil.sharedJson().writeValueAsString(projetado);
+                return CanonicalJsonHasher.canonicalize(projetado);
             }
             removerCamposVolateisComparacao(entidade, obj);
-            return MapperUtil.sharedJson().writeValueAsString(obj);
+            return CanonicalJsonHasher.canonicalize(obj);
         } catch (JsonProcessingException e) {
             log.debug(
                 "Fallback de normalizacao de metadata por erro de parse JSON | entidade={} | erro={}",

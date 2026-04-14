@@ -70,11 +70,11 @@ class LoopDaemonComandoReconciliacaoHistoryTest {
                 true,
                 2,
                 0,
-                (data, incluirFaturasGraphQL) -> {
+                (data, api, entidade, incluirFaturasGraphQL) -> {
                     // no-op
                 }
             );
-            final ReconciliationSummary resumo = service.processarPosCiclo(inicio, fimExtracao, true, true);
+            final ReconciliationSummary resumo = service.processarPosCiclo(inicio, fimExtracao, true, true, null);
 
             final DaemonHistoryWriter writer = new DaemonHistoryWriter(
                 tempDir,

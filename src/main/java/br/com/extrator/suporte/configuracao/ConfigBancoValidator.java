@@ -32,6 +32,7 @@ final class ConfigBancoValidator {
 
     static void validarConexaoBancoDados() {
         logger.info("Validando conexao com o banco de dados...");
+        validarConfiguracaoPersistenciaSegura();
 
         final String url = ConfigBanco.obterUrlBancoDados();
         final String usuario = ConfigBanco.obterUsuarioBancoDados();
@@ -171,6 +172,31 @@ final class ConfigBancoValidator {
         }
 
         return new RuntimeException(mensagemErro, causa);
+    }
+
+    private static void validarConfiguracaoPersistenciaSegura() {
+        if (!ConfigEtl.isModoIntegridadeEstrito() && !isAmbienteProducao()) {
+            return;
+        }
+        if (!ConfigBanco.isModoCommitAtomico()) {
+            throw new IllegalStateException(
+                "Configuracao insegura para persistencia detectada: db.atomic.commit=false nao e permitido em STRICT_INTEGRITY/PRODUCAO."
+            );
+        }
+        if (!ConfigBanco.isModoCommitAtomico() && ConfigBanco.isContinuarAposErro()) {
+            throw new IllegalStateException(
+                "Configuracao insegura para persistencia detectada: db.continue.on.error=true com commit nao atomico."
+            );
+        }
+    }
+
+    private static boolean isAmbienteProducao() {
+        final String valor = ConfigSource.obterConfiguracao("ETL_ENVIRONMENT", "etl.environment");
+        if (valor == null || valor.isBlank()) {
+            return false;
+        }
+        final String normalizado = valor.trim().toLowerCase();
+        return "prod".equals(normalizado) || "production".equals(normalizado) || "producao".equals(normalizado);
     }
 
     private static String extrairMensagemMaisInterna(final Throwable throwable) {

@@ -315,7 +315,7 @@ public final class ConfigEtl {
                     "ETL_EXECUTION_LOCK_TIMEOUT_MS",
                     "etl.execution.lock.timeout.ms"
                 ),
-            5_000,
+            30_000,
             value -> value >= 0,
             null,
             null,
@@ -483,6 +483,20 @@ public final class ConfigEtl {
         ));
     }
 
+    public static int obterTimeoutLockReplayMs() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_RECOVERY_REPLAY_LOCK_TIMEOUT_MS",
+                "etl.recovery.replay.lock.timeout.ms"
+            ),
+            30_000,
+            value -> value >= 0,
+            null,
+            null,
+            null
+        );
+    }
+
     public static long obterTimeoutParallelGraceMs() {
         return obterLongComFallback(
             "ETL_PIPELINE_TIMEOUT_PARALLEL_GRACE_MS",
@@ -535,6 +549,14 @@ public final class ConfigEtl {
         return obterBooleanComFallback(
             "ETL_PROCESS_ISOLATED_CHILD",
             "etl.process.isolated.child",
+            false
+        );
+    }
+
+    public static boolean isExecucaoManualStepIsoladoPermitida() {
+        return obterBooleanComFallback(
+            "ETL_PROCESS_ISOLATED_MANUAL_ALLOW",
+            "etl.process.isolated.manual.allow",
             false
         );
     }

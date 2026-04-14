@@ -49,21 +49,19 @@ Atributos-chave:
 package br.com.extrator.persistencia.entidade;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import br.com.extrator.suporte.json.CanonicalJsonHasher;
+import br.com.extrator.suporte.mapeamento.MapperUtil;
 /**
  * Entity (Entidade) que representa uma linha na tabela 'manifestos' do banco de dados.
  * É o "produto final" da transformação, contendo os dados já estruturados e prontos
@@ -73,7 +71,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ManifestoEntity {
 
     private static final Logger logger = LoggerFactory.getLogger(ManifestoEntity.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // --- Coluna de Chave Primária ---
     private Long sequenceCode;
@@ -992,13 +989,11 @@ public class ManifestoEntity {
             return "NULL_METADATA_" + (this.sequenceCode != null ? this.sequenceCode : "UNKNOWN");
         }
         try {
-            // Parse do JSON para Map
-            @SuppressWarnings("unchecked")
-            final
-            Map<String, Object> metadataMap = (Map<String, Object>) objectMapper.readValue(metadata, Map.class);
-            
-            // Criar cópia do metadata para não modificar o original
-            final Map<String, Object> metadataParaHash = new LinkedHashMap<>(metadataMap);
+            final JsonNode parsed = MapperUtil.sharedJson().readTree(metadata);
+            if (!parsed.isObject()) {
+                return CanonicalJsonHasher.sha256CanonicalJson(metadata);
+            }
+            final ObjectNode metadataParaHash = ((ObjectNode) parsed).deepCopy();
             
             // Lista COMPLETA de campos voláteis que DEVEM ser excluídos do hash
             // IMPORTANTE: Campos que podem mudar DURANTE a extração não devem fazer parte do hash
@@ -1032,10 +1027,7 @@ public class ManifestoEntity {
             camposVolateis.forEach(metadataParaHash::remove);
             
             // Gerar hash apenas dos campos estáveis
-            final String metadataJson = objectMapper.writeValueAsString(metadataParaHash);
-            final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            final byte[] hash = digest.digest(metadataJson.getBytes(StandardCharsets.UTF_8));
-            final String hashHex = bytesToHex(hash);
+            final String hashHex = CanonicalJsonHasher.sha256CanonicalJson(metadataParaHash);
             
             logger.debug("Identificador único gerado: {} (após remover {} campos voláteis)", 
                          hashHex.substring(0, 8), camposVolateis.size());
@@ -1045,30 +1037,8 @@ public class ManifestoEntity {
         } catch (final JsonProcessingException e) {
             logger.error("Erro ao processar metadata para hash: {}", e.getMessage(), e);
             // Fallback: calcular hash do metadata original (sem remover campos voláteis)
-            try {
-                final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                final byte[] hash = digest.digest(metadata.getBytes(StandardCharsets.UTF_8));
-                return bytesToHex(hash);
-            } catch (final NoSuchAlgorithmException ex) {
-                throw new RuntimeException("Erro ao calcular hash SHA-256 do metadata", ex);
-            }
-        } catch (final NoSuchAlgorithmException e) {
-            // Fallback: usar hash simples se SHA-256 não disponível (não deve acontecer)
-            throw new RuntimeException("Erro ao calcular hash SHA-256 do metadata", e);
+            return CanonicalJsonHasher.sha256Hex(metadata.trim());
         }
     }
 
-    /**
-     * Converte array de bytes para string hexadecimal.
-     * 
-     * @param bytes Array de bytes a ser convertido
-     * @return String hexadecimal (2 caracteres por byte)
-     */
-    private String bytesToHex(final byte[] bytes) {
-        final StringBuilder result = new StringBuilder();
-        for (final byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
-    }
 }

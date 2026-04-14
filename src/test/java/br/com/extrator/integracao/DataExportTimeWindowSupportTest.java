@@ -2,6 +2,7 @@ package br.com.extrator.integracao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -19,7 +20,9 @@ class DataExportTimeWindowSupportTest {
         final Instant fim = support.fimDoDia(data);
 
         assertEquals(data, support.toLocalDate(inicio));
-        assertEquals(data, support.toLocalDate(fim));
+        assertEquals(data.plusDays(1), support.toLocalDate(fim));
+        assertEquals(data, support.toInclusiveEndDate(fim));
+        assertEquals(Duration.ofHours(24), Duration.between(inicio, fim));
         assertEquals("2026-03-09 - 2026-03-09", support.formatarRange(inicio, fim));
     }
 }

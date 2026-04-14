@@ -57,7 +57,8 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         ReconciliationSummary processar(LocalDateTime inicio,
                                         LocalDateTime fimExtracao,
                                         boolean cicloSucesso,
-                                        boolean incluirFaturasGraphQL);
+                                        boolean incluirFaturasGraphQL,
+                                        String detalheFalhaCiclo);
     }
 
     public enum WaitResult {
@@ -198,7 +199,8 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                 inicio,
                 fimExtracao,
                 sucesso,
-                incluirFaturasGraphQL
+                incluirFaturasGraphQL,
+                sucesso ? null : detalhe
             );
             historyWriter.registerReconciliationHistory(inicio, fimExtracao, sucesso, resumoReconciliacao, cicloLog);
 
@@ -290,9 +292,16 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     private ReconciliationSummary processarReconciliacao(final LocalDateTime inicio,
                                                          final LocalDateTime fimExtracao,
                                                          final boolean cicloSucesso,
-                                                         final boolean incluirFaturasGraphQL) {
+                                                         final boolean incluirFaturasGraphQL,
+                                                         final String detalheFalhaCiclo) {
         try {
-            return reconciliationProcessor.processar(inicio, fimExtracao, cicloSucesso, incluirFaturasGraphQL);
+            return reconciliationProcessor.processar(
+                inicio,
+                fimExtracao,
+                cicloSucesso,
+                incluirFaturasGraphQL,
+                detalheFalhaCiclo
+            );
         } catch (final RuntimeException e) {
             System.err.println(
                 "ALERTA LOOP: Falha ao processar reconciliacao automatica: " + historyWriter.summarizeMessage(e.getMessage())

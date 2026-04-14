@@ -95,9 +95,29 @@ public final class SqlServerRecoveryReplayGate implements RecoveryReplayGate {
                 ps.setTimestamp(4, toTimestamp(finishedAt.plus(ConfigEtl.obterRecoveryReplayIdempotencyTtl())));
                 ps.setString(5, sanitizeError(errorMessage));
                 ps.setString(6, idempotencyKey);
-                ps.executeUpdate();
+                final int rowsAffected = ps.executeUpdate();
+                validarAtualizacaoStatusFinal(rowsAffected, idempotencyKey, executionUuid, status);
             }
         }
+    }
+
+    static void validarAtualizacaoStatusFinal(final int rowsAffected,
+                                              final String idempotencyKey,
+                                              final String executionUuid,
+                                              final String statusPretendido) throws SQLException {
+        if (rowsAffected == 1) {
+            return;
+        }
+        throw new SQLException(
+            "Gate de replay nao confirmou atualizacao final. rows_affected="
+                + rowsAffected
+                + " | idempotency_key="
+                + idempotencyKey
+                + " | execution_uuid="
+                + executionUuid
+                + " | status_pretendido="
+                + statusPretendido
+        );
     }
 
     private void upsertStarted(final Connection connection,
@@ -195,7 +215,7 @@ public final class SqlServerRecoveryReplayGate implements RecoveryReplayGate {
             """;
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, lockResource(idempotencyKey));
-            ps.setInt(2, ConfigEtl.obterTimeoutLockExecucaoMs());
+            ps.setInt(2, ConfigEtl.obterTimeoutLockReplayMs());
             try (ResultSet rs = ps.executeQuery()) {
                 final int resultado = rs.next() ? rs.getInt(1) : -999;
                 if (resultado < 0) {

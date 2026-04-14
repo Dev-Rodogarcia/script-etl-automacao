@@ -3,6 +3,7 @@ package br.com.extrator.aplicacao.extracao;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -79,6 +80,28 @@ class RecoveryUseCaseTest {
         assertEquals(0, gate.completedCalls.get());
     }
 
+    @Test
+    void devePreservarExcecaoOriginalQuandoMarkFailedTambemFalha() {
+        final FakeRecoveryReplayGate gate = new FakeRecoveryReplayGate(RecoveryReplayGate.StartResult.STARTED);
+        gate.throwOnMarkFailed = true;
+        final FakeExtracaoPorIntervaloUseCase extracao = new FakeExtracaoPorIntervaloUseCase();
+        extracao.throwOnExecute = true;
+        final RecoveryUseCase useCase = new RecoveryUseCase(
+            extracao,
+            gate,
+            Clock.fixed(Instant.parse("2026-04-13T03:00:00Z"), ZoneOffset.UTC)
+        );
+
+        final IllegalStateException erro = assertThrows(
+            IllegalStateException.class,
+            () -> useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true)
+        );
+
+        assertEquals("falha simulada", erro.getMessage());
+        assertEquals(1, erro.getSuppressed().length);
+        assertSame(gate.markFailedException, erro.getSuppressed()[0]);
+    }
+
     private static final class FakeExtracaoPorIntervaloUseCase extends ExtracaoPorIntervaloUseCase {
         private final AtomicInteger execucoes = new AtomicInteger();
         private boolean throwOnExecute;
@@ -96,6 +119,8 @@ class RecoveryUseCaseTest {
         private final StartResult startResult;
         private final AtomicInteger completedCalls = new AtomicInteger();
         private final AtomicInteger failedCalls = new AtomicInteger();
+        private boolean throwOnMarkFailed;
+        private RuntimeException markFailedException;
 
         private FakeRecoveryReplayGate(final StartResult startResult) {
             this.startResult = startResult;
@@ -119,6 +144,10 @@ class RecoveryUseCaseTest {
                                final java.time.LocalDateTime finishedAt,
                                final String errorMessage) {
             failedCalls.incrementAndGet();
+            if (throwOnMarkFailed) {
+                markFailedException = new RuntimeException("falha ao marcar replay como failed");
+                throw markFailedException;
+            }
         }
     }
 }

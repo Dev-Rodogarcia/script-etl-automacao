@@ -340,9 +340,7 @@ public class GraphQLExtractionService {
         // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
         final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
         final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> modoEstrito
-                ? !ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())
-                : ConstantesEntidades.STATUS_ERRO_API.equals(r.getStatus()))
+            .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
             .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
             .toList();
         if (!entidadesComFalha.isEmpty()) {
@@ -389,9 +387,7 @@ public class GraphQLExtractionService {
         exibirResumoConsolidado(List.of(resultado), inicioExecucao);
 
         final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
-        final boolean possuiFalha = modoEstrito
-            ? !ConstantesEntidades.STATUS_COMPLETO.equals(resultado.getStatus())
-            : ConstantesEntidades.STATUS_ERRO_API.equals(resultado.getStatus());
+        final boolean possuiFalha = deveFalharExecucaoFinal(resultado, modoEstrito);
         if (possuiFalha) {
             throw new RuntimeException(
                 "Extracao GraphQL auxiliar de coletas com falhas: "
@@ -763,5 +759,31 @@ public class GraphQLExtractionService {
             inicio.atStartOfDay(),
             fim.atTime(java.time.LocalTime.MAX)
         );
+    }
+
+    private boolean deveFalharExecucaoFinal(final ExtractionResult result, final boolean modoEstrito) {
+        if (result == null) {
+            return false;
+        }
+        if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
+            return false;
+        }
+        if (modoEstrito) {
+            return true;
+        }
+        return isEntidadeCriticaParaCompletude(result.getEntityName())
+            || ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus());
+    }
+
+    private boolean isEntidadeCriticaParaCompletude(final String entidade) {
+        if (entidade == null || entidade.isBlank()) {
+            return false;
+        }
+        return List.of(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            ConstantesEntidades.COLETAS,
+            ConstantesEntidades.FRETES,
+            ConstantesEntidades.FATURAS_GRAPHQL
+        ).contains(entidade);
     }
 }

@@ -10,8 +10,12 @@ import br.com.extrator.bootstrap.pipeline.IsolatedStepProcessExecutor.FaultMode;
 import br.com.extrator.comandos.cli.base.Comando;
 import br.com.extrator.integracao.dataexport.services.DataExportExtractionService;
 import br.com.extrator.integracao.graphql.services.GraphQLExtractionService;
+import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
 
 public class ExecutarStepIsoladoComando implements Comando {
+    private static final String EXECUTION_LOCK_RESOURCE = "etl-global-execution";
+
     @Override
     public void executar(final String[] args) throws Exception {
         if (args == null || args.length < 5) {
@@ -19,6 +23,7 @@ public class ExecutarStepIsoladoComando implements Comando {
                 "Uso: --executar-step-isolado <graphql|dataexport> <yyyy-mm-dd> <yyyy-mm-dd> <entidade|all> [--fault modo]"
             );
         }
+        validarOrigemDaExecucao();
 
         final ApiType apiType = resolverApi(args[1]);
         final LocalDate dataInicio = parseDate(args[2], "dataInicio");
@@ -27,11 +32,12 @@ public class ExecutarStepIsoladoComando implements Comando {
         final FaultMode faultMode = resolverFault(args);
 
         executarFaultSeNecessario(faultMode);
-
-        switch (apiType) {
-            case GRAPHQL -> new GraphQLExtractionService().executar(dataInicio, dataFim, entidade);
-            case DATAEXPORT -> new DataExportExtractionService().executar(dataInicio, dataFim, entidade);
-            default -> throw new IllegalArgumentException("API isolada nao suportada: " + apiType);
+        if (ConfigEtl.isProcessoFilhoIsolado()) {
+            executarStep(apiType, dataInicio, dataFim, entidade);
+            return;
+        }
+        try (AutoCloseable ignored = new SqlServerExecutionLockManager().acquire(EXECUTION_LOCK_RESOURCE)) {
+            executarStep(apiType, dataInicio, dataFim, entidade);
         }
     }
 
@@ -85,6 +91,26 @@ public class ExecutarStepIsoladoComando implements Comando {
                     // Simula tarefa externa nao cooperativa; o pai deve matar o processo.
                 }
             }
+        }
+    }
+
+    private void validarOrigemDaExecucao() {
+        if (ConfigEtl.isProcessoFilhoIsolado() || ConfigEtl.isExecucaoManualStepIsoladoPermitida()) {
+            return;
+        }
+        throw new IllegalStateException(
+            "O comando --executar-step-isolado e interno e nao pode ser executado manualmente sem ETL_PROCESS_ISOLATED_MANUAL_ALLOW=true."
+        );
+    }
+
+    private void executarStep(final ApiType apiType,
+                              final LocalDate dataInicio,
+                              final LocalDate dataFim,
+                              final String entidade) {
+        switch (apiType) {
+            case GRAPHQL -> new GraphQLExtractionService().executar(dataInicio, dataFim, entidade);
+            case DATAEXPORT -> new DataExportExtractionService().executar(dataInicio, dataFim, entidade);
+            default -> throw new IllegalArgumentException("API isolada nao suportada: " + apiType);
         }
     }
 }

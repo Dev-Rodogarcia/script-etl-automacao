@@ -325,9 +325,7 @@ public class DataExportExtractionService {
         // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
         final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
         final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> modoEstrito
-                ? !ConstantesEntidades.STATUS_COMPLETO.equals(r.getStatus())
-                : ConstantesEntidades.STATUS_ERRO_API.equals(r.getStatus()))
+            .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
             .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
             .toList();
         if (!entidadesComFalha.isEmpty()) {
@@ -624,5 +622,34 @@ public class DataExportExtractionService {
             inicio.atStartOfDay(),
             fim.atTime(java.time.LocalTime.MAX)
         );
+    }
+
+    private boolean deveFalharExecucaoFinal(final ExtractionResult result, final boolean modoEstrito) {
+        if (result == null) {
+            return false;
+        }
+        if (ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus())) {
+            return false;
+        }
+        if (modoEstrito) {
+            return true;
+        }
+        return isEntidadeCriticaParaCompletude(result.getEntityName())
+            || ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus());
+    }
+
+    private boolean isEntidadeCriticaParaCompletude(final String entidade) {
+        if (entidade == null || entidade.isBlank()) {
+            return false;
+        }
+        return List.of(
+            ConstantesEntidades.MANIFESTOS,
+            ConstantesEntidades.COTACOES,
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            ConstantesEntidades.CONTAS_A_PAGAR,
+            ConstantesEntidades.FATURAS_POR_CLIENTE,
+            ConstantesEntidades.INVENTARIO,
+            ConstantesEntidades.SINISTROS
+        ).contains(entidade);
     }
 }

@@ -34,7 +34,7 @@ class LoopDaemonRunHandlerTest {
             stateStore,
             historyWriter,
             incluirFaturas -> ciclosExecutados.incrementAndGet(),
-            (inicio, fimExtracao, sucesso, incluirFaturas) -> null,
+            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
             (proximoCiclo, store) -> chamadaEspera.getAndIncrement() == 0
                 ? LoopDaemonRunHandler.WaitResult.FORCE_RUN_REQUESTED
                 : LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
@@ -65,7 +65,7 @@ class LoopDaemonRunHandlerTest {
             incluirFaturas -> {
                 throw new RuntimeException(LoopDaemonHandlerSupport.MENSAGEM_FALHA_INTEGRIDADE + " em teste");
             },
-            (inicio, fimExtracao, sucesso, incluirFaturas) -> null,
+            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 4321L,
@@ -92,7 +92,7 @@ class LoopDaemonRunHandlerTest {
             true,
             1,
             0,
-            (data, incluirFaturas) -> {
+            (data, api, entidade, incluirFaturas) -> {
                 throw new IllegalStateException("falha simulada");
             }
         );
@@ -101,7 +101,8 @@ class LoopDaemonRunHandlerTest {
             LocalDateTime.now().minusMinutes(10),
             LocalDateTime.now(),
             true,
-            true
+            true,
+            null
         );
 
         assertEquals(
@@ -132,7 +133,7 @@ class LoopDaemonRunHandlerTest {
                     }
                 }
             },
-            (inicio, fimExtracao, sucesso, incluirFaturas) -> null,
+            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 2468L,
@@ -168,7 +169,7 @@ class LoopDaemonRunHandlerTest {
                     ciclosExecutados.incrementAndGet();
                     throw new RuntimeException(LoopDaemonHandlerSupport.MENSAGEM_FALHA_INTEGRIDADE + " em serie");
                 },
-                (inicio, fimExtracao, sucesso, incluirFaturas) -> null,
+                (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
                 (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.TIME_ELAPSED,
                 cicloLog -> () -> { },
                 () -> 97531L,

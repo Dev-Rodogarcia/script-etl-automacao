@@ -132,6 +132,30 @@ class ConfigEtlTest {
         }
     }
 
+    @Test
+    void deveUsarTimeoutMaiorParaLockGlobalPorPadrao() {
+        final String valorAnterior = System.getProperty("etl.execution.lock.timeout.ms");
+        try {
+            System.clearProperty("etl.execution.lock.timeout.ms");
+
+            assertEquals(30_000, ConfigEtl.obterTimeoutLockExecucaoMs());
+        } finally {
+            restaurarPropriedade("etl.execution.lock.timeout.ms", valorAnterior);
+        }
+    }
+
+    @Test
+    void execucaoManualDeStepIsoladoDeveVirDesabilitadaPorPadrao() {
+        final String valorAnterior = System.getProperty("etl.process.isolated.manual.allow");
+        try {
+            System.clearProperty("etl.process.isolated.manual.allow");
+
+            assertTrue(!ConfigEtl.isExecucaoManualStepIsoladoPermitida());
+        } finally {
+            restaurarPropriedade("etl.process.isolated.manual.allow", valorAnterior);
+        }
+    }
+
     private void restaurarPropriedade(final String chave, final String valorAnterior) {
         if (valorAnterior == null) {
             System.clearProperty(chave);

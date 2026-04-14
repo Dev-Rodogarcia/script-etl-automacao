@@ -36,6 +36,7 @@ final class LoopReconciliationStateStore {
     private static final String KEY_LAST_DAILY_SCHEDULED_DATE = "last_daily_scheduled_date";
     private static final String KEY_LAST_SUCCESSFUL_RECONCILIATION_DATE = "last_successful_reconciliation_date";
     private static final String KEY_PENDING_DATES = "pending_dates";
+    private static final String KEY_PENDING_TARGETS = "pending_targets";
     private static final String KEY_LAST_ERROR = "last_error";
     private static final String KEY_UPDATED_AT = "updated_at";
 
@@ -66,12 +67,23 @@ final class LoopReconciliationStateStore {
         estado.lastDailyScheduledDate = parseDate(properties.getProperty(KEY_LAST_DAILY_SCHEDULED_DATE));
         estado.lastSuccessfulReconciliationDate = parseDate(properties.getProperty(KEY_LAST_SUCCESSFUL_RECONCILIATION_DATE));
 
+        final String pendenciasDetalhadas = properties.getProperty(KEY_PENDING_TARGETS, "");
+        if (!pendenciasDetalhadas.isBlank()) {
+            for (final String token : pendenciasDetalhadas.split(",")) {
+                final ReconciliationTarget target = parseTarget(token);
+                if (target != null) {
+                    estado.pendingTargets.add(target);
+                }
+            }
+            return estado;
+        }
+
         final String pendencias = properties.getProperty(KEY_PENDING_DATES, "");
         if (!pendencias.isBlank()) {
             for (final String token : pendencias.split(",")) {
                 final LocalDate data = parseDate(token);
                 if (data != null) {
-                    estado.pendingDates.add(data);
+                    estado.pendingTargets.add(new ReconciliationTarget(data, null, null));
                 }
             }
         }
@@ -84,8 +96,17 @@ final class LoopReconciliationStateStore {
         properties.setProperty(KEY_LAST_DAILY_SCHEDULED_DATE, toStringDate(estado.lastDailyScheduledDate));
         properties.setProperty(KEY_LAST_SUCCESSFUL_RECONCILIATION_DATE, toStringDate(estado.lastSuccessfulReconciliationDate));
         properties.setProperty(
+            KEY_PENDING_TARGETS,
+            estado.pendingTargets.stream()
+                .sorted((esquerda, direita) -> esquerda.token().compareTo(direita.token()))
+                .map(ReconciliationTarget::token)
+                .collect(Collectors.joining(","))
+        );
+        properties.setProperty(
             KEY_PENDING_DATES,
-            estado.pendingDates.stream()
+            estado.pendingTargets.stream()
+                .map(ReconciliationTarget::data)
+                .distinct()
                 .sorted()
                 .map(LocalDate::toString)
                 .collect(Collectors.joining(","))
@@ -127,9 +148,40 @@ final class LoopReconciliationStateStore {
         return data == null ? "" : data.toString();
     }
 
+    private ReconciliationTarget parseTarget(final String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        final String[] partes = valor.trim().split("\\|", -1);
+        final LocalDate data = parseDate(partes.length > 0 ? partes[0] : null);
+        if (data == null) {
+            return null;
+        }
+        final String api = normalizarEscopo(partes.length > 1 ? partes[1] : null);
+        final String entidade = normalizarEscopo(partes.length > 2 ? partes[2] : null);
+        return new ReconciliationTarget(data, api, entidade);
+    }
+
+    private String normalizarEscopo(final String valor) {
+        if (valor == null || valor.isBlank() || "*".equals(valor.trim())) {
+            return null;
+        }
+        return valor.trim();
+    }
+
     static final class ReconciliationState {
         LocalDate lastDailyScheduledDate;
         LocalDate lastSuccessfulReconciliationDate;
-        final Set<LocalDate> pendingDates = new LinkedHashSet<>();
+        final Set<ReconciliationTarget> pendingTargets = new LinkedHashSet<>();
+    }
+
+    record ReconciliationTarget(LocalDate data, String api, String entidade) {
+        String token() {
+            return data
+                + "|"
+                + (api == null || api.isBlank() ? "*" : api)
+                + "|"
+                + (entidade == null || entidade.isBlank() ? "*" : entidade);
+        }
     }
 }

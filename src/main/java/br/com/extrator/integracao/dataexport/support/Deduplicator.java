@@ -273,10 +273,10 @@ public final class Deduplicator {
                 },
                 e -> e,
                 (primeiro, segundo) -> {
-                    // ✅ ESTRATÉGIA "KEEP LAST": Manter o segundo (último processado)
-                    logger.warn("⚠️ Duplicado detectado: sequence_code={}. Mantendo o último processado.", 
+                    final ContasAPagarDataExportEntity maisFresco = obterMaisRecenteContaAPagar(primeiro, segundo);
+                    logger.warn("⚠️ Duplicado detectado: sequence_code={}. Mantendo o registro mais fresco (dataCriacao/dataTransacao/dataLiquidacao).", 
                         segundo.getSequenceCode());
-                    return segundo;
+                    return maisFresco;
                 }
             ))
             .values()
@@ -314,5 +314,50 @@ public final class Deduplicator {
             .values()
             .stream()
             .collect(Collectors.toList());
+    }
+
+    private static ContasAPagarDataExportEntity obterMaisRecenteContaAPagar(
+        final ContasAPagarDataExportEntity primeiro,
+        final ContasAPagarDataExportEntity segundo
+    ) {
+        final int dataCriacao = comparar(primeiro.getDataCriacao(), segundo.getDataCriacao());
+        if (dataCriacao != 0) {
+            return dataCriacao >= 0 ? primeiro : segundo;
+        }
+
+        final int dataTransacao = comparar(primeiro.getDataTransacao(), segundo.getDataTransacao());
+        if (dataTransacao != 0) {
+            return dataTransacao >= 0 ? primeiro : segundo;
+        }
+
+        final int dataLiquidacao = comparar(primeiro.getDataLiquidacao(), segundo.getDataLiquidacao());
+        if (dataLiquidacao != 0) {
+            return dataLiquidacao >= 0 ? primeiro : segundo;
+        }
+
+        final int issueDate = comparar(primeiro.getIssueDate(), segundo.getIssueDate());
+        if (issueDate != 0) {
+            return issueDate >= 0 ? primeiro : segundo;
+        }
+
+        final int dataExtracao = comparar(primeiro.getDataExtracao(), segundo.getDataExtracao());
+        if (dataExtracao != 0) {
+            return dataExtracao >= 0 ? primeiro : segundo;
+        }
+
+        return segundo;
+    }
+
+    private static <T extends Comparable<? super T>> int comparar(final T esquerda, final T direita) {
+        if (esquerda == null && direita == null) {
+            return 0;
+        }
+        if (esquerda == null) {
+            return -1;
+        }
+        if (direita == null) {
+            return 1;
+        }
+        return esquerda.compareTo(direita);
     }
 }

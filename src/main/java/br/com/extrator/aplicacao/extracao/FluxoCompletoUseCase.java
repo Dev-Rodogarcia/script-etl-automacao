@@ -435,8 +435,9 @@ public class FluxoCompletoUseCase {
 
     private String nomeRunnerParaResultado(final StepExecutionResult result) {
         final String step = result.obterNomeEtapa() == null ? "" : result.obterNomeEtapa().toLowerCase(Locale.ROOT);
-        if (step.contains(ConstantesEntidades.FATURAS_GRAPHQL)) {
-            return "FaturasGraphQL";
+        final String runnerEspecifico = extrairRunnerEspecifico(result);
+        if (runnerEspecifico != null) {
+            return runnerEspecifico;
         }
         if (step.startsWith("graphql:")) {
             return "GraphQL";
@@ -446,6 +447,34 @@ public class FluxoCompletoUseCase {
         }
         final String entidade = result.obterNomeEntidade();
         return entidade == null || entidade.isBlank() ? "desconhecido" : entidade;
+    }
+
+    private String extrairRunnerEspecifico(final StepExecutionResult result) {
+        if (result == null || result.getMessage() == null || result.getMessage().isBlank()) {
+            return null;
+        }
+        final String step = result.obterNomeEtapa() == null ? "" : result.obterNomeEtapa().toLowerCase(Locale.ROOT);
+        final String api = step.startsWith("graphql:") ? "GraphQL" : step.startsWith("dataexport:") ? "DataExport" : null;
+        if (api == null) {
+            return null;
+        }
+
+        final String mensagem = result.getMessage();
+        final int idxFalhas = mensagem.toLowerCase(Locale.ROOT).indexOf("falhas:");
+        if (idxFalhas >= 0) {
+            final String falhas = mensagem.substring(idxFalhas + "falhas:".length()).trim();
+            final String primeiroItem = falhas.split(",")[0].trim();
+            final int idxStatus = primeiroItem.indexOf('(');
+            final String entidade = idxStatus >= 0 ? primeiroItem.substring(0, idxStatus).trim() : primeiroItem;
+            if (!entidade.isBlank()) {
+                return api + "/" + entidade.toLowerCase(Locale.ROOT);
+            }
+        }
+
+        if (step.contains(ConstantesEntidades.FATURAS_GRAPHQL)) {
+            return "GraphQL/" + ConstantesEntidades.FATURAS_GRAPHQL;
+        }
+        return null;
     }
 
     private void executarPreBackfillReferencialColetas(final LocalDate dataInicio, final boolean modoLoopDaemon) {

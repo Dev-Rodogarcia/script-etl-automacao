@@ -90,7 +90,7 @@ class LoopReconciliationServiceStressTest {
             true,
             15,
             1,
-            (data, incluirFaturasGraphQL) -> {
+            (data, api, entidade, incluirFaturasGraphQL) -> {
                 totalExecucoes.incrementAndGet();
                 final int tentativaAtual = tentativasPorData.computeIfAbsent(data, d -> new AtomicInteger(0)).incrementAndGet();
 
@@ -109,7 +109,8 @@ class LoopReconciliationServiceStressTest {
                 LocalDateTime.of(2026, 2, 20, 10, 0),
                 LocalDateTime.of(2026, 2, 20, 10, 30),
                 true,
-                true
+                true,
+                null
             );
             if (resumo.getPendenciasRestantes().isEmpty()) {
                 break;
@@ -139,7 +140,7 @@ class LoopReconciliationServiceStressTest {
             true,
             5,
             0,
-            (data, incluirFaturasGraphQL) -> conciliadas.add(data)
+            (data, api, entidade, incluirFaturasGraphQL) -> conciliadas.add(data)
         );
 
         for (int dia = 0; dia < 90; dia++) {
@@ -150,7 +151,8 @@ class LoopReconciliationServiceStressTest {
                 dataAtual.atStartOfDay(),
                 dataAtual.atTime(0, 30),
                 true,
-                true
+                true,
+                null
             );
 
             assertTrue(resumo.isAtivo());

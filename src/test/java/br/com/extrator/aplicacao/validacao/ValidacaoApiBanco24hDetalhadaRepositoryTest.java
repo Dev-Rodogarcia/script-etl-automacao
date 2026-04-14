@@ -169,6 +169,35 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
     }
 
     @Test
+    void deveAplicarFiltroEstritoPorJanelaEstruturadaEmContasAPagar() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            assertTrue(sql.contains("FROM dbo.contas_a_pagar"));
+            assertTrue(sql.contains("data_extracao >= ? AND data_extracao <= ?"));
+            assertTrue(!sql.contains("COALESCE(issue_date"));
+            return criarPreparedStatement(captured, criarResultSet(List.of()));
+        });
+        final JanelaExecucao janela = new JanelaExecucao(
+            LocalDateTime.of(2026, 4, 13, 17, 46, 14),
+            LocalDateTime.of(2026, 4, 13, 17, 46, 39),
+            true
+        );
+
+        repository.carregarChavesBancoNaJanela(
+            conexao,
+            ConstantesEntidades.CONTAS_A_PAGAR,
+            janela,
+            LocalDate.of(2026, 4, 12),
+            LocalDate.of(2026, 4, 12),
+            true
+        );
+
+        assertEquals(Timestamp.valueOf(janela.inicio()), captured.get(1));
+        assertEquals(Timestamp.valueOf(janela.fim()), captured.get(2));
+        assertEquals(2, captured.size());
+    }
+
+    @Test
     void deveResolverExecutionUuidAncoraAPartirDaAuditoriaEstruturada() throws SQLException {
         final Map<Integer, Object> captured = new LinkedHashMap<>();
         final Connection conexao = criarConexao(sql -> {

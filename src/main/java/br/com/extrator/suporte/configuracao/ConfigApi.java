@@ -206,6 +206,34 @@ public final class ConfigApi {
         );
     }
 
+    public static int obterMaxTentativasAnomaliaPaginacaoGraphQL() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "API_GRAPHQL_PAGINACAO_ANOMALIA_MAX_TENTATIVAS",
+                "api.graphql.paginacao.anomalia.max_tentativas"
+            ),
+            2,
+            value -> value >= 0,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static long obterDelayRetryAnomaliaPaginacaoGraphQLMs() {
+        return ConfigValueParser.parseLong(
+            ConfigSource.obterConfiguracao(
+                "API_GRAPHQL_PAGINACAO_ANOMALIA_DELAY_MS",
+                "api.graphql.paginacao.anomalia.delay_ms"
+            ),
+            750L,
+            value -> value >= 0L,
+            null,
+            null,
+            null
+        );
+    }
+
     public static int obterMaxRegistrosDataExport() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao("API_DATAEXPORT_MAX_REGISTROS", "api.dataexport.max.registros.execucao"),

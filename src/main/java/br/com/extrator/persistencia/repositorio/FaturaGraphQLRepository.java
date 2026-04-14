@@ -73,7 +73,7 @@ public class FaturaGraphQLRepository extends AbstractRepository<FaturaGraphQLEnt
             "COALESCE(CAST(source.updated_at AS datetime2), CAST(source.created_at AS datetime2))"
         );
         final String sql = """
-            MERGE dbo.faturas_graphql AS target
+            MERGE dbo.faturas_graphql WITH (HOLDLOCK) AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)) AS source
                   (id, document, issue_date, due_date, original_due_date, value, paid_value, value_to_pay, discount_value, interest_value, paid, status, type, comments, sequence_code, competence_month, competence_year, created_at, updated_at, corporation_id, corporation_name, corporation_cnpj, nfse_numero, carteira_banco, instrucao_boleto, banco_nome, metodo_pagamento, metadata, data_extracao)
             ON target.id = source.id

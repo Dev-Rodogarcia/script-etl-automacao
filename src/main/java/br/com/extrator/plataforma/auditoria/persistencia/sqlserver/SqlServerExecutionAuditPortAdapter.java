@@ -1,5 +1,6 @@
 package br.com.extrator.plataforma.auditoria.persistencia.sqlserver;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -7,8 +8,13 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +23,7 @@ import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
+import br.com.extrator.suporte.mapeamento.MapperUtil;
 
 public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditPort {
     private static final Logger logger = LoggerFactory.getLogger(SqlServerExecutionAuditPortAdapter.class);
@@ -75,7 +82,11 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
 
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             if (!tabelaExiste(conexao, "sys_execution_audit")) {
-                tratarFalhaEscrita("Tabela dbo.sys_execution_audit ausente; auditoria estruturada nao pode ser persistida.");
+                tratarFalhaEscrita(
+                    "Tabela dbo.sys_execution_audit ausente; auditoria estruturada nao pode ser persistida.",
+                    null,
+                    criarPayloadFallback("execution_audit", record)
+                );
                 return;
             }
             try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -104,7 +115,11 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
                 stmt.executeUpdate();
             }
         } catch (final SQLException e) {
-            tratarFalhaEscrita("Falha ao gravar sys_execution_audit: " + e.getMessage(), e);
+            tratarFalhaEscrita(
+                "Falha ao gravar sys_execution_audit: " + e.getMessage(),
+                e,
+                criarPayloadFallback("execution_audit", record)
+            );
         }
     }
 
@@ -206,7 +221,12 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
         try (Connection conexao = GerenciadorConexao.obterConexao()) {
             if (!tabelaExiste(conexao, "sys_execution_watermark")) {
                 tratarFalhaEscrita(
-                    "Tabela dbo.sys_execution_watermark ausente; watermark confirmado de '" + entidade + "' nao pode ser atualizado."
+                    "Tabela dbo.sys_execution_watermark ausente; watermark confirmado de '" + entidade + "' nao pode ser atualizado.",
+                    null,
+                    criarPayloadFallback("execution_watermark", Map.of(
+                        "entidade", entidade,
+                        "watermark_confirmado", watermarkConfirmado
+                    ))
                 );
                 return;
             }
@@ -216,7 +236,14 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
                 stmt.executeUpdate();
             }
         } catch (final SQLException e) {
-            tratarFalhaEscrita("Falha ao atualizar watermark de " + entidade + ": " + e.getMessage(), e);
+            tratarFalhaEscrita(
+                "Falha ao atualizar watermark de " + entidade + ": " + e.getMessage(),
+                e,
+                criarPayloadFallback("execution_watermark", Map.of(
+                    "entidade", entidade,
+                    "watermark_confirmado", watermarkConfirmado
+                ))
+            );
         }
     }
 
@@ -277,11 +304,15 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
         return timestamp == null ? null : timestamp.toLocalDateTime();
     }
 
+    @SuppressWarnings("unused")
     private void tratarFalhaEscrita(final String mensagem) {
-        tratarFalhaEscrita(mensagem, null);
+        tratarFalhaEscrita(mensagem, null, Map.of("tipo", "audit_write_failure"));
     }
 
-    private void tratarFalhaEscrita(final String mensagem, final Exception causa) {
+    private void tratarFalhaEscrita(final String mensagem,
+                                    final Exception causa,
+                                    final Map<String, Object> payloadFallback) {
+        registrarFallbackLocal(mensagem, causa, payloadFallback);
         if (ConfigEtl.isModoIntegridadeEstrito()) {
             throw causa == null ? new IllegalStateException(mensagem) : new IllegalStateException(mensagem, causa);
         }
@@ -290,5 +321,55 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
             return;
         }
         logger.warn(mensagem, causa);
+    }
+
+    private void registrarFallbackLocal(final String mensagem,
+                                        final Exception causa,
+                                        final Map<String, Object> payloadFallback) {
+        final Map<String, Object> registro = new LinkedHashMap<>();
+        registro.put("recorded_at", LocalDateTime.now().toString());
+        registro.put("message", mensagem);
+        if (causa != null) {
+            registro.put("exception_type", causa.getClass().getName());
+            registro.put("exception_message", causa.getMessage());
+        }
+        if (payloadFallback != null && !payloadFallback.isEmpty()) {
+            registro.put("payload", payloadFallback);
+        }
+
+        final Path arquivo = resolverArquivoFallback();
+        try {
+            final Path parent = arquivo.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            final String linha = MapperUtil.sharedJson().writeValueAsString(registro) + System.lineSeparator();
+            Files.writeString(
+                arquivo,
+                linha,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND,
+                StandardOpenOption.WRITE
+            );
+        } catch (final IOException e) {
+            logger.error("Falha ao registrar fallback local de auditoria em {}: {}", arquivo.toAbsolutePath(), e.getMessage(), e);
+        }
+    }
+
+    private Map<String, Object> criarPayloadFallback(final String tipo, final Object detalhe) {
+        final Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("tipo", tipo);
+        payload.put("detalhe", detalhe);
+        return payload;
+    }
+
+    private Path resolverArquivoFallback() {
+        final String override = System.getProperty("etl.audit.fallback.file");
+        if (override != null && !override.isBlank()) {
+            return Path.of(override).toAbsolutePath().normalize();
+        }
+        return Path.of("runtime", "state", "audit", "sys_execution_audit_fallback.jsonl")
+            .toAbsolutePath()
+            .normalize();
     }
 }

@@ -142,7 +142,18 @@ public final class RecoveryUseCase {
             replayGate.markCompleted(idempotencyKey, executionUuid, LocalDateTime.now(clock));
             log.info("Recovery replay concluido com sucesso | idempotency_key={}", idempotencyKey);
         } catch (final Exception e) {
-            replayGate.markFailed(idempotencyKey, executionUuid, LocalDateTime.now(clock), e.getMessage());
+            try {
+                replayGate.markFailed(idempotencyKey, executionUuid, LocalDateTime.now(clock), e.getMessage());
+            } catch (final Exception erroSecundario) {
+                log.error(
+                    "Falha ao marcar replay como FAILED | idempotency_key={} | execution_uuid={} | erro_secundario={}",
+                    idempotencyKey,
+                    executionUuid,
+                    erroSecundario.getMessage(),
+                    erroSecundario
+                );
+                e.addSuppressed(erroSecundario);
+            }
             throw e;
         }
     }

@@ -51,7 +51,7 @@ import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
-final class ValidacaoApiBanco24hDetalhadaRepository {
+class ValidacaoApiBanco24hDetalhadaRepository {
     private final LoggerConsole log;
     private final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher;
     private final JanelaAbertaCeilingProvider janelaAbertaCeilingProvider;
@@ -403,6 +403,24 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate periodoInicio,
         final LocalDate periodoFim
     ) throws SQLException {
+        return carregarChavesBancoNaJanela(
+            conexao,
+            entidade,
+            janela,
+            periodoInicio,
+            periodoFim,
+            false
+        );
+    }
+
+    Set<String> carregarChavesBancoNaJanela(
+        final Connection conexao,
+        final String entidade,
+        final JanelaExecucao janela,
+        final LocalDate periodoInicio,
+        final LocalDate periodoFim,
+        final boolean filtroEstritoDataExtracao
+    ) throws SQLException {
         final String sql = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS ->
                 """
@@ -430,14 +448,14 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.localizacao_cargas
                 WHERE %s
                   AND sequence_number IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.CONTAS_A_PAGAR ->
                 """
                 SELECT CAST(sequence_code AS VARCHAR(50)) AS chave
                 FROM dbo.contas_a_pagar
                 WHERE %s
                   AND sequence_code IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.FATURAS_POR_CLIENTE ->
                 """
                 SELECT unique_id AS chave
@@ -472,13 +490,20 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.dim_usuarios
                 WHERE %s
                   AND user_id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             default -> throw new IllegalArgumentException("Entidade nao suportada na comparacao detalhada: " + entidade);
         };
 
         final Set<String> chaves = new HashSet<>();
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            preencherParametrosFiltroBanco(stmt, entidade, janela, periodoInicio, periodoFim);
+            preencherParametrosFiltroBanco(
+                stmt,
+                entidade,
+                janela,
+                periodoInicio,
+                periodoFim,
+                filtroEstritoDataExtracao
+            );
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String chave = rs.getString("chave");
@@ -512,6 +537,24 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate periodoInicio,
         final LocalDate periodoFim
     ) throws SQLException {
+        return carregarHashesMetadataBancoNaJanela(
+            conexao,
+            entidade,
+            janela,
+            periodoInicio,
+            periodoFim,
+            false
+        );
+    }
+
+    Map<String, String> carregarHashesMetadataBancoNaJanela(
+        final Connection conexao,
+        final String entidade,
+        final JanelaExecucao janela,
+        final LocalDate periodoInicio,
+        final LocalDate periodoFim,
+        final boolean filtroEstritoDataExtracao
+    ) throws SQLException {
         final String sql = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS ->
                 """
@@ -540,14 +583,14 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.localizacao_cargas
                 WHERE %s
                   AND sequence_number IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.CONTAS_A_PAGAR ->
                 """
                 SELECT CAST(sequence_code AS VARCHAR(50)) AS chave, metadata
                 FROM dbo.contas_a_pagar
                 WHERE %s
                   AND sequence_code IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.FATURAS_POR_CLIENTE ->
                 """
                 SELECT unique_id AS chave, metadata
@@ -582,13 +625,20 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.dim_usuarios
                 WHERE %s
                   AND user_id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             default -> throw new IllegalArgumentException("Entidade nao suportada na comparacao detalhada: " + entidade);
         };
 
         final Map<String, String> hashesPorChave = new LinkedHashMap<>();
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            preencherParametrosFiltroBanco(stmt, entidade, janela, periodoInicio, periodoFim);
+            preencherParametrosFiltroBanco(
+                stmt,
+                entidade,
+                janela,
+                periodoInicio,
+                periodoFim,
+                filtroEstritoDataExtracao
+            );
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String chave = rs.getString("chave");
@@ -803,6 +853,10 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
     }
 
     private String condicaoFiltroBanco(final String entidade) {
+        return condicaoFiltroBanco(entidade, false);
+    }
+
+    private String condicaoFiltroBanco(final String entidade, final boolean filtroEstritoDataExtracao) {
         return switch (entidade) {
             case ConstantesEntidades.COLETAS ->
                 "((data_extracao >= ? AND data_extracao <= ?)"
@@ -817,8 +871,10 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
                 "((data_extracao >= ? AND data_extracao <= ?)"
                     + " OR (COALESCE(CAST(service_at AS DATE), CAST(predicted_delivery_at AS DATE)) BETWEEN ? AND ?))";
             case ConstantesEntidades.CONTAS_A_PAGAR ->
-                "((data_extracao >= ? AND data_extracao <= ?)"
-                    + " OR (COALESCE(issue_date, data_transacao, data_liquidacao, CAST(data_criacao AS DATE)) BETWEEN ? AND ?))";
+                filtroEstritoDataExtracao
+                    ? "(data_extracao >= ? AND data_extracao <= ?)"
+                    : "((data_extracao >= ? AND data_extracao <= ?)"
+                        + " OR (COALESCE(issue_date, data_transacao, data_liquidacao, CAST(data_criacao AS DATE)) BETWEEN ? AND ?))";
             case ConstantesEntidades.FATURAS_POR_CLIENTE,
                  ConstantesEntidades.FATURAS_GRAPHQL ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
@@ -838,6 +894,17 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
         final LocalDate periodoInicio,
         final LocalDate periodoFim
     ) throws SQLException {
+        preencherParametrosFiltroBanco(stmt, entidade, janela, periodoInicio, periodoFim, false);
+    }
+
+    private void preencherParametrosFiltroBanco(
+        final PreparedStatement stmt,
+        final String entidade,
+        final JanelaExecucao janela,
+        final LocalDate periodoInicio,
+        final LocalDate periodoFim,
+        final boolean filtroEstritoDataExtracao
+    ) throws SQLException {
         if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade)) {
             stmt.setTimestamp(1, Timestamp.valueOf(periodoInicio.atStartOfDay()));
             stmt.setTimestamp(2, Timestamp.valueOf(periodoFim.atTime(java.time.LocalTime.MAX)));
@@ -848,6 +915,9 @@ final class ValidacaoApiBanco24hDetalhadaRepository {
 
         stmt.setTimestamp(1, Timestamp.valueOf(janela.inicio()));
         stmt.setTimestamp(2, Timestamp.valueOf(janela.fim()));
+        if (ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade) && filtroEstritoDataExtracao) {
+            return;
+        }
 
         if (ConstantesEntidades.MANIFESTOS.equals(entidade)
             || ConstantesEntidades.COTACOES.equals(entidade)

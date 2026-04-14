@@ -40,11 +40,18 @@ public class ReconciliacaoUseCase {
     }
 
     public void executar(final LocalDate data, final boolean incluirFaturasGraphQL) throws Exception {
+        executar(data, null, null, incluirFaturasGraphQL);
+    }
+
+    public void executar(final LocalDate data,
+                         final String api,
+                         final String entidade,
+                         final boolean incluirFaturasGraphQL) throws Exception {
         final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
             data,
             data,
-            null,
-            null,
+            api,
+            entidade,
             incluirFaturasGraphQL,
             true
         );

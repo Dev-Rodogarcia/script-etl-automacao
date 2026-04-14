@@ -16,7 +16,7 @@ class RepositoryMergeGuardSourceTest {
     void deveExigirGuardasMonotonicasNosMergesCriticos() throws IOException {
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/ColetaRepository.java",
-            List.of("WHEN MATCHED AND", "target.status_updated_at", "source.status_updated_at")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.status_updated_at", "source.status_updated_at")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FreteRepository.java",
@@ -36,11 +36,11 @@ class RepositoryMergeGuardSourceTest {
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaGraphQLRepository.java",
-            List.of("WHEN MATCHED AND", "target.updated_at", "source.updated_at")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.updated_at", "source.updated_at")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/UsuarioSistemaRepository.java",
-            List.of("WHEN MATCHED AND", "T.data_atualizacao", "S.data_atualizacao")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "T.data_atualizacao", "S.data_atualizacao")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",

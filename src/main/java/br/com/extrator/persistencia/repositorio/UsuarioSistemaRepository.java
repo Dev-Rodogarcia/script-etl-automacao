@@ -76,7 +76,7 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
             "(COALESCE(T.origem_atualizado_em, T.data_atualizacao) IS NULL "
                 + "OR COALESCE(S.origem_atualizado_em, S.data_atualizacao) >= COALESCE(T.origem_atualizado_em, T.data_atualizacao))";
         final String sql = String.format("""
-            MERGE dbo.%s AS T
+            MERGE dbo.%s WITH (HOLDLOCK) AS T
             USING (VALUES (?, ?, ?, ?, ?, ?)) AS S (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
             ON T.user_id = S.id
             WHEN MATCHED AND %s THEN
