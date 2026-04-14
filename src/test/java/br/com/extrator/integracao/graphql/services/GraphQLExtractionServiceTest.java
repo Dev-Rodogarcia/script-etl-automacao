@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
@@ -26,6 +27,11 @@ import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class GraphQLExtractionServiceTest {
+
+    @AfterEach
+    void limparContexto() {
+        ExecutionContext.clear();
+    }
 
     @Test
     void deveBloquearFretesQuandoColetasNaoConcluirComSucessoNoMesmoCiclo() {
@@ -116,6 +122,59 @@ class GraphQLExtractionServiceTest {
         }
     }
 
+    @Test
+    void naoDevePersistirResultadosIntermediariosQuandoTentativaFalhaESeraRetentada() {
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort();
+        final RecordingLogExtracaoRepository logRepository = new RecordingLogExtracaoRepository();
+        final BufferedGraphQLExtractionService service = new BufferedGraphQLExtractionService(
+            resultado(ConstantesEntidades.USUARIOS_SISTEMA, ConstantesEntidades.STATUS_COMPLETO, true, "usuarios ok"),
+            resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas ok"),
+            resultado(ConstantesEntidades.FRETES, ConstantesEntidades.STATUS_ERRO_API, false, "fretes falhou"),
+            logRepository,
+            auditPort
+        );
+
+        ExecutionContext.initialize("--loop-daemon-run");
+        ExecutionContext.setRetryContext(1, 3);
+
+        assertThrows(
+            RuntimeException.class,
+            () -> service.execute(LocalDate.of(2026, 3, 18), LocalDate.of(2026, 3, 18), null)
+        );
+
+        assertEquals(0, logRepository.logs.size(), "Tentativa intermediaria nao deve gerar log_extracoes oficial.");
+        assertEquals(0, auditPort.records.size(), "Tentativa intermediaria nao deve contaminar a auditoria estruturada.");
+    }
+
+    @Test
+    void devePersistirResultadosNaTentativaFinalMesmoQuandoFalhar() {
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort();
+        final RecordingLogExtracaoRepository logRepository = new RecordingLogExtracaoRepository();
+        final BufferedGraphQLExtractionService service = new BufferedGraphQLExtractionService(
+            resultado(ConstantesEntidades.USUARIOS_SISTEMA, ConstantesEntidades.STATUS_COMPLETO, true, "usuarios ok"),
+            resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas ok"),
+            resultado(ConstantesEntidades.FRETES, ConstantesEntidades.STATUS_ERRO_API, false, "fretes falhou"),
+            logRepository,
+            auditPort
+        );
+
+        ExecutionContext.initialize("--loop-daemon-run");
+        ExecutionContext.setRetryContext(3, 3);
+
+        assertThrows(
+            RuntimeException.class,
+            () -> service.execute(LocalDate.of(2026, 3, 18), LocalDate.of(2026, 3, 18), null)
+        );
+
+        assertEquals(3, logRepository.logs.size(), "Tentativa final deve persistir o conjunto completo de resultados.");
+        assertEquals(3, auditPort.records.size(), "Tentativa final deve registrar auditoria para cada entidade executada.");
+        assertTrue(
+            logRepository.logs.stream().anyMatch(log -> ConstantesEntidades.FRETES.equals(log.getEntidade())
+                && ConstantesEntidades.STATUS_ERRO_API.equals(log.getStatusFinal().getValor())),
+            "A falha final de Fretes precisa permanecer visivel para diagnostico."
+        );
+    }
+
     private static ExtractionResult resultado(final String entidade,
                                               final String status,
                                               final boolean sucesso,
@@ -167,20 +226,20 @@ class GraphQLExtractionServiceTest {
 
         @Override
         protected ExtractionResult extractUsuarios(final LocalDate dataInicio, final LocalDate dataFim, final boolean throwOnError) {
-            registrarLogExtracao(usuariosResult);
+            registrarResultadoExecucao(usuariosResult);
             return usuariosResult;
         }
 
         @Override
         protected ExtractionResult extractColetas(final LocalDate dataInicio, final LocalDate dataFim) {
-            registrarLogExtracao(coletasResult);
+            registrarResultadoExecucao(coletasResult);
             return coletasResult;
         }
 
         @Override
         protected ExtractionResult extractFretes(final LocalDate dataInicio, final LocalDate dataFim) {
             fretesExecutado = true;
-            registrarLogExtracao(fretesResult);
+            registrarResultadoExecucao(fretesResult);
             return fretesResult;
         }
     }
@@ -234,7 +293,7 @@ class GraphQLExtractionServiceTest {
         protected ExtractionResult extractColetas(final LocalDate dataInicio, final LocalDate dataFim) {
             coletasPrincipalExecutado = true;
             final ExtractionResult result = resultado(ConstantesEntidades.COLETAS, ConstantesEntidades.STATUS_COMPLETO, true, "coletas principal");
-            registrarLogExtracao(result);
+            registrarResultadoExecucao(result);
             return result;
         }
 
@@ -243,8 +302,60 @@ class GraphQLExtractionServiceTest {
             coletasReferencialExecutado = true;
             final ExtractionResult result =
                 resultado(ConstantesEntidades.COLETAS_REFERENCIAL, ConstantesEntidades.STATUS_COMPLETO, true, "coletas auxiliar");
-            registrarLogExtracao(result);
+            registrarResultadoExecucao(result);
             return result;
+        }
+    }
+
+    private static final class BufferedGraphQLExtractionService extends GraphQLExtractionService {
+        private final ExtractionResult usuariosResult;
+        private final ExtractionResult coletasResult;
+        private final ExtractionResult fretesResult;
+
+        private BufferedGraphQLExtractionService(final ExtractionResult usuariosResult,
+                                                 final ExtractionResult coletasResult,
+                                                 final ExtractionResult fretesResult,
+                                                 final LogExtracaoRepository logRepository,
+                                                 final ExecutionAuditPort executionAuditPort) {
+            super(
+                null,
+                logRepository,
+                executionAuditPort,
+                new ExtractionLogger(BufferedGraphQLExtractionService.class),
+                LoggerConsole.getLogger(BufferedGraphQLExtractionService.class),
+                true
+            );
+            this.usuariosResult = usuariosResult;
+            this.coletasResult = coletasResult;
+            this.fretesResult = fretesResult;
+        }
+
+        @Override
+        protected void validarInfraestrutura() {
+            // no-op
+        }
+
+        @Override
+        protected void aplicarDelayEntreEntidades() {
+            // no-op
+        }
+
+        @Override
+        protected ExtractionResult extractUsuarios(final LocalDate dataInicio, final LocalDate dataFim, final boolean throwOnError) {
+            registrarResultadoExecucao(usuariosResult);
+            return usuariosResult;
+        }
+
+        @Override
+        protected ExtractionResult extractColetas(final LocalDate dataInicio, final LocalDate dataFim) {
+            registrarResultadoExecucao(coletasResult);
+            return coletasResult;
+        }
+
+        @Override
+        protected ExtractionResult extractFretes(final LocalDate dataInicio, final LocalDate dataFim) {
+            registrarResultadoExecucao(fretesResult);
+            return fretesResult;
         }
     }
 

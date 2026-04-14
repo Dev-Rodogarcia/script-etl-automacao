@@ -80,6 +80,7 @@ import br.com.extrator.suporte.concorrencia.OperationTimeoutGuard;
 import br.com.extrator.suporte.configuracao.ConfigBanco;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -105,6 +106,7 @@ public class GraphQLExtractionService {
     private final boolean auditoriaEstruturadaAtiva;
     private final ExtractionLogger logger;
     private final LoggerConsole log;
+    private final List<ExtractionResult> resultadosPendentesPersistencia = new ArrayList<>();
     
     public GraphQLExtractionService() {
         this(true);
@@ -165,8 +167,11 @@ public class GraphQLExtractionService {
     
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
         this.entidadeEspecifica = entidade;
+        resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
+        boolean houveFalhaExecucao = false;
+        RuntimeException erroTerminal = null;
         
         log.info("");
         log.info("=".repeat(80));
@@ -178,180 +183,196 @@ public class GraphQLExtractionService {
         log.info("Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
         log.info("");
         
-        validarInfraestrutura();
-        ExtractionHelper.limparAvisosSeguranca();
+        try {
+            validarInfraestrutura();
+            ExtractionHelper.limparAvisosSeguranca();
 
-        final boolean executarColetas = shouldExecute(entidade, ConstantesEntidades.COLETAS);
-        final boolean executarFretes = shouldExecute(entidade, ConstantesEntidades.FRETES);
-        final boolean executarFaturasGraphql = shouldExecute(entidade, ConstantesEntidades.FATURAS_GRAPHQL,
-            ConstantesEntidades.ALIASES_FATURAS_GRAPHQL);
-        final boolean executarUsuariosSistema = shouldExecute(entidade, ConstantesEntidades.USUARIOS_SISTEMA);
-        boolean coletasConcluidasComSucesso = !executarColetas;
+            final boolean executarColetas = shouldExecute(entidade, ConstantesEntidades.COLETAS);
+            final boolean executarFretes = shouldExecute(entidade, ConstantesEntidades.FRETES);
+            final boolean executarFaturasGraphql = shouldExecute(entidade, ConstantesEntidades.FATURAS_GRAPHQL,
+                ConstantesEntidades.ALIASES_FATURAS_GRAPHQL);
+            final boolean executarUsuariosSistema = shouldExecute(entidade, ConstantesEntidades.USUARIOS_SISTEMA);
+            boolean coletasConcluidasComSucesso = !executarColetas;
 
-        // Extrair usuários ANTES de coletas (dependência)
-        if (executarColetas) {
-            try {
-                final ExtractionResult resultUsuarios = executarComTimeout(
-                    ConstantesEntidades.USUARIOS_SISTEMA,
-                    () -> {
-                        final ExecutionDates datas = resolverDatasExecucao(
-                            ConstantesEntidades.USUARIOS_SISTEMA,
-                            dataInicio,
-                            dataFim
-                        );
-                        return extractUsuarios(datas.inicio(), datas.fim(), false);
+            // Extrair usuários ANTES de coletas (dependência)
+            if (executarColetas) {
+                try {
+                    final ExtractionResult resultUsuarios = executarComTimeout(
+                        ConstantesEntidades.USUARIOS_SISTEMA,
+                        () -> {
+                            final ExecutionDates datas = resolverDatasExecucao(
+                                ConstantesEntidades.USUARIOS_SISTEMA,
+                                dataInicio,
+                                dataFim
+                            );
+                            return extractUsuarios(datas.inicio(), datas.fim(), false);
+                        }
+                    );
+                    if (resultUsuarios != null) {
+                        resultados.add(resultUsuarios);
                     }
-                );
-                if (resultUsuarios != null) {
-                    resultados.add(resultUsuarios);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.USUARIOS_SISTEMA,
+                        "Usuarios do Sistema",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.USUARIOS_SISTEMA,
-                    "Usuarios do Sistema",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
-            }
-            aplicarDelayEntreEntidades();
-        } else if (executarUsuariosSistema) {
-            try {
-                final ExtractionResult resultUsuarios = executarComTimeout(
-                    ConstantesEntidades.USUARIOS_SISTEMA,
-                    () -> {
-                        final ExecutionDates datas = resolverDatasExecucao(
-                            ConstantesEntidades.USUARIOS_SISTEMA,
-                            dataInicio,
-                            dataFim
-                        );
-                        return extractUsuarios(datas.inicio(), datas.fim(), true);
+                aplicarDelayEntreEntidades();
+            } else if (executarUsuariosSistema) {
+                try {
+                    final ExtractionResult resultUsuarios = executarComTimeout(
+                        ConstantesEntidades.USUARIOS_SISTEMA,
+                        () -> {
+                            final ExecutionDates datas = resolverDatasExecucao(
+                                ConstantesEntidades.USUARIOS_SISTEMA,
+                                dataInicio,
+                                dataFim
+                            );
+                            return extractUsuarios(datas.inicio(), datas.fim(), true);
+                        }
+                    );
+                    if (resultUsuarios != null) {
+                        resultados.add(resultUsuarios);
                     }
-                );
-                if (resultUsuarios != null) {
-                    resultados.add(resultUsuarios);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.USUARIOS_SISTEMA,
+                        "Usuarios do Sistema",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.USUARIOS_SISTEMA,
-                    "Usuarios do Sistema",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
+                aplicarDelayEntreEntidades();
             }
-            aplicarDelayEntreEntidades();
-        }
 
-        if (executarColetas) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.COLETAS,
-                    () -> {
-                        final ExecutionDates datas = resolverDatasExecucao(ConstantesEntidades.COLETAS, dataInicio, dataFim);
-                        return extractColetas(datas.inicio(), datas.fim());
-                    }
-                );
-                if (result != null) {
-                    resultados.add(result);
-                    coletasConcluidasComSucesso = ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus());
-                }
-            } catch (final Exception e) {
-                coletasConcluidasComSucesso = false;
-                registrarFalhaEntidade(resultados, ConstantesEntidades.COLETAS, "Coletas", e, dataInicio, dataFim);
-            }
-            aplicarDelayEntreEntidades();
-        }
-
-        if (executarFretes) {
-            if (executarColetas && !coletasConcluidasComSucesso) {
-                final ExtractionResult bloqueado = registrarBloqueioFretesPorColetas();
-                resultados.add(bloqueado);
-            } else {
+            if (executarColetas) {
                 try {
                     final ExtractionResult result = executarComTimeout(
-                        ConstantesEntidades.FRETES,
+                        ConstantesEntidades.COLETAS,
                         () -> {
                             final ExecutionDates datas =
-                                resolverDatasExecucao(ConstantesEntidades.FRETES, dataInicio, dataFim);
-                            return extractFretes(datas.inicio(), datas.fim());
+                                resolverDatasExecucao(ConstantesEntidades.COLETAS, dataInicio, dataFim);
+                            return extractColetas(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
+                        coletasConcluidasComSucesso = ConstantesEntidades.STATUS_COMPLETO.equals(result.getStatus());
+                    }
+                } catch (final Exception e) {
+                    coletasConcluidasComSucesso = false;
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.COLETAS, "Coletas", e, dataInicio, dataFim);
+                }
+                aplicarDelayEntreEntidades();
+            }
+
+            if (executarFretes) {
+                if (executarColetas && !coletasConcluidasComSucesso) {
+                    final ExtractionResult bloqueado = registrarBloqueioFretesPorColetas();
+                    resultados.add(bloqueado);
+                } else {
+                    try {
+                        final ExtractionResult result = executarComTimeout(
+                            ConstantesEntidades.FRETES,
+                            () -> {
+                                final ExecutionDates datas =
+                                    resolverDatasExecucao(ConstantesEntidades.FRETES, dataInicio, dataFim);
+                                return extractFretes(datas.inicio(), datas.fim());
+                            }
+                        );
+                        if (result != null) {
+                            resultados.add(result);
+                        }
+                    } catch (final Exception e) {
+                        registrarFalhaEntidade(resultados, ConstantesEntidades.FRETES, "Fretes", e, dataInicio, dataFim);
+                    }
+                }
+                aplicarDelayEntreEntidades();
+            }
+
+            // FASE 3: FATURAS_GRAPHQL foi movido para ser executado POR ÚLTIMO
+            // A extração de faturas_graphql agora é controlada pelos comandos (ExecutarFluxoCompletoComando
+            // e ExecutarExtracaoPorIntervaloComando) que chamam GraphQLRunner.executarFaturasGraphQLPorIntervalo()
+            // APÓS todas as outras entidades serem extraídas.
+            //
+            // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
+            // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
+            //
+            // Se executarFaturasGraphql for true E estivermos em modo de extração específica de faturas_graphql,
+            // executamos aqui. Caso contrário, deixamos para o comando orquestrador.
+            final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null
+                && (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica)
+                || java.util.Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_GRAPHQL)
+                    .anyMatch(alias -> alias.equalsIgnoreCase(entidadeEspecifica)));
+
+            if (executarFaturasGraphql && isSomenteFaturasGraphQL) {
+                // Extração específica de faturas_graphql foi solicitada explicitamente
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.FATURAS_GRAPHQL,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.FATURAS_GRAPHQL, dataInicio, dataFim);
+                            return extractFaturasGraphQL(datas.inicio(), datas.fim());
                         }
                     );
                     if (result != null) {
                         resultados.add(result);
                     }
                 } catch (final Exception e) {
-                    registrarFalhaEntidade(resultados, ConstantesEntidades.FRETES, "Fretes", e, dataInicio, dataFim);
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.FATURAS_GRAPHQL,
+                        "Faturas GraphQL",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
+                aplicarDelayEntreEntidades();
+            } else if (executarFaturasGraphql) {
+                // Faturas GraphQL será executado POR ÚLTIMO pelo comando orquestrador
+                log.info("[INFO] Faturas GraphQL sera extraido POR ULTIMO apos todas as outras entidades (FASE 3)");
             }
-            aplicarDelayEntreEntidades();
+
+            // Resumo consolidado final
+            exibirResumoConsolidado(resultados, inicioExecucao);
+
+            // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+            final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
+            final List<String> entidadesComFalha = resultados.stream()
+                .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
+                .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
+                .toList();
+            houveFalhaExecucao = !entidadesComFalha.isEmpty();
+            if (houveFalhaExecucao) {
+                erroTerminal = new RuntimeException("Extração GraphQL com falhas: " + String.join(", ", entidadesComFalha)
+                    + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+            }
+        } catch (final RuntimeException e) {
+            houveFalhaExecucao = true;
+            erroTerminal = e;
+        } finally {
+            finalizarPersistenciaResultadosPendentes(houveFalhaExecucao);
         }
 
-        // FASE 3: FATURAS_GRAPHQL foi movido para ser executado POR ÚLTIMO
-        // A extração de faturas_graphql agora é controlada pelos comandos (ExecutarFluxoCompletoComando
-        // e ExecutarExtracaoPorIntervaloComando) que chamam GraphQLRunner.executarFaturasGraphQLPorIntervalo()
-        // APÓS todas as outras entidades serem extraídas.
-        // 
-        // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
-        // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
-        //
-        // Se executarFaturasGraphql for true E estivermos em modo de extração específica de faturas_graphql,
-        // executamos aqui. Caso contrário, deixamos para o comando orquestrador.
-        final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null && 
-            (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica) ||
-             java.util.Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_GRAPHQL)
-                 .anyMatch(alias -> alias.equalsIgnoreCase(entidadeEspecifica)));
-        
-        if (executarFaturasGraphql && isSomenteFaturasGraphQL) {
-            // Extração específica de faturas_graphql foi solicitada explicitamente
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.FATURAS_GRAPHQL,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.FATURAS_GRAPHQL, dataInicio, dataFim);
-                        return extractFaturasGraphQL(datas.inicio(), datas.fim());
-                    }
-                );
-                if (result != null) {
-                    resultados.add(result);
-                }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.FATURAS_GRAPHQL,
-                    "Faturas GraphQL",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
-            }
-            aplicarDelayEntreEntidades();
-        } else if (executarFaturasGraphql) {
-            // Faturas GraphQL será executado POR ÚLTIMO pelo comando orquestrador
-            log.info("[INFO] Faturas GraphQL sera extraido POR ULTIMO apos todas as outras entidades (FASE 3)");
-        }
-
-        // Resumo consolidado final
-        exibirResumoConsolidado(resultados, inicioExecucao);
-
-        // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
-        final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
-        final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
-            .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
-            .toList();
-        if (!entidadesComFalha.isEmpty()) {
-            throw new RuntimeException("Extração GraphQL com falhas: " + String.join(", ", entidadesComFalha)
-                + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+        if (erroTerminal != null) {
+            throw erroTerminal;
         }
     }
     
     public ExtractionResult executarSomenteColetasReferencial(final LocalDate dataInicio, final LocalDate dataFim) {
         this.entidadeEspecifica = ConstantesEntidades.COLETAS;
+        resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
+        boolean houveFalhaExecucao = false;
+        RuntimeException erroTerminal = null;
 
         log.info("");
         log.info("=".repeat(80));
@@ -362,41 +383,53 @@ public class GraphQLExtractionService {
         log.info("Modo: AUXILIAR_REFERENCIAL");
         log.info("");
 
-        validarInfraestrutura();
-        ExtractionHelper.limparAvisosSeguranca();
-
-        final ExtractionResult resultado;
         try {
-            resultado = executarComTimeout(
-                ConstantesEntidades.COLETAS_REFERENCIAL,
-                ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial(),
-                () -> extractColetasReferencial(dataInicio, dataFim)
-            );
-        } catch (final Exception e) {
-            if (e instanceof ExecutionTimeoutException) {
-                final String aviso = String.format(
-                    "Timeout na entidade %s apos %d ms. A extracao auxiliar sera encerrada.",
-                    ConstantesEntidades.COLETAS,
-                    ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial().toMillis()
+            validarInfraestrutura();
+            ExtractionHelper.limparAvisosSeguranca();
+
+            final ExtractionResult resultado;
+            try {
+                resultado = executarComTimeout(
+                    ConstantesEntidades.COLETAS_REFERENCIAL,
+                    ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial(),
+                    () -> extractColetasReferencial(dataInicio, dataFim)
                 );
-                ExtractionHelper.appendAvisoSeguranca(aviso);
-                log.error("[TIMEOUT] {}", aviso, e);
+            } catch (final Exception e) {
+                if (e instanceof ExecutionTimeoutException) {
+                    final String aviso = String.format(
+                        "Timeout na entidade %s apos %d ms. A extracao auxiliar sera encerrada.",
+                        ConstantesEntidades.COLETAS,
+                        ConfigEtl.obterTimeoutEntidadeGraphQLColetasReferencial().toMillis()
+                    );
+                    ExtractionHelper.appendAvisoSeguranca(aviso);
+                    log.error("[TIMEOUT] {}", aviso, e);
+                }
+                throw new RuntimeException("Falha na extracao auxiliar de coletas referencial", e);
             }
-            throw new RuntimeException("Falha na extracao auxiliar de coletas referencial", e);
-        }
-        exibirResumoConsolidado(List.of(resultado), inicioExecucao);
+            exibirResumoConsolidado(List.of(resultado), inicioExecucao);
 
-        final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
-        final boolean possuiFalha = deveFalharExecucaoFinal(resultado, modoEstrito);
-        if (possuiFalha) {
-            throw new RuntimeException(
-                "Extracao GraphQL auxiliar de coletas com falhas: "
-                    + resultado.getEntityName()
-                    + "(" + resultado.getStatus() + "). Verifique os logs."
-            );
-        }
+            final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
+            houveFalhaExecucao = deveFalharExecucaoFinal(resultado, modoEstrito);
+            if (houveFalhaExecucao) {
+                erroTerminal = new RuntimeException(
+                    "Extracao GraphQL auxiliar de coletas com falhas: "
+                        + resultado.getEntityName()
+                        + "(" + resultado.getStatus() + "). Verifique os logs."
+                );
+            }
 
-        return resultado;
+            if (erroTerminal != null) {
+                throw erroTerminal;
+            }
+
+            return resultado;
+        } catch (final RuntimeException e) {
+            houveFalhaExecucao = true;
+            erroTerminal = e;
+            throw e;
+        } finally {
+            finalizarPersistenciaResultadosPendentes(houveFalhaExecucao);
+        }
     }
 
     private boolean shouldExecute(final String entidade, final String entityName) {
@@ -421,6 +454,12 @@ public class GraphQLExtractionService {
 
     protected void aplicarDelayEntreEntidades() {
         ExtractionHelper.aplicarDelay();
+    }
+
+    protected void registrarResultadoExecucao(final ExtractionResult result) {
+        if (result != null) {
+            resultadosPendentesPersistencia.add(result);
+        }
     }
 
     protected void registrarLogExtracao(final ExtractionResult result) {
@@ -448,7 +487,7 @@ public class GraphQLExtractionService {
         log.info(ConstantesExtracao.MSG_LOG_EXTRAINDO_COM_MOTIVO, extractor.getEmoji(), "Usuarios do Sistema", motivo);
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         
         if (throwOnError && ConstantesEntidades.STATUS_ERRO_API.equals(result.getStatus())) {
             throw new RuntimeException(String.format(ConstantesExtracao.MSG_ERRO_EXTRACAO, "usuarios do sistema"), result.getErro());
@@ -465,7 +504,7 @@ public class GraphQLExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         
         return result;
     }
@@ -511,7 +550,7 @@ public class GraphQLExtractionService {
 
         final ExtractionResult result =
             logger.executeWithLogging(extractorAuxiliar, dataInicio, dataFim, extractorAuxiliar.getEmoji());
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         return result;
     }
 
@@ -532,7 +571,7 @@ public class GraphQLExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -546,7 +585,7 @@ public class GraphQLExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         
         return result;
     }
@@ -698,7 +737,7 @@ public class GraphQLExtractionService {
             ConstantesEntidades.COLETAS,
             mensagem
         ).build();
-        registrarLogExtracao(result);
+        registrarResultadoExecucao(result);
         return result;
     }
 
@@ -734,8 +773,29 @@ public class GraphQLExtractionService {
             .janelaConfirmacaoInicio(plano.confirmacaoInicio())
             .janelaConfirmacaoFim(plano.confirmacaoFim())
             .build();
-        registrarLogExtracao(erroResult);
+        registrarResultadoExecucao(erroResult);
         resultados.add(erroResult);
+    }
+
+    private void finalizarPersistenciaResultadosPendentes(final boolean houveFalhaExecucao) {
+        if (resultadosPendentesPersistencia.isEmpty()) {
+            return;
+        }
+        if (devePersistirResultadosDaTentativa(houveFalhaExecucao)) {
+            resultadosPendentesPersistencia.forEach(this::registrarLogExtracao);
+        } else {
+            log.info(
+                "[INFO] Tentativa intermediaria {} de {} descartou {} resultado(s) operacionais do log_extracoes/auditoria; os logs de arquivo foram mantidos.",
+                ExecutionContext.currentRetryAttempt(),
+                ExecutionContext.currentRetryMaxAttempts(),
+                resultadosPendentesPersistencia.size()
+            );
+        }
+        resultadosPendentesPersistencia.clear();
+    }
+
+    private boolean devePersistirResultadosDaTentativa(final boolean houveFalhaExecucao) {
+        return !houveFalhaExecucao || ExecutionContext.isRetryFinalAttempt();
     }
 
     private String formatarNumero(final int numero) {

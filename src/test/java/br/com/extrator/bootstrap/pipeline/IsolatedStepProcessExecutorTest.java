@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 
 class IsolatedStepProcessExecutorTest {
 
@@ -24,7 +25,10 @@ class IsolatedStepProcessExecutorTest {
         System.clearProperty("ETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS");
         System.clearProperty("ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS");
         System.clearProperty("etl.parent.execution.id");
+        System.clearProperty("etl.parent.retry.attempt");
+        System.clearProperty("etl.parent.retry.max_attempts");
         System.clearProperty("etl.process.isolation.enabled");
+        ExecutionContext.clear();
     }
 
     @Test
@@ -71,6 +75,23 @@ class IsolatedStepProcessExecutorTest {
         assertTrue(comando.contains("-DETL_GRAPHQL_TIMEOUT_ENTIDADE_USUARIOS_SISTEMA_MS=5400000"));
         assertTrue(comando.contains("-DETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS=400"));
         assertFalse(comando.contains("-Detl.process.isolation.enabled=true"));
+    }
+
+    @Test
+    void devePropagarContextoDeRetryParaProcessoFilho() throws Exception {
+        ExecutionContext.initialize("--loop-daemon-run");
+        ExecutionContext.setRetryContext(2, 3);
+
+        final InspectingExecutor executor = new InspectingExecutor();
+        final List<String> comando = executor.construir(
+            IsolatedStepProcessExecutor.ApiType.GRAPHQL,
+            LocalDate.of(2026, 3, 18),
+            LocalDate.of(2026, 3, 18),
+            "fretes"
+        );
+
+        assertTrue(comando.contains("-Detl.parent.retry.attempt=2"));
+        assertTrue(comando.contains("-Detl.parent.retry.max_attempts=3"));
     }
 
     private static final class HangingCommandExecutor extends IsolatedStepProcessExecutor {

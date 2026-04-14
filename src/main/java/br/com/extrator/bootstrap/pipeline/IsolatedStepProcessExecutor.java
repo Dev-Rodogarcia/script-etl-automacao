@@ -129,6 +129,10 @@ public class IsolatedStepProcessExecutor {
         comando.add("-Detl.parent.execution.id=" + ExecutionContext.currentExecutionId());
         comando.add("-Detl.parent.command=" + ExecutionContext.currentCommand());
         comando.add("-Detl.parent.cycle.id=" + ExecutionContext.currentCycleId());
+        if (ExecutionContext.hasRetryContext()) {
+            comando.add("-Detl.parent.retry.attempt=" + ExecutionContext.currentRetryAttempt());
+            comando.add("-Detl.parent.retry.max_attempts=" + ExecutionContext.currentRetryMaxAttempts());
+        }
         adicionarSystemPropertiesConfiguracao(comando);
 
         final Path jarAtual = resolverJarAtual();

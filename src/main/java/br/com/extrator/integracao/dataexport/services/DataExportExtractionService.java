@@ -83,6 +83,7 @@ import br.com.extrator.suporte.concorrencia.OperationTimeoutGuard;
 import br.com.extrator.suporte.configuracao.ConfigBanco;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.console.LoggerConsole;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -107,6 +108,7 @@ public class DataExportExtractionService {
     private final ExecutionAuditPort executionAuditPort;
     private final ExtractionLogger logger;
     private final LoggerConsole log;
+    private final List<ExtractionResult> resultadosPendentesPersistencia = new ArrayList<>();
     
     public DataExportExtractionService() {
         this.apiClient = new ClienteApiDataExport();
@@ -132,8 +134,11 @@ public class DataExportExtractionService {
      * @throws RuntimeException Se houver falha crítica na extração
      */
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
+        resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
+        boolean houveFalhaExecucao = false;
+        RuntimeException erroTerminal = null;
         
         log.info("");
         log.info("=".repeat(80));
@@ -145,193 +150,219 @@ public class DataExportExtractionService {
         log.info("Modo de integridade: {}", ConfigEtl.obterModoIntegridadeEtl());
         log.info("");
         
-        ConfigBanco.validarConexaoBancoDados();
-        ConfigBanco.validarTabelasEssenciais();
-        ExtractionHelper.limparAvisosSeguranca();
+        try {
+            ConfigBanco.validarConexaoBancoDados();
+            ConfigBanco.validarTabelasEssenciais();
+            ExtractionHelper.limparAvisosSeguranca();
 
-        final String ent = entidade == null ? "" : entidade.trim().toLowerCase();
-        final boolean executarManifestos = ent.isEmpty() || ConstantesEntidades.MANIFESTOS.equals(ent);
-        final boolean executarCotacoes = ent.isEmpty() || ConstantesEntidades.COTACOES.equals(ent) 
-            || Arrays.stream(ConstantesEntidades.ALIASES_COTACOES).anyMatch(alias -> alias.equals(ent));
-        final boolean executarLocalizacao = ent.isEmpty() || ConstantesEntidades.LOCALIZACAO_CARGAS.equals(ent) 
-            || Arrays.stream(ConstantesEntidades.ALIASES_LOCALIZACAO).anyMatch(alias -> alias.equals(ent));
-        final boolean executarContasAPagar = ent.isEmpty() || ConstantesEntidades.CONTAS_A_PAGAR.equals(ent) 
-            || Arrays.stream(ConstantesEntidades.ALIASES_CONTAS_PAGAR).anyMatch(alias -> alias.equals(ent))
-            || "constas a pagar".equals(ent) || "constas-a-pagar".equals(ent);
-        final boolean executarFaturasPorCliente = ent.isEmpty() || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(ent) 
-            || Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_CLIENTE).anyMatch(alias -> alias.equals(ent));
-        final boolean executarInventario = ent.isEmpty() || ConstantesEntidades.INVENTARIO.equals(ent)
-            || Arrays.stream(ConstantesEntidades.ALIASES_INVENTARIO).anyMatch(alias -> alias.equals(ent));
-        final boolean executarSinistros = ent.isEmpty() || ConstantesEntidades.SINISTROS.equals(ent)
-            || Arrays.stream(ConstantesEntidades.ALIASES_SINISTROS).anyMatch(alias -> alias.equals(ent));
-        
-        if (executarManifestos) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.MANIFESTOS,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.MANIFESTOS, dataInicio, dataFim);
-                        return extractManifestos(datas.inicio(), datas.fim());
+            final String ent = entidade == null ? "" : entidade.trim().toLowerCase();
+            final boolean executarManifestos = ent.isEmpty() || ConstantesEntidades.MANIFESTOS.equals(ent);
+            final boolean executarCotacoes = ent.isEmpty() || ConstantesEntidades.COTACOES.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_COTACOES).anyMatch(alias -> alias.equals(ent));
+            final boolean executarLocalizacao = ent.isEmpty() || ConstantesEntidades.LOCALIZACAO_CARGAS.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_LOCALIZACAO).anyMatch(alias -> alias.equals(ent));
+            final boolean executarContasAPagar = ent.isEmpty() || ConstantesEntidades.CONTAS_A_PAGAR.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_CONTAS_PAGAR).anyMatch(alias -> alias.equals(ent))
+                || "constas a pagar".equals(ent) || "constas-a-pagar".equals(ent);
+            final boolean executarFaturasPorCliente = ent.isEmpty() || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_CLIENTE).anyMatch(alias -> alias.equals(ent));
+            final boolean executarInventario = ent.isEmpty() || ConstantesEntidades.INVENTARIO.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_INVENTARIO).anyMatch(alias -> alias.equals(ent));
+            final boolean executarSinistros = ent.isEmpty() || ConstantesEntidades.SINISTROS.equals(ent)
+                || Arrays.stream(ConstantesEntidades.ALIASES_SINISTROS).anyMatch(alias -> alias.equals(ent));
+
+            if (executarManifestos) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.MANIFESTOS,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.MANIFESTOS, dataInicio, dataFim);
+                            return extractManifestos(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
                     }
-                );
-                if (result != null) {
-                    resultados.add(result);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.MANIFESTOS, "Manifestos", e, dataInicio, dataFim);
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.MANIFESTOS, "Manifestos", e, dataInicio, dataFim);
+                ExtractionHelper.aplicarDelay();
             }
-            ExtractionHelper.aplicarDelay();
-        }
-        
-        if (executarCotacoes) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.COTACOES,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.COTACOES, dataInicio, dataFim);
-                        return extractCotacoes(datas.inicio(), datas.fim());
+
+            if (executarCotacoes) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.COTACOES,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.COTACOES, dataInicio, dataFim);
+                            return extractCotacoes(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
                     }
-                );
-                if (result != null) {
-                    resultados.add(result);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.COTACOES, "Cotacoes", e, dataInicio, dataFim);
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.COTACOES, "Cotacoes", e, dataInicio, dataFim);
+                ExtractionHelper.aplicarDelay();
             }
-            ExtractionHelper.aplicarDelay();
-        }
-        
-        if (executarLocalizacao) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.LOCALIZACAO_CARGAS,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.LOCALIZACAO_CARGAS, dataInicio, dataFim);
-                        return extractLocalizacoes(datas.inicio(), datas.fim());
+
+            if (executarLocalizacao) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.LOCALIZACAO_CARGAS,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.LOCALIZACAO_CARGAS, dataInicio, dataFim);
+                            return extractLocalizacoes(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
                     }
-                );
-                if (result != null) {
-                    resultados.add(result);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.LOCALIZACAO_CARGAS,
+                        "Localizacao de Cargas",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.LOCALIZACAO_CARGAS,
-                    "Localizacao de Cargas",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
+                ExtractionHelper.aplicarDelay();
             }
-            ExtractionHelper.aplicarDelay();
-        }
-        
-        if (executarContasAPagar) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.CONTAS_A_PAGAR,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.CONTAS_A_PAGAR, dataInicio, dataFim);
-                        return extractContasAPagar(datas.inicio(), datas.fim());
+
+            if (executarContasAPagar) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.CONTAS_A_PAGAR,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.CONTAS_A_PAGAR, dataInicio, dataFim);
+                            return extractContasAPagar(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
                     }
-                );
-                if (result != null) {
-                    resultados.add(result);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.CONTAS_A_PAGAR,
+                        "Contas a Pagar",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.CONTAS_A_PAGAR,
-                    "Contas a Pagar",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
+                ExtractionHelper.aplicarDelay();
             }
-            ExtractionHelper.aplicarDelay();
-        }
-        
-        if (executarFaturasPorCliente) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.FATURAS_POR_CLIENTE,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.FATURAS_POR_CLIENTE, dataInicio, dataFim);
-                        return extractFaturasPorCliente(datas.inicio(), datas.fim());
+
+            if (executarFaturasPorCliente) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.FATURAS_POR_CLIENTE,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.FATURAS_POR_CLIENTE, dataInicio, dataFim);
+                            return extractFaturasPorCliente(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
                     }
-                );
-                if (result != null) {
-                    resultados.add(result);
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(
+                        resultados,
+                        ConstantesEntidades.FATURAS_POR_CLIENTE,
+                        "Faturas por Cliente",
+                        e,
+                        dataInicio,
+                        dataFim
+                    );
                 }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(
-                    resultados,
-                    ConstantesEntidades.FATURAS_POR_CLIENTE,
-                    "Faturas por Cliente",
-                    e,
-                    dataInicio,
-                    dataFim
-                );
+                ExtractionHelper.aplicarDelay();
             }
-            ExtractionHelper.aplicarDelay();
+
+            if (executarInventario) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.INVENTARIO,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.INVENTARIO, dataInicio, dataFim);
+                            return extractInventario(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
+                    }
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.INVENTARIO, "Inventario", e, dataInicio, dataFim);
+                }
+                ExtractionHelper.aplicarDelay();
+            }
+
+            if (executarSinistros) {
+                try {
+                    final ExtractionResult result = executarComTimeout(
+                        ConstantesEntidades.SINISTROS,
+                        () -> {
+                            final ExecutionDates datas =
+                                resolverDatasExecucao(ConstantesEntidades.SINISTROS, dataInicio, dataFim);
+                            return extractSinistros(datas.inicio(), datas.fim());
+                        }
+                    );
+                    if (result != null) {
+                        resultados.add(result);
+                    }
+                } catch (final Exception e) {
+                    registrarFalhaEntidade(resultados, ConstantesEntidades.SINISTROS, "Sinistros", e, dataInicio, dataFim);
+                }
+                ExtractionHelper.aplicarDelay();
+            }
+
+            // Resumo consolidado final
+            exibirResumoConsolidado(resultados, inicioExecucao);
+
+            // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
+            final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
+            final List<String> entidadesComFalha = resultados.stream()
+                .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
+                .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
+                .toList();
+            houveFalhaExecucao = !entidadesComFalha.isEmpty();
+            if (houveFalhaExecucao) {
+                erroTerminal = new RuntimeException("Extração DataExport com falhas: " + String.join(", ", entidadesComFalha)
+                    + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+            }
+        } catch (final RuntimeException e) {
+            houveFalhaExecucao = true;
+            erroTerminal = e;
+        } finally {
+            finalizarPersistenciaResultadosPendentes(houveFalhaExecucao);
         }
 
-        if (executarInventario) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.INVENTARIO,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.INVENTARIO, dataInicio, dataFim);
-                        return extractInventario(datas.inicio(), datas.fim());
-                    }
-                );
-                if (result != null) {
-                    resultados.add(result);
-                }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.INVENTARIO, "Inventario", e, dataInicio, dataFim);
-            }
-            ExtractionHelper.aplicarDelay();
+        if (erroTerminal != null) {
+            throw erroTerminal;
         }
+    }
 
-        if (executarSinistros) {
-            try {
-                final ExtractionResult result = executarComTimeout(
-                    ConstantesEntidades.SINISTROS,
-                    () -> {
-                        final ExecutionDates datas =
-                            resolverDatasExecucao(ConstantesEntidades.SINISTROS, dataInicio, dataFim);
-                        return extractSinistros(datas.inicio(), datas.fim());
-                    }
-                );
-                if (result != null) {
-                    resultados.add(result);
-                }
-            } catch (final Exception e) {
-                registrarFalhaEntidade(resultados, ConstantesEntidades.SINISTROS, "Sinistros", e, dataInicio, dataFim);
-            }
-            ExtractionHelper.aplicarDelay();
+    protected void registrarResultadoExecucao(final ExtractionResult result) {
+        if (result != null) {
+            resultadosPendentesPersistencia.add(result);
         }
-        
-        // Resumo consolidado final
-        exibirResumoConsolidado(resultados, inicioExecucao);
+    }
 
-        // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
-        final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
-        final List<String> entidadesComFalha = resultados.stream()
-            .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
-            .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
-            .toList();
-        if (!entidadesComFalha.isEmpty()) {
-            throw new RuntimeException("Extração DataExport com falhas: " + String.join(", ", entidadesComFalha)
-                + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+    protected void registrarLogExtracao(final ExtractionResult result) {
+        if (result == null) {
+            return;
         }
+        logRepository.gravarLogExtracao(result.toLogEntity());
+        ExecutionAuditRecorder.registrar(executionAuditPort, result);
     }
     
     private ExtractionResult extractManifestos(final LocalDate dataInicio, final LocalDate dataFim) {
@@ -343,8 +374,7 @@ public class DataExportExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -357,8 +387,7 @@ public class DataExportExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -371,8 +400,7 @@ public class DataExportExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -385,8 +413,7 @@ public class DataExportExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -399,8 +426,7 @@ public class DataExportExtractionService {
         );
         
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
 
@@ -413,8 +439,7 @@ public class DataExportExtractionService {
         );
 
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
 
@@ -427,8 +452,7 @@ public class DataExportExtractionService {
         );
 
         final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        logRepository.gravarLogExtracao(result.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, result);
+        registrarResultadoExecucao(result);
         return result;
     }
     
@@ -596,9 +620,29 @@ public class DataExportExtractionService {
             .janelaConfirmacaoInicio(plano.confirmacaoInicio())
             .janelaConfirmacaoFim(plano.confirmacaoFim())
             .build();
-        logRepository.gravarLogExtracao(erroResult.toLogEntity());
-        ExecutionAuditRecorder.registrar(executionAuditPort, erroResult);
+        registrarResultadoExecucao(erroResult);
         resultados.add(erroResult);
+    }
+
+    private void finalizarPersistenciaResultadosPendentes(final boolean houveFalhaExecucao) {
+        if (resultadosPendentesPersistencia.isEmpty()) {
+            return;
+        }
+        if (devePersistirResultadosDaTentativa(houveFalhaExecucao)) {
+            resultadosPendentesPersistencia.forEach(this::registrarLogExtracao);
+        } else {
+            log.info(
+                "[INFO] Tentativa intermediaria {} de {} descartou {} resultado(s) operacionais do log_extracoes/auditoria; os logs de arquivo foram mantidos.",
+                ExecutionContext.currentRetryAttempt(),
+                ExecutionContext.currentRetryMaxAttempts(),
+                resultadosPendentesPersistencia.size()
+            );
+        }
+        resultadosPendentesPersistencia.clear();
+    }
+
+    private boolean devePersistirResultadosDaTentativa(final boolean houveFalhaExecucao) {
+        return !houveFalhaExecucao || ExecutionContext.isRetryFinalAttempt();
     }
 
     private String formatarNumero(final int numero) {

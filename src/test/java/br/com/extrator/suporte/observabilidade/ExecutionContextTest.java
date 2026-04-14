@@ -1,6 +1,7 @@
 package br.com.extrator.suporte.observabilidade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,13 +33,18 @@ class ExecutionContextTest {
     void devePropagarMdcParaRunnableEncapsulado() throws InterruptedException {
         final String executionId = ExecutionContext.initialize("--loop");
         ExecutionContext.setCycleId("cycle-123");
+        ExecutionContext.setRetryContext(2, 3);
         final AtomicReference<String> executionIdThread = new AtomicReference<>();
         final AtomicReference<String> cycleIdThread = new AtomicReference<>();
+        final AtomicReference<Integer> retryAttemptThread = new AtomicReference<>();
+        final AtomicReference<Integer> retryMaxThread = new AtomicReference<>();
         final CountDownLatch latch = new CountDownLatch(1);
 
         final Runnable wrapped = ExecutionContext.wrapRunnable(() -> {
             executionIdThread.set(ExecutionContext.currentExecutionId());
             cycleIdThread.set(ExecutionContext.currentCycleId());
+            retryAttemptThread.set(ExecutionContext.currentRetryAttempt());
+            retryMaxThread.set(ExecutionContext.currentRetryMaxAttempts());
             latch.countDown();
         });
 
@@ -52,6 +58,8 @@ class ExecutionContextTest {
 
         assertEquals(executionId, executionIdThread.get());
         assertEquals("cycle-123", cycleIdThread.get());
+        assertEquals(2, retryAttemptThread.get());
+        assertEquals(3, retryMaxThread.get());
     }
 
     @Test
@@ -59,6 +67,8 @@ class ExecutionContextTest {
         System.setProperty("etl.parent.execution.id", "exec-pai");
         System.setProperty("etl.parent.command", "--loop-daemon-run");
         System.setProperty("etl.parent.cycle.id", "cycle-pai");
+        System.setProperty("etl.parent.retry.attempt", "2");
+        System.setProperty("etl.parent.retry.max_attempts", "3");
         try {
             final String executionId = ExecutionContext.initialize(null);
 
@@ -66,11 +76,28 @@ class ExecutionContextTest {
             assertEquals("exec-pai", ExecutionContext.currentExecutionId());
             assertEquals("--loop-daemon-run", ExecutionContext.currentCommand());
             assertEquals("cycle-pai", ExecutionContext.currentCycleId());
+            assertEquals(2, ExecutionContext.currentRetryAttempt());
+            assertEquals(3, ExecutionContext.currentRetryMaxAttempts());
+            assertTrue(ExecutionContext.isRetryIntermediaryAttempt());
+            assertFalse(ExecutionContext.isRetryFinalAttempt());
             assertTrue(ExecutionContext.isLoopDaemonCommand());
         } finally {
             System.clearProperty("etl.parent.execution.id");
             System.clearProperty("etl.parent.command");
             System.clearProperty("etl.parent.cycle.id");
+            System.clearProperty("etl.parent.retry.attempt");
+            System.clearProperty("etl.parent.retry.max_attempts");
         }
+    }
+
+    @Test
+    void deveReconhecerTentativaFinalDeRetry() {
+        ExecutionContext.initialize("--fluxo-completo");
+        ExecutionContext.setRetryContext(3, 3);
+
+        assertEquals(3, ExecutionContext.currentRetryAttempt());
+        assertEquals(3, ExecutionContext.currentRetryMaxAttempts());
+        assertTrue(ExecutionContext.isRetryFinalAttempt());
+        assertFalse(ExecutionContext.isRetryIntermediaryAttempt());
     }
 }

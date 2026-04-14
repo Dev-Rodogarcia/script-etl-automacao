@@ -37,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.aplicacao.portas.ClockPort;
+import br.com.extrator.suporte.observabilidade.ExecutionContext;
 
 public class ExponentialBackoffRetryPolicy implements RetryPolicy {
     private static final Logger logger = LoggerFactory.getLogger(ExponentialBackoffRetryPolicy.class);
@@ -66,29 +67,41 @@ public class ExponentialBackoffRetryPolicy implements RetryPolicy {
     @Override
     public <T> T executar(final CheckedSupplier<T> supplier, final String operationName) throws Exception {
         Exception ultimoErro = null;
-        for (int tentativa = 1; tentativa <= maxTentativas; tentativa++) {
-            try {
-                return supplier.get();
-            } catch (Exception e) {
-                ultimoErro = e;
-                if (tentativa >= maxTentativas) {
-                    throw e;
-                }
-                final long delay = calcularDelay(tentativa);
-                logger.warn(
-                    "Retry operation={} tentativa={}/{} delay_ms={} erro={}",
-                    operationName,
-                    tentativa,
-                    maxTentativas,
-                    delay,
-                    e.getMessage()
-                );
+        final boolean hadRetryContext = ExecutionContext.hasRetryContext();
+        final int previousAttempt = ExecutionContext.currentRetryAttempt();
+        final int previousMaxAttempts = ExecutionContext.currentRetryMaxAttempts();
+        try {
+            for (int tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+                ExecutionContext.setRetryContext(tentativa, maxTentativas);
                 try {
-                    clock.dormir(Duration.ofMillis(delay));
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Retry interrompido para operacao " + operationName, ie);
+                    return supplier.get();
+                } catch (Exception e) {
+                    ultimoErro = e;
+                    if (tentativa >= maxTentativas) {
+                        throw e;
+                    }
+                    final long delay = calcularDelay(tentativa);
+                    logger.warn(
+                        "Retry operation={} tentativa={}/{} delay_ms={} erro={}",
+                        operationName,
+                        tentativa,
+                        maxTentativas,
+                        delay,
+                        e.getMessage()
+                    );
+                    try {
+                        clock.dormir(Duration.ofMillis(delay));
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Retry interrompido para operacao " + operationName, ie);
+                    }
                 }
+            }
+        } finally {
+            if (hadRetryContext) {
+                ExecutionContext.setRetryContext(previousAttempt, previousMaxAttempts);
+            } else {
+                ExecutionContext.clearRetryContext();
             }
         }
         throw ultimoErro == null ? new IllegalStateException("Falha sem erro detalhado") : ultimoErro;
@@ -104,6 +117,5 @@ public class ExponentialBackoffRetryPolicy implements RetryPolicy {
         return base + adicional;
     }
 }
-
 
 
