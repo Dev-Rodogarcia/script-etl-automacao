@@ -169,7 +169,7 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         final boolean usarFiltroEstritoDataExtracao =
             periodoFechado
                 && janelaEstruturada.isPresent()
-                && ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade);
+                && !ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade);
         final Set<String> chavesBanco = repository.carregarChavesBancoNaJanela(
             conexao,
             entidade,

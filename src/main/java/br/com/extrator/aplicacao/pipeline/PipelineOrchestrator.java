@@ -133,10 +133,14 @@ public final class PipelineOrchestrator {
         if (index < 0 || index + 1 >= steps.size()) {
             return false;
         }
+        final PipelineStep stepAtual = steps.get(index);
+        final PipelineStep stepProximo = steps.get(index + 1);
         final String entidadeAtual = normalizarEntidade(steps.get(index).obterNomeEntidade());
         final String entidadeProxima = normalizarEntidade(steps.get(index + 1).obterNomeEntidade());
         return ENTIDADES_CORE_PARALELAS.contains(entidadeAtual)
             && ENTIDADES_CORE_PARALELAS.contains(entidadeProxima)
+            && stepAtual.permiteExecucaoParalelaCore()
+            && stepProximo.permiteExecucaoParalelaCore()
             && !entidadeAtual.equals(entidadeProxima);
     }
 

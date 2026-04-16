@@ -160,6 +160,53 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
             """.formatted(targetFreshnessExpr, sourceFreshnessExpr);
     }
 
+    protected String castToDateTimeExpr(final String expression) {
+        if (expression == null || expression.isBlank()) {
+            throw new IllegalArgumentException("Expressao SQL nao pode ser nula ao converter para datetime2.");
+        }
+        return "CAST(" + expression + " AS datetime2(3))";
+    }
+
+    protected String castDateToEndOfDayExpr(final String expression) {
+        if (expression == null || expression.isBlank()) {
+            throw new IllegalArgumentException("Expressao SQL nao pode ser nula ao normalizar data para fim do dia.");
+        }
+        return """
+            (CASE
+                WHEN %1$s IS NULL THEN NULL
+                ELSE DATEADD(MILLISECOND, -1, DATEADD(DAY, 1, CAST(%1$s AS datetime2(3))))
+             END)
+            """.formatted(expression);
+    }
+
+    protected String buildGreatestTimestampExpression(final String... expressions) {
+        if (expressions == null || expressions.length == 0) {
+            throw new IllegalArgumentException("Ao menos uma expressao SQL deve ser informada para compor freshness.");
+        }
+
+        final StringBuilder values = new StringBuilder();
+        for (final String expression : expressions) {
+            if (expression == null || expression.isBlank()) {
+                throw new IllegalArgumentException("Expressao SQL vazia nao pode compor freshness.");
+            }
+            if (values.length() > 0) {
+                values.append(",\n");
+            }
+            values.append("(")
+                .append(expression)
+                .append(")");
+        }
+
+        return """
+            (
+                SELECT MAX(v.ts)
+                FROM (VALUES
+                    %s
+                ) AS v(ts)
+            )
+            """.formatted(values);
+    }
+
     protected boolean aceitarMergeSemAlteracoesComoSucesso(final T entidade) {
         return false;
     }
@@ -174,6 +221,10 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
 
     protected int executarMergeNoDestinoDaExecucao(final Connection conexao, final T entidade) throws SQLException {
         return executarMerge(conexao, entidade);
+    }
+
+    protected int refrescarDataExtracaoQuandoNoOp(final Connection conexao, final T entidade) throws SQLException {
+        return 0;
     }
 
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
@@ -252,7 +303,40 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
             insertValues
         );
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            return statement.executeUpdate();
+            final int rowsPromovidos = statement.executeUpdate();
+            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
+                conexao,
+                tabelaDestino,
+                stagingValidado,
+                condicaoMerge,
+                freshnessGuard
+            );
+            return rowsPromovidos + rowsConfirmadosSemRefresh;
+        }
+    }
+
+    protected final int refrescarDataExtracaoEmNoOpsDeStaging(final Connection conexao,
+                                                              final String tabelaDestino,
+                                                              final String stagingValidado,
+                                                              final String condicaoMerge,
+                                                              final String freshnessGuard) throws SQLException {
+        final String sqlRefresh = """
+            UPDATE target
+               SET data_extracao = source.data_extracao
+              FROM %s AS target
+              JOIN %s AS source
+                ON %s
+             WHERE NOT (%s)
+               AND source.data_extracao IS NOT NULL
+               AND (target.data_extracao IS NULL OR source.data_extracao > target.data_extracao)
+            """.formatted(
+            tabelaDestino,
+            stagingValidado,
+            condicaoMerge,
+            freshnessGuard
+        );
+        try (PreparedStatement refresh = conexao.prepareStatement(sqlRefresh)) {
+            return refresh.executeUpdate();
         }
     }
 
@@ -342,14 +426,17 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
                             totalSucesso++;
                             totalPersistidos += rowsAffected;
                         } else if (aceitarMergeSemAlteracoesComoSucesso(entidade)) {
+                            final int rowsRefrescadas = refrescarDataExtracaoQuandoNoOp(conexao, entidade);
                             totalSucesso++;
                             totalNoOpIdempotente++;
+                            totalPersistidos += rowsRefrescadas;
                             logger.debug(
-                                "MERGE retornou 0 para registro {}/{} de {}: {} (no-op idempotente aceito)",
+                                "MERGE retornou 0 para registro {}/{} de {}: {} (no-op idempotente aceito, rows_refrescadas={})",
                                 registroAtual,
                                 totalRegistros,
                                 getClass().getSimpleName(),
-                                obterIdentificadorEntidade(entidade)
+                                obterIdentificadorEntidade(entidade),
+                                rowsRefrescadas
                             );
                         } else {
                             logger.warn("⚠️ MERGE retornou 0 para registro {}/{} de {}: {} (não foi salvo)", 

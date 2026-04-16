@@ -27,6 +27,7 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -58,39 +59,40 @@ public class GerenciadorRequisicaoHttp {
         private final AtomicLong lastFailureTime = new AtomicLong(0);
         private final AtomicBoolean isOpen = new AtomicBoolean(false);
 
-        boolean canExecute() {
+        boolean canExecute(final String escopo) {
             if (!isOpen.get()) {
                 return true;
             }
 
             final long timeSinceFailure = System.currentTimeMillis() - lastFailureTime.get();
             if (timeSinceFailure >= RESET_TIMEOUT_MS) {
-                logger.warn("Circuit breaker tentando HALF-OPEN state apos {}s", timeSinceFailure / 1000);
+                logger.warn("Circuit breaker [{}] tentando HALF-OPEN state apos {}s", escopo, timeSinceFailure / 1000);
                 return true;
             }
             return false;
         }
 
-        void recordSuccess() {
+        void recordSuccess(final String escopo) {
             final int previousFailures = failureCount.getAndSet(0);
             if (isOpen.getAndSet(false) || previousFailures > 0) {
-                logger.info("Circuit breaker FECHADO apos sucesso (havia {} falhas)", previousFailures);
+                logger.info("Circuit breaker [{}] FECHADO apos sucesso (havia {} falhas)", escopo, previousFailures);
             }
         }
 
-        void recordFailure() {
+        void recordFailure(final String escopo) {
             final int failures = failureCount.incrementAndGet();
             lastFailureTime.set(System.currentTimeMillis());
 
             if (failures >= FAILURE_THRESHOLD && !isOpen.get()) {
                 isOpen.set(true);
                 logger.error(
-                    "CIRCUIT BREAKER ABERTO apos {} falhas consecutivas. Requests bloqueadas por {}s",
+                    "CIRCUIT BREAKER [{}] ABERTO apos {} falhas consecutivas. Requests bloqueadas por {}s",
+                    escopo,
                     failures,
                     RESET_TIMEOUT_MS / 1000
                 );
             } else if (failures < FAILURE_THRESHOLD) {
-                logger.warn("Falha {}/{} - Circuit ainda fechado", failures, FAILURE_THRESHOLD);
+                logger.warn("Falha {}/{} em [{}] - Circuit ainda fechado", failures, FAILURE_THRESHOLD, escopo);
             }
         }
 
@@ -108,7 +110,7 @@ public class GerenciadorRequisicaoHttp {
         private static final GerenciadorRequisicaoHttp INSTANCE = new GerenciadorRequisicaoHttp();
     }
 
-    private final CircuitBreakerState circuitBreaker = new CircuitBreakerState();
+    private final ConcurrentHashMap<String, CircuitBreakerState> circuitBreakers = new ConcurrentHashMap<>();
     private final ReentrantLock lockThrottling = new ReentrantLock(true);
     private final AtomicLong ultimaRequisicaoTimestamp = new AtomicLong(0);
 
@@ -238,6 +240,7 @@ public class GerenciadorRequisicaoHttp {
         validarCircuitBreaker(tipoEntidade, detalheProtecao);
         aplicarThrottling();
         Exception ultimaFalha = null;
+        final String escopoBreaker = normalizarEscopoCircuitBreaker(tipoEntidade);
 
         for (int tentativa = 1; tentativa <= maxTentativas; tentativa++) {
             try {
@@ -246,7 +249,7 @@ public class GerenciadorRequisicaoHttp {
                 final int statusCode = resposta.statusCode();
 
                 if (statusCode >= 200 && statusCode < 300) {
-                    circuitBreaker.recordSuccess();
+                    obterCircuitBreaker(escopoBreaker).recordSuccess(escopoBreaker);
                     logger.debug("Request bem-sucedida para {} - status={}", descreverTipoEntidade(tipoEntidade), statusCode);
                     return resposta;
                 }
@@ -256,13 +259,13 @@ public class GerenciadorRequisicaoHttp {
                     return resposta;
                 }
 
-                tratarStatusRetentavel(tipoEntidade, tentativa, resposta);
+                tratarStatusRetentavel(escopoBreaker, tipoEntidade, tentativa, resposta);
             } catch (final HttpTimeoutException e) {
                 ultimaFalha = e;
-                tratarTimeout(tipoEntidade, tentativa, e);
+                tratarTimeout(escopoBreaker, tipoEntidade, tentativa, e);
             } catch (final IOException e) {
                 ultimaFalha = e;
-                tratarIOException(tipoEntidade, tentativa, e);
+                tratarIOException(escopoBreaker, tipoEntidade, tentativa, e);
             } catch (final InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Thread interrompida durante requisicao", e);
@@ -313,7 +316,9 @@ public class GerenciadorRequisicaoHttp {
     }
 
     private void validarCircuitBreaker(final String tipoEntidade, final boolean detalheProtecao) {
-        if (!circuitBreaker.canExecute()) {
+        final String escopoBreaker = normalizarEscopoCircuitBreaker(tipoEntidade);
+        final CircuitBreakerState circuitBreaker = obterCircuitBreaker(escopoBreaker);
+        if (!circuitBreaker.canExecute(escopoBreaker)) {
             final long timeUntilReset = circuitBreaker.getTimeUntilReset();
             final String mensagem;
             if (detalheProtecao) {
@@ -372,12 +377,13 @@ public class GerenciadorRequisicaoHttp {
         );
     }
 
-    private void tratarStatusRetentavel(final String tipoEntidade,
+    private void tratarStatusRetentavel(final String escopoBreaker,
+                                        final String tipoEntidade,
                                         final int tentativa,
                                         final HttpResponse<String> resposta) {
         final int statusCode = resposta.statusCode();
         final String corpoResposta = resposta.body();
-        circuitBreaker.recordFailure();
+        obterCircuitBreaker(escopoBreaker).recordFailure(escopoBreaker);
 
         if (statusCode == 429) {
             final OptionalLong retryAfterMs = extrairRetryAfterMillis(resposta);
@@ -420,8 +426,12 @@ public class GerenciadorRequisicaoHttp {
         aguardarComBackoffSeNecessario(tentativa, "backoff exponencial");
     }
 
-    private void tratarTimeout(final String tipoEntidade, final int tentativa, final HttpTimeoutException e) {
-        circuitBreaker.recordFailure();
+    private void tratarTimeout(final String escopoBreaker,
+                               final String tipoEntidade,
+                               final int tentativa,
+                               final HttpTimeoutException e) {
+        throwIfInterrupted("timeout HTTP para " + descreverTipoEntidade(tipoEntidade));
+        obterCircuitBreaker(escopoBreaker).recordFailure(escopoBreaker);
         if (tentativa < maxTentativas) {
             logger.warn(
                 "Timeout na requisicao para {} - tentativa {}/{}",
@@ -442,8 +452,12 @@ public class GerenciadorRequisicaoHttp {
         aguardarComBackoffSeNecessario(tentativa, "retry apos timeout");
     }
 
-    private void tratarIOException(final String tipoEntidade, final int tentativa, final IOException e) {
-        circuitBreaker.recordFailure();
+    private void tratarIOException(final String escopoBreaker,
+                                   final String tipoEntidade,
+                                   final int tentativa,
+                                   final IOException e) {
+        throwIfInterrupted("IOException para " + descreverTipoEntidade(tipoEntidade));
+        obterCircuitBreaker(escopoBreaker).recordFailure(escopoBreaker);
         if (tentativa < maxTentativas) {
             logger.warn(
                 "IOException na requisicao para {} - tentativa {}/{}: {}",
@@ -468,6 +482,7 @@ public class GerenciadorRequisicaoHttp {
     private void aplicarThrottling() {
         lockThrottling.lock();
         try {
+            throwIfInterrupted("throttling global");
             final long agora = System.currentTimeMillis();
             final long ultimaRequisicao = ultimaRequisicaoTimestamp.get();
             final long tempoDecorrido = agora - ultimaRequisicao;
@@ -596,5 +611,20 @@ public class GerenciadorRequisicaoHttp {
 
     private String descreverTipoEntidade(final String tipoEntidade) {
         return tipoEntidade != null ? tipoEntidade : "API";
+    }
+
+    private CircuitBreakerState obterCircuitBreaker(final String escopoBreaker) {
+        return circuitBreakers.computeIfAbsent(escopoBreaker, ignored -> new CircuitBreakerState());
+    }
+
+    private String normalizarEscopoCircuitBreaker(final String tipoEntidade) {
+        return (tipoEntidade == null || tipoEntidade.isBlank()) ? "API" : tipoEntidade.trim();
+    }
+
+    private void throwIfInterrupted(final String contexto) {
+        if (!Thread.currentThread().isInterrupted()) {
+            return;
+        }
+        throw new RuntimeException("Thread interrompida durante " + contexto);
     }
 }

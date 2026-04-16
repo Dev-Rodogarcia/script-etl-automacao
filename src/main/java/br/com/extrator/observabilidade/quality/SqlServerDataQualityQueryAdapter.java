@@ -22,6 +22,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,15 @@ import br.com.extrator.suporte.banco.GerenciadorConexao;
 
 public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryPort {
     private static final Logger logger = LoggerFactory.getLogger(SqlServerDataQualityQueryAdapter.class);
+    private final ConnectionProvider connectionProvider;
+
+    public SqlServerDataQualityQueryAdapter() {
+        this(GerenciadorConexao::obterConexao);
+    }
+
+    SqlServerDataQualityQueryAdapter(final ConnectionProvider connectionProvider) {
+        this.connectionProvider = Objects.requireNonNull(connectionProvider, "connectionProvider");
+    }
 
     @Override
     public long contarDuplicidadesChaveNatural(final String entidade, final LocalDate dataInicio, final LocalDate dataFim) {
@@ -54,13 +64,13 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
 
     @Override
     public long contarLinhasIncompletas(final String entidade, final LocalDate dataInicio, final LocalDate dataFim) {
+        final MessagePatterns patterns = MessagePatterns.of(dataInicio, dataFim);
         final String sql = """
             WITH latest_run AS (
                 SELECT TOP 1 status_final
                 FROM dbo.log_extracoes
                 WHERE entidade = ?
-                  AND CAST(timestamp_inicio AS DATE) >= ?
-                  AND CAST(timestamp_fim AS DATE) <= ?
+                  AND (mensagem LIKE ? OR mensagem LIKE ?)
                 ORDER BY timestamp_fim DESC, timestamp_inicio DESC
             )
             SELECT CASE
@@ -71,8 +81,8 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
             """;
         return queryLong(sql, ps -> {
             ps.setString(1, normalize(entidade));
-            ps.setDate(2, java.sql.Date.valueOf(dataInicio));
-            ps.setDate(3, java.sql.Date.valueOf(dataFim));
+            ps.setString(2, patterns.primary());
+            ps.setString(3, patterns.secondary());
         });
     }
 
@@ -83,7 +93,7 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
             FROM dbo.log_extracoes
             WHERE entidade = ?
             """;
-        try (Connection connection = GerenciadorConexao.obterConexao();
+        try (Connection connection = connectionProvider.get();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, normalize(entidade));
             try (ResultSet rs = statement.executeQuery()) {
@@ -170,7 +180,7 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
     }
 
     private long queryLong(final String sql, final SqlBinder binder) {
-        try (Connection connection = GerenciadorConexao.obterConexao();
+        try (Connection connection = connectionProvider.get();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             binder.bind(statement);
             try (ResultSet rs = statement.executeQuery()) {
@@ -188,8 +198,32 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
         return entidade == null ? "" : entidade.trim().toLowerCase(Locale.ROOT);
     }
 
+    private record MessagePatterns(String primary, String secondary) {
+        private static MessagePatterns of(final LocalDate dataInicio, final LocalDate dataFim) {
+            if (dataInicio == null) {
+                return new MessagePatterns("%", "%");
+            }
+            final LocalDate fim = dataFim == null ? dataInicio : dataFim;
+            if (dataInicio.equals(fim)) {
+                return new MessagePatterns(
+                    "%Data: " + dataInicio + "%",
+                    "%Per\u00edodo: " + dataInicio + " a " + fim + "%"
+                );
+            }
+            return new MessagePatterns(
+                "%" + dataInicio + " a " + fim + "%",
+                "%" + dataInicio + "%" + fim + "%"
+            );
+        }
+    }
+
     @FunctionalInterface
     private interface SqlBinder {
         void bind(PreparedStatement statement) throws SQLException;
+    }
+
+    @FunctionalInterface
+    interface ConnectionProvider {
+        Connection get() throws SQLException;
     }
 }

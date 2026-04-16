@@ -73,6 +73,45 @@ class ValidacaoApiBanco24hDetalhadaMetadataHasherTest {
     }
 
     @Test
+    void deveIgnorarDriftOperacionalEmColetas() {
+        final String baseline = """
+            {
+              "id":"COLETA-1",
+              "sequenceCode":123,
+              "requestDate":"2026-03-09",
+              "serviceDate":"2026-03-10",
+              "requestHour":"08:00",
+              "serviceStartHour":"09:00",
+              "finishDate":"2026-03-10",
+              "serviceEndHour":"17:00",
+              "status":"open",
+              "customer":{"id":"CLI-1","cnpj":"12345678000100"},
+              "pickAddress":{"postalCode":"01001000","number":"10","city":{"name":"Sao Paulo","state":{"code":"SP"}}}
+            }
+            """;
+        final String drift = """
+            {
+              "id":"COLETA-1",
+              "sequenceCode":123,
+              "requestDate":"2026-03-09",
+              "serviceDate":"2026-03-10",
+              "requestHour":"08:00",
+              "serviceStartHour":"10:30",
+              "finishDate":null,
+              "serviceEndHour":null,
+              "status":"finished",
+              "customer":{"id":"CLI-1","cnpj":"12345678000100"},
+              "pickAddress":{"postalCode":"01001000","number":"10","city":{"name":"Sao Paulo","state":{"code":"SP"}}}
+            }
+            """;
+
+        assertEquals(
+            hasher.hashMetadata(ConstantesEntidades.COLETAS, baseline),
+            hasher.hashMetadata(ConstantesEntidades.COLETAS, drift)
+        );
+    }
+
+    @Test
     void deveIgnorarStatusVolatilEmLocalizacaoCargas() {
         final String baseline = """
             {
@@ -89,6 +128,39 @@ class ValidacaoApiBanco24hDetalhadaMetadataHasherTest {
               "service_at":"2026-03-09T10:15:30Z",
               "fit_fln_status":"finished",
               "fit_fln_cln_nickname":"SPO",
+              "fit_fhe_cte_key":"3526"
+            }
+            """;
+
+        assertEquals(
+            hasher.hashMetadata(ConstantesEntidades.LOCALIZACAO_CARGAS, baseline),
+            hasher.hashMetadata(ConstantesEntidades.LOCALIZACAO_CARGAS, drift)
+        );
+    }
+
+    @Test
+    void deveIgnorarLocalizacaoAtualVolatilEmLocalizacaoCargas() {
+        final String baseline = """
+            {
+              "sequence_number":334087,
+              "corporation_sequence_number":455,
+              "service_at":"2026-03-09T10:15:30Z",
+              "service_type":"NORMAL",
+              "total":"1500.00",
+              "fit_fln_cln_nickname":"SPO",
+              "fit_fhe_cte_number":123,
+              "fit_fhe_cte_key":"3526"
+            }
+            """;
+        final String drift = """
+            {
+              "sequence_number":334087,
+              "corporation_sequence_number":455,
+              "service_at":"2026-03-09T10:15:30Z",
+              "service_type":"NORMAL",
+              "total":"1500.00",
+              "fit_fln_cln_nickname":"RJR",
+              "fit_fhe_cte_number":123,
               "fit_fhe_cte_key":"3526"
             }
             """;
@@ -254,6 +326,75 @@ class ValidacaoApiBanco24hDetalhadaMetadataHasherTest {
         assertEquals(
             hasher.hashMetadata(ConstantesEntidades.CONTAS_A_PAGAR, baseline),
             hasher.hashMetadata(ConstantesEntidades.CONTAS_A_PAGAR, drift)
+        );
+    }
+
+    @Test
+    void deveIgnorarDriftOperacionalEmInventario() {
+        final String baseline = """
+            {
+              "sequence_code":2270,
+              "type":"CheckIn::Order::Unloading",
+              "started_at":"2026-04-13T06:09:00.000-03:00",
+              "finished_at":"2026-04-13T14:43:00.000-03:00",
+              "status":"finished",
+              "cnr_c_s_read_volumes":4,
+              "cnr_c_s_fit_corporation_sequence_number":355519,
+              "cnr_c_s_fit_invoices_mapping":["258442"],
+              "cnr_c_s_fit_invoices_value":"948.95",
+              "cnr_c_s_fit_real_weight":"37.4",
+              "cnr_c_s_fit_total_cubic_volume":"0.4044",
+              "cnr_c_s_fit_taxed_weight":"80.88",
+              "cnr_c_s_fit_invoices_volumes":4,
+              "cnr_c_s_fit_dpn_delivery_prediction_at":"2026-04-14T23:59:59.999-03:00",
+              "cnr_c_s_fit_dpn_performance_finished_at":"2026-04-13T18:00:00.000-03:00",
+              "cnr_c_s_fit_fte_lce_occurrence_at":"2026-04-14T15:22:54.734-03:00",
+              "cnr_c_s_fit_fte_lce_ore_description":"Comprovante de Entrega Anexado",
+              "cnr_c_s_fit_dyn_name":"RJR - RJR - RIO DE JANEIRO - POLO",
+              "cnr_c_s_fit_dyn_drt_nickname":"RJR - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA",
+              "cnr_c_s_fit_pyr_nickname":"IMPPAR (Umuarama)",
+              "cnr_c_s_fit_rpt_nickname":"ATAC-FIRE SEGURANCA CONTRA INCENDIO",
+              "cnr_c_s_fit_rpt_ads_cty_name":"Rio de Janeiro",
+              "cnr_c_s_fit_sdr_nickname":"IMPPAR (Umuarama)",
+              "cnr_c_s_fit_sdr_ads_cty_name":"Umuarama",
+              "cnr_cis_eoe_psn_name":"LUCAS DE LIMA RAMOS",
+              "cnr_crn_psn_nickname":"RJR - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+            }
+            """;
+        final String drift = """
+            {
+              "sequence_code":2270,
+              "type":"CheckIn::Order::Unloading",
+              "started_at":"2026-04-13T06:09:00.000-03:00",
+              "finished_at":null,
+              "status":"pending",
+              "cnr_c_s_read_volumes":5,
+              "cnr_c_s_fit_corporation_sequence_number":355519,
+              "cnr_c_s_fit_invoices_mapping":["258442"],
+              "cnr_c_s_fit_invoices_value":"948.95",
+              "cnr_c_s_fit_real_weight":"37.4",
+              "cnr_c_s_fit_total_cubic_volume":"0.4044",
+              "cnr_c_s_fit_taxed_weight":"80.88",
+              "cnr_c_s_fit_invoices_volumes":4,
+              "cnr_c_s_fit_dpn_delivery_prediction_at":"2026-04-15T23:59:59.999-03:00",
+              "cnr_c_s_fit_dpn_performance_finished_at":null,
+              "cnr_c_s_fit_fte_lce_occurrence_at":"2026-04-15T10:39:00.000-03:00",
+              "cnr_c_s_fit_fte_lce_ore_description":"Saida para Entrega",
+              "cnr_c_s_fit_dyn_name":"RJR - RJR - RIO DE JANEIRO - POLO",
+              "cnr_c_s_fit_dyn_drt_nickname":"RJR - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA",
+              "cnr_c_s_fit_pyr_nickname":"IMPPAR (Umuarama)",
+              "cnr_c_s_fit_rpt_nickname":"ATAC-FIRE SEGURANCA CONTRA INCENDIO",
+              "cnr_c_s_fit_rpt_ads_cty_name":"Rio de Janeiro",
+              "cnr_c_s_fit_sdr_nickname":"IMPPAR (Umuarama)",
+              "cnr_c_s_fit_sdr_ads_cty_name":"Umuarama",
+              "cnr_cis_eoe_psn_name":"Outro Conferente",
+              "cnr_crn_psn_nickname":"RJR - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA"
+            }
+            """;
+
+        assertEquals(
+            hasher.hashMetadata(ConstantesEntidades.INVENTARIO, baseline),
+            hasher.hashMetadata(ConstantesEntidades.INVENTARIO, drift)
         );
     }
 

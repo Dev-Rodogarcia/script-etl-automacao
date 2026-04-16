@@ -145,6 +145,31 @@ class ConfigEtlTest {
     }
 
     @Test
+    void deveUsarTimeoutAgregadoMaisRealistaParaStepDataExport() {
+        final String valorAnterior = System.getProperty("etl.pipeline.timeout.step.dataexport.ms");
+        try {
+            System.clearProperty("etl.pipeline.timeout.step.dataexport.ms");
+
+            assertEquals(Duration.ofHours(1), ConfigEtl.obterTimeoutStepDataExport());
+        } finally {
+            restaurarPropriedade("etl.pipeline.timeout.step.dataexport.ms", valorAnterior);
+        }
+    }
+
+    @Test
+    void deveRespeitarOverrideDoTimeoutDoStepDataExport() {
+        final String chave = "etl.pipeline.timeout.step.dataexport.ms";
+        final String valorAnterior = System.getProperty(chave);
+        try {
+            System.setProperty(chave, "5400000");
+
+            assertEquals(Duration.ofMinutes(90), ConfigEtl.obterTimeoutStepDataExport());
+        } finally {
+            restaurarPropriedade(chave, valorAnterior);
+        }
+    }
+
+    @Test
     void execucaoManualDeStepIsoladoDeveVirDesabilitadaPorPadrao() {
         final String valorAnterior = System.getProperty("etl.process.isolated.manual.allow");
         try {

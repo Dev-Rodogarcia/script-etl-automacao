@@ -110,7 +110,8 @@ final class DataExportPaginationSupport {
         final String motivo = resultado.getMotivoInterrupcao();
         return ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(motivo)
             || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(motivo)
-            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(motivo);
+            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(motivo)
+            || ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA.getCodigo().equals(motivo);
     }
 
     <T> ResultadoExtracao<T> selecionarMelhorResultadoParcial(final ResultadoExtracao<T> atual,
@@ -128,6 +129,27 @@ final class DataExportPaginationSupport {
             && candidato.getPaginasProcessadas() > atual.getPaginasProcessadas()) {
             return candidato;
         }
+        if (candidato.getRegistrosExtraidos() == atual.getRegistrosExtraidos()
+            && candidato.getPaginasProcessadas() == atual.getPaginasProcessadas()
+            && pontuarMotivo(candidato.getMotivoInterrupcao()) > pontuarMotivo(atual.getMotivoInterrupcao())) {
+            return candidato;
+        }
         return atual;
+    }
+
+    private int pontuarMotivo(final String motivo) {
+        if (ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA.getCodigo().equals(motivo)) {
+            return 4;
+        }
+        if (ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(motivo)) {
+            return 3;
+        }
+        if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(motivo)) {
+            return 2;
+        }
+        if (ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(motivo)) {
+            return 1;
+        }
+        return 0;
     }
 }

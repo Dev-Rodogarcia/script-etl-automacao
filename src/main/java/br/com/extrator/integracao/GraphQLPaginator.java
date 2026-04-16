@@ -127,6 +127,7 @@ final class GraphQLPaginator {
 
         while (hasNextPage) {
             try {
+                verificarInterrupcaoCooperativa(nomeEntidade, paginaAtual);
                 if (paginaAtual > limitePaginas) {
                     logger.warn("Limite de paginas atingido para {}: {}", nomeEntidade, limitePaginas);
                     interrompido = true;
@@ -216,6 +217,13 @@ final class GraphQLPaginator {
                         ? registrosRecebidos
                         : Math.max(tamanhoPaginaEsperado, registrosRecebidos);
                 }
+                registrarAnomaliaObservavelPaginaCurta(
+                    nomeEntidade,
+                    paginaAtual,
+                    registrosRecebidos,
+                    tamanhoPaginaEsperado,
+                    resposta.getHasNextPage()
+                );
 
                 todasEntidades.addAll(resposta.getEntidades());
                 totalRegistrosProcessados += resposta.getEntidades().size();
@@ -297,13 +305,6 @@ final class GraphQLPaginator {
         }
 
         if (novoCursor != null && cursorAtual != null && novoCursor.equals(cursorAtual) && hasNextPage) {
-            final int limiarPaginaCurta = tamanhoPaginaEsperado != null ? tamanhoPaginaEsperado : perInt;
-            if (registrosRecebidos < limiarPaginaCurta) {
-                return new AnomaliaPaginacao(
-                    ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
-                    "cursor repetido com pagina curta (" + registrosRecebidos + " < " + limiarPaginaCurta + ")"
-                );
-            }
             return new AnomaliaPaginacao(
                 ResultadoExtracao.MotivoInterrupcao.LOOP_DETECTADO,
                 "cursor repetido com hasNextPage=true"
@@ -317,12 +318,6 @@ final class GraphQLPaginator {
             );
         }
 
-        if (hasNextPage && tamanhoPaginaEsperado != null && registrosRecebidos < tamanhoPaginaEsperado) {
-            return new AnomaliaPaginacao(
-                ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE,
-                "pagina " + paginaAtual + " retornou " + registrosRecebidos + " registros (< " + tamanhoPaginaEsperado + ") com hasNextPage=true"
-            );
-        }
         return null;
     }
 
@@ -337,6 +332,32 @@ final class GraphQLPaginator {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Thread interrompida durante retentativa de anomalia de paginacao GraphQL", e);
         }
+    }
+
+    private void registrarAnomaliaObservavelPaginaCurta(final String nomeEntidade,
+                                                        final int paginaAtual,
+                                                        final int registrosRecebidos,
+                                                        final Integer tamanhoPaginaEsperado,
+                                                        final boolean hasNextPage) {
+        if (!hasNextPage || tamanhoPaginaEsperado == null || registrosRecebidos >= tamanhoPaginaEsperado) {
+            return;
+        }
+        logger.warn(
+            "Anomalia observavel de paginacao GraphQL em {} pagina {}: pagina curta {} (< {}) com hasNextPage=true. Extracao seguira porque cursor continua avancando.",
+            nomeEntidade,
+            paginaAtual,
+            registrosRecebidos,
+            tamanhoPaginaEsperado
+        );
+    }
+
+    private void verificarInterrupcaoCooperativa(final String nomeEntidade, final int paginaAtual) {
+        if (!Thread.currentThread().isInterrupted()) {
+            return;
+        }
+        throw new IllegalStateException(
+            "Thread interrompida durante paginacao GraphQL de " + nomeEntidade + " na pagina " + paginaAtual
+        );
     }
 
     private void incrementarContadorFalhas(final String chaveEntidade, final String nomeEntidade) {

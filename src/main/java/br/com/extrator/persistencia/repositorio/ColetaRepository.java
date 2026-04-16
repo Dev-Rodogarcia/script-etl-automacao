@@ -206,8 +206,29 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             }
 
             final int rowsAffected = statement.executeUpdate();
+            if (rowsAffected == 0) {
+                return refrescarDataExtracaoNoOp(conexao, coleta);
+            }
             logger.debug("MERGE executado para Coleta ID {}: {} linha(s) afetada(s)", coleta.getId(), rowsAffected);
             return rowsAffected;
+        }
+    }
+
+    private int refrescarDataExtracaoNoOp(final Connection conexao, final ColetaEntity coleta) throws SQLException {
+        final String sql = """
+            UPDATE dbo.coletas
+               SET data_extracao = ?
+             WHERE id = ?
+               AND ? IS NOT NULL
+               AND (data_extracao IS NULL OR data_extracao < ?)
+            """;
+        try (PreparedStatement statement = conexao.prepareStatement(sql)) {
+            final Instant agora = Instant.now();
+            setInstantParameter(statement, 1, agora);
+            statement.setString(2, coleta.getId());
+            setInstantParameter(statement, 3, agora);
+            setInstantParameter(statement, 4, agora);
+            return statement.executeUpdate();
         }
     }
 }

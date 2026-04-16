@@ -35,6 +35,18 @@ import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 
 final class DataExportPaginator {
+    @FunctionalInterface
+    interface ExpectedCountProbe {
+        Integer obterContagemEsperada(
+            int templateId,
+            String nomeTabela,
+            String campoData,
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            String tipoAmigavel
+        );
+    }
+
     private final Logger logger;
     private final String urlBase;
     private final DataExportRequestBodyFactory requestBodyFactory;
@@ -46,6 +58,7 @@ final class DataExportPaginator {
     private final DataExportPaginationSupport paginationSupport;
     private final DataExportTimeWindowSupport timeWindowSupport;
     private final DataExportTimeout422Probe timeout422Probe;
+    private final ExpectedCountProbe expectedCountProbe;
 
     DataExportPaginator(final Logger logger,
                         final String urlBase,
@@ -57,6 +70,32 @@ final class DataExportPaginator {
                         final int intervaloLogProgresso,
                         final DataExportPaginationSupport paginationSupport,
                         final DataExportTimeWindowSupport timeWindowSupport) {
+        this(
+            logger,
+            urlBase,
+            requestBodyFactory,
+            pageAuditLogger,
+            httpExecutor,
+            maxTentativasTimeoutPorPagina,
+            maxTentativasTimeoutPaginaUm,
+            intervaloLogProgresso,
+            paginationSupport,
+            timeWindowSupport,
+            null
+        );
+    }
+
+    DataExportPaginator(final Logger logger,
+                        final String urlBase,
+                        final DataExportRequestBodyFactory requestBodyFactory,
+                        final DataExportPageAuditLogger pageAuditLogger,
+                        final DataExportHttpExecutor httpExecutor,
+                        final int maxTentativasTimeoutPorPagina,
+                        final int maxTentativasTimeoutPaginaUm,
+                        final int intervaloLogProgresso,
+                        final DataExportPaginationSupport paginationSupport,
+                        final DataExportTimeWindowSupport timeWindowSupport,
+                        final ExpectedCountProbe expectedCountProbe) {
         this.logger = logger;
         this.urlBase = urlBase;
         this.requestBodyFactory = requestBodyFactory;
@@ -68,6 +107,7 @@ final class DataExportPaginator {
         this.paginationSupport = paginationSupport;
         this.timeWindowSupport = timeWindowSupport;
         this.timeout422Probe = new DataExportTimeout422Probe(logger, requestBodyFactory, httpExecutor);
+        this.expectedCountProbe = expectedCountProbe;
     }
 
     <T> ResultadoExtracao<T> buscarDadosGenericos(final String executionUuid,
@@ -179,6 +219,7 @@ final class DataExportPaginator {
 
             LocalDate dia = janelaInicio;
             while (!dia.isAfter(janelaFim)) {
+                verificarInterrupcaoCooperativa("particionamento DataExport", templateId, dia.toString());
                 final Instant inicioDia = timeWindowSupport.inicioDoDia(dia);
                 final Instant fimDia = timeWindowSupport.fimDoDia(dia);
 
@@ -229,6 +270,9 @@ final class DataExportPaginator {
         int totalPaginas = 0;
         int totalRegistrosProcessados = 0;
         int paginasTimeout422ComLacuna = 0;
+        Integer tamanhoUltimaPagina = null;
+        int maiorTamanhoPagina = 0;
+        boolean repetiuPaginaVaziaInesperada = false;
         boolean interrompido = false;
         ResultadoExtracao.MotivoInterrupcao motivoInterrupcao = null;
 
@@ -237,6 +281,7 @@ final class DataExportPaginator {
 
         try {
             while (true) {
+                verificarInterrupcaoCooperativa("paginacao DataExport", templateId, "pagina " + paginaAtual);
                 if (paginaAtual > limitePaginas) {
                     logger.warn(
                         "PROTECAO ATIVADA - Template {} ({}): Limite de {} paginas atingido. Interrompendo busca para evitar loop infinito.",
@@ -374,7 +419,62 @@ final class DataExportPaginator {
                                 resposta.statusCode(),
                                 (int) duracaoMs
                             );
-                            logger.info("Fim da paginacao (pagina vazia)");
+                            if (ehPaginaVaziaNatural(paginaAtual, tamanhoUltimaPagina, perInt)) {
+                                logger.info(
+                                    "Fim natural da paginacao DataExport no template {} (pagina {} vazia apos pagina com {} registro(s)).",
+                                    templateId,
+                                    paginaAtual,
+                                    tamanhoUltimaPagina == null ? 0 : tamanhoUltimaPagina
+                                );
+                                totalPaginas = paginaAtual - 1;
+                                break;
+                            }
+
+                            if (ehPaginacaoIrregularSemProvaDeLacuna(maiorTamanhoPagina, perInt)) {
+                                logger.warn(
+                                    "Fim natural observado no template {} pagina {}: endpoint retornou pagina acima do 'per' configurado (maior_pagina={}, per={}). A pagina vazia seguinte sera tratada como encerramento observado, nao como lacuna.",
+                                    templateId,
+                                    paginaAtual,
+                                    maiorTamanhoPagina,
+                                    perInt
+                                );
+                                totalPaginas = paginaAtual - 1;
+                                break;
+                            }
+
+                            if (!repetiuPaginaVaziaInesperada) {
+                                repetiuPaginaVaziaInesperada = true;
+                                final long atrasoRetryPaginaVaziaMs = calcularAtrasoRetryPaginaVaziaInesperada();
+                                logger.warn(
+                                    "Pagina vazia inesperada detectada no template {} pagina {} apos pagina cheia. Repetindo a mesma pagina em {}ms antes de marcar resultado incompleto.",
+                                    templateId,
+                                    paginaAtual,
+                                    atrasoRetryPaginaVaziaMs
+                                );
+                                aguardarRetryPaginaVaziaInesperada(atrasoRetryPaginaVaziaMs, templateId, paginaAtual);
+                                continue;
+                            }
+
+                            if (contagemEsperadaConfirmaFimNatural(
+                                templateId,
+                                nomeTabela,
+                                campoData,
+                                janelaInicio,
+                                janelaFim,
+                                tipoAmigavel,
+                                totalRegistrosProcessados
+                            )) {
+                                totalPaginas = paginaAtual - 1;
+                                break;
+                            }
+
+                            logger.warn(
+                                "Pagina vazia inesperada confirmada no template {} pagina {} apos retentativa. Extração será marcada como incompleta.",
+                                templateId,
+                                paginaAtual
+                            );
+                            interrompido = true;
+                            motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA;
                             totalPaginas = paginaAtual - 1;
                             break;
                         }
@@ -428,6 +528,9 @@ final class DataExportPaginator {
                 logger.info("Pagina {}: {} registros parseados", paginaAtual, registrosPagina.size());
                 resultadosFinais.addAll(registrosPagina);
                 totalRegistrosProcessados += registrosPagina.size();
+                tamanhoUltimaPagina = registrosPagina.size();
+                maiorTamanhoPagina = Math.max(maiorTamanhoPagina, registrosPagina.size());
+                repetiuPaginaVaziaInesperada = false;
                 paginationSupport.resetarEstadoFalhasTemplate(chaveTemplate);
 
                 logger.info("Total acumulado: {} registros", totalRegistrosProcessados);
@@ -487,10 +590,115 @@ final class DataExportPaginator {
             return atual;
         }
         if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(candidato)
-            || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(candidato)) {
+            || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA.getCodigo().equals(candidato)) {
             return candidato;
         }
         return (atual == null || atual.isBlank()) ? candidato : atual;
+    }
+
+    private boolean ehPaginaVaziaNatural(final int paginaAtual,
+                                         final Integer tamanhoUltimaPagina,
+                                         final int perInt) {
+        if (paginaAtual <= 1) {
+            return true;
+        }
+        return tamanhoUltimaPagina != null && tamanhoUltimaPagina < perInt;
+    }
+
+    private boolean ehPaginacaoIrregularSemProvaDeLacuna(final int maiorTamanhoPagina,
+                                                         final int perInt) {
+        return maiorTamanhoPagina > perInt;
+    }
+
+    private boolean contagemEsperadaConfirmaFimNatural(final int templateId,
+                                                       final String nomeTabela,
+                                                       final String campoData,
+                                                       final LocalDate janelaInicio,
+                                                       final LocalDate janelaFim,
+                                                       final String tipoAmigavel,
+                                                       final int totalRegistrosProcessados) {
+        if (expectedCountProbe == null) {
+            logger.warn(
+                "Pagina vazia inesperada confirmada no template {} sem sonda de contagem esperada. Mantendo resultado incompleto por falta de prova de completude.",
+                templateId
+            );
+            return false;
+        }
+
+        try {
+            final Integer contagemEsperada = expectedCountProbe.obterContagemEsperada(
+                templateId,
+                nomeTabela,
+                campoData,
+                janelaInicio,
+                janelaFim,
+                tipoAmigavel
+            );
+            if (contagemEsperada == null) {
+                logger.warn(
+                    "Sonda de contagem esperada retornou nulo para template {}. Mantendo resultado incompleto por falta de prova de completude.",
+                    templateId
+                );
+                return false;
+            }
+            if (contagemEsperada <= totalRegistrosProcessados) {
+                logger.info(
+                    "Fim natural confirmado via contagem CSV no template {}: esperado={} acumulado={}.",
+                    templateId,
+                    contagemEsperada,
+                    totalRegistrosProcessados
+                );
+                return true;
+            }
+            logger.warn(
+                "Pagina vazia inesperada confirmada no template {} com prova de lacuna via contagem CSV: esperado={} acumulado={}.",
+                templateId,
+                contagemEsperada,
+                totalRegistrosProcessados
+            );
+            return false;
+        } catch (final RuntimeException e) {
+            logger.warn(
+                "Nao foi possivel provar completude via contagem CSV no template {}. Mantendo resultado incompleto. erro={}",
+                templateId,
+                e.getMessage()
+            );
+            return false;
+        }
+    }
+
+    private long calcularAtrasoRetryPaginaVaziaInesperada() {
+        return Math.max(250L, ConfigApi.obterDelayBaseRetry());
+    }
+
+    private void aguardarRetryPaginaVaziaInesperada(final long delayMs,
+                                                    final int templateId,
+                                                    final int paginaAtual) {
+        try {
+            ThreadUtil.aguardar(delayMs);
+        } catch (final InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(
+                "Thread interrompida durante retentativa de pagina vazia inesperada no template "
+                    + templateId
+                    + " pagina "
+                    + paginaAtual,
+                ex
+            );
+        }
+    }
+
+    private void verificarInterrupcaoCooperativa(final String contexto,
+                                                 final int templateId,
+                                                 final String detalhe) {
+        if (!Thread.currentThread().isInterrupted()) {
+            return;
+        }
+        throw new RuntimeException(
+            "Thread interrompida durante " + contexto + " do template " + templateId + " (" + detalhe + ")"
+        );
     }
 
 }

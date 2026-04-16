@@ -36,8 +36,11 @@ public interface PipelineStep {
 
     String obterNomeEntidade();
 
+    default boolean permiteExecucaoParalelaCore() {
+        return true;
+    }
+
     default Duration obterTimeoutExecucao() {
         return ConfigEtl.obterTimeoutStepPadrao();
     }
 }
-

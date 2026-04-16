@@ -222,7 +222,8 @@ public class ValidacaoEtlExtremaUseCase {
             dataInicio,
             dataFim,
             entidades,
-            permitirFallbackJanela
+            permitirFallbackJanela,
+            Map.of()
         )) {
             resultados.put(entidade.entidade(), entidade.fornecedor().get());
         }

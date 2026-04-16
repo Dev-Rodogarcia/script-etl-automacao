@@ -44,11 +44,11 @@ class RepositoryMergeGuardSourceTest {
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",
-            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND %s THEN", "target.data_baixa_fatura", "source.data_baixa_fatura")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND %s THEN", "construirExpressaoFreshness(\"target\")", "construirExpressaoFreshness(\"source\")")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/ContasAPagarRepository.java",
-            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.data_transacao", "source.data_transacao")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "construirExpressaoFreshness(\"target\")", "construirExpressaoFreshness(\"source\")")
         );
     }
 
@@ -73,6 +73,68 @@ class RepositoryMergeGuardSourceTest {
         );
     }
 
+    @Test
+    void abstractRepositoryDeveRefrescarDataExtracaoEmNoOpsDeStaging() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/AbstractRepository.java"
+        ));
+        assertTrue(source.contains("SET data_extracao = source.data_extracao"));
+        assertTrue(source.contains("WHERE NOT ("));
+    }
+
+    @Test
+    void abstractRepositoryDeveGerarGreatestTimestampComValuesMaxParaEvitarExplosaoDeExpressao() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/AbstractRepository.java"
+        ));
+        assertTrue(source.contains("SELECT MAX(v.ts)"));
+        assertTrue(source.contains("FROM (VALUES"));
+    }
+
+    @Test
+    void repositoriosCustomizadosDeStagingDevemRefrescarDataExtracaoNosNoOps() throws IOException {
+        assertRefreshNoOpStaging(
+            "src/main/java/br/com/extrator/persistencia/repositorio/CotacaoRepository.java",
+            "target.sequence_code = source.sequence_code"
+        );
+        assertRefreshNoOpStaging(
+            "src/main/java/br/com/extrator/persistencia/repositorio/LocalizacaoCargaRepository.java",
+            "target.sequence_number = source.sequence_number"
+        );
+        assertRefreshNoOpStaging(
+            "src/main/java/br/com/extrator/persistencia/repositorio/ContasAPagarRepository.java",
+            "target.sequence_code = source.sequence_code"
+        );
+        assertRefreshNoOpStaging(
+            "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",
+            "target.unique_id = source.unique_id"
+        );
+    }
+
+    @Test
+    void repositoriosComCamposDateDevemNormalizarFreshnessParaFimDoDia() throws IOException {
+        assertSqlFreshnessNormalizado(
+            "src/main/java/br/com/extrator/persistencia/repositorio/ContasAPagarRepository.java",
+            List.of(
+                "buildGreatestTimestampExpression(",
+                "castDateToEndOfDayExpr(alias + \".data_transacao\")",
+                "castDateToEndOfDayExpr(alias + \".data_liquidacao\")",
+                "castToDateTimeExpr(alias + \".data_criacao\")"
+            )
+        );
+        assertSqlFreshnessNormalizado(
+            "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",
+            List.of(
+                "buildGreatestTimestampExpression(",
+                "castDateToEndOfDayExpr(alias + \".data_baixa_fatura\")",
+                "castDateToEndOfDayExpr(alias + \".data_vencimento_fatura\")",
+                "castDateToEndOfDayExpr(alias + \".data_emissao_fatura\")",
+                "castToDateTimeExpr(alias + \".data_emissao_cte\")",
+                "castDateToEndOfDayExpr(alias + \".fit_ant_issue_date\")"
+            )
+        );
+    }
+
     private void assertMergeGuard(final String filePath, final List<String> expectedTokens) throws IOException {
         final String source = Files.readString(Path.of(filePath));
         for (final String token : expectedTokens) {
@@ -88,5 +150,27 @@ class RepositoryMergeGuardSourceTest {
         method.setAccessible(true);
         final Object resultado = method.invoke(repository);
         assertTrue(Boolean.TRUE.equals(resultado), () -> repository.getClass().getSimpleName() + " deve usar staging por execucao.");
+    }
+
+    private void assertRefreshNoOpStaging(final String filePath, final String condicaoMerge) throws IOException {
+        final String source = Files.readString(Path.of(filePath));
+        assertTrue(
+            source.contains("refrescarDataExtracaoEmNoOpsDeStaging("),
+            () -> "Arquivo " + filePath + " deve refrescar data_extracao na promocao do staging."
+        );
+        assertTrue(
+            source.contains(condicaoMerge),
+            () -> "Arquivo " + filePath + " deve usar a mesma condicao de merge no refresh do no-op."
+        );
+    }
+
+    private void assertSqlFreshnessNormalizado(final String filePath, final List<String> expectedTokens) throws IOException {
+        final String source = Files.readString(Path.of(filePath));
+        for (final String token : expectedTokens) {
+            assertTrue(
+                source.contains(token),
+                () -> "Arquivo " + filePath + " deve conter token de freshness normalizado: " + token
+            );
+        }
     }
 }

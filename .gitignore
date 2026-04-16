@@ -2,6 +2,25 @@
 .env
 .env.*
 !.env.example
+**/config.local.properties
+**/config.*.local.properties
+**/application-local.properties
+**/application-*.local.properties
+**/*credentials*.json
+**/*secret*.json
+**/*token*.json
+**/*api-key*.json
+**/*apikey*.json
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.ppk
+id_rsa*
+id_ed25519*
 last_run.properties
 last_successful_run.properties
 /runtime/
@@ -22,6 +41,8 @@ database/config.bat
 # Relatorios gerados automaticamente
 docs/relatorio-validacao-etl-*.md
 docs/AUDITORIA-TECNICA-ETL-*.md
+src/test/results/
+test-results/
 
 # Analises internas e materiais de apoio locais
 docs/analises/
@@ -47,6 +68,9 @@ temp/
 *.err
 *.tmp
 *.temp
+tmp_*.sql
+dump_*.sql
+backup_*.sql
 *.pid
 *.state
 *.orig

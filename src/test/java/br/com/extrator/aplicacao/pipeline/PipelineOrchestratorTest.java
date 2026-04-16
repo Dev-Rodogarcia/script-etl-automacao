@@ -17,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
 import br.com.extrator.aplicacao.portas.ClockPort;
+import br.com.extrator.aplicacao.portas.DataExportGateway;
 import br.com.extrator.aplicacao.portas.ExtractionLoggerPort;
+import br.com.extrator.aplicacao.portas.GraphQLGateway;
 import br.com.extrator.observabilidade.pipeline.InMemoryPipelineMetrics;
 import br.com.extrator.aplicacao.politicas.CircuitBreaker;
 import br.com.extrator.aplicacao.politicas.ErrorClassifier;
@@ -112,6 +114,68 @@ class PipelineOrchestratorTest {
         assertTrue(
             duracaoMs < 700,
             "GraphQL e DataExport devem rodar em paralelo quando adjacentes (duracao observada=" + duracaoMs + "ms)"
+        );
+    }
+
+    @Test
+    void deveExecutarStepsAgregadosReaisEmSerieMesmoQuandoAdjacentes() {
+        final MutableClock clock = new MutableClock(LocalDateTime.of(2026, 1, 1, 0, 0));
+        final PipelineOrchestrator orchestrator = criarOrchestrator(
+            clock,
+            (entidade, taxonomy) -> FailureMode.CONTINUE_WITH_ALERT
+        );
+        final AtomicBoolean graphqlEmExecucao = new AtomicBoolean(false);
+        final AtomicBoolean houveSobreposicao = new AtomicBoolean(false);
+
+        final GraphQLGateway graphQLGateway = (dataInicio, dataFim, entidade) -> {
+            graphqlEmExecucao.set(true);
+            try {
+                Thread.sleep(250L);
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
+            } finally {
+                graphqlEmExecucao.set(false);
+            }
+            final LocalDateTime now = LocalDateTime.now();
+            return StepExecutionResult.builder("graphql:" + entidade, entidade)
+                .status(StepStatus.SUCCESS)
+                .startedAt(now)
+                .finishedAt(now.plusNanos(250_000_000L))
+                .build();
+        };
+        final DataExportGateway dataExportGateway = (dataInicio, dataFim, entidade) -> {
+            houveSobreposicao.set(graphqlEmExecucao.get());
+            try {
+                Thread.sleep(250L);
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
+            final LocalDateTime now = LocalDateTime.now();
+            return StepExecutionResult.builder("dataexport:" + entidade, entidade)
+                .status(StepStatus.SUCCESS)
+                .startedAt(now)
+                .finishedAt(now.plusNanos(250_000_000L))
+                .build();
+        };
+
+        final List<PipelineStep> steps = List.of(
+            new GraphQLPipelineStep(graphQLGateway, "graphql"),
+            new DataExportPipelineStep(dataExportGateway, "dataexport")
+        );
+
+        final long inicioMs = System.currentTimeMillis();
+        final PipelineReport report = orchestrator.executar(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 2), steps);
+        final long duracaoMs = System.currentTimeMillis() - inicioMs;
+
+        assertFalse(report.isAborted());
+        assertEquals(2, report.getResultados().size());
+        assertEquals(2, report.totalSucessos());
+        assertFalse(houveSobreposicao.get(), "Steps agregados reais nao devem se sobrepor no fluxo completo");
+        assertTrue(
+            duracaoMs >= 450,
+            "Steps agregados reais devem rodar em serie (duracao observada=" + duracaoMs + "ms)"
         );
     }
 
@@ -299,4 +363,3 @@ class PipelineOrchestratorTest {
         }
     }
 }
-

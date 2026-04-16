@@ -75,6 +75,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
 
     @Override
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String condicaoMerge = "target.sequence_code = source.sequence_code";
         final String freshnessGuard = buildMonotonicUpdateGuard(
             "COALESCE(CAST(target.nfse_issued_at AS datetime2), CAST(target.cte_issued_at AS datetime2), CAST(target.requested_at AS datetime2))",
             "COALESCE(CAST(source.nfse_issued_at AS datetime2), CAST(source.cte_issued_at AS datetime2), CAST(source.requested_at AS datetime2))"
@@ -85,7 +86,15 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
             freshnessGuard
         );
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            return statement.executeUpdate();
+            final int rowsPromovidos = statement.executeUpdate();
+            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
+                conexao,
+                qualificarTabelaDestino(),
+                NOME_TABELA_STAGING,
+                condicaoMerge,
+                freshnessGuard
+            );
+            return rowsPromovidos + rowsConfirmadosSemRefresh;
         }
     }
 

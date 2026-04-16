@@ -87,6 +87,8 @@ public final class SqlServerRecoveryReplayGate implements RecoveryReplayGate {
                        last_error = ?,
                        updated_at = SYSDATETIME()
                  WHERE idempotency_key = ?
+                   AND execution_uuid = ?
+                   AND status = 'STARTED'
                 """;
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
                 ps.setString(1, status);
@@ -95,6 +97,7 @@ public final class SqlServerRecoveryReplayGate implements RecoveryReplayGate {
                 ps.setTimestamp(4, toTimestamp(finishedAt.plus(ConfigEtl.obterRecoveryReplayIdempotencyTtl())));
                 ps.setString(5, sanitizeError(errorMessage));
                 ps.setString(6, idempotencyKey);
+                ps.setString(7, executionUuid);
                 final int rowsAffected = ps.executeUpdate();
                 validarAtualizacaoStatusFinal(rowsAffected, idempotencyKey, executionUuid, status);
             }
@@ -109,7 +112,7 @@ public final class SqlServerRecoveryReplayGate implements RecoveryReplayGate {
             return;
         }
         throw new SQLException(
-            "Gate de replay nao confirmou atualizacao final. rows_affected="
+            "Gate de replay nao confirmou atualizacao final com ownership por execution_uuid. rows_affected="
                 + rowsAffected
                 + " | idempotency_key="
                 + idempotencyKey

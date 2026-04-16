@@ -83,13 +83,13 @@ ORDER BY data_extracao DESC;
 
 - Fonte: GraphQL `pick`
 - Grão: 1 linha por coleta
-- Chaves: PK `id`; `sequence_code` é `UNIQUE`
+- Chaves: PK `id`; `sequence_code` é `NOT NULL` e `UNIQUE`
 - Observação importante: o ETL lê mais campos do que a tabela promove. Hoje ficam só em `metadata` campos como `requester`, `comments`, `agentId`, `serviceStartHour`, `serviceEndHour`, `cargoClassificationId`, `costCenterId`, `invoicesCubedWeight`, `lunchBreakEndHour`, `lunchBreakStartHour`, `notificationEmail`, `notificationPhone`, `pickTypeId`, `pickupLocationId`, além de IDs e documentos que aparecem na entidade como `clienteId`, `usuarioId` e `filialCnpj` (payloads `customer.id`, `user.id` e `corporation.person.cnpj`).
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
 | `id` | `NVARCHAR(50)` | ID técnico GraphQL da coleta. |
-| `sequence_code` | `BIGINT` | Número operacional da coleta/minuta. |
+| `sequence_code` | `BIGINT NOT NULL` | Número operacional da coleta/minuta; chave candidata usada pela FK de manifestos. |
 | `request_date` | `DATE` | Data de solicitação da coleta. |
 | `request_hour` | `NVARCHAR(8)` | Hora da solicitação (`HH:MM:SS`). |
 | `service_date` | `DATE` | Data de execução/serviço da coleta. |

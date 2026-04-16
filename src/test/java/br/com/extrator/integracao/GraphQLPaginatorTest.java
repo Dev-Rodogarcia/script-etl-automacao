@@ -57,14 +57,18 @@ class GraphQLPaginatorTest {
         );
 
         assertFalse(resultado.isCompleto());
-        assertEquals(ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE.getCodigo(), resultado.getMotivoInterrupcao());
+        assertEquals(ResultadoExtracao.MotivoInterrupcao.LOOP_DETECTADO.getCodigo(), resultado.getMotivoInterrupcao());
         assertEquals(1, resultado.getPaginasProcessadas());
         assertEquals(20, resultado.getDados().size());
-        assertEquals(4, callCount.get(), "Pagina anomala deve ser retentada antes de marcar incompleto.");
+        assertEquals(
+            ConfigApi.obterMaxTentativasAnomaliaPaginacaoGraphQL() + 2,
+            callCount.get(),
+            "Cursor repetido deve receber as retentativas configuradas antes de marcar incompleto."
+        );
     }
 
     @Test
-    void deveMarcarIncompletoQuandoHasNextPageVemComPaginaCurta() {
+    void devePermitirPaginaCurtaQuandoCursorContinuaAvancando() {
         final AtomicInteger callCount = new AtomicInteger();
         final GraphQLPaginator paginator = new GraphQLPaginator(
             LoggerFactory.getLogger(GraphQLPaginatorTest.class),
@@ -83,10 +87,14 @@ class GraphQLPaginatorTest {
                     final Map<String, Object> variaveis,
                     final Class<T> tipoClasse
                 ) {
-                    if (callCount.getAndIncrement() == 0) {
+                    final int chamada = callCount.getAndIncrement();
+                    if (chamada == 0) {
                         return cast(java.util.stream.IntStream.rangeClosed(1, 20).boxed().toList(), true, "cursor-2");
                     }
-                    return cast(List.of(21, 22, 23, 24, 25), true, "cursor-3");
+                    if (chamada == 1) {
+                        return cast(List.of(21, 22, 23, 24, 25), true, "cursor-3");
+                    }
+                    return cast(List.of(26, 27, 28), false, "cursor-4");
                 }
             }
         );
@@ -99,11 +107,10 @@ class GraphQLPaginatorTest {
             Integer.class
         );
 
-        assertFalse(resultado.isCompleto());
-        assertEquals(ResultadoExtracao.MotivoInterrupcao.PAGINACAO_INCONSISTENTE.getCodigo(), resultado.getMotivoInterrupcao());
-        assertEquals(1, resultado.getPaginasProcessadas());
-        assertEquals(20, resultado.getDados().size());
-        assertEquals(4, callCount.get(), "Pagina curta com hasNextPage=true deve receber retentativa curta.");
+        assertTrue(resultado.isCompleto());
+        assertEquals(3, resultado.getPaginasProcessadas());
+        assertEquals(28, resultado.getDados().size());
+        assertEquals(3, callCount.get(), "Pagina curta com cursor valido deve permitir continuar a extracao.");
     }
 
     @Test

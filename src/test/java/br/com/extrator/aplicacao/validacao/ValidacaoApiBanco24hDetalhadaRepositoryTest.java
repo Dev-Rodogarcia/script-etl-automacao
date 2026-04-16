@@ -198,6 +198,93 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
     }
 
     @Test
+    void deveAplicarFiltroEstritoPorJanelaEstruturadaEmFretes() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            assertTrue(sql.contains("FROM dbo.fretes"));
+            assertTrue(sql.contains("data_extracao >= ? AND data_extracao <= ?"));
+            assertTrue(!sql.contains("service_date"));
+            return criarPreparedStatement(captured, criarResultSet(List.of()));
+        });
+        final JanelaExecucao janela = new JanelaExecucao(
+            LocalDateTime.of(2026, 4, 15, 1, 4, 25),
+            LocalDateTime.of(2026, 4, 15, 1, 15, 13),
+            true
+        );
+
+        repository.carregarChavesBancoNaJanela(
+            conexao,
+            ConstantesEntidades.FRETES,
+            janela,
+            LocalDate.of(2026, 4, 9),
+            LocalDate.of(2026, 4, 15),
+            true
+        );
+
+        assertEquals(Timestamp.valueOf(janela.inicio()), captured.get(1));
+        assertEquals(Timestamp.valueOf(janela.fim()), captured.get(2));
+        assertEquals(2, captured.size());
+    }
+
+    @Test
+    void deveAplicarFiltroEstritoPorJanelaEstruturadaEmColetas() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            assertTrue(sql.contains("FROM dbo.coletas"));
+            assertTrue(sql.contains("data_extracao >= ? AND data_extracao <= ?"));
+            assertTrue(!sql.contains("request_date BETWEEN"));
+            return criarPreparedStatement(captured, criarResultSet(List.of()));
+        });
+        final JanelaExecucao janela = new JanelaExecucao(
+            LocalDateTime.of(2026, 4, 15, 1, 2, 14),
+            LocalDateTime.of(2026, 4, 15, 1, 4, 23),
+            true
+        );
+
+        repository.carregarChavesBancoNaJanela(
+            conexao,
+            ConstantesEntidades.COLETAS,
+            janela,
+            LocalDate.of(2026, 4, 9),
+            LocalDate.of(2026, 4, 15),
+            true
+        );
+
+        assertEquals(Timestamp.valueOf(janela.inicio()), captured.get(1));
+        assertEquals(Timestamp.valueOf(janela.fim()), captured.get(2));
+        assertEquals(2, captured.size());
+    }
+
+    @Test
+    void deveAplicarFiltroEstritoPorJanelaEstruturadaEmLocalizacaoCargas() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            assertTrue(sql.contains("FROM dbo.localizacao_cargas"));
+            assertTrue(sql.contains("data_extracao >= ? AND data_extracao <= ?"));
+            assertTrue(!sql.contains("predicted_delivery_at"));
+            return criarPreparedStatement(captured, criarResultSet(List.of()));
+        });
+        final JanelaExecucao janela = new JanelaExecucao(
+            LocalDateTime.of(2026, 4, 15, 1, 17, 53),
+            LocalDateTime.of(2026, 4, 15, 1, 19, 32),
+            true
+        );
+
+        repository.carregarChavesBancoNaJanela(
+            conexao,
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            janela,
+            LocalDate.of(2026, 4, 9),
+            LocalDate.of(2026, 4, 15),
+            true
+        );
+
+        assertEquals(Timestamp.valueOf(janela.inicio()), captured.get(1));
+        assertEquals(Timestamp.valueOf(janela.fim()), captured.get(2));
+        assertEquals(2, captured.size());
+    }
+
+    @Test
     void deveResolverExecutionUuidAncoraAPartirDaAuditoriaEstruturada() throws SQLException {
         final Map<Integer, Object> captured = new LinkedHashMap<>();
         final Connection conexao = criarConexao(sql -> {
@@ -239,6 +326,107 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
         assertEquals(ConstantesEntidades.FRETES, captured.get(4));
         assertEquals(ConstantesEntidades.COLETAS, captured.get(5));
         assertEquals(ConstantesEntidades.COTACOES, captured.get(6));
+    }
+
+    @Test
+    void deveResolverExecutionUuidAncoraRecenteSemExigirMesmaJanela() throws SQLException {
+        final Map<Integer, Object> captured = new LinkedHashMap<>();
+        final Connection conexao = criarConexao(sql -> {
+            if (sql.contains("OBJECT_ID")) {
+                return criarPreparedStatement(
+                    new LinkedHashMap<>(),
+                    criarResultSet(List.of(Map.of("", 1, "1", 1)))
+                );
+            }
+            assertTrue(sql.contains("FROM dbo.sys_execution_audit"));
+            assertTrue(!sql.contains("janela_consulta_inicio = ?"));
+            return criarPreparedStatement(
+                captured,
+                criarResultSet(List.of(Map.of("execution_uuid", "exec-recente")) )
+            );
+        });
+        final Set<String> entidades = new LinkedHashSet<>(List.of(
+            ConstantesEntidades.FRETES,
+            ConstantesEntidades.COLETAS
+        ));
+        final LocalDateTime inicioValidacao = LocalDateTime.of(2026, 4, 15, 2, 10, 5);
+
+        final Optional<String> executionUuid = repository.resolverExecutionUuidAncoraRecente(
+            conexao,
+            entidades,
+            inicioValidacao
+        );
+
+        assertTrue(executionUuid.isPresent());
+        assertEquals("exec-recente", executionUuid.get());
+        assertEquals(Timestamp.valueOf(inicioValidacao), captured.get(1));
+        assertEquals(ConstantesEntidades.FRETES, captured.get(2));
+        assertEquals(ConstantesEntidades.COLETAS, captured.get(3));
+    }
+
+    @Test
+    void deveCarregarPeriodoConsultaDaExecucaoEstruturada() throws SQLException {
+        final LocalDateTime inicio = LocalDateTime.of(2026, 4, 9, 0, 0);
+        final LocalDateTime fim = LocalDateTime.of(2026, 4, 15, 23, 59, 59);
+        final Connection conexao = criarConexao(sql -> {
+            if (sql.contains("OBJECT_ID")) {
+                return criarPreparedStatement(
+                    new LinkedHashMap<>(),
+                    criarResultSet(List.of(Map.of("", 1, "1", 1)))
+                );
+            }
+            assertTrue(sql.contains("janela_consulta_inicio"));
+            return criarPreparedStatement(
+                new LinkedHashMap<>(),
+                criarResultSet(List.of(Map.of(
+                    "janela_consulta_inicio", Timestamp.valueOf(inicio),
+                    "janela_consulta_fim", Timestamp.valueOf(fim)
+                )))
+            );
+        });
+
+        final Optional<ValidacaoApiBanco24hDetalhadaTypes.PeriodoConsulta> periodo =
+            repository.buscarPeriodoConsultaDaExecucao(
+                conexao,
+                "exec-estruturada",
+                ConstantesEntidades.MANIFESTOS
+            );
+
+        assertTrue(periodo.isPresent());
+        assertEquals(LocalDate.of(2026, 4, 9), periodo.get().inicio());
+        assertEquals(LocalDate.of(2026, 4, 15), periodo.get().fim());
+    }
+
+    @Test
+    void deveNormalizarFimExclusivoArredondadoPeloSqlServerAoCarregarPeriodoConsulta() throws SQLException {
+        final LocalDateTime inicio = LocalDateTime.of(2026, 4, 9, 0, 0);
+        final LocalDateTime fimExclusivo = LocalDateTime.of(2026, 4, 16, 0, 0);
+        final Connection conexao = criarConexao(sql -> {
+            if (sql.contains("OBJECT_ID")) {
+                return criarPreparedStatement(
+                    new LinkedHashMap<>(),
+                    criarResultSet(List.of(Map.of("", 1, "1", 1)))
+                );
+            }
+            return criarPreparedStatement(
+                new LinkedHashMap<>(),
+                criarResultSet(List.of(Map.of(
+                    "janela_consulta_inicio", Timestamp.valueOf(inicio),
+                    "janela_consulta_fim", Timestamp.valueOf(fimExclusivo)
+                )))
+            );
+        });
+
+        final Optional<ValidacaoApiBanco24hDetalhadaTypes.PeriodoConsulta> periodo =
+            repository.buscarPeriodoConsultaDaExecucao(
+                conexao,
+                "exec-exclusiva",
+                ConstantesEntidades.FRETES
+            );
+
+        assertTrue(periodo.isPresent());
+        assertEquals(LocalDate.of(2026, 4, 9), periodo.get().inicio());
+        assertEquals(LocalDate.of(2026, 4, 15), periodo.get().fim());
     }
 
     private Connection criarConexao(final StatementFactory factory) {

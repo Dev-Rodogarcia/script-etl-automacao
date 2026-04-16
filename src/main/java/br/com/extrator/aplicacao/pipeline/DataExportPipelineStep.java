@@ -57,8 +57,12 @@ public final class DataExportPipelineStep implements PipelineStep {
     }
 
     @Override
+    public boolean permiteExecucaoParalelaCore() {
+        return !"dataexport".equalsIgnoreCase(entidade);
+    }
+
+    @Override
     public Duration obterTimeoutExecucao() {
         return ConfigEtl.obterTimeoutStepDataExport();
     }
 }
-

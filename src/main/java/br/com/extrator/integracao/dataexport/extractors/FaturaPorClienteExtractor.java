@@ -103,7 +103,7 @@ public class FaturaPorClienteExtractor implements DataExportEntityExtractor<Fatu
         int descartesSemChave = 0;
         for (final FaturaPorClienteDTO dto : dtos) {
             final String uniqueId = calcularUniqueIdTemporario(dto);
-            if (uniqueId != null && !faturasUnicas.containsKey(uniqueId)) {
+            if (uniqueId != null) {
                 faturasUnicas.put(uniqueId, dto);
             } else if (uniqueId == null) {
                 descartesSemChave++;

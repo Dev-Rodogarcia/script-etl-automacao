@@ -58,6 +58,11 @@ public final class GraphQLPipelineStep implements PipelineStep {
     }
 
     @Override
+    public boolean permiteExecucaoParalelaCore() {
+        return !"graphql".equalsIgnoreCase(entidade);
+    }
+
+    @Override
     public Duration obterTimeoutExecucao() {
         if (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidade)) {
             return ConfigEtl.obterTimeoutStepFaturasGraphQL();

@@ -77,6 +77,7 @@ public final class GraphQLIntervaloHelper {
         final long totalDias = ChronoUnit.DAYS.between(dataInicio, dataFim) + 1;
 
         while (!dia.isAfter(dataFim)) {
+            verificarInterrupcaoCooperativa(nomeEntidade, dia);
             logger.info("{} - Dia {}/{}: {}", nomeEntidade, diaAtual, totalDias, dia);
 
             final ResultadoExtracao<T> resultadoDia = executarDiaComRetry(dia, executorDia, nomeEntidade, diaAtual, totalDias);
@@ -131,6 +132,7 @@ public final class GraphQLIntervaloHelper {
 
         LocalDate dia = dataInicio;
         while (!dia.isAfter(dataFim)) {
+            verificarInterrupcaoCooperativa(nomeEntidade, dia);
             final ResultadoExtracao<T> resultadoDia = executarDiaComRetry(dia, executorDia, nomeEntidade, 0, 0);
             todas.addAll(resultadoDia.getDados());
             totalPaginas += resultadoDia.getPaginasProcessadas();
@@ -241,6 +243,15 @@ public final class GraphQLIntervaloHelper {
         final double fator = Math.pow(multiplicador, Math.max(0, tentativa - 1));
         final long delayCalculado = Math.round(delayBaseMs * fator);
         return Math.min(delayCalculado, 30_000L);
+    }
+
+    private static void verificarInterrupcaoCooperativa(final String nomeEntidade, final LocalDate dia) {
+        if (!Thread.currentThread().isInterrupted()) {
+            return;
+        }
+        throw new RuntimeException(
+            "Thread interrompida durante extracao GraphQL por dia de " + nomeEntidade + " no dia " + dia
+        );
     }
 
     private static String selecionarMotivoInterrupcao(final String atual, final String candidato) {

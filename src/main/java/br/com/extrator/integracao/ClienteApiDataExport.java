@@ -124,18 +124,6 @@ public class ClienteApiDataExport {
             new java.util.HashSet<>(),
             new java.util.HashMap<>()
         );
-        this.paginator = new DataExportPaginator(
-            logger,
-            this.urlBase,
-            requestBodyFactory,
-            pageAuditLogger,
-            httpExecutor,
-            maxTentativasTimeoutPorPagina,
-            maxTentativasTimeoutPaginaUm,
-            INTERVALO_LOG_PROGRESSO,
-            this.paginationSupport,
-            this.timeWindowSupport
-        );
         this.csvCountSupport = new DataExportCsvCountSupport(
             logger,
             this.urlBase,
@@ -146,6 +134,20 @@ public class ClienteApiDataExport {
             paginationSupport::isCircuitBreakerAtivo,
             paginationSupport::resetarEstadoFalhasTemplate,
             paginationSupport::incrementarContadorFalhas
+        );
+        this.paginator = new DataExportPaginator(
+            logger,
+            this.urlBase,
+            requestBodyFactory,
+            pageAuditLogger,
+            httpExecutor,
+            maxTentativasTimeoutPorPagina,
+            maxTentativasTimeoutPaginaUm,
+            INTERVALO_LOG_PROGRESSO,
+            this.paginationSupport,
+            this.timeWindowSupport,
+            (templateId, nomeTabela, campoData, dataInicio, dataFim, tipoAmigavel) ->
+                this.csvCountSupport.obterContagemGenericaCsv(templateId, nomeTabela, campoData, dataInicio, dataFim, tipoAmigavel)
         );
 
         logger.info("Cliente da API Data Export inicializado com sucesso");
@@ -545,7 +547,8 @@ public class ClienteApiDataExport {
         }
         if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(candidato)
             || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(candidato)
-            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(candidato)) {
+            || ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422.getCodigo().equals(candidato)
+            || ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA.getCodigo().equals(candidato)) {
             return candidato;
         }
         return (atual == null || atual.isBlank()) ? candidato : atual;

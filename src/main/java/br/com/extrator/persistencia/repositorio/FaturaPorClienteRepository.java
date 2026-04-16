@@ -83,9 +83,10 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
 
     @Override
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String condicaoMerge = "target.unique_id = source.unique_id";
         final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.data_baixa_fatura AS datetime2), CAST(target.data_vencimento_fatura AS datetime2), CAST(target.data_emissao_fatura AS datetime2), CAST(target.data_emissao_cte AS datetime2), CAST(target.fit_ant_issue_date AS datetime2), CAST(target.fit_ant_ils_original_due_date AS datetime2))",
-            "COALESCE(CAST(source.data_baixa_fatura AS datetime2), CAST(source.data_vencimento_fatura AS datetime2), CAST(source.data_emissao_fatura AS datetime2), CAST(source.data_emissao_cte AS datetime2), CAST(source.fit_ant_issue_date AS datetime2), CAST(source.fit_ant_ils_original_due_date AS datetime2))"
+            construirExpressaoFreshness("target"),
+            construirExpressaoFreshness("source")
         );
         final String sql = construirSqlMerge(
             qualificarTabelaDestino(),
@@ -93,7 +94,15 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             freshnessGuard
         );
         try (PreparedStatement pstmt = conexao.prepareStatement(sql)) {
-            return pstmt.executeUpdate();
+            final int rowsPromovidos = pstmt.executeUpdate();
+            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
+                conexao,
+                qualificarTabelaDestino(),
+                NOME_TABELA_STAGING,
+                condicaoMerge,
+                freshnessGuard
+            );
+            return rowsPromovidos + rowsConfirmadosSemRefresh;
         }
     }
 
@@ -109,8 +118,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
         reconciliarAliasLegado(conexao, entity);
 
         final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.data_baixa_fatura AS datetime2), CAST(target.data_vencimento_fatura AS datetime2), CAST(target.data_emissao_fatura AS datetime2), CAST(target.data_emissao_cte AS datetime2), CAST(target.fit_ant_issue_date AS datetime2), CAST(target.fit_ant_ils_original_due_date AS datetime2))",
-            "COALESCE(CAST(source.data_baixa_fatura AS datetime2), CAST(source.data_vencimento_fatura AS datetime2), CAST(source.data_emissao_fatura AS datetime2), CAST(source.data_emissao_cte AS datetime2), CAST(source.fit_ant_issue_date AS datetime2), CAST(source.fit_ant_ils_original_due_date AS datetime2))"
+            construirExpressaoFreshness("target"),
+            construirExpressaoFreshness("source")
         );
         try (PreparedStatement pstmt = conexao.prepareStatement(
             construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard)
@@ -208,6 +217,17 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao)
                 VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao);
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
+
+    private String construirExpressaoFreshness(final String alias) {
+        return buildGreatestTimestampExpression(
+            castDateToEndOfDayExpr(alias + ".data_baixa_fatura"),
+            castDateToEndOfDayExpr(alias + ".data_vencimento_fatura"),
+            castDateToEndOfDayExpr(alias + ".data_emissao_fatura"),
+            castToDateTimeExpr(alias + ".data_emissao_cte"),
+            castDateToEndOfDayExpr(alias + ".fit_ant_issue_date"),
+            castDateToEndOfDayExpr(alias + ".fit_ant_ils_original_due_date")
+        );
     }
 
     private String construirSourceClauseValues() {

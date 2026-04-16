@@ -24,6 +24,31 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
     }
 
     @Override
+    protected int refrescarDataExtracaoQuandoNoOp(final Connection conexao,
+                                                  final InventarioEntity inventario) throws SQLException {
+        if (inventario == null
+            || inventario.getIdentificadorUnico() == null
+            || inventario.getIdentificadorUnico().isBlank()) {
+            return 0;
+        }
+
+        final String sql = """
+            UPDATE dbo.inventario
+               SET data_extracao = ?
+             WHERE identificador_unico = ?
+               AND (data_extracao IS NULL OR data_extracao < ?)
+            """;
+
+        try (PreparedStatement statement = conexao.prepareStatement(sql)) {
+            final Instant agora = Instant.now();
+            setInstantParameter(statement, 1, agora);
+            setStringParameter(statement, 2, inventario.getIdentificadorUnico());
+            setInstantParameter(statement, 3, agora);
+            return statement.executeUpdate();
+        }
+    }
+
+    @Override
     protected int executarMerge(final Connection conexao, final InventarioEntity inventario) throws SQLException {
         if (inventario.getIdentificadorUnico() == null || inventario.getIdentificadorUnico().isBlank()) {
             throw new SQLException("Nao e possivel executar o MERGE para inventario sem identificador_unico.");

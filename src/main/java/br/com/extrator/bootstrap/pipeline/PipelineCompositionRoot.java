@@ -130,7 +130,7 @@ public final class PipelineCompositionRoot {
 
         final FailurePolicy failurePolicy = new MapFailurePolicy(
             criarPoliticaFalhaPorEntidade(),
-            parseFailureMode(config.obterTexto("etl.failure.default", "CONTINUE_WITH_ALERT"), FailureMode.CONTINUE_WITH_ALERT)
+            parseFailureMode(config.obterTexto("etl.failure.default", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
         );
 
         final CircuitBreaker circuitBreaker = new CircuitBreaker(
@@ -233,15 +233,15 @@ public final class PipelineCompositionRoot {
         final Map<String, FailureMode> porEntidade = new LinkedHashMap<>();
         porEntidade.put(
             "graphql",
-            parseFailureMode(config.obterTexto("etl.failure.graphql", "CONTINUE_WITH_ALERT"), FailureMode.CONTINUE_WITH_ALERT)
+            parseFailureMode(config.obterTexto("etl.failure.graphql", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
         );
         porEntidade.put(
             "dataexport",
-            parseFailureMode(config.obterTexto("etl.failure.dataexport", "CONTINUE_WITH_ALERT"), FailureMode.CONTINUE_WITH_ALERT)
+            parseFailureMode(config.obterTexto("etl.failure.dataexport", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
         );
         porEntidade.put(
             ConstantesEntidades.FATURAS_GRAPHQL,
-            parseFailureMode(config.obterTexto("etl.failure.faturas_graphql", "CONTINUE_WITH_ALERT"), FailureMode.CONTINUE_WITH_ALERT)
+            parseFailureMode(config.obterTexto("etl.failure.faturas_graphql", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
         );
         porEntidade.put(
             "quality",

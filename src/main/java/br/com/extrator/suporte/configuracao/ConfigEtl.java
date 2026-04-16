@@ -358,7 +358,7 @@ public final class ConfigEtl {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_PIPELINE_TIMEOUT_STEP_DATAEXPORT_MS",
             "etl.pipeline.timeout.step.dataexport.ms",
-            1_200_000L
+            3_600_000L
         ));
     }
 
@@ -483,6 +483,36 @@ public final class ConfigEtl {
         ));
     }
 
+    public static boolean isLateDataAutoReplayAtivo() {
+        final String valor = ConfigSource.obterConfiguracao(
+            "ETL_LATE_DATA_AUTO_REPLAY_ENABLED",
+            "etl.late_data.auto_replay.enabled"
+        );
+        return valor == null || valor.isBlank() || Boolean.parseBoolean(valor.trim());
+    }
+
+    public static int obterLateDataAutoReplayMaxAttempts() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_LATE_DATA_AUTO_REPLAY_MAX_ATTEMPTS",
+                "etl.late_data.auto_replay.max_attempts"
+            ),
+            1,
+            value -> value >= 0 && value <= 3,
+            null,
+            null,
+            null
+        );
+    }
+
+    public static long obterLateDataAutoReplayDelayMs() {
+        return obterLongComFallback(
+            "ETL_LATE_DATA_AUTO_REPLAY_DELAY_MS",
+            "etl.late_data.auto_replay.delay.ms",
+            0L
+        );
+    }
+
     public static int obterTimeoutLockReplayMs() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao(
@@ -509,7 +539,7 @@ public final class ConfigEtl {
         return obterLongComFallback(
             "ETL_PIPELINE_SHUTDOWN_TIMEOUT_MS",
             "etl.pipeline.shutdown.timeout.ms",
-            250L
+            5_000L
         );
     }
 

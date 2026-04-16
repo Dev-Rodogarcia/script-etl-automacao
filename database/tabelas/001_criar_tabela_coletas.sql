@@ -10,7 +10,7 @@ BEGIN
         id NVARCHAR(50) PRIMARY KEY,
 
         -- Colunas Essenciais para Indexação e Relatórios
-        sequence_code BIGINT,
+        sequence_code BIGINT NOT NULL,
         request_date DATE,
         request_hour NVARCHAR(8),
         service_date DATE,

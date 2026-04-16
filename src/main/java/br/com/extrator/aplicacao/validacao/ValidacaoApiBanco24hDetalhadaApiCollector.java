@@ -35,6 +35,7 @@ package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.EntidadeValidacao;
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;
+import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.PeriodoConsulta;
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.ResultadoApiChaves;
 
 import java.sql.Connection;
@@ -45,6 +46,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -150,7 +152,30 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final LocalDate dataInicio,
         final LocalDate dataFim,
         final boolean incluirFaturasGraphQL,
-        final boolean permitirFallbackJanela
+        final boolean permitirFallbackJanela,
+        final Map<String, PeriodoConsulta> periodosPorEntidade
+    ) {
+        return criarEntidades(
+            conexao,
+            dataReferencia,
+            dataInicio,
+            dataFim,
+            incluirFaturasGraphQL,
+            permitirFallbackJanela,
+            periodosPorEntidade,
+            Optional.empty()
+        );
+    }
+
+    List<EntidadeValidacao> criarEntidades(
+        final Connection conexao,
+        final LocalDate dataReferencia,
+        final LocalDate dataInicio,
+        final LocalDate dataFim,
+        final boolean incluirFaturasGraphQL,
+        final boolean permitirFallbackJanela,
+        final Map<String, PeriodoConsulta> periodosPorEntidade,
+        final Optional<String> executionUuidAncora
     ) {
         final List<String> entidadesSolicitadas = new ArrayList<>(List.of(
             ConstantesEntidades.FRETES,
@@ -171,7 +196,9 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             dataInicio,
             dataFim,
             entidadesSolicitadas,
-            permitirFallbackJanela
+            permitirFallbackJanela,
+            periodosPorEntidade,
+            executionUuidAncora
         );
     }
 
@@ -181,43 +208,81 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final LocalDate dataInicio,
         final LocalDate dataFim,
         final List<String> entidadesSolicitadas,
-        final boolean permitirFallbackJanela
+        final boolean permitirFallbackJanela,
+        final Map<String, PeriodoConsulta> periodosPorEntidade
+    ) {
+        return criarEntidades(
+            conexao,
+            dataReferencia,
+            dataInicio,
+            dataFim,
+            entidadesSolicitadas,
+            permitirFallbackJanela,
+            periodosPorEntidade,
+            Optional.empty()
+        );
+    }
+
+    List<EntidadeValidacao> criarEntidades(
+        final Connection conexao,
+        final LocalDate dataReferencia,
+        final LocalDate dataInicio,
+        final LocalDate dataFim,
+        final List<String> entidadesSolicitadas,
+        final boolean permitirFallbackJanela,
+        final Map<String, PeriodoConsulta> periodosPorEntidade,
+        final Optional<String> executionUuidAncora
     ) {
         final List<EntidadeValidacao> entidades = new ArrayList<>();
         for (final String entidade : entidadesSolicitadas) {
+            final PeriodoConsulta periodo = resolverPeriodoEntidade(entidade, dataInicio, dataFim, periodosPorEntidade);
             if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade)) {
                 entidades.add(new EntidadeValidacao(
                     entidade,
-                    () -> carregarUsuariosSistema(conexao, dataInicio, dataFim)
+                    () -> carregarUsuariosSistema(conexao, periodo.inicio(), periodo.fim())
                 ));
             } else if (ConstantesEntidades.MANIFESTOS.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarManifestos(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarManifestos(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.COTACOES.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarCotacoes(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarCotacoes(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.LOCALIZACAO_CARGAS.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarLocalizacao(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarLocalizacao(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarContasAPagar(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarContasAPagar(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.FATURAS_POR_CLIENTE.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarFaturasPorCliente(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarFaturasPorCliente(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.FRETES.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarFretes(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarFretes(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.COLETAS.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(entidade, () -> carregarColetas(dataInicio, dataFim)));
+                entidades.add(new EntidadeValidacao(entidade, () -> carregarColetas(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)) {
                 entidades.add(new EntidadeValidacao(
                     entidade,
                     () -> carregarFaturasGraphQL(
                         conexao,
                         dataReferencia,
-                        dataInicio,
-                        dataFim,
-                        permitirFallbackJanela
+                        periodo.inicio(),
+                        periodo.fim(),
+                        permitirFallbackJanela,
+                        executionUuidAncora
                     )
                 ));
             }
         }
         return entidades;
+    }
+
+    private PeriodoConsulta resolverPeriodoEntidade(final String entidade,
+                                                    final LocalDate dataInicio,
+                                                    final LocalDate dataFim,
+                                                    final Map<String, PeriodoConsulta> periodosPorEntidade) {
+        if (periodosPorEntidade != null) {
+            final PeriodoConsulta periodo = periodosPorEntidade.get(entidade);
+            if (periodo != null) {
+                return periodo;
+            }
+        }
+        return new PeriodoConsulta(dataInicio, dataFim);
     }
 
     private ResultadoApiChaves carregarUsuariosSistema(final Connection conexao,
@@ -404,7 +469,8 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final LocalDate dataReferencia,
         final LocalDate dataInicio,
         final LocalDate dataFim,
-        final boolean permitirFallbackJanela
+        final boolean permitirFallbackJanela,
+        final Optional<String> executionUuidAncora
     ) throws SQLException {
         final ResultadoExtracao<CreditCustomerBillingNodeDTO> resultado =
             clienteGraphQL.buscarCapaFaturas(dataInicio, dataFim);
@@ -421,14 +487,20 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             porId.put(dto.getId(), dto);
         }
 
-        final java.util.Optional<JanelaExecucao> janelaFretesOpt = repository.buscarUltimaJanelaCompletaDoDia(
-            conexao,
-            ConstantesEntidades.FRETES,
-            dataReferencia,
-            dataInicio,
-            dataFim,
-            permitirFallbackJanela
-        );
+        final Optional<JanelaExecucao> janelaFretesAncorada = executionUuidAncora
+            .flatMap(executionUuid ->
+                buscarJanelaFretesAncorada(conexao, executionUuid)
+            );
+        final Optional<JanelaExecucao> janelaFretesOpt = janelaFretesAncorada.isPresent()
+            ? janelaFretesAncorada
+            : repository.buscarUltimaJanelaCompletaDoDia(
+                conexao,
+                ConstantesEntidades.FRETES,
+                dataReferencia,
+                dataInicio,
+                dataFim,
+                permitirFallbackJanela
+            );
         final List<Long> idsFretesJanela = janelaFretesOpt.isPresent()
             ? repository.listarAccountingCreditIdsFretes(
                 conexao,
@@ -462,7 +534,9 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
                 + janela.fim()
                 + "]"
                 + " | fretes_alinhados_periodo="
-                + janela.alinhadaAoPeriodo())
+                + janela.alinhadaAoPeriodo()
+                + " | fretes_origem_janela="
+                + (janelaFretesAncorada.isPresent() ? "EXECUTION_AUDIT" : "LOG_EXTRACOES"))
             .orElse("ids_fretes_janela=0 | fretes_janela=NAO_ENCONTRADA");
 
         return new ResultadoApiChaves(
@@ -480,6 +554,22 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             resultado.getPaginasProcessadas(),
             caminhosEstruturais
         );
+    }
+
+    private Optional<JanelaExecucao> buscarJanelaFretesAncorada(final Connection conexao,
+                                                                final String executionUuidAncora) {
+        if (executionUuidAncora == null || executionUuidAncora.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return repository.buscarJanelaEstruturadaDaExecucao(
+                conexao,
+                executionUuidAncora,
+                ConstantesEntidades.FRETES
+            );
+        } catch (final SQLException e) {
+            throw new RuntimeException("Falha ao resolver janela ancorada de fretes", e);
+        }
     }
 
     private <DTO, ENTITY> ResultadoApiChaves carregarDataExport(

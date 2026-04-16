@@ -24,14 +24,30 @@ package br.com.extrator.aplicacao.validacao;
 
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Optional;
 
 public record ValidacaoApiBanco24hDetalhadaRequest(
     boolean incluirFaturasGraphQL,
     boolean periodoFechado,
     boolean permitirFallbackJanela,
-    LocalDate dataReferenciaSistema
+    LocalDate dataReferenciaSistema,
+    String executionUuidAncora
 ) {
+    public ValidacaoApiBanco24hDetalhadaRequest(final boolean incluirFaturasGraphQL,
+                                                final boolean periodoFechado,
+                                                final boolean permitirFallbackJanela,
+                                                final LocalDate dataReferenciaSistema) {
+        this(incluirFaturasGraphQL, periodoFechado, permitirFallbackJanela, dataReferenciaSistema, null);
+    }
+
     public ValidacaoApiBanco24hDetalhadaRequest {
         Objects.requireNonNull(dataReferenciaSistema, "dataReferenciaSistema");
+        executionUuidAncora = executionUuidAncora == null || executionUuidAncora.isBlank()
+            ? null
+            : executionUuidAncora.trim();
+    }
+
+    public Optional<String> executionUuidAncoraOpt() {
+        return Optional.ofNullable(executionUuidAncora);
     }
 }

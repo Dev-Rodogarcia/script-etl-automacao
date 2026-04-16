@@ -1,6 +1,7 @@
 package br.com.extrator.integracao;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -27,6 +28,27 @@ class DataExportPaginationSupportTest {
         final ResultadoExtracao<String> resultado = ResultadoExtracao.incompleto(
             java.util.List.of(),
             ResultadoExtracao.MotivoInterrupcao.LACUNA_PAGINACAO_422,
+            3,
+            300
+        );
+
+        assertTrue(support.deveRetentarResultadoIncompleto(resultado));
+    }
+
+    @Test
+    void deveRetentarQuandoPaginaVaziaInesperadaIndicarLacuna() {
+        final DataExportPaginationSupport support = new DataExportPaginationSupport(
+            LoggerFactory.getLogger(DataExportPaginationSupportTest.class),
+            5,
+            Duration.ofMinutes(10),
+            new HashMap<>(),
+            new HashSet<>(),
+            new HashMap<>()
+        );
+
+        final ResultadoExtracao<String> resultado = ResultadoExtracao.incompleto(
+            java.util.List.of("1"),
+            ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA,
             3,
             300
         );
@@ -71,5 +93,35 @@ class DataExportPaginationSupportTest {
         );
 
         assertFalse(support.isCircuitBreakerAtivo("Template-4924"));
+    }
+
+    @Test
+    void devePreferirMelhorParcialComMotivoMaisExplicitoQuandoEmpata() {
+        final DataExportPaginationSupport support = new DataExportPaginationSupport(
+            LoggerFactory.getLogger(DataExportPaginationSupportTest.class),
+            5,
+            Duration.ofMinutes(10),
+            new HashMap<>(),
+            new HashSet<>(),
+            new HashMap<>()
+        );
+
+        final ResultadoExtracao<String> parcialErroApi = ResultadoExtracao.incompleto(
+            java.util.List.of("1", "2"),
+            ResultadoExtracao.MotivoInterrupcao.ERRO_API,
+            2,
+            2
+        );
+        final ResultadoExtracao<String> parcialPaginaVaziaInesperada = ResultadoExtracao.incompleto(
+            java.util.List.of("1", "2"),
+            ResultadoExtracao.MotivoInterrupcao.PAGINA_VAZIA_INESPERADA,
+            2,
+            2
+        );
+
+        assertSame(
+            parcialPaginaVaziaInesperada,
+            support.selecionarMelhorResultadoParcial(parcialErroApi, parcialPaginaVaziaInesperada)
+        );
     }
 }

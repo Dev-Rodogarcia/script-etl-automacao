@@ -137,9 +137,6 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
                 "requestDate",
                 "serviceDate",
                 "requestHour",
-                "serviceStartHour",
-                "finishDate",
-                "serviceEndHour",
                 "requester",
                 "agentId",
                 "manifestItemPickId",
@@ -170,7 +167,6 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
                 "fit_dyn_name",
                 "fit_dyn_drt_nickname",
                 "fit_fsn_name",
-                "fit_fln_cln_nickname",
                 "fit_o_n_name",
                 "fit_o_n_drt_nickname",
                 "fit_fhe_cte_number",
@@ -190,6 +186,26 @@ final class ValidacaoApiBanco24hDetalhadaMetadataHasher {
                 "ant_ils_pas_ant_name",
                 "ant_aln_name",
                 "ant_ils_expense_description"
+            );
+            case ConstantesEntidades.INVENTARIO -> List.of(
+                "sequence_code",
+                "type",
+                "started_at",
+                "cnr_c_s_fit_corporation_sequence_number",
+                "cnr_c_s_fit_invoices_mapping",
+                "cnr_c_s_fit_invoices_value",
+                "cnr_c_s_fit_real_weight",
+                "cnr_c_s_fit_total_cubic_volume",
+                "cnr_c_s_fit_taxed_weight",
+                "cnr_c_s_fit_invoices_volumes",
+                "cnr_c_s_fit_dyn_name",
+                "cnr_c_s_fit_dyn_drt_nickname",
+                "cnr_c_s_fit_pyr_nickname",
+                "cnr_c_s_fit_rpt_nickname",
+                "cnr_c_s_fit_rpt_ads_cty_name",
+                "cnr_c_s_fit_sdr_nickname",
+                "cnr_c_s_fit_sdr_ads_cty_name",
+                "cnr_crn_psn_nickname"
             );
             case ConstantesEntidades.USUARIOS_SISTEMA -> List.of(
                 "id",

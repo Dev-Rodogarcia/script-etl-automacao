@@ -155,6 +155,7 @@ for %%F in (
     "migrations\007_adicionar_fk_seletiva_manifestos_coletas.sql"
     "migrations\008_criar_tabela_sys_replay_idempotency.sql"
     "migrations\009_criar_tabela_sys_reconciliation_quarantine.sql"
+    "migrations\010_harden_coletas_sequence_code.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F

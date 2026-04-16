@@ -75,9 +75,10 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
 
     @Override
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String condicaoMerge = "target.sequence_code = source.sequence_code";
         final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.data_transacao AS datetime2), CAST(target.data_liquidacao AS datetime2), CAST(target.data_criacao AS datetime2))",
-            "COALESCE(CAST(source.data_transacao AS datetime2), CAST(source.data_liquidacao AS datetime2), CAST(source.data_criacao AS datetime2))"
+            construirExpressaoFreshness("target"),
+            construirExpressaoFreshness("source")
         );
         final String sql = construirSqlMerge(
             qualificarTabelaDestino(),
@@ -85,7 +86,15 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             freshnessGuard
         );
         try (PreparedStatement ps = conexao.prepareStatement(sql)) {
-            return ps.executeUpdate();
+            final int rowsPromovidos = ps.executeUpdate();
+            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
+                conexao,
+                qualificarTabelaDestino(),
+                NOME_TABELA_STAGING,
+                condicaoMerge,
+                freshnessGuard
+            );
+            return rowsPromovidos + rowsConfirmadosSemRefresh;
         }
     }
 
@@ -107,8 +116,8 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
         }
 
         final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.data_transacao AS datetime2), CAST(target.data_liquidacao AS datetime2), CAST(target.data_criacao AS datetime2))",
-            "COALESCE(CAST(source.data_transacao AS datetime2), CAST(source.data_liquidacao AS datetime2), CAST(source.data_criacao AS datetime2))"
+            construirExpressaoFreshness("target"),
+            construirExpressaoFreshness("source")
         );
         final String sqlMerge = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard);
 
@@ -218,6 +227,14 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     source.metadata, source.data_extracao
                 );
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
+    }
+
+    private String construirExpressaoFreshness(final String alias) {
+        return buildGreatestTimestampExpression(
+            castDateToEndOfDayExpr(alias + ".data_transacao"),
+            castDateToEndOfDayExpr(alias + ".data_liquidacao"),
+            castToDateTimeExpr(alias + ".data_criacao")
+        );
     }
 
     private String construirSourceClauseValues() {

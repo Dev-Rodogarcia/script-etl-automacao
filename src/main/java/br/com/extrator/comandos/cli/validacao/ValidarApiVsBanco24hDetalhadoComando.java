@@ -41,7 +41,8 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
                 !possuiFlag(args, "--sem-faturas-graphql"),
                 possuiFlag(args, "--periodo-fechado"),
                 possuiFlag(args, "--permitir-fallback-janela"),
-                RelogioSistema.hoje()
+                RelogioSistema.hoje(),
+                valorFlag(args, "--execution-uuid")
             )
         );
     }
@@ -56,5 +57,18 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
             }
         }
         return false;
+    }
+
+    private String valorFlag(final String[] args, final String flag) {
+        if (args == null || flag == null) {
+            return null;
+        }
+        for (int i = 0; i < args.length - 1; i++) {
+            if (flag.equalsIgnoreCase(args[i])) {
+                final String valor = args[i + 1];
+                return valor == null || valor.isBlank() ? null : valor.trim();
+            }
+        }
+        return null;
     }
 }

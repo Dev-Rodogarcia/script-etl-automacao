@@ -58,6 +58,7 @@ public class ResultadoExtracao<T> {
         ERRO_API("ERRO_API"),
         CIRCUIT_BREAKER("CIRCUIT_BREAKER"),
         PAGINA_VAZIA("PAGINA_VAZIA"),
+        PAGINA_VAZIA_INESPERADA("PAGINA_VAZIA_INESPERADA"),
         LACUNA_PAGINACAO_422("LACUNA_PAGINACAO_422");
         
         private final String codigo;

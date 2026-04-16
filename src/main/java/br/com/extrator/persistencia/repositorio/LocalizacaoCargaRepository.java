@@ -75,6 +75,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
 
     @Override
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
+        final String condicaoMerge = "target.sequence_number = source.sequence_number";
         final String freshnessGuard = buildMonotonicUpdateGuard(
             "COALESCE(CAST(target.predicted_delivery_at AS datetime2), CAST(target.service_at AS datetime2))",
             "COALESCE(CAST(source.predicted_delivery_at AS datetime2), CAST(source.service_at AS datetime2))"
@@ -85,7 +86,15 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             freshnessGuard
         );
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            return statement.executeUpdate();
+            final int rowsPromovidos = statement.executeUpdate();
+            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
+                conexao,
+                qualificarTabelaDestino(),
+                NOME_TABELA_STAGING,
+                condicaoMerge,
+                freshnessGuard
+            );
+            return rowsPromovidos + rowsConfirmadosSemRefresh;
         }
     }
 

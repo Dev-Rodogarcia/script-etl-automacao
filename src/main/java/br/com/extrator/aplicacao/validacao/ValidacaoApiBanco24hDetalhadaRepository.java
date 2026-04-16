@@ -30,12 +30,14 @@ Metodos principais:
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;
+import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.PeriodoConsulta;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.Collections;
@@ -248,6 +250,57 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         return Optional.empty();
     }
 
+    Optional<String> resolverExecutionUuidAncoraRecente(final Connection conexao,
+                                                        final Set<String> entidades,
+                                                        final LocalDateTime validacaoIniciadaEm) throws SQLException {
+        if (conexao == null
+            || entidades == null
+            || entidades.isEmpty()
+            || validacaoIniciadaEm == null
+            || !tabelaExiste(conexao, "sys_execution_audit")) {
+            return Optional.empty();
+        }
+
+        final String placeholders = String.join(",", Collections.nCopies(entidades.size(), "?"));
+        final String sql = """
+            WITH candidatos AS (
+                SELECT
+                    execution_uuid,
+                    COUNT(DISTINCT entidade) AS entidades_cobertas,
+                    MAX(finished_at) AS ultimo_fim
+                FROM dbo.sys_execution_audit
+                WHERE finished_at IS NOT NULL
+                  AND finished_at <= ?
+                  AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
+                  AND api_completa = 1
+                  AND command_name IN ('--fluxo-completo', '--extracao-intervalo', '--executar-step-isolado', '--loop-daemon-run', '--recovery')
+                  AND entidade IN (%s)
+                GROUP BY execution_uuid
+            )
+            SELECT TOP 1 execution_uuid
+            FROM candidatos
+            ORDER BY entidades_cobertas DESC, ultimo_fim DESC
+            """.formatted(placeholders);
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            int parametro = 1;
+            stmt.setTimestamp(parametro++, Timestamp.valueOf(validacaoIniciadaEm));
+            for (final String entidade : entidades) {
+                stmt.setString(parametro++, entidade);
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    final String executionUuid = rs.getString("execution_uuid");
+                    return executionUuid == null || executionUuid.isBlank()
+                        ? Optional.empty()
+                        : Optional.of(executionUuid.trim());
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
     Optional<JanelaExecucao> buscarJanelaEstruturadaDaExecucao(final Connection conexao,
                                                                final String executionUuid,
                                                                final String entidade) throws SQLException {
@@ -281,6 +334,46 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                         rs.getTimestamp("finished_at").toLocalDateTime(),
                         true
                     ));
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    Optional<PeriodoConsulta> buscarPeriodoConsultaDaExecucao(final Connection conexao,
+                                                              final String executionUuid,
+                                                              final String entidade) throws SQLException {
+        if (conexao == null
+            || executionUuid == null
+            || executionUuid.isBlank()
+            || entidade == null
+            || entidade.isBlank()
+            || !tabelaExiste(conexao, "sys_execution_audit")) {
+            return Optional.empty();
+        }
+
+        final String sql = """
+            SELECT TOP 1 janela_consulta_inicio, janela_consulta_fim
+            FROM dbo.sys_execution_audit
+            WHERE execution_uuid = ?
+              AND entidade = ?
+              AND status_execucao IN ('COMPLETO', 'RECONCILIADO', 'RECONCILED')
+              AND api_completa = 1
+              AND janela_consulta_inicio IS NOT NULL
+              AND janela_consulta_fim IS NOT NULL
+            ORDER BY finished_at DESC
+            """;
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, executionUuid);
+            stmt.setString(2, entidade);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    final LocalDateTime janelaInicio = rs.getTimestamp("janela_consulta_inicio").toLocalDateTime();
+                    final LocalDateTime janelaFim = rs.getTimestamp("janela_consulta_fim").toLocalDateTime();
+                    final LocalDate dataInicio = janelaInicio.toLocalDate();
+                    final LocalDate dataFim = normalizarFimPeriodoConsulta(janelaInicio, janelaFim);
+                    return Optional.of(new PeriodoConsulta(dataInicio, dataFim));
                 }
             }
         }
@@ -469,14 +562,14 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.fretes
                 WHERE %s
                   AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.COLETAS ->
                 """
                 SELECT id AS chave
                 FROM dbo.coletas
                 WHERE %s
                   AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.FATURAS_GRAPHQL ->
                 """
                 SELECT CAST(id AS VARCHAR(50)) AS chave
@@ -604,14 +697,14 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                 FROM dbo.fretes
                 WHERE %s
                   AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.COLETAS ->
                 """
                 SELECT id AS chave, metadata
                 FROM dbo.coletas
                 WHERE %s
                   AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
+                """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
             case ConstantesEntidades.FATURAS_GRAPHQL ->
                 """
                 SELECT CAST(id AS VARCHAR(50)) AS chave, metadata
@@ -859,17 +952,23 @@ class ValidacaoApiBanco24hDetalhadaRepository {
     private String condicaoFiltroBanco(final String entidade, final boolean filtroEstritoDataExtracao) {
         return switch (entidade) {
             case ConstantesEntidades.COLETAS ->
-                "((data_extracao >= ? AND data_extracao <= ?)"
-                    + " OR (request_date BETWEEN ? AND ?))";
+                filtroEstritoDataExtracao
+                    ? "(data_extracao >= ? AND data_extracao <= ?)"
+                    : "((data_extracao >= ? AND data_extracao <= ?)"
+                        + " OR (request_date BETWEEN ? AND ?))";
             case ConstantesEntidades.FRETES ->
-                "((data_extracao >= ? AND data_extracao <= ?)"
-                    + " OR (COALESCE(service_date, CONVERT(date, servico_em)) BETWEEN ? AND ?))";
+                filtroEstritoDataExtracao
+                    ? "(data_extracao >= ? AND data_extracao <= ?)"
+                    : "((data_extracao >= ? AND data_extracao <= ?)"
+                        + " OR (COALESCE(service_date, CONVERT(date, servico_em)) BETWEEN ? AND ?))";
             case ConstantesEntidades.MANIFESTOS,
                  ConstantesEntidades.COTACOES ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
             case ConstantesEntidades.LOCALIZACAO_CARGAS ->
-                "((data_extracao >= ? AND data_extracao <= ?)"
-                    + " OR (COALESCE(CAST(service_at AS DATE), CAST(predicted_delivery_at AS DATE)) BETWEEN ? AND ?))";
+                filtroEstritoDataExtracao
+                    ? "(data_extracao >= ? AND data_extracao <= ?)"
+                    : "((data_extracao >= ? AND data_extracao <= ?)"
+                        + " OR (COALESCE(CAST(service_at AS DATE), CAST(predicted_delivery_at AS DATE)) BETWEEN ? AND ?))";
             case ConstantesEntidades.CONTAS_A_PAGAR ->
                 filtroEstritoDataExtracao
                     ? "(data_extracao >= ? AND data_extracao <= ?)"
@@ -915,7 +1014,11 @@ class ValidacaoApiBanco24hDetalhadaRepository {
 
         stmt.setTimestamp(1, Timestamp.valueOf(janela.inicio()));
         stmt.setTimestamp(2, Timestamp.valueOf(janela.fim()));
-        if (ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade) && filtroEstritoDataExtracao) {
+        if (filtroEstritoDataExtracao
+            && (ConstantesEntidades.CONTAS_A_PAGAR.equals(entidade)
+                || ConstantesEntidades.FRETES.equals(entidade)
+                || ConstantesEntidades.COLETAS.equals(entidade)
+                || ConstantesEntidades.LOCALIZACAO_CARGAS.equals(entidade))) {
             return;
         }
 
@@ -928,6 +1031,17 @@ class ValidacaoApiBanco24hDetalhadaRepository {
 
         stmt.setDate(3, java.sql.Date.valueOf(periodoInicio));
         stmt.setDate(4, java.sql.Date.valueOf(periodoFim));
+    }
+
+    private LocalDate normalizarFimPeriodoConsulta(final LocalDateTime janelaInicio, final LocalDateTime janelaFim) {
+        if (janelaInicio == null || janelaFim == null) {
+            return janelaFim == null ? null : janelaFim.toLocalDate();
+        }
+        if (LocalTime.MIDNIGHT.equals(janelaFim.toLocalTime())
+            && janelaFim.toLocalDate().isAfter(janelaInicio.toLocalDate())) {
+            return janelaFim.toLocalDate().minusDays(1);
+        }
+        return janelaFim.toLocalDate();
     }
 
     @FunctionalInterface

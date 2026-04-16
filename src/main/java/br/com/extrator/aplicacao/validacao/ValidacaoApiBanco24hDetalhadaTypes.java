@@ -49,6 +49,11 @@ final class ValidacaoApiBanco24hDetalhadaTypes {
         boolean alinhadaAoPeriodo
     ) { }
 
+    record PeriodoConsulta(
+        java.time.LocalDate inicio,
+        java.time.LocalDate fim
+    ) { }
+
     record ResultadoApiChaves(
         int apiBruto,
         int apiUnico,
