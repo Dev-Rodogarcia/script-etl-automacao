@@ -51,10 +51,10 @@ import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
- * RepositÃƒÂ³rio para operaÃƒÂ§ÃƒÂµes de persistÃƒÂªncia da entidade FreteEntity.
- * Implementa a arquitetura de persistÃƒÂªncia hÃƒÂ­brida: colunas-chave para indexaÃƒÂ§ÃƒÂ£o
- * e uma coluna de metadados para resiliÃƒÂªncia e completude dos dados.
- * Utiliza operaÃƒÂ§ÃƒÂµes MERGE (UPSERT) com a chave primÃƒÂ¡ria (id) do frete.
+ * Repositório para operações de persistência da entidade FreteEntity.
+ * Implementa a arquitetura de persistência híbrida: colunas-chave para indexação
+ * e uma coluna de metadados para resiliência e completude dos dados.
+ * Utiliza operações MERGE (UPSERT) com a chave primária (id) do frete.
  */
 public class FreteRepository extends AbstractRepository<FreteEntity> {
     private static final Logger logger = LoggerFactory.getLogger(FreteRepository.class);
@@ -76,13 +76,28 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         "other_fees", "km", "payment_accountable_type", "insured_value", "globalized", "sec_cat_subtotal",
         "globalized_type", "price_table_accountable_type", "insurance_accountable_type", "pagador_documento",
         "remetente_documento", "destinatario_documento", "filial_cnpj", "cte_issued_at", "cubages_cubed_weight",
-        "freight_weight_subtotal", "ad_valorem_subtotal", "toll_subtotal", "itr_subtotal", "fiscal_cst_type",
+        "data_referencia_faturamento", "is_elegivel_faturamento", "freight_weight_subtotal",
+        "ad_valorem_subtotal", "toll_subtotal", "itr_subtotal", "fiscal_cst_type",
         "fiscal_cfop_code", "fiscal_tax_value", "fiscal_pis_value", "fiscal_cofins_value", "filial_apelido",
         "cte_id", "cte_emission_type", "cte_created_at", "fiscal_calculation_basis", "fiscal_tax_rate",
         "fiscal_pis_rate", "fiscal_cofins_rate", "fiscal_has_difal", "fiscal_difal_origin",
         "fiscal_difal_destination", "metadata", "data_extracao"
     );
     private static final List<String> COLUNAS_ATUALIZAVEIS = List.copyOf(COLUNAS_MERGE.subList(1, COLUNAS_MERGE.size()));
+    private static final String DATA_REFERENCIA_FATURAMENTO_SQL = "COALESCE(source.cte_issued_at, source.servico_em)";
+    private static final String ELEGIVEL_FATURAMENTO_SQL = """
+        CAST(
+            CASE
+                WHEN source.cortesia = 1 THEN 0
+                WHEN CONVERT(NVARCHAR(MAX), ISNULL(source.classificacao_nome, N'')) COLLATE Latin1_General_CI_AI LIKE N'%bloqueio%'
+                 AND (
+                    CONVERT(NVARCHAR(MAX), ISNULL(source.classificacao_nome, N'')) COLLATE Latin1_General_CI_AI LIKE N'%anulacao%'
+                    OR CONVERT(NVARCHAR(MAX), ISNULL(source.classificacao_nome, N'')) COLLATE Latin1_General_CI_AI LIKE N'%isolamento%'
+                 )
+                THEN 0
+                ELSE 1
+            END AS bit
+        )""";
     private final FreteNfseUpdateSupport nfseUpdateSupport = new FreteNfseUpdateSupport(logger);
 
     @Override
@@ -617,9 +632,9 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     private int executarMergeEmTabela(final Connection conexao,
                                       final FreteEntity frete,
                                       final String tabelaAlvo) throws SQLException {
-        // Para Fretes, o 'id' ÃƒÂ© a ÃƒÂºnica chave confiÃƒÂ¡vel para o MERGE.
+        // Para Fretes, o 'id' é a única chave confiável para o MERGE.
         if (frete.getId() == null) {
-            throw new SQLException("NÃƒÂ£o ÃƒÂ© possÃƒÂ­vel executar o MERGE para Frete sem um ID.");
+            throw new SQLException("Não é possível executar o MERGE para Frete sem um ID.");
         }
 
         final String freshnessGuard = buildMonotonicUpdateGuard(
@@ -729,6 +744,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     destinatario_documento = source.destinatario_documento,
                     filial_cnpj = source.filial_cnpj,
                     cte_issued_at = source.cte_issued_at,
+                    data_referencia_faturamento = %s,
+                    is_elegivel_faturamento = %s,
                     cubages_cubed_weight = source.cubages_cubed_weight,
                     freight_weight_subtotal = source.freight_weight_subtotal,
                     ad_valorem_subtotal = source.ad_valorem_subtotal,
@@ -761,7 +778,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         accounting_credit_id, accounting_credit_installment_id,
                         service_type, insurance_enabled, gris_subtotal, tde_subtotal, modal_cte, redispatch_subtotal, suframa_subtotal, payment_type, previous_document_type,
                         products_value, trt_subtotal, nfse_series, nfse_number, insurance_id, other_fees, km, payment_accountable_type, insured_value, globalized, sec_cat_subtotal, globalized_type, price_table_accountable_type, insurance_accountable_type,
-                        pagador_documento, remetente_documento, destinatario_documento, filial_cnpj, cte_issued_at, cubages_cubed_weight, freight_weight_subtotal, ad_valorem_subtotal, toll_subtotal, itr_subtotal,
+                        pagador_documento, remetente_documento, destinatario_documento, filial_cnpj, cte_issued_at, data_referencia_faturamento, is_elegivel_faturamento, cubages_cubed_weight, freight_weight_subtotal, ad_valorem_subtotal, toll_subtotal, itr_subtotal,
                         fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
                         filial_apelido, cte_id, cte_emission_type, cte_created_at,
                         fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
@@ -774,15 +791,16 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         source.accounting_credit_id, source.accounting_credit_installment_id,
                         source.service_type, source.insurance_enabled, source.gris_subtotal, source.tde_subtotal, source.modal_cte, source.redispatch_subtotal, source.suframa_subtotal, source.payment_type, source.previous_document_type,
                         source.products_value, source.trt_subtotal, source.nfse_series, source.nfse_number, source.insurance_id, source.other_fees, source.km, source.payment_accountable_type, source.insured_value, source.globalized, source.sec_cat_subtotal, source.globalized_type, source.price_table_accountable_type, source.insurance_accountable_type,
-                        source.pagador_documento, source.remetente_documento, source.destinatario_documento, source.filial_cnpj, source.cte_issued_at, source.cubages_cubed_weight, source.freight_weight_subtotal, source.ad_valorem_subtotal, source.toll_subtotal, source.itr_subtotal,
+                        source.pagador_documento, source.remetente_documento, source.destinatario_documento, source.filial_cnpj, source.cte_issued_at, %s, %s, source.cubages_cubed_weight, source.freight_weight_subtotal, source.ad_valorem_subtotal, source.toll_subtotal, source.itr_subtotal,
                         source.fiscal_cst_type, source.fiscal_cfop_code, source.fiscal_tax_value, source.fiscal_pis_value, source.fiscal_cofins_value,
                         source.filial_apelido, source.cte_id, source.cte_emission_type, source.cte_created_at,
                         source.fiscal_calculation_basis, source.fiscal_tax_rate, source.fiscal_pis_rate, source.fiscal_cofins_rate, source.fiscal_has_difal, source.fiscal_difal_origin, source.fiscal_difal_destination,
                         source.metadata, source.data_extracao);
-            """, tabelaAlvo, freshnessGuard);
+            """, tabelaAlvo, freshnessGuard, DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL,
+            DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            // Define os parÃƒÂ¢metros de forma segura e na ordem correta.
+            // Define os parâmetros de forma segura e na ordem correta.
             int paramIndex = 1;
             statement.setObject(paramIndex++, frete.getId(), Types.BIGINT);
             statement.setObject(paramIndex++, frete.getServicoEm(), Types.TIMESTAMP_WITH_TIMEZONE);

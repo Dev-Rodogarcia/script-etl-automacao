@@ -183,6 +183,18 @@ END
 ELSE
     PRINT '    Indice IX_fretes_servico_em ja existe';
 
+-- Indice para o painel de faturamento por data de referencia materializada
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_fretes_faturamento_data_elegivel' AND object_id = OBJECT_ID('dbo.fretes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_faturamento_data_elegivel
+    ON dbo.fretes(data_referencia_faturamento DESC, is_elegivel_faturamento)
+    INCLUDE (id, valor_total, subtotal, status, filial_nome, pagador_nome, classificacao_nome);
+
+    PRINT '  Indice IX_fretes_faturamento_data_elegivel criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_faturamento_data_elegivel ja existe';
+
 -- ============================================================================
 -- LOCALIZACAO DE CARGAS - Indices para otimizar queries
 -- ============================================================================

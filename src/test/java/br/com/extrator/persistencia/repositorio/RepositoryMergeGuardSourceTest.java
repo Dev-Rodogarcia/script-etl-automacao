@@ -74,6 +74,38 @@ class RepositoryMergeGuardSourceTest {
     }
 
     @Test
+    void freteRepositoryDeveRecalcularFaturamentoMaterializadoEmUpdatesEInserts() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/FreteRepository.java"
+        ));
+
+        assertTrue(source.contains(
+            "private static final String DATA_REFERENCIA_FATURAMENTO_SQL = \"COALESCE(source.cte_issued_at, source.servico_em)\""
+        ));
+        assertTrue(source.contains("WHEN source.cortesia = 1 THEN 0"));
+        assertTrue(source.contains("COLLATE Latin1_General_CI_AI LIKE N'%bloqueio%'"));
+        assertTrue(source.contains("COLLATE Latin1_General_CI_AI LIKE N'%anulacao%'"));
+        assertTrue(source.contains("COLLATE Latin1_General_CI_AI LIKE N'%isolamento%'"));
+        assertTrue(source.contains("classificacao_nome = source.classificacao_nome"));
+        assertTrue(source.contains("data_referencia_faturamento = %s"));
+        assertTrue(source.contains("is_elegivel_faturamento = %s"));
+        assertTrue(source.contains("cte_issued_at, data_referencia_faturamento, is_elegivel_faturamento"));
+        assertTrue(source.contains("source.cte_issued_at, %s, %s"));
+    }
+
+    @Test
+    void guardaMonotonicaDeveAceitarAtualizacaoQuandoFreshnessForIgual() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/AbstractRepository.java"
+        ));
+
+        assertTrue(
+            source.contains("OR (%2$s IS NOT NULL AND %2$s >= %1$s)"),
+            "Atualizacoes retroativas de status/classificacao no mesmo frete precisam passar quando a freshness do payload e igual a do destino."
+        );
+    }
+
+    @Test
     void abstractRepositoryDeveRefrescarDataExtracaoEmNoOpsDeStaging() throws IOException {
         final String source = Files.readString(Path.of(
             "src/main/java/br/com/extrator/persistencia/repositorio/AbstractRepository.java"

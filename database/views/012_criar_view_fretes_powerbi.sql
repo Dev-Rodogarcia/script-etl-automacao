@@ -14,6 +14,7 @@ SELECT
     f.numero_cte AS [Nº CT-e],
     f.serie_cte AS [Série],
     f.cte_issued_at AS [CT-e Emissão],
+    f.data_referencia_faturamento AS data_referencia_faturamento,
     f.cte_emission_type AS [CT-e Tipo Emissão],
     f.cte_id AS [CT-e ID],
     f.cte_created_at AS [CT-e Criado em],
@@ -151,6 +152,7 @@ SELECT
          ELSE NULL
     END AS [Cortesia],
     f.cortesia AS [Cortesia Flag],
+    f.is_elegivel_faturamento AS is_elegivel_faturamento,
     REPLACE(f.tipo_frete, 'Freight::', '') AS [Tipo Frete],
     f.service_type AS [Service Type],
     CASE WHEN f.insurance_enabled = 1 THEN 'Com seguro'

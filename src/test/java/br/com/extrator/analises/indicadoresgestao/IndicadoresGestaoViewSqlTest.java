@@ -47,6 +47,34 @@ class IndicadoresGestaoViewSqlTest {
     }
 
     @Test
+    void fretesPowerBiDeveExporFaturamentoMaterializadoSemRegraPesadaNaView() throws IOException {
+        final String sql = lerSql("database/views/012_criar_view_fretes_powerbi.sql");
+
+        assertContem(sql, "f.data_referencia_faturamento AS data_referencia_faturamento");
+        assertContem(sql, "f.is_elegivel_faturamento AS is_elegivel_faturamento");
+        assertFalse(
+            sql.contains("%bloqueio%") || sql.contains("%anulacao%") || sql.contains("%isolamento%"),
+            "A view de fretes deve apenas expor os campos materializados pelo ETL, sem regra pesada de string."
+        );
+        assertSemMojibake(sql, "database/views/012_criar_view_fretes_powerbi.sql");
+    }
+
+    @Test
+    void migrationFretesFaturamentoDeveMaterializarRegraEIndice() throws IOException {
+        final String sql = lerSql("database/migrations/016_materializar_faturamento_fretes.sql");
+
+        assertContem(sql, "ALTER TABLE dbo.fretes ADD data_referencia_faturamento DATETIMEOFFSET NULL");
+        assertContem(sql, "ALTER TABLE dbo.fretes ADD is_elegivel_faturamento BIT NULL");
+        assertContem(sql, "COALESCE(f.cte_issued_at, f.servico_em) AS data_referencia_faturamento");
+        assertContem(sql, "WHEN f.cortesia = 1 THEN 0");
+        assertContem(sql, "COLLATE Latin1_General_CI_AI LIKE N''%bloqueio%''");
+        assertContem(sql, "COLLATE Latin1_General_CI_AI LIKE N''%anulacao%''");
+        assertContem(sql, "COLLATE Latin1_General_CI_AI LIKE N''%isolamento%''");
+        assertContem(sql, "IX_fretes_faturamento_data_elegivel");
+        assertSemMojibake(sql, "database/migrations/016_materializar_faturamento_fretes.sql");
+    }
+
+    @Test
     void manifestosPowerBiDeveExporLocalDeDescarregamentoComNomeDoNegocio() throws IOException {
         final String sql = lerSql("database/views/018_criar_view_manifestos_powerbi.sql");
 

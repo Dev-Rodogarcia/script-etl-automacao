@@ -62,6 +62,8 @@ BEGIN
         cte_emission_type NVARCHAR(50),
         cte_created_at DATETIMEOFFSET,
         cte_issued_at DATETIMEOFFSET,
+        data_referencia_faturamento DATETIMEOFFSET,
+        is_elegivel_faturamento BIT,
 
         service_type INT,
         insurance_enabled BIT,

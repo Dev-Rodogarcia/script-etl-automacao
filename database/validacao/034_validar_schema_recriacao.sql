@@ -83,7 +83,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'012_adicionar_frete_cortesia'),
     (N'013_ajustar_precisao_cubagem_fretes'),
     (N'014_criar_tabelas_raster'),
-    (N'015_adicionar_cliente_cnpj_faturas_por_cliente');
+    (N'015_adicionar_cliente_cnpj_faturas_por_cliente'),
+    (N'016_materializar_faturamento_fretes');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -112,6 +113,12 @@ IF COL_LENGTH(N'dbo.fretes', N'corporation_sequence_number') IS NULL
 IF COL_LENGTH(N'dbo.fretes', N'cortesia') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.cortesia', N'Coluna da migration 012 ausente');
 
+IF COL_LENGTH(N'dbo.fretes', N'data_referencia_faturamento') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.data_referencia_faturamento', N'Coluna da migration 016 ausente');
+
+IF COL_LENGTH(N'dbo.fretes', N'is_elegivel_faturamento') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.is_elegivel_faturamento', N'Coluna da migration 016 ausente');
+
 IF COL_LENGTH(N'dbo.faturas_por_cliente', N'cliente_cnpj') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.cliente_cnpj', N'Coluna da migration 015 ausente');
 
@@ -122,6 +129,14 @@ IF NOT EXISTS (
       AND object_id = OBJECT_ID(N'dbo.faturas_por_cliente')
 )
     INSERT INTO @falhas VALUES (N'INDICE', N'IX_fpc_cliente_cnpj', N'Indice filtrado da migration 015 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fretes_faturamento_data_elegivel'
+      AND object_id = OBJECT_ID(N'dbo.fretes')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fretes_faturamento_data_elegivel', N'Indice da migration 016 ausente');
 
 IF EXISTS (
     SELECT 1
