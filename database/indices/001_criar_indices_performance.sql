@@ -225,6 +225,30 @@ END
 ELSE
     PRINT '    Indice IX_localizacao_service_at ja existe';
 
+-- Indice para painel Localizacao de Cargas por filial atual e regiao de destino
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_localizacao_tracking_dashboard' AND object_id = OBJECT_ID('dbo.localizacao_cargas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_localizacao_tracking_dashboard
+    ON dbo.localizacao_cargas(status_branch_nickname, service_at DESC, status_normalized, destination_branch_nickname)
+    INCLUDE (sequence_number, localizacao_hash, predicted_delivery_at, total_value, taxed_weight_decimal, invoices_value_decimal, invoices_volumes, data_extracao);
+
+    PRINT '  Indice IX_localizacao_tracking_dashboard criado';
+END
+ELSE
+    PRINT '    Indice IX_localizacao_tracking_dashboard ja existe';
+
+-- Indice para reduzir I/O do MERGE por hash operacional
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_localizacao_hash_upsert' AND object_id = OBJECT_ID('dbo.localizacao_cargas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_localizacao_hash_upsert
+    ON dbo.localizacao_cargas(sequence_number, localizacao_hash)
+    INCLUDE (status_normalized, status, status_branch_nickname, fit_fln_cln_nickname, destination_branch_nickname, predicted_delivery_at, service_at);
+
+    PRINT '  Indice IX_localizacao_hash_upsert criado';
+END
+ELSE
+    PRINT '    Indice IX_localizacao_hash_upsert ja existe';
+
 -- ============================================================================
 -- LOG_EXTRACOES - Indices para otimizar queries de auditoria
 -- ============================================================================

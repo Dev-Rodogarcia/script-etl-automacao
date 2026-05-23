@@ -16,6 +16,7 @@ INSERT INTO @tabelas (nome) VALUES
     (N'manifestos'),
     (N'cotacoes'),
     (N'localizacao_cargas'),
+    (N'localizacao_cargas_regiao_destino_alias'),
     (N'contas_a_pagar'),
     (N'faturas_por_cliente'),
     (N'faturas_graphql'),
@@ -84,7 +85,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'013_ajustar_precisao_cubagem_fretes'),
     (N'014_criar_tabelas_raster'),
     (N'015_adicionar_cliente_cnpj_faturas_por_cliente'),
-    (N'016_materializar_faturamento_fretes');
+    (N'016_materializar_faturamento_fretes'),
+    (N'017_localizacao_cargas_dashboard_operacional');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -122,6 +124,15 @@ IF COL_LENGTH(N'dbo.fretes', N'is_elegivel_faturamento') IS NULL
 IF COL_LENGTH(N'dbo.faturas_por_cliente', N'cliente_cnpj') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.cliente_cnpj', N'Coluna da migration 015 ausente');
 
+IF COL_LENGTH(N'dbo.localizacao_cargas', N'localizacao_hash') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.localizacao_hash', N'Coluna da migration 017 ausente');
+
+IF COL_LENGTH(N'dbo.localizacao_cargas', N'status_normalized') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.status_normalized', N'Coluna da migration 017 ausente');
+
+IF COL_LENGTH(N'dbo.localizacao_cargas', N'taxed_weight_decimal') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.taxed_weight_decimal', N'Coluna da migration 017 ausente');
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
@@ -137,6 +148,14 @@ IF NOT EXISTS (
       AND object_id = OBJECT_ID(N'dbo.fretes')
 )
     INSERT INTO @falhas VALUES (N'INDICE', N'IX_fretes_faturamento_data_elegivel', N'Indice da migration 016 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_localizacao_tracking_dashboard'
+      AND object_id = OBJECT_ID(N'dbo.localizacao_cargas')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_localizacao_tracking_dashboard', N'Indice da migration 017 ausente');
 
 IF EXISTS (
     SELECT 1

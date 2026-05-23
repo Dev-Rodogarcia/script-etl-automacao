@@ -33,9 +33,13 @@ import br.com.extrator.persistencia.entidade.LocalizacaoCargaEntity;
 import br.com.extrator.suporte.validacao.ValidadorDTO;
 import br.com.extrator.suporte.validacao.ValidadorDTO.ResultadoValidacao;
 import br.com.extrator.suporte.formatacao.FormatadorData;
+import br.com.extrator.suporte.json.CanonicalJsonHasher;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
+import br.com.extrator.suporte.mapeamento.NumeroUtil;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Locale;
+import java.util.StringJoiner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,13 +87,16 @@ public class LocalizacaoCargaMapper {
         entity.setType(dto.getType());
         entity.setInvoicesVolumes(dto.getInvoicesVolumes());
         entity.setTaxedWeight(dto.getTaxedWeight());
+        entity.setTaxedWeightDecimal(parseDecimal(dto.getTaxedWeight()));
         entity.setInvoicesValue(dto.getInvoicesValue());
+        entity.setInvoicesValueDecimal(parseDecimal(dto.getInvoicesValue()));
         entity.setServiceType(dto.getServiceType());
         entity.setBranchNickname(dto.getBranchNickname());
         entity.setDestinationLocationName(dto.getDestinationLocationName());
         entity.setDestinationBranchNickname(dto.getDestinationBranchNickname());
         entity.setClassification(dto.getClassification());
         entity.setStatus(dto.getStatus());
+        entity.setStatusNormalized(normalizarStatus(dto.getStatus()));
         entity.setStatusBranchNickname(dto.getStatusBranchNickname());
         entity.setFitFlnClnNickname(dto.getFitFlnClnNickname());
         entity.setOriginLocationName(dto.getOriginLocationName());
@@ -121,7 +128,47 @@ public class LocalizacaoCargaMapper {
         // 3. Empacotamento de todos os metadados
         String metadata = MapperUtil.toJson(dto.getAllProperties());
         entity.setMetadata(metadata);
+        entity.setLocalizacaoHash(calcularHashOperacional(entity));
 
         return entity;
+    }
+
+    private BigDecimal parseDecimal(final String valor) {
+        return NumeroUtil.parseBigDecimalUS(valor);
+    }
+
+    private String normalizarStatus(final String status) {
+        if (status == null || status.isBlank()) {
+            return "sem_status";
+        }
+        return status.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String calcularHashOperacional(final LocalizacaoCargaEntity entity) {
+        final StringJoiner joiner = new StringJoiner("|");
+        joiner.add(valor(entity.getSequenceNumber()));
+        joiner.add(valor(entity.getType()));
+        joiner.add(valor(entity.getServiceAt()));
+        joiner.add(valor(entity.getInvoicesVolumes()));
+        joiner.add(valor(entity.getTaxedWeightDecimal()));
+        joiner.add(valor(entity.getInvoicesValueDecimal()));
+        joiner.add(valor(entity.getTotalValue()));
+        joiner.add(valor(entity.getServiceType()));
+        joiner.add(valor(entity.getBranchNickname()));
+        joiner.add(valor(entity.getPredictedDeliveryAt()));
+        joiner.add(valor(entity.getDestinationLocationName()));
+        joiner.add(valor(entity.getDestinationBranchNickname()));
+        joiner.add(valor(entity.getClassification()));
+        joiner.add(valor(entity.getStatus()));
+        joiner.add(valor(entity.getStatusNormalized()));
+        joiner.add(valor(entity.getStatusBranchNickname()));
+        joiner.add(valor(entity.getOriginLocationName()));
+        joiner.add(valor(entity.getOriginBranchNickname()));
+        joiner.add(valor(entity.getFitFlnClnNickname()));
+        return CanonicalJsonHasher.sha256Hex(joiner.toString());
+    }
+
+    private String valor(final Object valor) {
+        return valor == null ? "__NULL__" : valor.toString().trim();
     }
 }

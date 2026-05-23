@@ -13,6 +13,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class ExecutionWindowPlanner {
     private static final int REPLAY_MINIMO_DIAS = 7;
+    private static final int REPLAY_LOCALIZACAO_CARGAS_DIAS = 90;
     private final ExecutionAuditPort executionAuditPort;
     private final Map<String, FeatureExecutionWindowStrategy> strategies;
 
@@ -47,7 +48,14 @@ public final class ExecutionWindowPlanner {
         registrarReplay(registradas, ConstantesEntidades.MANIFESTOS);
         registrarReplay(registradas, ConstantesEntidades.FRETES);
         registrarReplay(registradas, ConstantesEntidades.COTACOES);
-        registrarReplay(registradas, ConstantesEntidades.LOCALIZACAO_CARGAS);
+        registradas.put(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            new RegisteredExecutionWindowStrategy(
+                ConstantesEntidades.LOCALIZACAO_CARGAS,
+                REPLAY_LOCALIZACAO_CARGAS_DIAS,
+                true
+            )
+        );
         registrarReplay(registradas, ConstantesEntidades.FATURAS_POR_CLIENTE);
 
         registrarJanelaDiaria(registradas, ConstantesEntidades.USUARIOS_SISTEMA);

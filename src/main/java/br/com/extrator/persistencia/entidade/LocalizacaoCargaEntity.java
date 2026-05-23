@@ -68,7 +68,9 @@ public class LocalizacaoCargaEntity {
     private OffsetDateTime serviceAt;
     private Integer invoicesVolumes; // Volumes
     private String taxedWeight; // Peso Taxado
+    private BigDecimal taxedWeightDecimal; // Peso Taxado materializado para BI
     private String invoicesValue; // Valor NF
+    private BigDecimal invoicesValueDecimal; // Valor NF materializado para BI
     private BigDecimal totalValue;
     private String serviceType; // Serviço
     private String branchNickname; // Filial
@@ -77,6 +79,7 @@ public class LocalizacaoCargaEntity {
     private String destinationBranchNickname; // Filial de Destino
     private String classification; // Classificação
     private String status;
+    private String statusNormalized;
     private String statusBranchNickname; // Filial do Status
     private String originLocationName; // Polo de Origem
     private String originBranchNickname; // Filial de Origem
@@ -84,6 +87,7 @@ public class LocalizacaoCargaEntity {
 
     // --- Coluna de Metadados ---
     private String metadata;
+    private String localizacaoHash;
 
     // --- Getters e Setters ---
 
@@ -109,6 +113,14 @@ public class LocalizacaoCargaEntity {
 
     public void setStatus(final String status) {
         this.status = status;
+    }
+
+    public String getStatusNormalized() {
+        return statusNormalized;
+    }
+
+    public void setStatusNormalized(final String statusNormalized) {
+        this.statusNormalized = statusNormalized;
     }
 
     public BigDecimal getTotalValue() {
@@ -169,12 +181,28 @@ public class LocalizacaoCargaEntity {
         this.taxedWeight = taxedWeight;
     }
 
+    public BigDecimal getTaxedWeightDecimal() {
+        return taxedWeightDecimal;
+    }
+
+    public void setTaxedWeightDecimal(final BigDecimal taxedWeightDecimal) {
+        this.taxedWeightDecimal = taxedWeightDecimal;
+    }
+
     public String getInvoicesValue() {
         return invoicesValue;
     }
 
     public void setInvoicesValue(final String invoicesValue) {
         this.invoicesValue = invoicesValue;
+    }
+
+    public BigDecimal getInvoicesValueDecimal() {
+        return invoicesValueDecimal;
+    }
+
+    public void setInvoicesValueDecimal(final BigDecimal invoicesValueDecimal) {
+        this.invoicesValueDecimal = invoicesValueDecimal;
     }
 
     public String getServiceType() {
@@ -239,5 +267,13 @@ public class LocalizacaoCargaEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public String getLocalizacaoHash() {
+        return localizacaoHash;
+    }
+
+    public void setLocalizacaoHash(final String localizacaoHash) {
+        this.localizacaoHash = localizacaoHash;
     }
 }

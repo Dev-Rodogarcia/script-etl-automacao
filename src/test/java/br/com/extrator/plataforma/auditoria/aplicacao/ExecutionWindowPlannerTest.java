@@ -60,6 +60,19 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
+    void devePlanejarJanelaDeNoventaDiasParaLocalizacaoCargas() {
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            LocalDate.of(2026, 3, 25)
+        );
+
+        assertEquals(LocalDate.of(2025, 12, 26), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
+    }
+
+    @Test
     void naoDeveIncluirFaturasGraphqlQuandoFlagEstiverDesabilitada() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 

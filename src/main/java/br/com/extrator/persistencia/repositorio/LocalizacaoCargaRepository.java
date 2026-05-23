@@ -27,6 +27,7 @@ package br.com.extrator.persistencia.repositorio;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.time.Instant;
 
@@ -65,6 +66,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
     @Override
     protected void prepararStagingPorExecucao(final Connection conexao) throws SQLException {
         recriarTabelaTemporariaPorExecucao(conexao, NOME_TABELA_STAGING);
+        criarIndicesStaging(conexao);
     }
 
     @Override
@@ -75,26 +77,13 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
 
     @Override
     protected int promoverStagingPorExecucao(final Connection conexao) throws SQLException {
-        final String condicaoMerge = "target.sequence_number = source.sequence_number";
-        final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.predicted_delivery_at AS datetime2), CAST(target.service_at AS datetime2))",
-            "COALESCE(CAST(source.predicted_delivery_at AS datetime2), CAST(source.service_at AS datetime2))"
-        );
         final String sql = construirSqlMerge(
             qualificarTabelaDestino(),
             NOME_TABELA_STAGING + " AS source",
-            freshnessGuard
+            hashOperacionalDiferente()
         );
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
-            final int rowsPromovidos = statement.executeUpdate();
-            final int rowsConfirmadosSemRefresh = refrescarDataExtracaoEmNoOpsDeStaging(
-                conexao,
-                qualificarTabelaDestino(),
-                NOME_TABELA_STAGING,
-                condicaoMerge,
-                freshnessGuard
-            );
-            return rowsPromovidos + rowsConfirmadosSemRefresh;
+            return statement.executeUpdate();
         }
     }
 
@@ -115,11 +104,7 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             throw new SQLException("Não é possível executar o MERGE para Localização de Carga sem um 'sequence_number'.");
         }
 
-        final String freshnessGuard = buildMonotonicUpdateGuard(
-            "COALESCE(CAST(target.predicted_delivery_at AS datetime2), CAST(target.service_at AS datetime2))",
-            "COALESCE(CAST(source.predicted_delivery_at AS datetime2), CAST(source.service_at AS datetime2))"
-        );
-        final String sql = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), freshnessGuard);
+        final String sql = construirSqlMerge(tabelaAlvo, construirSourceClauseValues(), hashOperacionalDiferente());
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
@@ -134,7 +119,9 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             }
             setIntegerParameter(statement, paramIndex++, carga.getInvoicesVolumes());
             setStringParameter(statement, paramIndex++, carga.getTaxedWeight());
+            setBigDecimalParameter(statement, paramIndex++, carga.getTaxedWeightDecimal());
             setStringParameter(statement, paramIndex++, carga.getInvoicesValue());
+            setBigDecimalParameter(statement, paramIndex++, carga.getInvoicesValueDecimal());
             setBigDecimalParameter(statement, paramIndex++, carga.getTotalValue());
             setStringParameter(statement, paramIndex++, carga.getServiceType());
             setStringParameter(statement, paramIndex++, carga.getBranchNickname());
@@ -147,16 +134,17 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
             setStringParameter(statement, paramIndex++, carga.getDestinationBranchNickname());
             setStringParameter(statement, paramIndex++, carga.getClassification());
             setStringParameter(statement, paramIndex++, carga.getStatus());
+            setStringParameter(statement, paramIndex++, carga.getStatusNormalized());
             setStringParameter(statement, paramIndex++, carga.getStatusBranchNickname());
             setStringParameter(statement, paramIndex++, carga.getOriginLocationName());
             setStringParameter(statement, paramIndex++, carga.getOriginBranchNickname());
             setStringParameter(statement, paramIndex++, carga.getFitFlnClnNickname());
             setStringParameter(statement, paramIndex++, carga.getMetadata());
+            setStringParameter(statement, paramIndex++, carga.getLocalizacaoHash());
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             
-            // Verificar se todos os parâmetros foram definidos (20 parâmetros = paramIndex final = 21)
-            if (paramIndex != 21) {
-                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 20, definido %d", paramIndex - 1));
+            if (paramIndex != 25) {
+                throw new SQLException(String.format("Número incorreto de parâmetros: esperado 24, definido %d", paramIndex - 1));
             }
 
             final int rowsAffected = statement.executeUpdate();
@@ -178,7 +166,9 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     service_at = source.service_at,
                     invoices_volumes = source.invoices_volumes,
                     taxed_weight = source.taxed_weight,
+                    taxed_weight_decimal = source.taxed_weight_decimal,
                     invoices_value = source.invoices_value,
+                    invoices_value_decimal = source.invoices_value_decimal,
                     total_value = source.total_value,
                     service_type = source.service_type,
                     branch_nickname = source.branch_nickname,
@@ -187,22 +177,48 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     destination_branch_nickname = source.destination_branch_nickname,
                     classification = source.classification,
                     status = source.status,
+                    status_normalized = source.status_normalized,
                     status_branch_nickname = source.status_branch_nickname,
                     origin_location_name = source.origin_location_name,
                     origin_branch_nickname = source.origin_branch_nickname,
                     fit_fln_cln_nickname = source.fit_fln_cln_nickname,
                     metadata = source.metadata,
+                    localizacao_hash = source.localizacao_hash,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
-                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
-                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.invoices_value, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.data_extracao);
+                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao)
+                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.taxed_weight_decimal, source.invoices_value, source.invoices_value_decimal, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_normalized, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.localizacao_hash, source.data_extracao);
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
 
     private String construirSourceClauseValues() {
         return """
-            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
-                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, invoices_value, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, data_extracao)
+            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao)
             """;
+    }
+
+    private String hashOperacionalDiferente() {
+        return """
+            (
+                target.localizacao_hash IS NULL
+                OR source.localizacao_hash IS NULL
+                OR target.localizacao_hash <> source.localizacao_hash
+            )
+            """;
+    }
+
+    private void criarIndicesStaging(final Connection conexao) throws SQLException {
+        try (Statement statement = conexao.createStatement()) {
+            statement.execute("""
+                CREATE UNIQUE CLUSTERED INDEX CX_stg_localizacao_sequence
+                ON #stg_localizacao_cargas(sequence_number)
+                """);
+            statement.execute("""
+                CREATE NONCLUSTERED INDEX IX_stg_localizacao_hash
+                ON #stg_localizacao_cargas(sequence_number, localizacao_hash)
+                INCLUDE (status, status_normalized, status_branch_nickname, fit_fln_cln_nickname, destination_branch_nickname, predicted_delivery_at, service_at)
+                """);
+        }
     }
 }

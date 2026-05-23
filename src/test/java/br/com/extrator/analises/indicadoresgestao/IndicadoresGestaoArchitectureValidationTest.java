@@ -64,6 +64,8 @@ class IndicadoresGestaoArchitectureValidationTest {
               "fit_dyn_drt_nickname": "CPQ - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA",
               "fit_crn_psn_nickname": "SPO - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA",
               "fit_dyn_name": "CAMPINAS - POLO",
+              "taxed_weight": "6786.5",
+              "invoices_value": "4936574.13",
               "fit_fln_status": "in_transit",
               "total": "1500.25"
             }
@@ -77,6 +79,11 @@ class IndicadoresGestaoArchitectureValidationTest {
         assertEquals("CPQ - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA", entity.getDestinationBranchNickname());
         assertEquals("SPO - RODOGARCIA TRANSPORTES RODOVIARIOS LTDA", entity.getBranchNickname());
         assertEquals(OffsetDateTime.parse("2026-03-05T18:00:00-03:00"), entity.getPredictedDeliveryAt());
+        assertEquals("in_transit", entity.getStatusNormalized());
+        assertEquals("6786.5", entity.getTaxedWeightDecimal().stripTrailingZeros().toPlainString());
+        assertEquals("4936574.13", entity.getInvoicesValueDecimal().stripTrailingZeros().toPlainString());
+        assertNotNull(entity.getLocalizacaoHash());
+        assertEquals(64, entity.getLocalizacaoHash().length());
     }
 
     @Test

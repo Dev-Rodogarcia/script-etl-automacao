@@ -32,7 +32,7 @@ class RepositoryMergeGuardSourceTest {
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/LocalizacaoCargaRepository.java",
-            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.predicted_delivery_at", "source.predicted_delivery_at")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.localizacao_hash", "source.localizacao_hash")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaGraphQLRepository.java",
@@ -141,10 +141,6 @@ class RepositoryMergeGuardSourceTest {
             "target.sequence_code = source.sequence_code"
         );
         assertRefreshNoOpStaging(
-            "src/main/java/br/com/extrator/persistencia/repositorio/LocalizacaoCargaRepository.java",
-            "target.sequence_number = source.sequence_number"
-        );
-        assertRefreshNoOpStaging(
             "src/main/java/br/com/extrator/persistencia/repositorio/ContasAPagarRepository.java",
             "target.sequence_code = source.sequence_code"
         );
@@ -152,6 +148,18 @@ class RepositoryMergeGuardSourceTest {
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",
             "target.unique_id = source.unique_id"
         );
+    }
+
+    @Test
+    void localizacaoCargaRepositoryDeveEvitarRefreshArtificialQuandoHashForIdentico() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/LocalizacaoCargaRepository.java"
+        ));
+
+        assertTrue(source.contains("target.localizacao_hash <> source.localizacao_hash"));
+        assertTrue(source.contains("CREATE UNIQUE CLUSTERED INDEX CX_stg_localizacao_sequence"));
+        assertTrue(source.contains("CREATE NONCLUSTERED INDEX IX_stg_localizacao_hash"));
+        assertTrue(!source.contains("refrescarDataExtracaoEmNoOpsDeStaging("));
     }
 
     @Test
