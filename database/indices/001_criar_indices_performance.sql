@@ -153,6 +153,18 @@ END
 ELSE
     PRINT '    Indice IX_coletas_service_date ja existe';
 
+-- Indice para dashboard de Coletas por data de solicitacao, status e origem
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_coletas_request_date_dashboard' AND object_id = OBJECT_ID('dbo.coletas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_coletas_request_date_dashboard
+    ON dbo.coletas(request_date, status, pick_region, cidade_coleta)
+    INCLUDE (id, sequence_code, filial_nome, cliente_nome, usuario_nome, data_extracao);
+
+    PRINT '  Indice IX_coletas_request_date_dashboard criado';
+END
+ELSE
+    PRINT '    Indice IX_coletas_request_date_dashboard ja existe';
+
 -- ============================================================================
 -- FRETES - Indices para otimizar queries
 -- ============================================================================

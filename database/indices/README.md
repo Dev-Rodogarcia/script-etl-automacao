@@ -43,6 +43,7 @@ executar_indices.bat
 ### Coletas
 - `IX_coletas_data_extracao` - Otimiza queries de auditoria
 - `IX_coletas_service_date` - Otimiza busca por data de serviço
+- `IX_coletas_request_date_dashboard` - Otimiza dashboard de Coletas por solicitação, status, região e cidade
 
 ### Fretes
 - `IX_fretes_data_extracao` - Otimiza queries de auditoria

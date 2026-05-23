@@ -47,6 +47,23 @@ class IndicadoresGestaoViewSqlTest {
     }
 
     @Test
+    void coletasPowerBiDeveExporSolicitacaoComoDataNativaEIndiceDashboard() throws IOException {
+        final String tabelaSql = lerSql("database/tabelas/001_criar_tabela_coletas.sql");
+        final String viewSql = lerSql("database/views/013_criar_view_coletas_powerbi.sql");
+        final String indicesSql = lerSql("database/indices/001_criar_indices_performance.sql");
+        final String migrationSql = lerSql("database/migrations/018_adicionar_indice_coletas_request_date_dashboard.sql");
+
+        assertContem(tabelaSql, "request_date DATE");
+        assertContem(viewSql, "c.request_date AS [Solicitacao]");
+        assertContem(indicesSql, "IX_coletas_request_date_dashboard");
+        assertContem(indicesSql, "ON dbo.coletas(request_date, status, pick_region, cidade_coleta)");
+        assertContem(migrationSql, "IX_coletas_request_date_dashboard");
+        assertContem(migrationSql, "ON dbo.coletas(request_date, status, pick_region, cidade_coleta)");
+        assertSemMojibake(viewSql, "database/views/013_criar_view_coletas_powerbi.sql");
+        assertSemMojibake(migrationSql, "database/migrations/018_adicionar_indice_coletas_request_date_dashboard.sql");
+    }
+
+    @Test
     void fretesPowerBiDeveExporFaturamentoMaterializadoSemRegraPesadaNaView() throws IOException {
         final String sql = lerSql("database/views/012_criar_view_fretes_powerbi.sql");
 
