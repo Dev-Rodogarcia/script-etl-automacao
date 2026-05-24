@@ -1,7 +1,5 @@
--- ============================================
--- Script de criação da view 'vw_fretes_powerbi'
--- Execute este script UMA VEZ antes de colocar o sistema em produção
--- ============================================
+PRINT 'Migration 019: adicionar comprovante e regiao destino na view de fretes para Performance';
+GO
 
 CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
 SELECT
@@ -257,5 +255,16 @@ OUTER APPLY (
 ) AS indicador_perf;
 GO
 
-PRINT 'View vw_fretes_powerbi criada/atualizada com sucesso!';
+IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'019_adicionar_comprovante_fretes_performance')
+BEGIN
+    INSERT INTO dbo.schema_migrations (migration_id, notes)
+    VALUES (
+        N'019_adicionar_comprovante_fretes_performance',
+        N'Adiciona Região Destino, Cidade Destino e Comprovante Anexado na view vw_fretes_powerbi.'
+    );
+END;
+GO
+
+PRINT 'View vw_fretes_powerbi atualizada para Performance com sucesso!';
 GO
