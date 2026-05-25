@@ -20,3 +20,9 @@ Use `docs/index.md` como ponto de entrada.
 - Historico controlado: `docs/legado`
 - Termos globais: `docs/glossary.md`
 - Decisoes arquiteturais: `docs/decisions.md`
+
+Contrato principal:
+
+- o ETL e o unico owner estrutural de `ETL_SISTEMA` (`esl_cloud`);
+- views `dbo.vw_*_powerbi` e `dbo.vw_dim_*` pertencem a este projeto;
+- o Dashboard consome essas views em leitura e nao executa DDL cross-database.

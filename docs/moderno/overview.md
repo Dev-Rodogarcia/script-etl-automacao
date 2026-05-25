@@ -26,6 +26,8 @@ Este repositorio contem um ETL CLI em Java 17 que integra dados da ESL Cloud com
 Depois da extracao, o sistema:
 
 - persiste os dados em tabelas operacionais;
+- mantem o contrato estrutural do schema `ETL_SISTEMA` (`esl_cloud`);
+- publica views `dbo.vw_*_powerbi` e `dbo.vw_dim_*` para Dashboard e BI;
 - registra logs de extracao e historico de execucao;
 - valida completude;
 - valida integridade ETL;
@@ -35,9 +37,21 @@ Depois da extracao, o sistema:
 ## O que este sistema nao e
 
 - Nao e um servico web.
+- Nao e o frontend dos dashboards.
 - Nao e um ETL orientado a eventos.
 - Nao e um conjunto de scripts soltos sem orquestracao.
 - Nao usa a documentacao historica como autoridade primaria.
+
+## Fronteira com o projeto Dashboard
+
+O ETL e produtor e owner estrutural dos dados analiticos. O Dashboard e consumidor.
+
+Na pratica:
+
+- tabelas, indices, views Power BI e views dimensionais devem ser alterados neste repositorio;
+- `database/` e a base estrutural para o contrato SQL do ETL;
+- o Dashboard nao deve executar DDL cross-database contra `ETL_SISTEMA` (`esl_cloud`);
+- mudancas em views `dbo.vw_*_powerbi` devem preservar ou versionar o contrato consumido pelo Dashboard.
 
 ## Fonte oficial da verdade
 

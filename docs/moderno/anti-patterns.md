@@ -48,6 +48,10 @@ O problema e de referencia operacional, nao de narrativa.
 
 Hoje isso esta incorreto para o ETL moderno.
 
+### Deixar o Dashboard corrigir schema do ETL
+
+Views `dbo.vw_*_powerbi`, views `dbo.vw_dim_*`, tabelas e indices de `ETL_SISTEMA` (`esl_cloud`) pertencem ao ETL. Corrigir isso por migration, wrapper local ou DDL cross-database no Dashboard cria drift entre os repositorios.
+
 ### Escrever documentacao moderna sem apontar para comportamento do codigo
 
 Documentacao sem ancoragem em runtime vira opiniao, nao source of truth.

@@ -16,9 +16,21 @@ graph TD
     ESLDataExport[ESL Cloud - Data Export API] -->|Manifestos, Cotações, Contas a Pagar...| ExtratorDaemon
     RasterAPI[Raster API] -->|Viagens e Paradas| ExtratorDaemon
     
-    ExtratorDaemon -->|Persistência / Queries de Integridade| SQLServer[(SQL Server DB - esl_cloud)]
+    ExtratorDaemon -->|Persistência / DDL / Views BI| SQLServer[(SQL Server DB - ETL_SISTEMA / esl_cloud)]
     ExtratorDaemon <-->|Autenticação Operacional & Logs| SQLiteLocal[(SQLite Local - users.db)]
 ```
+
+---
+
+## 🧱 Governança Estrutural do Banco e Views
+
+O projeto **ETL Extração de Dados** é o **único owner estrutural** do banco/schema `ETL_SISTEMA` (`esl_cloud`) e de todas as views analíticas consumidas pelo Dashboard, incluindo `dbo.vw_*_powerbi` e `dbo.vw_dim_*`.
+
+As tabelas base, migrations, índices, views operacionais, views dimensionais e materializações de BI devem ser alteradas neste repositório, principalmente em `database/tabelas/`, `database/migrations/`, `database/views/`, `database/views-dimensao/` e `database/indices/`.
+
+O Dashboard é consumidor read-only desse contrato. Ele não possui permissão nem responsabilidade para executar DDL cross-database contra `ETL_SISTEMA`/`esl_cloud`, criar wrappers locais das views do ETL ou sincronizar estrutura analítica por migrations próprias.
+
+Qualquer alteração de coluna, semântica de filtro, regra materializada, view `vw_*_powerbi` ou dependência dimensional deve nascer no ETL, ser validada aqui e então ser consumida pelo Dashboard como contrato publicado.
 
 ---
 
@@ -53,7 +65,7 @@ Main (CLI Entrypoint)
 
 * **Linguagem**: Java 17 (Compiler Release 17 com codificação estrita em UTF-8)
 * **Build System**: Maven (com `maven-shade-plugin` para geração de Fat JAR consolidado e limpo)
-* **Banco de Dados Principal**: Microsoft SQL Server (via JDBC Driver `mssql-jdbc` v12.8.1)
+* **Banco de Dados Principal**: Microsoft SQL Server (`ETL_SISTEMA` / `esl_cloud`, via JDBC Driver `mssql-jdbc` v12.8.1)
 * **Banco de Dados Local de Segurança**: SQLite JDBC (v3.49.1.0)
 * **Pool de Conexões**: HikariCP (v5.1.0) para alta performance e reutilização de conexões SQL.
 * **Manipulação de JSON**: Jackson Databind & Jackson JSR310 (v2.17.2)
@@ -152,7 +164,7 @@ Para operar de forma robusta 24 horas por dia em infraestruturas instáveis, o e
 etl-extracao-dados/
 ├── .ci/                    # Configurações de Integração Contínua
 ├── config/                 # Arquivos de configurações do ETL (.env.example)
-├── database/               # Scripts SQL (baseline de tabelas, views, migrações)
+├── database/               # SSOT estrutural: tabelas, migrations, views, índices e validações SQL
 │   ├── tabelas/            # Estrutura base de criação das tabelas no SQL Server
 │   ├── views/              # Views operacionais de negócio
 │   ├── views-dimensao/     # Views dimensionais de referência

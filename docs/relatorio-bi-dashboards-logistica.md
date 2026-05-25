@@ -1,13 +1,16 @@
 # Relatório Estratégico de BI e Dashboards de Logística
 
+> [!NOTE]
+> Este relatorio pertence ao projeto ETL. As views citadas sao contrato SQL publicado por `etl-extracao-dados`; o Dashboard deve consumi-las em leitura, sem DDL cross-database.
+
 ## 1. Escopo e método
 
 Este relatório foi produzido a partir dos scripts SQL versionados no projeto, usando como fonte principal:
 
-- `Database/views`
-- `Database/views-dimensao`
-- `Database/tabelas`
-- scripts de validação e observabilidade do ETL em `Database/validacao` e `src/main/java/.../observabilidade`
+- `database/views`
+- `database/views-dimensao`
+- `database/tabelas`
+- scripts de validação e observabilidade do ETL em `database/validacao` e `src/main/java/.../observabilidade`
 
 Premissas adotadas:
 

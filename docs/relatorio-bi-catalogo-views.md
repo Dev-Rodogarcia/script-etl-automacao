@@ -1,6 +1,9 @@
 # Catálogo Técnico das Views de BI
 
-Fonte: scripts SQL do projeto em `Database/views`, `Database/views-dimensao` e `Database/tabelas`.
+> [!NOTE]
+> Este catalogo pertence ao projeto ETL. As views `dbo.vw_*_powerbi` e `dbo.vw_dim_*` sao publicadas por este repositorio e consumidas em leitura pelo Dashboard.
+
+Fonte: scripts SQL do projeto em `database/views`, `database/views-dimensao` e `database/tabelas`.
 
 Observações:
 - Tipos são inferidos a partir do DDL das tabelas ou da expressão SQL da view.

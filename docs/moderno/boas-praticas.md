@@ -21,6 +21,8 @@ related_files:
 - Ao mudar comportamento do runtime, atualize a documentacao moderna na mesma entrega.
 - Use os nomes oficiais das entidades (`coletas`, `fretes`, `faturas_graphql`, etc.).
 - Diferencie claramente janela operacional de janela de auditoria.
+- Evolua tabelas, indices e views analiticas em `database/`, mantendo o ETL como owner estrutural.
+- Trate o Dashboard como consumidor read-only das views `vw_*_powerbi` e `vw_dim_*`.
 - Antes de concluir que o ETL falhou, verifique logs, historico e integridade.
 
 ## Para IA e agentes

@@ -29,6 +29,23 @@ Main
   -> Repositories / SQL Server
 ```
 
+## Ownership arquitetural
+
+O ETL e o owner estrutural do schema `ETL_SISTEMA` (`esl_cloud`) e das views `dbo.vw_*_powerbi` / `dbo.vw_dim_*`.
+
+Responsabilidades que pertencem a este projeto:
+
+- criar e evoluir tabelas operacionais, indices, tabelas de auditoria e historico;
+- publicar views Power BI e dimensionais consumidas pelo Dashboard;
+- manter scripts SQL em `database/` alinhados ao runtime Java;
+- validar completude, integridade ETL e data quality antes do consumo analitico.
+
+Responsabilidades que nao pertencem ao Dashboard:
+
+- executar DDL cross-database contra o schema do ETL;
+- criar wrappers locais para substituir views `vw_*_powerbi`;
+- corrigir drift estrutural do ETL em migrations do Dashboard.
+
 ## Pacotes relevantes
 
 ### `bootstrap`

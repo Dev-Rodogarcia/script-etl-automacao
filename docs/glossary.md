@@ -32,6 +32,21 @@ related_files:
 - Fonte oficial da verdade.
 - Neste repositorio, o codigo atual tem prioridade sobre qualquer documento historico.
 
+**ETL_SISTEMA / esl_cloud**
+
+- Schema/base SQL Server governado estruturalmente pelo ETL.
+- Tabelas, indices, historicos, views Power BI e views dimensionais devem ser evoluidos neste repositorio.
+
+**Views Power BI (`vw_*_powerbi`)**
+
+- Contrato analitico publicado pelo ETL para consumidores como Dashboard e BI.
+- O Dashboard consome essas views em leitura; nao cria, altera nem sincroniza essas estruturas por DDL cross-database.
+
+**Views dimensionais (`vw_dim_*`)**
+
+- Views auxiliares para filtros, segmentacoes e dimensoes analiticas.
+- Pertencem ao contrato SQL do ETL.
+
 **Pipeline**
 
 - Sequencia controlada de steps de extracao e validacao.

@@ -203,3 +203,26 @@ related_files:
 **Impacto**
 
 - Navegacao muito mais segura para onboarding, IA e debugging.
+
+## D11. ETL e owner estrutural das views consumidas pelo Dashboard
+
+**Problema**
+
+- A arquitetura anterior permitia ambiguidade sobre quem deveria criar, corrigir ou sincronizar views analiticas.
+
+**Decisao tomada**
+
+- O ETL e o unico owner estrutural do schema `ETL_SISTEMA` (`esl_cloud`) e das views `dbo.vw_*_powerbi` / `dbo.vw_dim_*`.
+- O Dashboard consome essas views em leitura e nao executa DDL cross-database.
+- Mudancas de tabela, indice, view Power BI ou view dimensional devem nascer neste repositorio, em `database/`.
+
+**Alternativas consideradas**
+
+- Permitir que o Dashboard mantivesse wrappers locais ou migrations de sincronizacao para views do ETL.
+- Duplicar definicoes estruturais em mais de um repositorio.
+
+**Impacto**
+
+- Menos drift entre ETL, Dashboard e BI.
+- Ownership claro para incidentes de schema.
+- Pipeline de mudanca mais previsivel para novas views e filtros.

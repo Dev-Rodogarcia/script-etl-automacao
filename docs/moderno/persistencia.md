@@ -27,6 +27,20 @@ O ETL moderno persiste principalmente em SQL Server. O banco contem:
 - views dimensionais;
 - scripts de validacao.
 
+## Fonte estrutural e ownership
+
+O ETL e o unico owner estrutural do schema `ETL_SISTEMA` (`esl_cloud`). A fonte de verdade para estruturas SQL deste projeto fica em `database/`.
+
+Isso inclui:
+
+- tabelas operacionais e de auditoria;
+- indices;
+- views Power BI `dbo.vw_*_powerbi`;
+- views dimensionais `dbo.vw_dim_*`;
+- scripts de validacao e sanidade.
+
+Consumidores externos, incluindo o projeto `dashboards`, devem acessar essas estruturas em leitura. O Dashboard nao deve executar DDL cross-database para criar, substituir, sincronizar ou corrigir views/tabelas do ETL.
+
 ## Tabelas centrais do ETL
 
 ### GraphQL
@@ -100,13 +114,20 @@ sinistros.corporation_sequence_number -> fretes.corporation_sequence_number
 
 O runtime moderno registra as views analiticas centrais em `ConstantesViewsPowerBI`.
 
-Para a frente operacional atual, as views mais importantes sao:
+Para a frente operacional atual, as views consumidas por Dashboard/BI incluem:
 
+- `vw_coletas_powerbi`
+- `vw_contas_a_pagar_powerbi`
+- `vw_cotacoes_powerbi`
+- `vw_faturas_graphql_powerbi`
+- `vw_faturas_por_cliente_powerbi`
 - `vw_fretes_powerbi`
 - `vw_localizacao_cargas_powerbi`
 - `vw_manifestos_powerbi`
 - `vw_inventario_powerbi`
 - `vw_sinistros_powerbi`
+
+As views dimensionais `vw_dim_*` tambem pertencem a este contrato. Quando uma nova dimensao for necessaria para filtros ou segmentacao do Dashboard, ela deve ser criada e governada no ETL.
 
 ## Como a gravacao e feita
 

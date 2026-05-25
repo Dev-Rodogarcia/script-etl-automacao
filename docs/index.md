@@ -21,8 +21,17 @@ Esta pasta foi reorganizada para separar claramente o que e oficial do que e ape
 Regra principal:
 
 - O codigo atual e a fonte primaria da verdade.
+- Os scripts SQL em `database/` sao a fonte estrutural das tabelas e views do ETL.
 - A documentacao moderna existe para explicar o codigo atual.
 - A documentacao legado existe para preservar contexto, nao para orientar novas mudancas.
+
+## Contrato estrutural com o Dashboard
+
+O ETL e o unico owner estrutural do schema `ETL_SISTEMA` (`esl_cloud`) e das views analiticas `dbo.vw_*_powerbi` e `dbo.vw_dim_*`.
+
+O projeto `dashboards` consome essas views em modo leitura. Ele nao deve executar DDL cross-database, criar wrappers locais para views do ETL, corrigir colunas do ETL ou sincronizar definicoes estruturais fora deste repositorio.
+
+Quando uma tabela, indice, view Power BI ou view dimensional precisar mudar, a alteracao deve nascer neste projeto, em `database/`, e ser refletida na documentacao moderna.
 
 Diretriz editorial adotada nesta reestruturacao:
 
@@ -79,6 +88,7 @@ O runtime atual e um ETL CLI em Java 17 que:
 
 - extrai dados principalmente de GraphQL e DataExport;
 - persiste em SQL Server;
+- publica as views consumidas pelo Dashboard e por BI;
 - executa validacoes de completude, integridade e data quality;
 - opera em execucao unica, intervalo, recovery e loop daemon;
 - aplica retry, circuit breaker, watchdog e isolamento por processo.
