@@ -73,7 +73,7 @@ SELECT
     f.valor_notas AS [Valor NF],
     f.peso_notas AS [Kg NF],
     f.subtotal AS [Valor Frete],
-    f.invoices_total_volumes AS [Volumes],
+    COALESCE(lc.invoices_volumes, f.invoices_total_volumes, 0) AS [Volumes],
     f.taxed_weight AS [Kg Taxado],
     f.taxed_weight AS [Peso Taxado],
     f.real_weight AS [Kg Real],
@@ -144,8 +144,12 @@ SELECT
         ELSE 'ACIMA DE 3 DIAS ANTES'
     END AS [Performance Status Dif de Dias Oficial],
     CASE
-        WHEN ISJSON(lc.metadata) = 1
-          AND JSON_VALUE(lc.metadata, '$.cnr_c_s_fit_fte_lce_ore_description') COLLATE Latin1_General_CI_AI LIKE N'%Comprovante%Entrega%Anexado%'
+        WHEN EXISTS (
+            SELECT 1
+            FROM dbo.inventario AS inv
+            WHERE inv.numero_minuta = f.corporation_sequence_number
+              AND inv.flag_comprovante_anexado = 1
+        )
             THEN N'Sim'
         ELSE N'Não'
     END AS [Comprovante Anexado],

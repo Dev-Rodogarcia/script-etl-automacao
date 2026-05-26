@@ -33,10 +33,17 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "[Peso Real]");
         assertContem(sql, "[Peso Cubado]");
         assertContem(sql, "[Total M3]");
+        assertContem(sql, "COALESCE(lc.invoices_volumes, f.invoices_total_volumes, 0) AS [Volumes]");
+        assertFalse(sql.contains("NULLIF(f.invoices_total_volumes, 0)"));
         assertContem(sql, "[Cortesia]");
         assertContem(sql, "[Cortesia Flag]");
+        assertContem(sql, "[Comprovante Anexado]");
+        assertContem(sql, "FROM dbo.inventario AS inv");
+        assertContem(sql, "inv.flag_comprovante_anexado = 1");
         assertContem(sql, "NULLIF(LTRIM(RTRIM(f.nfse_series)), '')");
         assertContem(sql, "LEFT JOIN dbo.localizacao_cargas");
+        assertFalse(sql.contains("JSON_VALUE(lc.metadata, '$.cnr_c_s_fit_fte_lce_ore_description')"));
+        assertFalse(sql.contains("%Comprovante%Entrega%Anexado%"));
     }
 
     @Test
@@ -92,6 +99,19 @@ class IndicadoresGestaoViewSqlTest {
     }
 
     @Test
+    void migrationComprovanteDeveMaterializarFlagNoInventario() throws IOException {
+        final String sql = lerSql("database/migrations/021_materializar_comprovante_inventario.sql");
+
+        assertContem(sql, "ADD flag_comprovante_anexado BIT NOT NULL");
+        assertContem(sql, "UPDATE dbo.inventario");
+        assertContem(sql, "COLLATE Latin1_General_CI_AI LIKE N'%Comprovante%Entrega%Anexado%'");
+        assertContem(sql, "WHERE flag_comprovante_anexado = 1");
+        assertContem(sql, "inv.flag_comprovante_anexado = 1");
+        assertFalse(sql.contains("inv.ultima_ocorrencia_descricao COLLATE Latin1_General_CI_AI LIKE"));
+        assertSemMojibake(sql, "database/migrations/021_materializar_comprovante_inventario.sql");
+    }
+
+    @Test
     void manifestosPowerBiDeveExporLocalDeDescarregamentoComNomeDoNegocio() throws IOException {
         final String sql = lerSql("database/views/018_criar_view_manifestos_powerbi.sql");
 
@@ -126,6 +146,26 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "p.data_extracao AS parada_data_extracao");
         assertContem(sql, "END AS data_extracao_raster");
         assertContem(sql, "data_extracao_raster AS [Data de extracao]");
+    }
+
+    @Test
+    void executorDatabaseDeveAplicarMigrationsRecentesDoContratoDeFretes() throws IOException {
+        final String sql = lerSql("database/executar_database.bat");
+        final String validacao = lerSql("database/validacao/034_validar_schema_recriacao.sql");
+
+        assertContem(sql, "migrations\\016_materializar_faturamento_fretes.sql");
+        assertContem(sql, "migrations\\017_localizacao_cargas_dashboard_operacional.sql");
+        assertContem(sql, "migrations\\018_adicionar_indice_coletas_request_date_dashboard.sql");
+        assertContem(sql, "migrations\\019_adicionar_comprovante_fretes_performance.sql");
+        assertContem(sql, "migrations\\020_adicionar_tipo_motorista_manifestos.sql");
+        assertContem(sql, "migrations\\021_materializar_comprovante_inventario.sql");
+        assertContem(sql, "migrations\\022_corrigir_volumes_fretes_faturamento.sql");
+        assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
+        assertContem(validacao, "019_adicionar_comprovante_fretes_performance");
+        assertContem(validacao, "021_materializar_comprovante_inventario");
+        assertContem(validacao, "022_corrigir_volumes_fretes_faturamento");
+        assertContem(validacao, "dbo.vw_fretes_powerbi.[Comprovante Anexado]");
+        assertContem(validacao, "lc.invoices_volumes");
     }
 
     @Test

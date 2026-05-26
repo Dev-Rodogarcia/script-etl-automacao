@@ -32,6 +32,7 @@ public class InventarioEntity {
     private OffsetDateTime performanceFinishedAt;
     private OffsetDateTime ultimaOcorrenciaAt;
     private String ultimaOcorrenciaDescricao;
+    private boolean flagComprovanteAnexado;
     private String metadata;
 
     public String getIdentificadorUnico() {
@@ -248,6 +249,14 @@ public class InventarioEntity {
 
     public void setUltimaOcorrenciaDescricao(final String ultimaOcorrenciaDescricao) {
         this.ultimaOcorrenciaDescricao = ultimaOcorrenciaDescricao;
+    }
+
+    public boolean isFlagComprovanteAnexado() {
+        return flagComprovanteAnexado;
+    }
+
+    public void setFlagComprovanteAnexado(final boolean flagComprovanteAnexado) {
+        this.flagComprovanteAnexado = flagComprovanteAnexado;
     }
 
     public String getMetadata() {

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.Normalizer;
+import java.util.Locale;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,11 +60,33 @@ public class InventarioMapper {
         entity.setPerformanceFinishedAt(FormatadorData.parseOffsetDateTime(dto.getPerformanceFinishedAt()));
         entity.setUltimaOcorrenciaAt(FormatadorData.parseOffsetDateTime(dto.getUltimaOcorrenciaAt()));
         entity.setUltimaOcorrenciaDescricao(dto.getUltimaOcorrenciaDescricao());
+        entity.setFlagComprovanteAnexado(isComprovanteEntregaAnexado(dto.getUltimaOcorrenciaDescricao()));
 
         final String metadata = MapperUtil.toJson(dto.getAllProperties());
         entity.setMetadata(metadata);
         entity.setIdentificadorUnico(calcularIdentificador(dto, entity.getInvoicesMapping(), metadata));
         return entity;
+    }
+
+    private boolean isComprovanteEntregaAnexado(final String descricao) {
+        if (descricao == null || descricao.isBlank()) {
+            return false;
+        }
+
+        final String texto = Normalizer
+            .normalize(descricao, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "")
+            .toLowerCase(Locale.ROOT);
+
+        final int comprovante = texto.indexOf("comprovante");
+        if (comprovante < 0) {
+            return false;
+        }
+        final int entrega = texto.indexOf("entrega", comprovante + "comprovante".length());
+        if (entrega < 0) {
+            return false;
+        }
+        return texto.indexOf("anexado", entrega + "entrega".length()) >= 0;
     }
 
     private BigDecimal converterParaBigDecimal(final String valor, final String campo, final Long sequenceCode) {

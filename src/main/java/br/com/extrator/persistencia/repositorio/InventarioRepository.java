@@ -60,13 +60,14 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
         );
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
                 AS source (
                     identificador_unico, sequence_code, numero_minuta, pagador_nome, remetente_nome, origem_cidade,
                     destinatario_nome, destino_cidade, regiao_entrega, filial_entregadora, branch_nickname, type,
                     started_at, finished_at, status, conferente_nome, invoices_mapping, invoices_value, real_weight,
                     total_cubic_volume, taxed_weight, invoices_volumes, read_volumes, predicted_delivery_at,
-                    performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao, metadata, data_extracao
+                    performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao,
+                    flag_comprovante_anexado, metadata, data_extracao
                 )
             ON target.identificador_unico = source.identificador_unico
             WHEN MATCHED AND %s THEN
@@ -97,6 +98,7 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
                     performance_finished_at = source.performance_finished_at,
                     ultima_ocorrencia_at = source.ultima_ocorrencia_at,
                     ultima_ocorrencia_descricao = source.ultima_ocorrencia_descricao,
+                    flag_comprovante_anexado = source.flag_comprovante_anexado,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao
             WHEN NOT MATCHED THEN
@@ -105,14 +107,16 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
                     destinatario_nome, destino_cidade, regiao_entrega, filial_entregadora, branch_nickname, type,
                     started_at, finished_at, status, conferente_nome, invoices_mapping, invoices_value, real_weight,
                     total_cubic_volume, taxed_weight, invoices_volumes, read_volumes, predicted_delivery_at,
-                    performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao, metadata, data_extracao
+                    performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao,
+                    flag_comprovante_anexado, metadata, data_extracao
                 )
                 VALUES (
                     source.identificador_unico, source.sequence_code, source.numero_minuta, source.pagador_nome, source.remetente_nome, source.origem_cidade,
                     source.destinatario_nome, source.destino_cidade, source.regiao_entrega, source.filial_entregadora, source.branch_nickname, source.type,
                     source.started_at, source.finished_at, source.status, source.conferente_nome, source.invoices_mapping, source.invoices_value, source.real_weight,
                     source.total_cubic_volume, source.taxed_weight, source.invoices_volumes, source.read_volumes, source.predicted_delivery_at,
-                    source.performance_finished_at, source.ultima_ocorrencia_at, source.ultima_ocorrencia_descricao, source.metadata, source.data_extracao
+                    source.performance_finished_at, source.ultima_ocorrencia_at, source.ultima_ocorrencia_descricao,
+                    source.flag_comprovante_anexado, source.metadata, source.data_extracao
                 );
             """, NOME_TABELA, freshnessGuard);
 
@@ -145,6 +149,7 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
             statement.setObject(paramIndex++, inventario.getPerformanceFinishedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
             statement.setObject(paramIndex++, inventario.getUltimaOcorrenciaAt(), Types.TIMESTAMP_WITH_TIMEZONE);
             setStringParameter(statement, paramIndex++, inventario.getUltimaOcorrenciaDescricao());
+            setBooleanParameter(statement, paramIndex++, inventario.isFlagComprovanteAnexado());
             setStringParameter(statement, paramIndex++, inventario.getMetadata());
             setInstantParameter(statement, paramIndex++, Instant.now());
             return statement.executeUpdate();

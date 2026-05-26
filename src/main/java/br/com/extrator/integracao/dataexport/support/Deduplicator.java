@@ -34,6 +34,7 @@ Atributos-chave:
 
 package br.com.extrator.integracao.dataexport.support;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,7 +52,9 @@ import br.com.extrator.persistencia.entidade.ManifestoEntity;
  * Classe utilitária para deduplicação de entidades do DataExport.
  * Remove registros duplicados da resposta da API antes de salvar no banco.
  * 
- * Estratégia: "Keep Last" (último vence) para preservar dados mais recentes.
+ * Estratégia: mantém o registro mais fresco e consolida métricas de duplicados
+ * para preservar campos financeiros/operacionais que a API pode devolver
+ * apenas em uma das variantes do mesmo manifesto.
  * Chaves de deduplicação são alinhadas com as chaves do MERGE SQL.
  */
 public final class Deduplicator {
@@ -65,7 +68,8 @@ public final class Deduplicator {
      * ⚠️ CRÍTICO: Usa a MESMA chave composta do MERGE SQL:
      * (sequence_code, pick_sequence_code, mdfe_number)
      * 
-     * Estratégia: "Keep Last" - mantém o registro mais recente baseado em finishedAt/createdAt.
+     * Estratégia: mantém o registro mais recente baseado em finishedAt/createdAt
+     * e completa métricas ausentes com valores reais vindos do duplicado.
      * 
      * @param manifestos Lista de manifestos a deduplicar
      * @return Lista deduplicada de manifestos
@@ -89,13 +93,12 @@ public final class Deduplicator {
                 },
                 m -> m,
                 (primeiro, segundo) -> {
-                    // ✅ ESTRATÉGIA "KEEP LAST": Manter o registro mais recente
-                    final ManifestoEntity maisRecente = obterMaisRecenteManifesto(primeiro, segundo);
-                    logger.warn("⚠️ Duplicado detectado na API: sequence_code={}, pick={}, mdfe={}. Mantendo o mais recente (finishedAt/createdAt).", 
+                    final ManifestoEntity consolidado = obterMaisRecenteManifesto(primeiro, segundo);
+                    logger.warn("⚠️ Duplicado detectado na API: sequence_code={}, pick={}, mdfe={}. Mantendo o mais fresco e consolidando métricas financeiras/operacionais.", 
                         primeiro.getSequenceCode(), 
                         primeiro.getPickSequenceCode(), 
                         primeiro.getMdfeNumber());
-                    return maisRecente;
+                    return consolidado;
                 }
             ))
             .values()
@@ -104,39 +107,84 @@ public final class Deduplicator {
     }
     
     /**
-     * Determina qual manifesto é mais recente baseado em finishedAt ou createdAt.
-     * Se ambos forem NULL, mantém o segundo (assume que é o último processado).
+     * Determina qual manifesto é mais recente baseado em finishedAt ou createdAt
+     * e preserva métricas reais que possam existir apenas em uma variante duplicada
+     * do payload da ESL.
      */
     private static ManifestoEntity obterMaisRecenteManifesto(final ManifestoEntity primeiro, final ManifestoEntity segundo) {
-        // Prioridade 1: finishedAt (data de finalização é mais confiável)
-        final OffsetDateTime finishedAt1 = primeiro.getFinishedAt();
-        final OffsetDateTime finishedAt2 = segundo.getFinishedAt();
-        if (finishedAt1 != null && finishedAt2 != null) {
-            return finishedAt1.isAfter(finishedAt2) ? primeiro : segundo;
+        final int comparacaoFreshness = compararFreshnessManifesto(primeiro, segundo);
+        final ManifestoEntity base;
+        final ManifestoEntity complemento;
+
+        if (comparacaoFreshness > 0) {
+            base = primeiro;
+            complemento = segundo;
+        } else if (comparacaoFreshness < 0) {
+            base = segundo;
+            complemento = primeiro;
+        } else if (pontuarMetricasManifesto(primeiro) >= pontuarMetricasManifesto(segundo)) {
+            base = primeiro;
+            complemento = segundo;
+        } else {
+            base = segundo;
+            complemento = primeiro;
         }
-        if (finishedAt2 != null) {
-            return segundo; // Segundo tem finishedAt, primeiro não → segundo é mais recente
+
+        enriquecerMetricasManifesto(base, complemento);
+        return base;
+    }
+
+    private static int compararFreshnessManifesto(final ManifestoEntity primeiro, final ManifestoEntity segundo) {
+        final int finishedAt = comparar(primeiro.getFinishedAt(), segundo.getFinishedAt());
+        if (finishedAt != 0) {
+            return finishedAt;
         }
-        if (finishedAt1 != null) {
-            return primeiro; // Primeiro tem finishedAt, segundo não → primeiro é mais recente
+
+        return comparar(primeiro.getCreatedAt(), segundo.getCreatedAt());
+    }
+
+    private static int pontuarMetricasManifesto(final ManifestoEntity manifesto) {
+        int pontuacao = 0;
+        pontuacao += temValor(manifesto.getKm()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getTotalCost()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getManifestFreightsTotal()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getTotalTaxedWeight()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getCapacidadeKg()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getVehicleWeightCapacity()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getManifestItemsCount()) ? 1 : 0;
+        pontuacao += temValor(manifesto.getFinalizedManifestItemsCount()) ? 1 : 0;
+        return pontuacao;
+    }
+
+    private static void enriquecerMetricasManifesto(final ManifestoEntity base, final ManifestoEntity complemento) {
+        if (base == null || complemento == null) {
+            return;
         }
-        
-        // Prioridade 2: createdAt (fallback)
-        final OffsetDateTime createdAt1 = primeiro.getCreatedAt();
-        final OffsetDateTime createdAt2 = segundo.getCreatedAt();
-        if (createdAt1 != null && createdAt2 != null) {
-            return createdAt1.isAfter(createdAt2) ? primeiro : segundo;
-        }
-        if (createdAt2 != null) {
-            return segundo;
-        }
-        if (createdAt1 != null) {
-            return primeiro;
-        }
-        
-        // Fallback final: manter o segundo (assume que é o último processado na lista)
-        logger.debug("Nenhum timestamp disponível para decidir. Mantendo o segundo (último processado).");
-        return segundo;
+
+        base.setKm(escolherValor(base.getKm(), complemento.getKm()));
+        base.setTotalCost(escolherValor(base.getTotalCost(), complemento.getTotalCost()));
+        base.setManifestFreightsTotal(escolherValor(base.getManifestFreightsTotal(), complemento.getManifestFreightsTotal()));
+        base.setTotalTaxedWeight(escolherValor(base.getTotalTaxedWeight(), complemento.getTotalTaxedWeight()));
+        base.setCapacidadeKg(escolherValor(base.getCapacidadeKg(), complemento.getCapacidadeKg()));
+        base.setVehicleWeightCapacity(escolherValor(base.getVehicleWeightCapacity(), complemento.getVehicleWeightCapacity()));
+        base.setManifestItemsCount(escolherValor(base.getManifestItemsCount(), complemento.getManifestItemsCount()));
+        base.setFinalizedManifestItemsCount(escolherValor(base.getFinalizedManifestItemsCount(), complemento.getFinalizedManifestItemsCount()));
+    }
+
+    private static BigDecimal escolherValor(final BigDecimal atual, final BigDecimal candidato) {
+        return !temValor(atual) && temValor(candidato) ? candidato : atual;
+    }
+
+    private static Integer escolherValor(final Integer atual, final Integer candidato) {
+        return !temValor(atual) && temValor(candidato) ? candidato : atual;
+    }
+
+    private static boolean temValor(final BigDecimal valor) {
+        return valor != null && BigDecimal.ZERO.compareTo(valor) != 0;
+    }
+
+    private static boolean temValor(final Integer valor) {
+        return valor != null && valor.intValue() != 0;
     }
     
     /**

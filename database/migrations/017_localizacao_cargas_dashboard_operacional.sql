@@ -160,3 +160,14 @@ LEFT JOIN dbo.localizacao_cargas_regiao_destino_alias regiao_alias
        ON regiao_alias.nome_responsavel = lc.destination_branch_nickname
       AND regiao_alias.ativo = 1;
 GO
+
+IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'017_localizacao_cargas_dashboard_operacional')
+BEGIN
+    INSERT INTO dbo.schema_migrations (migration_id, notes)
+    VALUES (
+        N'017_localizacao_cargas_dashboard_operacional',
+        N'Materializa campos e indices operacionais de localizacao de cargas para dashboards.'
+    );
+END;
+GO

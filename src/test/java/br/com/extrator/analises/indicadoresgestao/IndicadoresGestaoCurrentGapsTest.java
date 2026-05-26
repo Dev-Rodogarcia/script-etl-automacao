@@ -1,5 +1,6 @@
 package br.com.extrator.analises.indicadoresgestao;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,7 +97,8 @@ class IndicadoresGestaoCurrentGapsTest {
               "cnr_c_s_fit_real_weight": "12.3",
               "cnr_c_s_fit_total_cubic_volume": "0.8",
               "cnr_c_s_fit_taxed_weight": "14.1",
-              "cnr_c_s_fit_dpn_performance_finished_at": "03/03/2026 23:59:00"
+              "cnr_c_s_fit_dpn_performance_finished_at": "03/03/2026 23:59:00",
+              "cnr_c_s_fit_fte_lce_ore_description": "Comprovante de Entrega Anexado"
             }
             """;
 
@@ -108,6 +110,25 @@ class IndicadoresGestaoCurrentGapsTest {
         assertEqualsText("346841", String.valueOf(entity.getNumeroMinuta()));
         assertNotNull(entity.getStartedAt());
         assertNotNull(entity.getPerformanceFinishedAt());
+        assertTrue(entity.isFlagComprovanteAnexado());
+    }
+
+    @Test
+    void inventarioMapperDeveMaterializarComprovanteAnexadoSomenteParaOcorrenciaEsperada() throws Exception {
+        final String json = """
+            {
+              "cnr_c_s_fit_corporation_sequence_number": 346842,
+              "sequence_code": 99124,
+              "started_at": "03/02/2026 08:10:00",
+              "cnr_c_s_fit_fte_lce_ore_description": "Entrega Realizada Normalmente"
+            }
+            """;
+
+        final InventarioDTO dto = MapperUtil.sharedJson().readValue(json, InventarioDTO.class);
+        final InventarioEntity entity = new InventarioMapper().toEntity(dto);
+
+        assertNotNull(entity);
+        assertFalse(entity.isFlagComprovanteAnexado());
     }
 
     @Test

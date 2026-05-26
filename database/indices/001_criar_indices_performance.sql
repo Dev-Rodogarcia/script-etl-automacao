@@ -262,6 +262,36 @@ ELSE
     PRINT '    Indice IX_localizacao_hash_upsert ja existe';
 
 -- ============================================================================
+-- INVENTARIO - Indices para comprovante anexado na view de fretes
+-- ============================================================================
+
+PRINT 'Criando indices para tabela INVENTARIO...';
+
+-- Indice filtrado para resolver o EXISTS de comprovante anexado por minuta sem ler descricao textual
+IF EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_inventario_comprovante_minuta'
+      AND object_id = OBJECT_ID('dbo.inventario')
+      AND (filter_definition IS NULL OR filter_definition NOT LIKE '%flag_comprovante_anexado%')
+)
+BEGIN
+    DROP INDEX IX_inventario_comprovante_minuta ON dbo.inventario;
+    PRINT '  Indice IX_inventario_comprovante_minuta antigo removido';
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_inventario_comprovante_minuta' AND object_id = OBJECT_ID('dbo.inventario'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_inventario_comprovante_minuta
+    ON dbo.inventario(numero_minuta)
+    WHERE flag_comprovante_anexado = 1;
+
+    PRINT '  Indice IX_inventario_comprovante_minuta criado';
+END
+ELSE
+    PRINT '    Indice IX_inventario_comprovante_minuta ja existe';
+
+-- ============================================================================
 -- LOG_EXTRACOES - Indices para otimizar queries de auditoria
 -- ============================================================================
 
@@ -295,7 +325,7 @@ FROM sys.indexes i
 INNER JOIN sys.partitions p ON i.object_id = p.object_id AND i.index_id = p.index_id
 INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id
 WHERE i.name LIKE 'IX_%'
-  AND OBJECT_NAME(i.object_id) IN ('manifestos', 'cotacoes', 'contas_a_pagar', 'coletas', 'fretes', 'localizacao_cargas', 'log_extracoes')
+  AND OBJECT_NAME(i.object_id) IN ('manifestos', 'cotacoes', 'contas_a_pagar', 'coletas', 'fretes', 'localizacao_cargas', 'inventario', 'log_extracoes')
 GROUP BY i.object_id, i.name, i.type_desc
 ORDER BY Tabela, Nome_Indice;
 

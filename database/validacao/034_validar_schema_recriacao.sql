@@ -86,7 +86,12 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'014_criar_tabelas_raster'),
     (N'015_adicionar_cliente_cnpj_faturas_por_cliente'),
     (N'016_materializar_faturamento_fretes'),
-    (N'017_localizacao_cargas_dashboard_operacional');
+    (N'017_localizacao_cargas_dashboard_operacional'),
+    (N'018_adicionar_indice_coletas_request_date_dashboard'),
+    (N'019_adicionar_comprovante_fretes_performance'),
+    (N'020_adicionar_tipo_motorista_manifestos'),
+    (N'021_materializar_comprovante_inventario'),
+    (N'022_corrigir_volumes_fretes_faturamento');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -120,6 +125,9 @@ IF COL_LENGTH(N'dbo.fretes', N'data_referencia_faturamento') IS NULL
 
 IF COL_LENGTH(N'dbo.fretes', N'is_elegivel_faturamento') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.is_elegivel_faturamento', N'Coluna da migration 016 ausente');
+
+IF COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.inventario.flag_comprovante_anexado', N'Flag materializada de comprovante anexado ausente');
 
 IF COL_LENGTH(N'dbo.faturas_por_cliente', N'cliente_cnpj') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.cliente_cnpj', N'Coluna da migration 015 ausente');
@@ -156,6 +164,59 @@ IF NOT EXISTS (
       AND object_id = OBJECT_ID(N'dbo.localizacao_cargas')
 )
     INSERT INTO @falhas VALUES (N'INDICE', N'IX_localizacao_tracking_dashboard', N'Indice da migration 017 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_inventario_comprovante_minuta'
+      AND object_id = OBJECT_ID(N'dbo.inventario')
+      AND filter_definition LIKE N'%flag_comprovante_anexado%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_inventario_comprovante_minuta', N'Indice filtrado de comprovante anexado ausente ou desatualizado');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
+      AND name = N'Comprovante Anexado'
+)
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Comprovante Anexado]', N'Coluna do KPI Comprovante Anexado ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
+      AND name = N'Volumes'
+)
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Volumes]', N'Coluna do KPI Volumes ausente');
+
+IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_fretes_powerbi')) NOT LIKE N'%lc.invoices_volumes%'
+    INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_fretes_powerbi.[Volumes]', N'Volumes deve usar localizacao_cargas.invoices_volumes como fonte oficial');
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
+      AND name = N'Comprovante Anexado'
+)
+AND COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NOT NULL
+BEGIN
+    DECLARE @inventarioComComprovante BIT = 0;
+    DECLARE @viewComComprovante BIT = 0;
+
+    EXEC sys.sp_executesql
+        N'SELECT @saida = CASE WHEN EXISTS (SELECT 1 FROM dbo.inventario WHERE flag_comprovante_anexado = 1) THEN 1 ELSE 0 END',
+        N'@saida BIT OUTPUT',
+        @saida = @inventarioComComprovante OUTPUT;
+
+    EXEC sys.sp_executesql
+        N'SELECT @saida = CASE WHEN EXISTS (SELECT 1 FROM dbo.vw_fretes_powerbi WHERE [Comprovante Anexado] = N''Sim'') THEN 1 ELSE 0 END',
+        N'@saida BIT OUTPUT',
+        @saida = @viewComComprovante OUTPUT;
+
+    IF @inventarioComComprovante = 1 AND @viewComComprovante = 0
+        INSERT INTO @falhas VALUES (N'DADO', N'dbo.vw_fretes_powerbi.[Comprovante Anexado]', N'Inventario possui comprovantes, mas a view de fretes nao publica Sim');
+END;
 
 IF EXISTS (
     SELECT 1

@@ -171,6 +171,13 @@ for %%F in (
     "migrations\013_ajustar_precisao_cubagem_fretes.sql"
     "migrations\014_criar_tabelas_raster.sql"
     "migrations\015_adicionar_cliente_cnpj_faturas_por_cliente.sql"
+    "migrations\016_materializar_faturamento_fretes.sql"
+    "migrations\017_localizacao_cargas_dashboard_operacional.sql"
+    "migrations\018_adicionar_indice_coletas_request_date_dashboard.sql"
+    "migrations\019_adicionar_comprovante_fretes_performance.sql"
+    "migrations\020_adicionar_tipo_motorista_manifestos.sql"
+    "migrations\021_materializar_comprovante_inventario.sql"
+    "migrations\022_corrigir_volumes_fretes_faturamento.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -244,6 +251,7 @@ for %%F in (
     "validacao\032_validar_orfaos_manifestos_coletas.sql"
     "validacao\033_validar_orfaos_fretes_faturas_graphql.sql"
     "validacao\034_validar_schema_recriacao.sql"
+    "validacao\036_validar_volumes_fretes_faturamento.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F

@@ -1,4 +1,4 @@
-PRINT 'Migration 019: adicionar comprovante e regiao destino na view de fretes para Performance';
+PRINT 'Migration 021: materializar comprovante anexado no inventario';
 GO
 
 IF COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NULL
@@ -304,15 +304,16 @@ OUTER APPLY (
 GO
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'019_adicionar_comprovante_fretes_performance')
+   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'021_materializar_comprovante_inventario')
 BEGIN
     INSERT INTO dbo.schema_migrations (migration_id, notes)
     VALUES (
-        N'019_adicionar_comprovante_fretes_performance',
+        N'021_materializar_comprovante_inventario',
         N'Materializa flag de comprovante no inventario e publica Comprovante Anexado na view vw_fretes_powerbi.'
     );
 END;
 GO
 
-PRINT 'View vw_fretes_powerbi atualizada para Performance com sucesso!';
+PRINT 'Flag de comprovante materializada e view vw_fretes_powerbi atualizada com sucesso!';
 GO
+

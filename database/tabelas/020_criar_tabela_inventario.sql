@@ -28,6 +28,7 @@ BEGIN
         performance_finished_at DATETIMEOFFSET NULL,
         ultima_ocorrencia_at DATETIMEOFFSET NULL,
         ultima_ocorrencia_descricao NVARCHAR(500) NULL,
+        flag_comprovante_anexado BIT NOT NULL CONSTRAINT DF_inventario_flag_comprovante_anexado DEFAULT (0),
         metadata NVARCHAR(MAX) NULL,
         data_extracao DATETIME2 DEFAULT GETDATE()
     );
