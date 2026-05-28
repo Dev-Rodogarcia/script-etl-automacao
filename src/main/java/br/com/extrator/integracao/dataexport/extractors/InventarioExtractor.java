@@ -12,9 +12,8 @@ import br.com.extrator.dominio.dataexport.inventario.InventarioDTO;
 import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
-import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
+import br.com.extrator.integracao.comum.ChunkedDataExportEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
-import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.mapeamento.dataexport.inventario.InventarioMapper;
 import br.com.extrator.persistencia.entidade.InventarioEntity;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
@@ -23,7 +22,7 @@ import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
-public class InventarioExtractor implements DataExportEntityExtractor<InventarioDTO>, ChunkedEntityExtractor<InventarioDTO> {
+public class InventarioExtractor implements ChunkedDataExportEntityExtractor<InventarioDTO> {
 
     private final ClienteApiDataExport apiClient;
     private final InventarioRepository repository;

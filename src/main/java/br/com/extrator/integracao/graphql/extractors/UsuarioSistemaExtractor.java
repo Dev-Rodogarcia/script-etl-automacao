@@ -61,7 +61,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Deduplica por user_id (Keep Last) antes de salvar para que o log e o banco batam na validação API vs banco.
  * A carga completa de dim_usuarios é deliberadamente explícita e deve ser feita via comando dedicado.
  */
-public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDTO>, ChunkedEntityExtractor<IndividualNodeDTO> {
+public class UsuarioSistemaExtractor implements ChunkedEntityExtractor<IndividualNodeDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(UsuarioSistemaExtractor.class);
 

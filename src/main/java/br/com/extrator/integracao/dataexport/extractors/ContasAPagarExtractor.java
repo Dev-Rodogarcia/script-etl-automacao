@@ -49,9 +49,8 @@ import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.persistencia.repositorio.ContasAPagarRepository;
 import br.com.extrator.dominio.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.contasapagar.ContasAPagarMapper;
-import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
+import br.com.extrator.integracao.comum.ChunkedDataExportEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
-import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
@@ -61,7 +60,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Contas a Pagar (DataExport).
  * Inclui deduplicação antes de salvar.
  */
-public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAPagarDTO>, ChunkedEntityExtractor<ContasAPagarDTO> {
+public class ContasAPagarExtractor implements ChunkedDataExportEntityExtractor<ContasAPagarDTO> {
     
     private final ClienteApiDataExport apiClient;
     private final ContasAPagarRepository repository;
@@ -148,11 +147,6 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
             repository.getUltimoResumoSalvamento().getRegistrosPersistidos(),
             repository.getUltimoResumoSalvamento().getRegistrosNoOpIdempotente()
         );
-    }
-    
-    @Override
-    public int save(final List<ContasAPagarDTO> dtos) throws java.sql.SQLException {
-        return saveWithDeduplication(dtos).getRegistrosSalvos();
     }
     
     @Override

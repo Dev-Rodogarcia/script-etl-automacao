@@ -60,7 +60,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * 
  * @since 2.3.2 - Adicionada deduplicação preventiva por ID
  */
-public class ColetaExtractor implements EntityExtractor<ColetaNodeDTO>, ChunkedEntityExtractor<ColetaNodeDTO> {
+public class ColetaExtractor implements ChunkedEntityExtractor<ColetaNodeDTO> {
     private static final Logger logger = LoggerFactory.getLogger(ColetaExtractor.class);
     
     private final ClienteApiGraphQL apiClient;

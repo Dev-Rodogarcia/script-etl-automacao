@@ -75,7 +75,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * 
  * @since 2.3.2 - Adicionada deduplicação preventiva por ID
  */
-public class FreteExtractor implements EntityExtractor<FreteNodeDTO>, ChunkedEntityExtractor<FreteNodeDTO> {
+public class FreteExtractor implements ChunkedEntityExtractor<FreteNodeDTO> {
     private static final Logger logger = LoggerFactory.getLogger(FreteExtractor.class);
     private static final int MAX_DIAS_POR_REQUISICAO = 30;
     private static final DateTimeFormatter[] FORMATOS_BR_DATA_HORA = {

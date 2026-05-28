@@ -49,9 +49,8 @@ import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.persistencia.repositorio.ManifestoRepository;
 import br.com.extrator.dominio.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.manifestos.ManifestoMapper;
-import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
+import br.com.extrator.integracao.comum.ChunkedDataExportEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
-import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
@@ -61,7 +60,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Manifestos (DataExport).
  * Inclui deduplicação antes de salvar.
  */
-public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDTO>, ChunkedEntityExtractor<ManifestoDTO> {
+public class ManifestoExtractor implements ChunkedDataExportEntityExtractor<ManifestoDTO> {
     
     private final ClienteApiDataExport apiClient;
     private final ManifestoRepository repository;
@@ -148,11 +147,6 @@ public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDT
             repository.getUltimoResumoSalvamento().getRegistrosPersistidos(),
             repository.getUltimoResumoSalvamento().getRegistrosNoOpIdempotente()
         );
-    }
-    
-    @Override
-    public int save(final List<ManifestoDTO> dtos) throws java.sql.SQLException {
-        return saveWithDeduplication(dtos).getRegistrosSalvos();
     }
     
     @Override

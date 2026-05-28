@@ -52,9 +52,8 @@ import br.com.extrator.persistencia.repositorio.FaturaPorClienteRepository;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
-import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
+import br.com.extrator.integracao.comum.ChunkedDataExportEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
-import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
@@ -64,7 +63,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade faturas_por_cliente (DataExport).
  * Inclui deduplicacao antes de salvar.
  */
-public class FaturaPorClienteExtractor implements DataExportEntityExtractor<FaturaPorClienteDTO>, ChunkedEntityExtractor<FaturaPorClienteDTO> {
+public class FaturaPorClienteExtractor implements ChunkedDataExportEntityExtractor<FaturaPorClienteDTO> {
 
     private final ClienteApiDataExport apiClient;
     private final FaturaPorClienteRepository repository;
@@ -196,11 +195,6 @@ public class FaturaPorClienteExtractor implements DataExportEntityExtractor<Fatu
             log.debug("Falha ao calcular unique_id temporario para fatura por cliente: {}", e.getMessage());
             return null;
         }
-    }
-
-    @Override
-    public int save(final List<FaturaPorClienteDTO> dtos) throws java.sql.SQLException {
-        return saveWithDeduplication(dtos).getRegistrosSalvos();
     }
 
     @Override
