@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
+import br.com.extrator.features.fretes.aplicacao.FretesExecutionWindowStrategy;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -46,7 +47,7 @@ public final class ExecutionWindowPlanner {
         final Map<String, FeatureExecutionWindowStrategy> registradas = new LinkedHashMap<>();
         registrarReplay(registradas, ConstantesEntidades.COLETAS);
         registrarReplay(registradas, ConstantesEntidades.MANIFESTOS);
-        registrarReplay(registradas, ConstantesEntidades.FRETES);
+        registradas.put(ConstantesEntidades.FRETES, new FretesExecutionWindowStrategy());
         registrarReplay(registradas, ConstantesEntidades.COTACOES);
         registradas.put(
             ConstantesEntidades.LOCALIZACAO_CARGAS,
@@ -128,13 +129,28 @@ public final class ExecutionWindowPlanner {
                     .map(data -> data.isBefore(consultaMinima) ? data : consultaMinima)
                     .orElse(consultaMinima)
                 : consultaMinima;
-            final java.time.LocalDateTime confirmacaoInicio = watermarkConfirmado.orElse(consultaInicio.atStartOfDay());
+            final java.time.LocalDateTime confirmacaoFim = dataReferenciaFim.atTime(LocalTime.MAX);
+            final java.time.LocalDateTime confirmacaoInicio = resolverConfirmacaoInicio(
+                watermarkConfirmado,
+                consultaInicio,
+                confirmacaoFim
+            );
             return new ExecutionWindowPlan(
                 consultaInicio,
                 dataReferenciaFim,
                 confirmacaoInicio,
-                dataReferenciaFim.atTime(LocalTime.MAX)
+                confirmacaoFim
             );
+        }
+
+        private static java.time.LocalDateTime resolverConfirmacaoInicio(
+            final Optional<java.time.LocalDateTime> watermarkConfirmado,
+            final LocalDate consultaInicio,
+            final java.time.LocalDateTime confirmacaoFim
+        ) {
+            final java.time.LocalDateTime confirmacaoInicio =
+                watermarkConfirmado.orElse(consultaInicio.atStartOfDay());
+            return confirmacaoInicio.isAfter(confirmacaoFim) ? confirmacaoFim : confirmacaoInicio;
         }
     }
 }

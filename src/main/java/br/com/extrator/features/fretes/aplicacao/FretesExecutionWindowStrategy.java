@@ -20,12 +20,24 @@ public final class FretesExecutionWindowStrategy implements FeatureExecutionWind
     public ExecutionWindowPlan planejar(final LocalDate dataReferenciaFim,
                                         final Optional<LocalDateTime> watermarkConfirmado) {
         final LocalDate consultaInicio = dataReferenciaFim.minusDays(1);
-        final LocalDateTime confirmacaoInicio = watermarkConfirmado.orElse(consultaInicio.atStartOfDay());
+        final LocalDateTime confirmacaoFim = dataReferenciaFim.atTime(LocalTime.MAX);
+        final LocalDateTime confirmacaoInicio = resolverConfirmacaoInicio(
+            watermarkConfirmado,
+            consultaInicio,
+            confirmacaoFim
+        );
         return new ExecutionWindowPlan(
             consultaInicio,
             dataReferenciaFim,
             confirmacaoInicio,
-            dataReferenciaFim.atTime(LocalTime.MAX)
+            confirmacaoFim
         );
+    }
+
+    private static LocalDateTime resolverConfirmacaoInicio(final Optional<LocalDateTime> watermarkConfirmado,
+                                                           final LocalDate consultaInicio,
+                                                           final LocalDateTime confirmacaoFim) {
+        final LocalDateTime confirmacaoInicio = watermarkConfirmado.orElse(consultaInicio.atStartOfDay());
+        return confirmacaoInicio.isAfter(confirmacaoFim) ? confirmacaoFim : confirmacaoInicio;
     }
 }

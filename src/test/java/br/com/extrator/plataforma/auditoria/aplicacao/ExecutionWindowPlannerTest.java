@@ -21,7 +21,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 class ExecutionWindowPlannerTest {
 
     @Test
-    void devePlanejarJanelaComOverlapDe48hParaEntidadesCriticas() {
+    void devePlanejarReplayDeSeteDiasParaEntidadesCriticas() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 
         final ExecutionWindowPlan planoColetas = planner.planejarEntidade(
@@ -45,6 +45,19 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
+    void devePlanejarFretesComJanelaNormalDeDoisDias() {
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.FRETES,
+            LocalDate.of(2026, 3, 25)
+        );
+
+        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
+    }
+
+    @Test
     void deveUsarWatermarkConfirmadoComoInicioDeConfirmacao() {
         final LocalDateTime watermark = LocalDateTime.of(2026, 3, 24, 5, 30);
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
@@ -55,8 +68,30 @@ class ExecutionWindowPlannerTest {
         );
 
         assertEquals(watermark, plano.confirmacaoInicio());
-        assertEquals(LocalDate.of(2026, 3, 19), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
         assertEquals(LocalDateTime.of(2026, 3, 25, LocalTime.MAX.getHour(), LocalTime.MAX.getMinute(), LocalTime.MAX.getSecond(), LocalTime.MAX.getNano()), plano.confirmacaoFim());
+    }
+
+    @Test
+    void deveEvitarConfirmacaoInvertidaQuandoWatermarkPassouDoFimDaJanela() {
+        final LocalDate dataReferencia = LocalDate.of(2026, 3, 25);
+        final LocalDateTime watermark = LocalDateTime.of(2026, 3, 26, 0, 0);
+        final LocalDateTime fimDaJanela = dataReferencia.atTime(LocalTime.MAX);
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
+
+        final ExecutionWindowPlan planoFretes = planner.planejarEntidade(
+            ConstantesEntidades.FRETES,
+            dataReferencia
+        );
+        final ExecutionWindowPlan planoColetas = planner.planejarEntidade(
+            ConstantesEntidades.COLETAS,
+            dataReferencia
+        );
+
+        assertEquals(fimDaJanela, planoFretes.confirmacaoInicio());
+        assertEquals(fimDaJanela, planoFretes.confirmacaoFim());
+        assertEquals(fimDaJanela, planoColetas.confirmacaoInicio());
+        assertEquals(fimDaJanela, planoColetas.confirmacaoFim());
     }
 
     @Test

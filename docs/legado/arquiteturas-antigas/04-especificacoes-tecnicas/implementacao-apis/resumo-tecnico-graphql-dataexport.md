@@ -13,6 +13,9 @@ related_files:
 ---
 # Resumo Técnico: APIs GraphQL e Data Export
 
+> Documento legado perigoso. Nao usar este arquivo como regra operacional atual do ETL.
+> A regra vigente de `fretes` esta documentada em `docs/moderno/fluxos/fretes.md`.
+
 ## Contexto Geral
 
 Este documento resume a arquitetura de extração de dados das APIs **GraphQL** e **Data Export** do ESL Cloud, focando em autenticação, paginação, modelagem de dados e persistência.

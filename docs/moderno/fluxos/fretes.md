@@ -25,6 +25,13 @@ No runtime atual, essa trilha pode ser enriquecida com Data Export `6389`
 para completar `fit_dpn_performance_finished_at` e reforcar `finished_at`
 quando a origem oficial de performance estiver disponivel.
 
+## Janela operacional atual
+
+No fluxo completo e no loop daemon, `fretes` segue a janela principal `D-1..D`.
+
+O fluxo normal nao aplica lookback extra de performance. Lookback retroativo
+para `fretes` fica reservado para reconciliacao ou backfill explicitos.
+
 ## Passo a passo
 
 1. `GraphQLExtractionService` decide executar `fretes`
