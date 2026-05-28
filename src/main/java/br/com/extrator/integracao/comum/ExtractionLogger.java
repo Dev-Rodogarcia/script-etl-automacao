@@ -102,11 +102,23 @@ public class ExtractionLogger {
         
         try {
             final LocalDateTime inicioExtracao = RelogioSistema.agora();
-            final ResultadoExtracao<T> resultado = extractor.extract(dataInicio, dataFim);
+            final ChunkedExtractionOutcome<T> chunkedOutcome = executarChunkedQuandoDisponivel(
+                extractor,
+                dataInicio,
+                dataFim
+            );
+            final ResultadoExtracao<T> resultado = chunkedOutcome != null
+                ? chunkedOutcome.getResultado()
+                : extractor.extract(dataInicio, dataFim);
             final LocalDateTime fimExtracao = RelogioSistema.agora();
-            final Duration duracaoExtracao = Duration.between(inicioExtracao, fimExtracao);
+            final Duration duracaoExtracaoTotal = Duration.between(inicioExtracao, fimExtracao);
+            final Duration duracaoSalvamentoChunked = chunkedOutcome != null
+                ? chunkedOutcome.getDuracaoSalvamento()
+                : Duration.ZERO;
+            final Duration duracaoExtracao = subtrairSemNegativo(duracaoExtracaoTotal, duracaoSalvamentoChunked);
             
             final List<T> dtos = resultado.getDados();
+            final int totalRecebidoApi = resolverTotalRecebido(resultado, dtos);
             final int totalPaginas = resultado.getPaginasProcessadas();
             final boolean completo = resultado.isCompleto();
             final String statusMsg = completo
@@ -118,27 +130,79 @@ public class ExtractionLogger {
             // Log de extração detalhado
             log.info("{}", "-".repeat(80));
             log.info("RESULTADO DA EXTRACAO:");
-            log.info("   • Total extraído da API: {} registros", formatarNumero(dtos.size()));
+            log.info("   • Total extraído da API: {} registros", formatarNumero(totalRecebidoApi));
             log.info("   • Páginas processadas: {}", totalPaginas);
             log.info("   • Status: {}", statusMsg);
             final double segundosExtracao = duracaoExtracao.toMillis() / 1000.0;
             log.info("   • Tempo de extração (apenas busca na API): {} ms ({} s)",
                 duracaoExtracao.toMillis(),
                 String.format("%.2f", segundosExtracao));
-            log.info("      [INFO] enriquecimento e gravacao entram no Tempo de salvamento abaixo");
-            if (dtos.size() > 0 && duracaoExtracao.toMillis() > 0) {
-                final double registrosPorSegundo = (dtos.size() * 1000.0) / duracaoExtracao.toMillis();
+            if (chunkedOutcome != null) {
+                log.info("      [INFO] paginas foram persistidas em chunks durante a paginacao");
+            } else {
+                log.info("      [INFO] enriquecimento e gravacao entram no Tempo de salvamento abaixo");
+            }
+            if (totalRecebidoApi > 0 && duracaoExtracao.toMillis() > 0) {
+                final double registrosPorSegundo = (totalRecebidoApi * 1000.0) / duracaoExtracao.toMillis();
                 log.info("   • Taxa de extração: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
             }
             
             int registrosSalvos = 0;
             int registrosPersistidos = 0;
             int registrosNoOpIdempotente = 0;
-            int totalUnicos = dtos.size(); // Padrão para GraphQL
+            int totalUnicos = totalRecebidoApi; // Padrao para GraphQL
             int registrosInvalidos = 0;
             final LocalDateTime inicioSalvamento = RelogioSistema.agora();
             
-            if (!dtos.isEmpty()) {
+            if (chunkedOutcome != null) {
+                final EntityExtractor.SaveMetrics saveMetrics = chunkedOutcome.getSaveMetrics();
+                registrosSalvos = saveMetrics.getRegistrosSalvos();
+                registrosPersistidos = saveMetrics.getRegistrosPersistidos();
+                registrosNoOpIdempotente = saveMetrics.getRegistrosNoOpIdempotente();
+                totalUnicos = saveMetrics.getTotalUnicos();
+                registrosInvalidos = saveMetrics.getRegistrosInvalidos();
+
+                final Duration duracaoSalvamento = chunkedOutcome.getDuracaoSalvamento();
+                final boolean isDataExportExtractor = extractor instanceof DataExportEntityExtractor;
+
+                if (totalRecebidoApi != totalUnicos) {
+                    final int duplicadosRemovidos = Math.max(0, totalRecebidoApi - totalUnicos);
+                    final double percentualDuplicados = totalRecebidoApi == 0
+                        ? 0.0
+                        : (duplicadosRemovidos * 100.0) / totalRecebidoApi;
+                    if (duplicadosRemovidos > 0) {
+                        log.warn("   Duplicados removidos: {} ({}% do total)",
+                            formatarNumero(duplicadosRemovidos), String.format("%.2f", percentualDuplicados));
+                    }
+                }
+
+                log.info("{}", "-".repeat(80));
+                if (isDataExportExtractor) {
+                    log.info("RESULTADO DO SALVAMENTO EM CHUNKS (DataExport):");
+                    log.info("   Registros unicos apos deduplicacao por chunk: {}", formatarNumero(totalUnicos));
+                    log.info("   Operacoes no banco (INSERTs + UPDATEs + no-op idempotente): {}", formatarNumero(registrosSalvos));
+                } else {
+                    log.info("RESULTADO DO SALVAMENTO EM CHUNKS (GraphQL):");
+                    log.info("   Operacoes no banco (INSERTs + UPDATEs + no-op idempotente): {}", formatarNumero(registrosSalvos));
+                }
+                if (registrosPersistidos != registrosSalvos || registrosNoOpIdempotente > 0) {
+                    log.info("   Linhas efetivamente persistidas/atualizadas na janela: {}", formatarNumero(registrosPersistidos));
+                }
+                if (registrosNoOpIdempotente > 0) {
+                    log.info("   No-op idempotente aceito: {}", formatarNumero(registrosNoOpIdempotente));
+                }
+                final double segundosSalvamento = duracaoSalvamento.toMillis() / 1000.0;
+                log.info("   Tempo de salvamento: {} ms ({} s)",
+                    duracaoSalvamento.toMillis(),
+                    String.format("%.2f", segundosSalvamento));
+                if (registrosSalvos > 0 && duracaoSalvamento.toMillis() > 0) {
+                    final double registrosPorSegundo = (registrosSalvos * 1000.0) / duracaoSalvamento.toMillis();
+                    log.info("   Taxa de salvamento: {} registros/segundo", String.format("%.2f", registrosPorSegundo));
+                }
+                if (registrosInvalidos > 0) {
+                    log.warn("   Registros invalidos descartados: {}", formatarNumero(registrosInvalidos));
+                }
+            } else if (!dtos.isEmpty()) {
                 try {
                     final EntityExtractor.SaveMetrics saveMetrics = extractor.saveWithMetrics(dtos);
                     registrosSalvos = saveMetrics.getRegistrosSalvos();
@@ -151,9 +215,9 @@ public class ExtractionLogger {
                     final Duration duracaoSalvamento = Duration.between(inicioSalvamento, fimSalvamento);
                     final boolean isDataExportExtractor = extractor instanceof DataExportEntityExtractor;
 
-                    if (dtos.size() != totalUnicos) {
-                        final int duplicadosRemovidos = dtos.size() - totalUnicos;
-                        final double percentualDuplicados = (duplicadosRemovidos * 100.0) / dtos.size();
+                    if (totalRecebidoApi != totalUnicos) {
+                        final int duplicadosRemovidos = totalRecebidoApi - totalUnicos;
+                        final double percentualDuplicados = (duplicadosRemovidos * 100.0) / Math.max(1, totalRecebidoApi);
                         log.warn("   Duplicados removidos: {} ({}% do total)",
                             formatarNumero(duplicadosRemovidos), String.format("%.2f", percentualDuplicados));
                     }
@@ -196,7 +260,7 @@ public class ExtractionLogger {
 
             final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
-            final int totalRecebido = dtos.size();
+            final int totalRecebido = totalRecebidoApi;
             final int deltaIgnorados = Math.max(0, totalUnicos - registrosSalvos);
             final boolean salvamentoConsistente = registrosSalvos == totalUnicos;
             final boolean invalidosDentroTolerancia =
@@ -289,7 +353,7 @@ public class ExtractionLogger {
             
             // Usar sucessoComUnicos se for DataExport (tem deduplicação)
             final boolean usarUnicos = (extractor instanceof DataExportEntityExtractor)
-                || totalUnicos != resultado.getDados().size();
+                || totalUnicos != totalRecebido;
             if (usarUnicos) {
                 return ExtractionResult.sucessoComUnicos(entityName, inicio, resultado, registrosSalvos, totalUnicos, mensagem)
                     .status(statusFinal)
@@ -351,6 +415,38 @@ public class ExtractionLogger {
     
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ChunkedExtractionOutcome<T> executarChunkedQuandoDisponivel(final EntityExtractor<T> extractor,
+                                                                            final LocalDate dataInicio,
+                                                                            final LocalDate dataFim) throws Exception {
+        if (extractor instanceof final ChunkedEntityExtractor<?> chunkedExtractor) {
+            return ((ChunkedEntityExtractor<T>) chunkedExtractor).extractAndSaveWithMetrics(dataInicio, dataFim);
+        }
+        return null;
+    }
+
+    private <T> int resolverTotalRecebido(final ResultadoExtracao<T> resultado, final List<T> dtos) {
+        if (resultado == null) {
+            return 0;
+        }
+        final int registrosExtraidos = resultado.getRegistrosExtraidos();
+        if (registrosExtraidos > 0) {
+            return registrosExtraidos;
+        }
+        return dtos == null ? 0 : dtos.size();
+    }
+
+    private Duration subtrairSemNegativo(final Duration total, final Duration parte) {
+        if (total == null) {
+            return Duration.ZERO;
+        }
+        if (parte == null || parte.isZero() || parte.isNegative()) {
+            return total;
+        }
+        final Duration resultado = total.minus(parte);
+        return resultado.isNegative() ? Duration.ZERO : resultado;
     }
 
     private ExecutionWindowPlan criarJanelaPadrao(final LocalDate dataInicio, final LocalDate dataFim) {

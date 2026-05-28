@@ -42,12 +42,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.ManifestoEntity;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.persistencia.repositorio.ManifestoRepository;
 import br.com.extrator.dominio.dataexport.manifestos.ManifestoDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.manifestos.ManifestoMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
@@ -59,7 +61,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Manifestos (DataExport).
  * Inclui deduplicação antes de salvar.
  */
-public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDTO> {
+public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDTO>, ChunkedEntityExtractor<ManifestoDTO> {
     
     private final ClienteApiDataExport apiClient;
     private final ManifestoRepository repository;
@@ -86,6 +88,17 @@ public class ManifestoExtractor implements DataExportEntityExtractor<ManifestoDT
             return apiClient.buscarManifestos(dataInicio, fim);
         }
         return apiClient.buscarManifestos();
+    }
+
+    @Override
+    public ResultadoExtracao<ManifestoDTO> extractInChunks(final LocalDate dataInicio,
+                                                           final LocalDate dataFim,
+                                                           final PageChunkConsumer<ManifestoDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarManifestos(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
     
     @Override

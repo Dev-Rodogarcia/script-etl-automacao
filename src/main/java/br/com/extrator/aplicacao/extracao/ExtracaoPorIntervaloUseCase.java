@@ -57,7 +57,6 @@ import br.com.extrator.suporte.console.BannerUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.configuracao.ScopedSystemPropertyOverride;
-import br.com.extrator.suporte.observabilidade.ExecutionContext;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public class ExtracaoPorIntervaloUseCase {
@@ -162,6 +161,9 @@ public class ExtracaoPorIntervaloUseCase {
         );
         if (modoRapido24h) {
             log.console("Modo rapido 24h: ATIVO (sem pre-backfill e sem pos-hidratacao referencial de coletas)");
+        }
+        if (request.modoExecucao() != ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO) {
+            log.console("Modo de execucao: {}", request.modoExecucao());
         }
 
         final ValidadorLimiteExtracao validador = new ValidadorLimiteExtracao();
@@ -404,13 +406,10 @@ public class ExtracaoPorIntervaloUseCase {
     }
 
     private String resolverModoLookbackFretes(final ExtracaoPorIntervaloRequest request) {
-        if (request != null && request.modoLoopDaemon()) {
-            return "reconciliacao";
+        if (request == null || request.modoExecucao() == null) {
+            return ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO.modoLookbackFretes();
         }
-        if ("--recovery".equalsIgnoreCase(ExecutionContext.currentCommand())) {
-            return "backfill";
-        }
-        return "intervalo";
+        return request.modoExecucao().modoLookbackFretes();
     }
 
     private String resolverInteiroMinimo(final String propriedade, final int valorMinimo) {

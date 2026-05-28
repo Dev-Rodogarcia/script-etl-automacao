@@ -10,7 +10,9 @@ import java.util.Map;
 
 import br.com.extrator.dominio.dataexport.sinistros.SinistroDTO;
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.mapeamento.dataexport.sinistros.SinistroMapper;
@@ -21,7 +23,7 @@ import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
-public class SinistroExtractor implements DataExportEntityExtractor<SinistroDTO> {
+public class SinistroExtractor implements DataExportEntityExtractor<SinistroDTO>, ChunkedEntityExtractor<SinistroDTO> {
 
     private final ClienteApiDataExport apiClient;
     private final SinistroRepository repository;
@@ -47,6 +49,17 @@ public class SinistroExtractor implements DataExportEntityExtractor<SinistroDTO>
             return apiClient.buscarSinistros(dataInicio, fim);
         }
         return apiClient.buscarSinistros();
+    }
+
+    @Override
+    public ResultadoExtracao<SinistroDTO> extractInChunks(final LocalDate dataInicio,
+                                                          final LocalDate dataFim,
+                                                          final PageChunkConsumer<SinistroDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = dataFim != null ? dataFim : dataInicio;
+            return apiClient.buscarSinistros(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
 
     @Override

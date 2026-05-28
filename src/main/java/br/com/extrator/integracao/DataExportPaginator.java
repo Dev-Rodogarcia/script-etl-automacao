@@ -128,7 +128,8 @@ final class DataExportPaginator {
             dataFim,
             config,
             true,
-            Map.of()
+            Map.of(),
+            null
         );
     }
 
@@ -151,7 +152,8 @@ final class DataExportPaginator {
             dataFim,
             config,
             permitirParticionamento,
-            Map.of()
+            Map.of(),
+            null
         );
     }
 
@@ -165,6 +167,32 @@ final class DataExportPaginator {
                                                   final ConfiguracaoEntidade config,
                                                   final boolean permitirParticionamento,
                                                   final Map<String, String> filtrosExtras) {
+        return buscarDadosGenericos(
+            executionUuid,
+            templateId,
+            nomeTabela,
+            campoData,
+            typeReference,
+            dataInicio,
+            dataFim,
+            config,
+            permitirParticionamento,
+            filtrosExtras,
+            null
+        );
+    }
+
+    <T> ResultadoExtracao<T> buscarDadosGenericos(final String executionUuid,
+                                                  final int templateId,
+                                                  final String nomeTabela,
+                                                  final String campoData,
+                                                  final TypeReference<List<T>> typeReference,
+                                                  final Instant dataInicio,
+                                                  final Instant dataFim,
+                                                  final ConfiguracaoEntidade config,
+                                                  final boolean permitirParticionamento,
+                                                  final Map<String, String> filtrosExtras,
+                                                  final PageChunkConsumer<T> chunkConsumer) {
         final String tipoAmigavel = obterNomeAmigavelTipo(templateId, nomeTabela);
         final String chaveTemplate = "Template-" + templateId;
         final String executionId = (executionUuid == null || executionUuid.isBlank())
@@ -212,8 +240,9 @@ final class DataExportPaginator {
                 janelaFim
             );
 
-            final List<T> consolidados = new ArrayList<>();
+            final List<T> consolidados = chunkConsumer == null ? new ArrayList<>() : new ArrayList<>(0);
             int paginasConsolidadas = 0;
+            int registrosConsolidados = 0;
             String motivoInterrupcaoConsolidado = null;
             boolean completo = true;
 
@@ -233,10 +262,14 @@ final class DataExportPaginator {
                     fimDia,
                     config,
                     false,
-                    filtrosExtras
+                    filtrosExtras,
+                    chunkConsumer
                 );
-                consolidados.addAll(resultadoDia.getDados());
+                if (chunkConsumer == null) {
+                    consolidados.addAll(resultadoDia.getDados());
+                }
                 paginasConsolidadas += resultadoDia.getPaginasProcessadas();
+                registrosConsolidados += resultadoDia.getRegistrosExtraidos();
 
                 if (!resultadoDia.isCompleto()) {
                     completo = false;
@@ -249,14 +282,14 @@ final class DataExportPaginator {
             }
 
             return completo
-                ? ResultadoExtracao.completo(consolidados, paginasConsolidadas, consolidados.size())
+                ? ResultadoExtracao.completo(consolidados, paginasConsolidadas, registrosConsolidados)
                 : ResultadoExtracao.incompleto(
                     consolidados,
                     motivoInterrupcaoConsolidado != null
                         ? motivoInterrupcaoConsolidado
                         : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
                     paginasConsolidadas,
-                    consolidados.size()
+                    registrosConsolidados
                 );
         }
 
@@ -265,7 +298,7 @@ final class DataExportPaginator {
         logger.info("Valor 'per': {}", valorPer);
         logger.info("Timeout: {} segundos", timeout.getSeconds());
 
-        final List<T> resultadosFinais = new ArrayList<>();
+        final List<T> resultadosFinais = chunkConsumer == null ? new ArrayList<>() : new ArrayList<>(0);
         int paginaAtual = 1;
         int totalPaginas = 0;
         int totalRegistrosProcessados = 0;
@@ -525,11 +558,16 @@ final class DataExportPaginator {
                     throw new RuntimeException("Erro ao parsear pagina " + paginaAtual, e);
                 }
 
-                logger.info("Pagina {}: {} registros parseados", paginaAtual, registrosPagina.size());
-                resultadosFinais.addAll(registrosPagina);
-                totalRegistrosProcessados += registrosPagina.size();
-                tamanhoUltimaPagina = registrosPagina.size();
-                maiorTamanhoPagina = Math.max(maiorTamanhoPagina, registrosPagina.size());
+                final int registrosRecebidosPagina = registrosPagina.size();
+                logger.info("Pagina {}: {} registros parseados", paginaAtual, registrosRecebidosPagina);
+                if (chunkConsumer == null) {
+                    resultadosFinais.addAll(registrosPagina);
+                } else {
+                    processarChunkPagina(tipoAmigavel, paginaAtual, registrosPagina, chunkConsumer);
+                }
+                totalRegistrosProcessados += registrosRecebidosPagina;
+                tamanhoUltimaPagina = registrosRecebidosPagina;
+                maiorTamanhoPagina = Math.max(maiorTamanhoPagina, registrosRecebidosPagina);
                 repetiuPaginaVaziaInesperada = false;
                 paginationSupport.resetarEstadoFalhasTemplate(chaveTemplate);
 
@@ -561,10 +599,39 @@ final class DataExportPaginator {
                     totalPaginas > 0 ? totalPaginas : (paginaAtual - 1),
                     totalRegistrosProcessados
                 );
+        } catch (final PageChunkProcessingException e) {
+            throw e;
         } catch (final RuntimeException e) {
             logger.error("ERRO CRITICO na extracao de {}: {}", tipoAmigavel, e.getMessage(), e);
             paginationSupport.incrementarContadorFalhas(chaveTemplate, tipoAmigavel);
             throw new RuntimeException("Falha na extracao de " + tipoAmigavel, e);
+        }
+    }
+
+    private <T> void processarChunkPagina(final String tipoAmigavel,
+                                          final int paginaAtual,
+                                          final List<T> registrosPagina,
+                                          final PageChunkConsumer<T> chunkConsumer) {
+        if (registrosPagina == null || registrosPagina.isEmpty()) {
+            return;
+        }
+        try {
+            chunkConsumer.process(registrosPagina);
+        } catch (final Exception e) {
+            throw new PageChunkProcessingException(
+                "Falha ao processar chunk DataExport de " + tipoAmigavel + " na pagina " + paginaAtual,
+                e
+            );
+        } finally {
+            limparReferenciasPagina(registrosPagina);
+        }
+    }
+
+    private void limparReferenciasPagina(final List<?> registrosPagina) {
+        try {
+            registrosPagina.clear();
+        } catch (final UnsupportedOperationException ignored) {
+            logger.debug("Lista de pagina DataExport imutavel; referencias serao liberadas pelo escopo local.");
         }
     }
 

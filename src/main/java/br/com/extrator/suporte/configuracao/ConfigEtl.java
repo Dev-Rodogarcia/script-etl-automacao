@@ -27,6 +27,7 @@ public final class ConfigEtl {
     private static final Logger logger = LoggerFactory.getLogger(ConfigEtl.class);
     private static final int FRETES_LOOKBACK_MAX_DIAS = 30;
     private static final String FRETES_LOOKBACK_MODO_NORMAL = "normal";
+    private static final String FRETES_LOOKBACK_MODO_MICRO_BATCH = "micro_batch";
     private static final String FRETES_LOOKBACK_MODO_RECONCILIACAO = "reconciliacao";
     private static final String FRETES_LOOKBACK_MODO_BACKFILL = "backfill";
     private static final String FRETES_LOOKBACK_MODO_INTERVALO = "intervalo";
@@ -251,6 +252,7 @@ public final class ConfigEtl {
 
     public static int obterFretesPerformanceLookbackDiasEfetivo() {
         return switch (obterFretesPerformanceLookbackModo()) {
+            case FRETES_LOOKBACK_MODO_MICRO_BATCH -> obterFretesPerformanceLookbackDiasMicroBatch();
             case FRETES_LOOKBACK_MODO_RECONCILIACAO -> obterFretesPerformanceLookbackDiasReconciliacao();
             case FRETES_LOOKBACK_MODO_BACKFILL -> obterFretesPerformanceLookbackDiasBackfill();
             case FRETES_LOOKBACK_MODO_INTERVALO -> obterFretesPerformanceLookbackDiasIntervalo();
@@ -269,6 +271,7 @@ public final class ConfigEtl {
         final String normalizado = valor.trim().toLowerCase(Locale.ROOT);
         return switch (normalizado) {
             case FRETES_LOOKBACK_MODO_NORMAL,
+                FRETES_LOOKBACK_MODO_MICRO_BATCH,
                 FRETES_LOOKBACK_MODO_RECONCILIACAO,
                 FRETES_LOOKBACK_MODO_BACKFILL,
                 FRETES_LOOKBACK_MODO_INTERVALO -> normalizado;
@@ -290,6 +293,17 @@ public final class ConfigEtl {
             ),
             0,
             "etl.fretes.performance.lookback.normal.dias"
+        );
+    }
+
+    public static int obterFretesPerformanceLookbackDiasMicroBatch() {
+        return obterFretesLookbackDias(
+            ConfigSource.obterConfiguracao(
+                "ETL_FRETES_PERFORMANCE_LOOKBACK_MICRO_BATCH_DIAS",
+                "etl.fretes.performance.lookback.micro_batch.dias"
+            ),
+            0,
+            "etl.fretes.performance.lookback.micro_batch.dias"
         );
     }
 

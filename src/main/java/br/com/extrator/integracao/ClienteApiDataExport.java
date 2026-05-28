@@ -194,6 +194,12 @@ public class ClienteApiDataExport {
     }
 
     public ResultadoExtracao<ManifestoDTO> buscarManifestos(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarManifestos(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<ManifestoDTO> buscarManifestos(final LocalDate dataInicio,
+                                                            final LocalDate dataFim,
+                                                            final PageChunkConsumer<ManifestoDTO> chunkConsumer) {
         logger.info("Buscando manifestos da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS);
         final String chaveTemplate = "Template-" + config.templateId();
@@ -214,7 +220,10 @@ public class ClienteApiDataExport {
                 new TypeReference<List<ManifestoDTO>>() {},
                 inicio,
                 fim,
-                configTentativa
+                configTentativa,
+                true,
+                Map.of(),
+                chunkConsumer
             ),
             paginationSupport::deveRetentarResultadoIncompleto,
             paginationSupport::selecionarMelhorResultadoParcial,
@@ -226,28 +235,49 @@ public class ClienteApiDataExport {
     }
 
     public ResultadoExtracao<CotacaoDTO> buscarCotacoes(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarCotacoes(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<CotacaoDTO> buscarCotacoes(final LocalDate dataInicio,
+                                                        final LocalDate dataFim,
+                                                        final PageChunkConsumer<CotacaoDTO> chunkConsumer) {
         logger.info("Buscando cotações da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.COTACOES);
         return buscarDadosDiretos(
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<CotacaoDTO>>() {}
+            new TypeReference<List<CotacaoDTO>>() {},
+            chunkConsumer
         );
     }
 
     public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarLocalizacaoCarga(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<LocalizacaoCargaDTO> buscarLocalizacaoCarga(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<LocalizacaoCargaDTO> chunkConsumer) {
         logger.info("Buscando localização de carga da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.LOCALIZACAO_CARGAS);
         return buscarDadosDiretos(
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<LocalizacaoCargaDTO>>() {}
+            new TypeReference<List<LocalizacaoCargaDTO>>() {},
+            chunkConsumer
         );
     }
 
     public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarContasAPagar(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<ContasAPagarDTO> buscarContasAPagar(final LocalDate dataInicio,
+                                                                 final LocalDate dataFim,
+                                                                 final PageChunkConsumer<ContasAPagarDTO> chunkConsumer) {
         logger.info("Buscando Faturas a Pagar da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.CONTAS_A_PAGAR);
         final List<ConfiguracaoEntidade> tentativas = retryConfigFactory.criarTentativasContasAPagar(config);
@@ -277,7 +307,8 @@ public class ClienteApiDataExport {
                     fimBusiness,
                     configTentativa,
                     false,
-                    filtrosExtras
+                    filtrosExtras,
+                    chunkConsumer
                 ),
                 paginationSupport::deveRetentarResultadoIncompleto,
                 paginationSupport::selecionarMelhorResultadoParcial,
@@ -289,44 +320,75 @@ public class ClienteApiDataExport {
             resultadosSegmentados.add(resultadoSegmento);
         }
 
-        return consolidarResultadosContasAPagar(resultadosSegmentados);
+        return chunkConsumer == null
+            ? consolidarResultadosContasAPagar(resultadosSegmentados)
+            : consolidarMetadadosContasAPagar(resultadosSegmentados);
     }
 
     public ResultadoExtracao<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarFaturasPorCliente(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO> buscarFaturasPorCliente(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO> chunkConsumer) {
         logger.info("Buscando Faturas por Cliente da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.FATURAS_POR_CLIENTE);
         return buscarDadosDiretos(
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO>>() {}
+            new TypeReference<List<br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO>>() {},
+            chunkConsumer
         );
     }
 
     public ResultadoExtracao<InventarioDTO> buscarInventario(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarInventario(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<InventarioDTO> buscarInventario(final LocalDate dataInicio,
+                                                             final LocalDate dataFim,
+                                                             final PageChunkConsumer<InventarioDTO> chunkConsumer) {
         logger.info("Buscando inventario da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.INVENTARIO);
         return buscarDadosDiretos(
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<InventarioDTO>>() {}
+            new TypeReference<List<InventarioDTO>>() {},
+            chunkConsumer
         );
     }
 
     public ResultadoExtracao<SinistroDTO> buscarSinistros(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarSinistros(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<SinistroDTO> buscarSinistros(final LocalDate dataInicio,
+                                                          final LocalDate dataFim,
+                                                          final PageChunkConsumer<SinistroDTO> chunkConsumer) {
         logger.info("Buscando sinistros da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.SINISTROS);
         return buscarDadosDiretos(
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<SinistroDTO>>() {}
+            new TypeReference<List<SinistroDTO>>() {},
+            chunkConsumer
         );
     }
 
     public ResultadoExtracao<FreteIndicadorDTO> buscarFretesIndicadores(final LocalDate dataInicio,
                                                                          final LocalDate dataFim) {
+        return buscarFretesIndicadores(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<FreteIndicadorDTO> buscarFretesIndicadores(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<FreteIndicadorDTO> chunkConsumer) {
         logger.info("Buscando fretes indicadores da API DataExport - Período: {} a {}", dataInicio, dataFim);
         final ConfiguracaoEntidade config = new ConfiguracaoEntidade(
             6389,
@@ -341,7 +403,8 @@ public class ClienteApiDataExport {
             dataInicio,
             dataFim,
             config,
-            new TypeReference<List<FreteIndicadorDTO>>() {}
+            new TypeReference<List<FreteIndicadorDTO>>() {},
+            chunkConsumer
         );
     }
 
@@ -428,6 +491,40 @@ public class ClienteApiDataExport {
             );
     }
 
+    static ResultadoExtracao<ContasAPagarDTO> consolidarMetadadosContasAPagar(
+        final List<ResultadoExtracao<ContasAPagarDTO>> resultadosSegmentados
+    ) {
+        if (resultadosSegmentados == null || resultadosSegmentados.isEmpty()) {
+            return ResultadoExtracao.completo(List.of(), 0, 0);
+        }
+
+        int paginasProcessadas = 0;
+        int registrosExtraidos = 0;
+        boolean completo = true;
+        String motivoInterrupcao = null;
+
+        for (final ResultadoExtracao<ContasAPagarDTO> resultado : resultadosSegmentados) {
+            if (resultado == null) {
+                continue;
+            }
+            paginasProcessadas += resultado.getPaginasProcessadas();
+            registrosExtraidos += resultado.getRegistrosExtraidos();
+            if (!resultado.isCompleto()) {
+                completo = false;
+                motivoInterrupcao = selecionarMotivoInterrupcao(motivoInterrupcao, resultado.getMotivoInterrupcao());
+            }
+        }
+
+        return completo
+            ? ResultadoExtracao.completo(List.of(), paginasProcessadas, registrosExtraidos)
+            : ResultadoExtracao.incompleto(
+                List.of(),
+                motivoInterrupcao != null ? motivoInterrupcao : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
+                paginasProcessadas,
+                registrosExtraidos
+            );
+    }
+
     static List<ContasAPagarDTO> consolidarContasAPagarPorSequenceCode(final List<ContasAPagarDTO> registros) {
         if (registros == null || registros.isEmpty()) {
             return List.of();
@@ -498,6 +595,14 @@ public class ClienteApiDataExport {
                                                         final LocalDate dataFim,
                                                         final ConfiguracaoEntidade config,
                                                         final TypeReference<List<T>> typeReference) {
+        return buscarDadosDiretos(dataInicio, dataFim, config, typeReference, null);
+    }
+
+    private <T> ResultadoExtracao<T> buscarDadosDiretos(final LocalDate dataInicio,
+                                                        final LocalDate dataFim,
+                                                        final ConfiguracaoEntidade config,
+                                                        final TypeReference<List<T>> typeReference,
+                                                        final PageChunkConsumer<T> chunkConsumer) {
         final Instant inicio = timeWindowSupport.inicioDoDia(dataInicio);
         final Instant fim = timeWindowSupport.fimDoDia(dataFim);
         return paginator.buscarDadosGenericos(
@@ -508,7 +613,10 @@ public class ClienteApiDataExport {
             typeReference,
             inicio,
             fim,
-            config
+            config,
+            true,
+            Map.of(),
+            chunkConsumer
         );
     }
 

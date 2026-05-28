@@ -56,6 +56,7 @@ class RecoveryUseCaseTest {
         useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true);
 
         assertEquals(1, extracao.execucoes.get());
+        assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL, extracao.requestCapturada.modoExecucao());
         assertEquals(1, gate.completedCalls.get());
         assertEquals(0, gate.failedCalls.get());
     }
@@ -104,10 +105,12 @@ class RecoveryUseCaseTest {
 
     private static final class FakeExtracaoPorIntervaloUseCase extends ExtracaoPorIntervaloUseCase {
         private final AtomicInteger execucoes = new AtomicInteger();
+        private ExtracaoPorIntervaloRequest requestCapturada;
         private boolean throwOnExecute;
 
         @Override
         public void executar(final ExtracaoPorIntervaloRequest request) {
+            this.requestCapturada = request;
             execucoes.incrementAndGet();
             if (throwOnExecute) {
                 throw new IllegalStateException("falha simulada");

@@ -80,12 +80,10 @@ final class LoopReconciliationStateStore {
 
         final String pendencias = properties.getProperty(KEY_PENDING_DATES, "");
         if (!pendencias.isBlank()) {
-            for (final String token : pendencias.split(",")) {
-                final LocalDate data = parseDate(token);
-                if (data != null) {
-                    estado.pendingTargets.add(new ReconciliationTarget(data, null, null));
-                }
-            }
+            logger.warn(
+                "Pendencias legadas de reconciliacao por data foram ignoradas por nao informarem api/entidade: {}",
+                pendencias
+            );
         }
 
         return estado;

@@ -30,12 +30,14 @@ class FreteExtractorTest {
         System.clearProperty("ETL_FRETES_PRUNE_AUSENTES");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_MODO");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_NORMAL_DIAS");
+        System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_MICRO_BATCH_DIAS");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_RECONCILIACAO_DIAS");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_BACKFILL_DIAS");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_INTERVALO_DIAS");
         System.clearProperty("ETL_FRETES_PERFORMANCE_LOOKBACK_DIAS");
         System.clearProperty("etl.fretes.performance.lookback.modo");
         System.clearProperty("etl.fretes.performance.lookback.normal.dias");
+        System.clearProperty("etl.fretes.performance.lookback.micro_batch.dias");
         System.clearProperty("etl.fretes.performance.lookback.reconciliacao.dias");
         System.clearProperty("etl.fretes.performance.lookback.backfill.dias");
         System.clearProperty("etl.fretes.performance.lookback.intervalo.dias");
@@ -46,6 +48,17 @@ class FreteExtractorTest {
     @Test
     void fluxoNormalNaoDeveExpandirJanelaMesmoComChaveLegadaConfigurada() {
         System.setProperty("etl.fretes.performance.lookback.modo", "normal");
+        System.setProperty("etl.fretes.performance.lookback.dias", "30");
+
+        assertEquals(
+            LocalDate.of(2026, 3, 1),
+            FreteExtractor.calcularDataInicioConsulta(LocalDate.of(2026, 3, 1))
+        );
+    }
+
+    @Test
+    void microBatchNaoDeveExpandirJanelaMesmoComChaveLegadaConfigurada() {
+        System.setProperty("etl.fretes.performance.lookback.modo", "micro_batch");
         System.setProperty("etl.fretes.performance.lookback.dias", "30");
 
         assertEquals(

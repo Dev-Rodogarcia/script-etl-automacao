@@ -42,12 +42,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.LocalizacaoCargaEntity;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.persistencia.repositorio.LocalizacaoCargaRepository;
 import br.com.extrator.dominio.dataexport.localizacaocarga.LocalizacaoCargaDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.localizacaocarga.LocalizacaoCargaMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
@@ -59,7 +61,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Localização de Cargas (DataExport).
  * Inclui deduplicação antes de salvar.
  */
-public class LocalizacaoCargaExtractor implements DataExportEntityExtractor<LocalizacaoCargaDTO> {
+public class LocalizacaoCargaExtractor implements DataExportEntityExtractor<LocalizacaoCargaDTO>, ChunkedEntityExtractor<LocalizacaoCargaDTO> {
     
     private final ClienteApiDataExport apiClient;
     private final LocalizacaoCargaRepository repository;
@@ -86,6 +88,18 @@ public class LocalizacaoCargaExtractor implements DataExportEntityExtractor<Loca
             return apiClient.buscarLocalizacaoCarga(dataInicio, fim);
         }
         return apiClient.buscarLocalizacaoCarga();
+    }
+
+    @Override
+    public ResultadoExtracao<LocalizacaoCargaDTO> extractInChunks(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<LocalizacaoCargaDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarLocalizacaoCarga(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
     
     @Override

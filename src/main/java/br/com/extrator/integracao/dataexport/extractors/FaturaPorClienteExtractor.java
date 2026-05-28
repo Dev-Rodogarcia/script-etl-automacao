@@ -45,12 +45,14 @@ import java.util.List;
 import java.util.Map;
 
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.FaturaPorClienteEntity;
 import br.com.extrator.persistencia.repositorio.FaturaPorClienteRepository;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
@@ -62,7 +64,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade faturas_por_cliente (DataExport).
  * Inclui deduplicacao antes de salvar.
  */
-public class FaturaPorClienteExtractor implements DataExportEntityExtractor<FaturaPorClienteDTO> {
+public class FaturaPorClienteExtractor implements DataExportEntityExtractor<FaturaPorClienteDTO>, ChunkedEntityExtractor<FaturaPorClienteDTO> {
 
     private final ClienteApiDataExport apiClient;
     private final FaturaPorClienteRepository repository;
@@ -89,6 +91,18 @@ public class FaturaPorClienteExtractor implements DataExportEntityExtractor<Fatu
             return apiClient.buscarFaturasPorCliente(dataInicio, fim);
         }
         return apiClient.buscarFaturasPorCliente();
+    }
+
+    @Override
+    public ResultadoExtracao<FaturaPorClienteDTO> extractInChunks(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<FaturaPorClienteDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarFaturasPorCliente(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
 
     @Override

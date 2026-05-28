@@ -34,12 +34,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -141,6 +143,20 @@ class ExtractionLoggerTest {
         assertFalse(result.isSucesso());
     }
 
+    @Test
+    void deveClassificarChunkedCompletoSemMaterializarDtos() {
+        final ExtractionLogger logger = new ExtractionLogger(ExtractionLoggerTest.class);
+        final DummyChunkedExtractor extractor = new DummyChunkedExtractor();
+
+        final ExtractionResult result =
+            logger.executeWithLogging(extractor, LocalDate.of(2026, 2, 1), LocalDate.of(2026, 2, 1), "");
+
+        assertEquals(ConstantesEntidades.STATUS_COMPLETO, result.getStatus());
+        assertEquals(500, result.getRegistrosExtraidos());
+        assertEquals(500, result.getRegistrosSalvos());
+        assertTrue(result.isSucesso());
+    }
+
     private ExtractionResult executar(final ResultadoExtracao<String> resultadoExtracao,
                                       final DataExportEntityExtractor.SaveResult saveResult) {
         return executar(resultadoExtracao, saveResult, false);
@@ -229,6 +245,40 @@ class ExtractionLoggerTest {
         @Override
         public String getEmoji() {
             return "";
+        }
+    }
+
+    private static final class DummyChunkedExtractor implements ChunkedEntityExtractor<String> {
+        @Override
+        public ResultadoExtracao<String> extract(final LocalDate dataInicio, final LocalDate dataFim) {
+            return ResultadoExtracao.completo(List.of("nao_usado"), 1, 1);
+        }
+
+        @Override
+        public ResultadoExtracao<String> extractInChunks(final LocalDate dataInicio,
+                                                         final LocalDate dataFim,
+                                                         final PageChunkConsumer<String> chunkConsumer) {
+            return ResultadoExtracao.completo(List.of(), 5, 500);
+        }
+
+        @Override
+        public ChunkedExtractionOutcome<String> extractAndSaveWithMetrics(final LocalDate dataInicio,
+                                                                          final LocalDate dataFim) {
+            return new ChunkedExtractionOutcome<>(
+                ResultadoExtracao.completo(List.of(), 5, 500),
+                new SaveMetrics(500, 500, 0),
+                Duration.ofMillis(12)
+            );
+        }
+
+        @Override
+        public int save(final List<String> dtos) {
+            return 0;
+        }
+
+        @Override
+        public String getEntityName() {
+            return "entidade_chunked";
         }
     }
 }

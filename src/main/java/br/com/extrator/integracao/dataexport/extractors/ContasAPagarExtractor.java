@@ -42,12 +42,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.ContasAPagarDataExportEntity;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.persistencia.repositorio.ContasAPagarRepository;
 import br.com.extrator.dominio.dataexport.contasapagar.ContasAPagarDTO;
 import br.com.extrator.integracao.mapeamento.dataexport.contasapagar.ContasAPagarMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
@@ -59,7 +61,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Extractor para entidade Contas a Pagar (DataExport).
  * Inclui deduplicação antes de salvar.
  */
-public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAPagarDTO> {
+public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAPagarDTO>, ChunkedEntityExtractor<ContasAPagarDTO> {
     
     private final ClienteApiDataExport apiClient;
     private final ContasAPagarRepository repository;
@@ -86,6 +88,17 @@ public class ContasAPagarExtractor implements DataExportEntityExtractor<ContasAP
             return apiClient.buscarContasAPagar(dataInicio, fim);
         }
         return apiClient.buscarContasAPagar();
+    }
+
+    @Override
+    public ResultadoExtracao<ContasAPagarDTO> extractInChunks(final LocalDate dataInicio,
+                                                              final LocalDate dataFim,
+                                                              final PageChunkConsumer<ContasAPagarDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = (dataFim != null) ? dataFim : dataInicio;
+            return apiClient.buscarContasAPagar(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
     
     @Override

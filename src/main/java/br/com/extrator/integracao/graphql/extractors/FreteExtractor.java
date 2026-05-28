@@ -37,14 +37,17 @@ Atributos-chave:
 package br.com.extrator.integracao.graphql.extractors;
 
 import java.time.LocalDate;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -53,7 +56,10 @@ import org.slf4j.LoggerFactory;
 import br.com.extrator.dominio.dataexport.fretes.FreteIndicadorDTO;
 import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.integracao.ClienteApiGraphQL;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
+import br.com.extrator.integracao.comum.ChunkedExtractionOutcome;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
@@ -69,7 +75,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * 
  * @since 2.3.2 - Adicionada deduplicação preventiva por ID
  */
-public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
+public class FreteExtractor implements EntityExtractor<FreteNodeDTO>, ChunkedEntityExtractor<FreteNodeDTO> {
     private static final Logger logger = LoggerFactory.getLogger(FreteExtractor.class);
     private static final int MAX_DIAS_POR_REQUISICAO = 30;
     private static final DateTimeFormatter[] FORMATOS_BR_DATA_HORA = {
@@ -87,10 +93,20 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
         ResultadoExtracao<FreteNodeDTO> buscar(LocalDate dataInicio, LocalDate dataFim);
     }
 
+    @FunctionalInterface
+    interface FreteStreamingApiProvider {
+        ResultadoExtracao<FreteNodeDTO> buscar(
+            LocalDate dataInicio,
+            LocalDate dataFim,
+            PageChunkConsumer<FreteNodeDTO> chunkConsumer
+        );
+    }
+
     record PeriodoConsulta(LocalDate dataInicio, LocalDate dataFim) {
     }
 
     private final FreteApiProvider freteApiProvider;
+    private final FreteStreamingApiProvider freteStreamingApiProvider;
     private final FreteIndicadoresProvider freteIndicadoresProvider;
     private final FreteRepository repository;
     private final FreteMapper mapper;
@@ -108,7 +124,14 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                           final FreteRepository repository,
                           final FreteMapper mapper,
                           final FreteIndicadoresProvider freteIndicadoresProvider) {
-        this(apiClient == null ? null : apiClient::buscarFretes, repository, mapper, freteIndicadoresProvider, true);
+        this(
+            apiClient == null ? null : apiClient::buscarFretes,
+            apiClient == null ? null : apiClient::buscarFretes,
+            repository,
+            mapper,
+            freteIndicadoresProvider,
+            true
+        );
     }
 
     FreteExtractor(final FreteApiProvider freteApiProvider,
@@ -116,7 +139,17 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                    final FreteMapper mapper,
                    final FreteIndicadoresProvider freteIndicadoresProvider,
                    final boolean usarProviderDireto) {
+        this(freteApiProvider, null, repository, mapper, freteIndicadoresProvider, usarProviderDireto);
+    }
+
+    private FreteExtractor(final FreteApiProvider freteApiProvider,
+                           final FreteStreamingApiProvider freteStreamingApiProvider,
+                           final FreteRepository repository,
+                           final FreteMapper mapper,
+                           final FreteIndicadoresProvider freteIndicadoresProvider,
+                           final boolean usarProviderDireto) {
         this.freteApiProvider = freteApiProvider;
+        this.freteStreamingApiProvider = freteStreamingApiProvider;
         this.freteIndicadoresProvider = freteIndicadoresProvider;
         this.repository = repository;
         this.mapper = mapper;
@@ -137,6 +170,57 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
         final ResultadoExtracao<FreteNodeDTO> resultado = buscarFretesComLimiteDeJanela(dataInicioConsulta, dataFim);
         registrarUltimaExtracao(dataInicioConsulta, dataFim, resultado != null && resultado.isCompleto());
         return resultado;
+    }
+
+    @Override
+    public ResultadoExtracao<FreteNodeDTO> extractInChunks(final LocalDate dataInicio,
+                                                           final LocalDate dataFim,
+                                                           final PageChunkConsumer<FreteNodeDTO> chunkConsumer) {
+        final LocalDate dataInicioConsulta = calcularDataInicioConsulta(dataInicio);
+        if (dataInicioConsulta != null && !dataInicioConsulta.equals(dataInicio)) {
+            logger.info(
+                "Expandindo janela de fretes para Performance: {} a {} consultado como {} a {}",
+                dataInicio,
+                dataFim,
+                dataInicioConsulta,
+                dataFim
+            );
+        }
+        return buscarFretesComLimiteDeJanela(dataInicioConsulta, dataFim, chunkConsumer);
+    }
+
+    @Override
+    public ChunkedExtractionOutcome<FreteNodeDTO> extractAndSaveWithMetrics(final LocalDate dataInicio,
+                                                                            final LocalDate dataFim) throws Exception {
+        if (freteStreamingApiProvider == null) {
+            final ResultadoExtracao<FreteNodeDTO> resultado = extract(dataInicio, dataFim);
+            final long inicioSalvamento = System.nanoTime();
+            final EntityExtractor.SaveMetrics metrics = saveWithMetrics(resultado.getDados());
+            return new ChunkedExtractionOutcome<>(
+                resultado,
+                metrics,
+                Duration.ofNanos(System.nanoTime() - inicioSalvamento)
+            );
+        }
+
+        final LocalDate dataInicioConsulta = calcularDataInicioConsulta(dataInicio);
+        registrarUltimaExtracao(dataInicioConsulta, dataFim, false);
+        final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta = carregarIndicadoresDataExportParaJanela();
+        final FreteChunkAccumulator accumulator = new FreteChunkAccumulator(indicadoresPorMinuta);
+        final ResultadoExtracao<FreteNodeDTO> resultado = extractInChunks(
+            dataInicio,
+            dataFim,
+            accumulator::processar
+        );
+        registrarUltimaExtracao(dataInicioConsulta, dataFim, resultado != null && resultado.isCompleto());
+        if (devePrunarAusentesNoPeriodo()) {
+            accumulator.prunarAusentesNoPeriodo();
+        }
+        return new ChunkedExtractionOutcome<>(
+            resultado,
+            accumulator.toSaveMetrics(),
+            accumulator.getDuracaoSalvamento()
+        );
     }
     
     @Override
@@ -262,14 +346,26 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
 
     private ResultadoExtracao<FreteNodeDTO> buscarFretesComLimiteDeJanela(final LocalDate dataInicio,
                                                                           final LocalDate dataFim) {
+        return buscarFretesComLimiteDeJanela(dataInicio, dataFim, null);
+    }
+
+    private ResultadoExtracao<FreteNodeDTO> buscarFretesComLimiteDeJanela(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<FreteNodeDTO> chunkConsumer) {
         if (freteApiProvider == null) {
             throw new IllegalStateException("Cliente GraphQL de fretes nao configurado.");
+        }
+        if (chunkConsumer != null && freteStreamingApiProvider == null) {
+            throw new IllegalStateException("Cliente GraphQL de fretes nao configurado para streaming.");
         }
 
         final List<PeriodoConsulta> blocos = dividirJanelaEmBlocos(dataInicio, dataFim);
         if (blocos.size() == 1) {
             final PeriodoConsulta periodo = blocos.get(0);
-            return freteApiProvider.buscar(periodo.dataInicio(), periodo.dataFim());
+            return chunkConsumer == null
+                ? freteApiProvider.buscar(periodo.dataInicio(), periodo.dataFim())
+                : freteStreamingApiProvider.buscar(periodo.dataInicio(), periodo.dataFim(), chunkConsumer);
         }
 
         logger.info(
@@ -280,7 +376,7 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             dataFim
         );
 
-        final List<FreteNodeDTO> dados = new ArrayList<>();
+        final List<FreteNodeDTO> dados = chunkConsumer == null ? new ArrayList<>() : new ArrayList<>(0);
         int paginasProcessadas = 0;
         int registrosExtraidos = 0;
         boolean completo = true;
@@ -292,8 +388,9 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                 bloco.dataInicio(),
                 bloco.dataFim()
             );
-            final ResultadoExtracao<FreteNodeDTO> resultadoBloco =
-                freteApiProvider.buscar(bloco.dataInicio(), bloco.dataFim());
+            final ResultadoExtracao<FreteNodeDTO> resultadoBloco = chunkConsumer == null
+                ? freteApiProvider.buscar(bloco.dataInicio(), bloco.dataFim())
+                : freteStreamingApiProvider.buscar(bloco.dataInicio(), bloco.dataFim(), chunkConsumer);
             if (resultadoBloco == null) {
                 completo = false;
                 motivoInterrupcao = selecionarMotivoInterrupcao(
@@ -302,7 +399,9 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                 );
                 continue;
             }
-            dados.addAll(resultadoBloco.getDados());
+            if (chunkConsumer == null) {
+                dados.addAll(resultadoBloco.getDados());
+            }
             paginasProcessadas += resultadoBloco.getPaginasProcessadas();
             registrosExtraidos += resultadoBloco.getRegistrosExtraidos();
             if (!resultadoBloco.isCompleto()) {
@@ -364,6 +463,15 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             return;
         }
 
+        final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta = carregarIndicadoresDataExportParaJanela();
+        aplicarIndicadoresDataExport(entities, indicadoresPorMinuta);
+    }
+
+    private Map<Long, FreteIndicadorDTO> carregarIndicadoresDataExportParaJanela() {
+        if (freteIndicadoresProvider == null || ultimaDataInicio == null || ultimaDataFim == null) {
+            return Map.of();
+        }
+
         final ResultadoExtracao<FreteIndicadorDTO> resultadoIndicadores;
         try {
             resultadoIndicadores = freteIndicadoresProvider.buscar(ultimaDataInicio, ultimaDataFim);
@@ -374,7 +482,7 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                 ultimaDataFim,
                 e.getMessage()
             );
-            return;
+            return Map.of();
         }
 
         if (resultadoIndicadores == null
@@ -385,10 +493,28 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
                 ultimaDataInicio,
                 ultimaDataFim
             );
+            return Map.of();
+        }
+
+        if (!resultadoIndicadores.isCompleto()) {
+            logger.warn(
+                "Enriquecimento de fretes via Data Export 6389 retornou parcialmente para {} a {} | motivo={} | paginas={}",
+                ultimaDataInicio,
+                ultimaDataFim,
+                resultadoIndicadores.getMotivoInterrupcao(),
+                resultadoIndicadores.getPaginasProcessadas()
+            );
+        }
+
+        return indexarIndicadores(resultadoIndicadores.getDados());
+    }
+
+    private void aplicarIndicadoresDataExport(final List<FreteEntity> entities,
+                                              final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta) {
+        if (entities == null || entities.isEmpty() || indicadoresPorMinuta == null || indicadoresPorMinuta.isEmpty()) {
             return;
         }
 
-        final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta = indexarIndicadores(resultadoIndicadores.getDados());
         int totalEnriquecidos = 0;
         int totalPerformanceOficial = 0;
         int totalFinishedAtFallback = 0;
@@ -423,16 +549,6 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
             if (alterado) {
                 totalEnriquecidos++;
             }
-        }
-
-        if (!resultadoIndicadores.isCompleto()) {
-            logger.warn(
-                "Enriquecimento de fretes via Data Export 6389 retornou parcialmente para {} a {} | motivo={} | paginas={}",
-                ultimaDataInicio,
-                ultimaDataFim,
-                resultadoIndicadores.getMotivoInterrupcao(),
-                resultadoIndicadores.getPaginasProcessadas()
-            );
         }
 
         logger.info(
@@ -470,6 +586,80 @@ public class FreteExtractor implements EntityExtractor<FreteNodeDTO> {
         final boolean atualTemFinishedAt = atual.getFinishedAt() != null && !atual.getFinishedAt().isBlank();
         final boolean candidatoTemFinishedAt = candidato.getFinishedAt() != null && !candidato.getFinishedAt().isBlank();
         return candidatoTemFinishedAt && !atualTemFinishedAt;
+    }
+
+    private final class FreteChunkAccumulator {
+        private final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta;
+        private final Set<Long> idsPresentes = new LinkedHashSet<>();
+        private int registrosSalvos;
+        private int totalUnicos;
+        private int registrosPersistidos;
+        private int registrosNoOpIdempotente;
+        private long nanosSalvamento;
+
+        private FreteChunkAccumulator(final Map<Long, FreteIndicadorDTO> indicadoresPorMinuta) {
+            this.indicadoresPorMinuta = indicadoresPorMinuta == null ? Map.of() : indicadoresPorMinuta;
+        }
+
+        private void processar(final List<FreteNodeDTO> dtos) throws java.sql.SQLException {
+            if (dtos == null || dtos.isEmpty()) {
+                return;
+            }
+
+            final long inicio = System.nanoTime();
+            final List<FreteEntity> entities = dtos.stream()
+                .map(mapper::toEntity)
+                .collect(Collectors.toList());
+            final List<FreteEntity> entitiesUnicos = deduplicarPorId(entities);
+
+            if (entities.size() != entitiesUnicos.size()) {
+                logger.warn("⚠️ Duplicados removidos na API GraphQL (Fretes): {} duplicados",
+                    entities.size() - entitiesUnicos.size());
+            }
+
+            aplicarIndicadoresDataExport(entitiesUnicos, indicadoresPorMinuta);
+            entitiesUnicos.stream()
+                .map(FreteEntity::getId)
+                .filter(Objects::nonNull)
+                .forEach(idsPresentes::add);
+
+            final int salvos = repository.salvar(entitiesUnicos);
+            nanosSalvamento += System.nanoTime() - inicio;
+            registrosSalvos += salvos;
+            totalUnicos += entitiesUnicos.size();
+            registrosPersistidos += repository.getUltimoResumoSalvamento().getRegistrosPersistidos();
+            registrosNoOpIdempotente += repository.getUltimoResumoSalvamento().getRegistrosNoOpIdempotente();
+        }
+
+        private void prunarAusentesNoPeriodo() throws java.sql.SQLException {
+            final int removidos = repository.removerAusentesNoPeriodo(
+                ultimaDataInicio,
+                ultimaDataFim,
+                idsPresentes
+            );
+            if (removidos > 0) {
+                logger.warn(
+                    "Reconciliacao por periodo removeu {} frete(s) ausente(s) na API para {} a {}",
+                    removidos,
+                    ultimaDataInicio,
+                    ultimaDataFim
+                );
+            }
+        }
+
+        private EntityExtractor.SaveMetrics toSaveMetrics() {
+            return new EntityExtractor.SaveMetrics(
+                registrosSalvos,
+                totalUnicos,
+                0,
+                registrosPersistidos,
+                registrosNoOpIdempotente
+            );
+        }
+
+        private Duration getDuracaoSalvamento() {
+            return Duration.ofNanos(nanosSalvamento);
+        }
     }
 
     private OffsetDateTime parsePerformanceFinishedAt(final String valorBruto, final FreteEntity entity) {

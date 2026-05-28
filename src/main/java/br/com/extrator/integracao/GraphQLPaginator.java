@@ -66,6 +66,15 @@ final class GraphQLPaginator {
                                                    final String nomeEntidade,
                                                    final Map<String, Object> variaveis,
                                                    final Class<T> tipoClasse) {
+        return executarQueryPaginada(executionUuid, query, nomeEntidade, variaveis, tipoClasse, null);
+    }
+
+    <T> ResultadoExtracao<T> executarQueryPaginada(final String executionUuid,
+                                                   final String query,
+                                                   final String nomeEntidade,
+                                                   final Map<String, Object> variaveis,
+                                                   final Class<T> tipoClasse,
+                                                   final PageChunkConsumer<T> chunkConsumer) {
         final String chaveEntidade = "GraphQL-" + nomeEntidade;
         if (isCircuitBreakerAtivo(chaveEntidade)) {
             logger.warn("Circuit breaker ativo para entidade {}", nomeEntidade);
@@ -79,7 +88,7 @@ final class GraphQLPaginator {
 
         logger.info("Executando query GraphQL paginada para entidade: {}", nomeEntidade);
 
-        final List<T> todasEntidades = new ArrayList<>();
+        final List<T> todasEntidades = chunkConsumer == null ? new ArrayList<>() : new ArrayList<>(0);
         String cursor = null;
         boolean hasNextPage = true;
         int paginaAtual = 1;
@@ -225,10 +234,6 @@ final class GraphQLPaginator {
                     resposta.getHasNextPage()
                 );
 
-                todasEntidades.addAll(resposta.getEntidades());
-                totalRegistrosProcessados += resposta.getEntidades().size();
-                paginasProcessadas++;
-
                 if (auditar && executionUuid != null && runUuid != null) {
                     pageAuditLogger.registrarPagina(
                         executionUuid,
@@ -242,11 +247,21 @@ final class GraphQLPaginator {
                     );
                 }
 
+                if (chunkConsumer == null) {
+                    todasEntidades.addAll(resposta.getEntidades());
+                } else {
+                    processarChunkPagina(nomeEntidade, paginaAtual, resposta.getEntidades(), chunkConsumer);
+                }
+                totalRegistrosProcessados += registrosRecebidos;
+                paginasProcessadas++;
+
                 resetarEstadoFalhas(chaveEntidade);
 
                 hasNextPage = resposta.getHasNextPage();
                 cursor = novoCursor;
                 paginaAtual++;
+            } catch (final PageChunkProcessingException e) {
+                throw e;
             } catch (final RuntimeException e) {
                 logger.error(
                     "Erro ao executar query GraphQL para entidade {} pagina {}: {}",
@@ -319,6 +334,33 @@ final class GraphQLPaginator {
         }
 
         return null;
+    }
+
+    private <T> void processarChunkPagina(final String nomeEntidade,
+                                          final int paginaAtual,
+                                          final List<T> registrosPagina,
+                                          final PageChunkConsumer<T> chunkConsumer) {
+        if (registrosPagina == null || registrosPagina.isEmpty()) {
+            return;
+        }
+        try {
+            chunkConsumer.process(registrosPagina);
+        } catch (final Exception e) {
+            throw new PageChunkProcessingException(
+                "Falha ao processar chunk GraphQL de " + nomeEntidade + " na pagina " + paginaAtual,
+                e
+            );
+        } finally {
+            limparReferenciasPagina(registrosPagina);
+        }
+    }
+
+    private void limparReferenciasPagina(final List<?> registrosPagina) {
+        try {
+            registrosPagina.clear();
+        } catch (final UnsupportedOperationException ignored) {
+            logger.debug("Lista de pagina GraphQL imutavel; referencias serao liberadas pelo escopo local.");
+        }
     }
 
     private void aguardarRetentativaAnomalia() {

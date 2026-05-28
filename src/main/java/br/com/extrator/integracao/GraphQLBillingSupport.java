@@ -54,16 +54,31 @@ final class GraphQLBillingSupport {
     ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(final String executionUuid,
                                                                       final LocalDate dataInicio,
                                                                       final LocalDate dataFim) {
+        return buscarCapaFaturas(executionUuid, dataInicio, dataFim, null);
+    }
+
+    ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(
+                                                                      final String executionUuid,
+                                                                      final LocalDate dataInicio,
+                                                                      final LocalDate dataFim,
+                                                                      final PageChunkConsumer<CreditCustomerBillingNodeDTO> chunkConsumer) {
         return GraphQLIntervaloHelper.executarPorDia(
             dataInicio,
             dataFim,
-            data -> buscarCapaFaturasDia(executionUuid, data),
+            data -> buscarCapaFaturasDia(executionUuid, data, chunkConsumer),
             "Capa Faturas"
         );
     }
 
     private ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturasDia(final String executionUuid,
                                                                                   final LocalDate data) {
+        return buscarCapaFaturasDia(executionUuid, data, null);
+    }
+
+    private ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturasDia(
+                                                                                  final String executionUuid,
+                                                                                  final LocalDate data,
+                                                                                  final PageChunkConsumer<CreditCustomerBillingNodeDTO> chunkConsumer) {
         final Set<String> camposDisponiveis = schemaInspector.listarCamposInput(
             GraphQLQueries.INTROSPECTION_CREDIT_CUSTOMER_BILLING,
             "GraphQL-Introspection",
@@ -80,7 +95,8 @@ final class GraphQLBillingSupport {
                 GraphQLQueries.QUERY_FATURAS,
                 ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FATURAS_GRAPHQL),
                 variaveis,
-                CreditCustomerBillingNodeDTO.class
+                CreditCustomerBillingNodeDTO.class,
+                chunkConsumer
             );
 
             ultimoResultado = resultado;

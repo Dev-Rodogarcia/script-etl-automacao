@@ -92,6 +92,42 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Coordena a execução de todas as entidades DataExport com logs detalhados e resumos consolidados.
  */
 public class DataExportExtractionService {
+    public enum ExecutionStatus {
+        SUCCESS,
+        PARTIAL_SUCCESS
+    }
+
+    public record ExecutionSummary(
+        ExecutionStatus status,
+        List<ExtractionResult> resultados,
+        List<String> entidadesComFalha
+    ) {
+        public static ExecutionSummary success(final List<ExtractionResult> resultados) {
+            return new ExecutionSummary(ExecutionStatus.SUCCESS, copiarResultados(resultados), List.of());
+        }
+
+        public static ExecutionSummary partialSuccess(final List<ExtractionResult> resultados,
+                                                      final List<String> entidadesComFalha) {
+            return new ExecutionSummary(
+                ExecutionStatus.PARTIAL_SUCCESS,
+                copiarResultados(resultados),
+                entidadesComFalha == null ? List.of() : List.copyOf(entidadesComFalha)
+            );
+        }
+
+        private static List<ExtractionResult> copiarResultados(final List<ExtractionResult> resultados) {
+            return resultados == null ? List.of() : List.copyOf(resultados);
+        }
+
+        public boolean isPartialSuccess() {
+            return status == ExecutionStatus.PARTIAL_SUCCESS;
+        }
+
+        public int totalEntidades() {
+            return resultados == null ? 0 : resultados.size();
+        }
+    }
+
     @FunctionalInterface
     private interface TimedExtractionSupplier {
         ExtractionResult executar() throws Exception;
@@ -133,11 +169,12 @@ public class DataExportExtractionService {
      * @param entidade Nome da entidade específica (null = todas)
      * @throws RuntimeException Se houver falha crítica na extração
      */
-    public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
+    public ExecutionSummary execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
         resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
-        boolean houveFalhaExecucao = false;
+        ExecutionSummary resumoExecucao = ExecutionSummary.success(resultados);
+        boolean houveFalhaTerminal = false;
         RuntimeException erroTerminal = null;
         
         log.info("");
@@ -328,27 +365,26 @@ public class DataExportExtractionService {
             // Resumo consolidado final
             exibirResumoConsolidado(resultados, inicioExecucao);
 
-            // Se alguma entidade falhou, propagar falha para o comando não marcar extração como sucesso
             final boolean modoEstrito = ConfigEtl.isModoIntegridadeEstrito();
-            final List<String> entidadesComFalha = resultados.stream()
-                .filter(r -> deveFalharExecucaoFinal(r, modoEstrito))
-                .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
-                .toList();
-            houveFalhaExecucao = !entidadesComFalha.isEmpty();
-            if (houveFalhaExecucao) {
-                erroTerminal = new RuntimeException("Extração DataExport com falhas: " + String.join(", ", entidadesComFalha)
-                    + ". Verifique os logs. A extração NÃO deve ser considerada concluída com sucesso.");
+            resumoExecucao = criarResumoExecucao(resultados, modoEstrito);
+            if (resumoExecucao.isPartialSuccess()) {
+                log.warn(
+                    "[DEGRADED] DATAEXPORT PARTIAL_SUCCESS | entidades_processadas={} | entidades_degradadas={}",
+                    resumoExecucao.totalEntidades(),
+                    String.join(", ", resumoExecucao.entidadesComFalha())
+                );
             }
         } catch (final RuntimeException e) {
-            houveFalhaExecucao = true;
+            houveFalhaTerminal = true;
             erroTerminal = e;
         } finally {
-            finalizarPersistenciaResultadosPendentes(houveFalhaExecucao);
+            finalizarPersistenciaResultadosPendentes(houveFalhaTerminal);
         }
 
         if (erroTerminal != null) {
             throw erroTerminal;
         }
+        return resumoExecucao;
     }
 
     protected void registrarResultadoExecucao(final ExtractionResult result) {
@@ -571,8 +607,8 @@ public class DataExportExtractionService {
         log.info("");
     }
 
-    public void executar(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
-        execute(dataInicio, dataFim, entidade);
+    public ExecutionSummary executar(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
+        return execute(dataInicio, dataFim, entidade);
     }
 
     private ExtractionResult executarComTimeout(final String entidade,
@@ -598,15 +634,20 @@ public class DataExportExtractionService {
         if (erro instanceof ExecutionTimeoutException) {
             final long timeoutMs = ConfigEtl.obterTimeoutEntidadeDataExport(entidade).toMillis();
             final String aviso = String.format(
-                "Timeout na entidade %s apos %d ms. A execucao seguiu para a proxima entidade.",
+                "DEGRADED: timeout na entidade %s apos %d ms. A execucao seguiu para a proxima entidade.",
                 entidade,
                 timeoutMs
             );
             ExtractionHelper.appendAvisoSeguranca(aviso);
-            log.error("[TIMEOUT] {}", aviso, erro);
+            log.error("[DEGRADED][TIMEOUT] {}", aviso, erro);
         } else {
+            final String aviso = String.format(
+                "DEGRADED: erro isolado na entidade %s. A execucao seguiu para a proxima entidade.",
+                entidade
+            );
+            ExtractionHelper.appendAvisoSeguranca(aviso);
             log.error(
-                "[ERRO] Erro ao extrair {}: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.",
+                "[DEGRADED] Erro ao extrair {}: {}. Indo para a proxima entidade; sera reextraida na proxima execucao.",
                 descricao,
                 erro.getMessage()
             );
@@ -645,6 +686,17 @@ public class DataExportExtractionService {
         return !houveFalhaExecucao || ExecutionContext.isRetryFinalAttempt();
     }
 
+    private ExecutionSummary criarResumoExecucao(final List<ExtractionResult> resultados, final boolean modoEstrito) {
+        final List<String> entidadesComFalha = resultados.stream()
+            .filter(r -> deveMarcarExecucaoParcial(r, modoEstrito))
+            .map(r -> r.getEntityName() + "(" + r.getStatus() + ")")
+            .toList();
+        if (entidadesComFalha.isEmpty()) {
+            return ExecutionSummary.success(List.copyOf(resultados));
+        }
+        return ExecutionSummary.partialSuccess(List.copyOf(resultados), entidadesComFalha);
+    }
+
     private String formatarNumero(final int numero) {
         return String.format("%,d", numero);
     }
@@ -668,7 +720,7 @@ public class DataExportExtractionService {
         );
     }
 
-    private boolean deveFalharExecucaoFinal(final ExtractionResult result, final boolean modoEstrito) {
+    private boolean deveMarcarExecucaoParcial(final ExtractionResult result, final boolean modoEstrito) {
         if (result == null) {
             return false;
         }

@@ -49,9 +49,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,11 +71,13 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  *
  * Regras aplicadas:
  * - Agenda reconciliacao diaria para D-1 (uma vez por dia).
- * - Em falha de ciclo, adiciona janelas retroativas para reprocessamento.
+ * - Em falha de ciclo, adiciona janelas retroativas somente para escopos identificados.
  * - Reexecuta pendencias com limite de tentativas por ciclo.
  */
 public final class LoopReconciliationService {
     private static final Logger logger = LoggerFactory.getLogger(LoopReconciliationService.class);
+    private static final String API_GRAPHQL = "graphql";
+    private static final String API_DATAEXPORT = "dataexport";
     private static final Pattern RUNNERS_FALHADOS_PATTERN =
         Pattern.compile("(?i)runners falhados:\\s*([^\\n\\r]+)");
     private static final Comparator<ReconciliationTarget> TARGET_COMPARATOR =
@@ -134,6 +138,7 @@ public final class LoopReconciliationService {
         }
 
         final ReconciliationState estado = stateStore.load();
+        removerPendenciasNaoEspecificas(estado);
         final LocalDate hoje = LocalDate.now(clock);
         final LocalDate ontem = hoje.minusDays(1);
 
@@ -145,10 +150,10 @@ public final class LoopReconciliationService {
         final List<String> detalhesFalha = new ArrayList<>();
 
         if (estado.lastDailyScheduledDate == null || estado.lastDailyScheduledDate.isBefore(ontem)) {
-            estado.pendingTargets.add(new ReconciliationTarget(ontem, null, null));
+            agendarEscoposParaData(estado, ontem, resolverEscoposDiarios(incluirFaturasGraphQL));
             estado.lastDailyScheduledDate = ontem;
             agendouDiaria = true;
-            logger.info("Reconciliacao diaria agendada para {}", ontem);
+            logger.info("Reconciliacao diaria agendada para {} com escopos explicitos", ontem);
         }
 
         if (!cicloSucesso) {
@@ -220,18 +225,20 @@ public final class LoopReconciliationService {
         }
 
         final List<ReconciliationTarget> escopos = resolverEscoposFalha(detalheFalhaCiclo);
+        if (escopos.isEmpty()) {
+            logger.warn(
+                "Falha de ciclo sem entidade identificada. Nenhuma pendencia generica de reconciliacao sera agendada: {}",
+                resumirMensagem(detalheFalhaCiclo)
+            );
+            return false;
+        }
+
         boolean adicionou = false;
         LocalDate atual = inicioPendencia;
         while (!atual.isAfter(fimPendencia)) {
-            if (escopos.isEmpty()) {
-                if (estado.pendingTargets.add(new ReconciliationTarget(atual, null, null))) {
+            for (final ReconciliationTarget escopo : escopos) {
+                if (adicionarPendencia(estado, new ReconciliationTarget(atual, escopo.api(), escopo.entidade()))) {
                     adicionou = true;
-                }
-            } else {
-                for (final ReconciliationTarget escopo : escopos) {
-                    if (estado.pendingTargets.add(new ReconciliationTarget(atual, escopo.api(), escopo.entidade()))) {
-                        adicionou = true;
-                    }
                 }
             }
             atual = atual.plusDays(1);
@@ -242,7 +249,7 @@ public final class LoopReconciliationService {
                 "Pendencias de reconciliacao adicionadas por falha de ciclo: {} ate {} | escopos={}",
                 inicioPendencia,
                 fimPendencia,
-                escopos.isEmpty() ? "all" : escopos.stream().map(escopo -> escopo.api() + "/" + escopo.entidade()).toList()
+                escopos.stream().map(escopo -> escopo.api() + "/" + escopo.entidade()).toList()
             );
         }
         return adicionou;
@@ -254,10 +261,10 @@ public final class LoopReconciliationService {
         }
         final Matcher matcher = RUNNERS_FALHADOS_PATTERN.matcher(detalheFalhaCiclo);
         final String candidatos = matcher.find() ? matcher.group(1) : detalheFalhaCiclo;
-        final List<ReconciliationTarget> escopos = new ArrayList<>();
+        final Set<ReconciliationTarget> escopos = new LinkedHashSet<>();
         for (final String token : candidatos.split(",")) {
             final ReconciliationTarget target = normalizarRunnerFalho(token);
-            if (target != null) {
+            if (isAlvoEspecifico(target)) {
                 escopos.add(target);
             }
         }
@@ -275,21 +282,133 @@ public final class LoopReconciliationService {
 
         final int idxSeparador = normalizado.indexOf('/');
         final String runner = idxSeparador >= 0 ? normalizado.substring(0, idxSeparador).trim() : normalizado;
-        final String entidadeBruta = idxSeparador >= 0 ? normalizado.substring(idxSeparador + 1).trim() : null;
-        final String api = switch (runner) {
-            case "graphql" -> "graphql";
-            case "dataexport" -> "dataexport";
-            case "faturasgraphql" -> "graphql";
+        final String entidadeBruta = limparEntidadeFalha(idxSeparador >= 0 ? normalizado.substring(idxSeparador + 1) : runner);
+        final String apiInformada = switch (runner) {
+            case API_GRAPHQL -> API_GRAPHQL;
+            case API_DATAEXPORT -> API_DATAEXPORT;
+            case "faturasgraphql" -> API_GRAPHQL;
+            case ConstantesEntidades.RASTER -> ConstantesEntidades.RASTER;
             default -> null;
         };
-        final String entidade = normalizarEntidade(entidadeBruta != null ? entidadeBruta : runner);
-        if (api == null && entidade == null) {
+        final String entidade = normalizarEntidade(entidadeBruta);
+        if (entidade == null) {
             return null;
         }
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)) {
-            return new ReconciliationTarget(LocalDate.MIN, "graphql", ConstantesEntidades.FATURAS_GRAPHQL);
+        final String apiInferida = resolverApiEntidade(entidade);
+        final String api = apiInformada == null ? apiInferida : apiInformada;
+        if (api == null || apiInferida == null || !api.equalsIgnoreCase(apiInferida)) {
+            logger.warn(
+                "Escopo de falha ignorado por incompatibilidade api/entidade: token={} api={} entidade={}",
+                token,
+                apiInformada == null ? "n/a" : apiInformada,
+                entidade
+            );
+            return null;
         }
         return new ReconciliationTarget(LocalDate.MIN, api, entidade);
+    }
+
+    private List<ReconciliationTarget> resolverEscoposDiarios(final boolean incluirFaturasGraphQL) {
+        final List<ReconciliationTarget> escopos = new ArrayList<>();
+        escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.USUARIOS_SISTEMA));
+        escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.COLETAS));
+        escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.FRETES));
+        if (incluirFaturasGraphQL) {
+            escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.FATURAS_GRAPHQL));
+        }
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.MANIFESTOS));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.COTACOES));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.LOCALIZACAO_CARGAS));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.CONTAS_A_PAGAR));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.FATURAS_POR_CLIENTE));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.INVENTARIO));
+        escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.SINISTROS));
+        return List.copyOf(escopos);
+    }
+
+    private ReconciliationTarget alvoDiario(final String api, final String entidade) {
+        return new ReconciliationTarget(LocalDate.MIN, api, entidade);
+    }
+
+    private boolean agendarEscoposParaData(final ReconciliationState estado,
+                                           final LocalDate data,
+                                           final List<ReconciliationTarget> escopos) {
+        boolean adicionou = false;
+        for (final ReconciliationTarget escopo : escopos) {
+            if (adicionarPendencia(estado, new ReconciliationTarget(data, escopo.api(), escopo.entidade()))) {
+                adicionou = true;
+            }
+        }
+        return adicionou;
+    }
+
+    private boolean adicionarPendencia(final ReconciliationState estado, final ReconciliationTarget target) {
+        if (!isAlvoEspecifico(target)) {
+            logger.warn(
+                "Pendencia de reconciliacao ignorada por escopo generico: {}",
+                target == null ? "null" : target.token()
+            );
+            return false;
+        }
+        return estado.pendingTargets.add(target);
+    }
+
+    private void removerPendenciasNaoEspecificas(final ReconciliationState estado) {
+        final int totalAntes = estado.pendingTargets.size();
+        estado.pendingTargets.removeIf(target -> !isAlvoEspecifico(target));
+        final int removidas = totalAntes - estado.pendingTargets.size();
+        if (removidas > 0) {
+            logger.warn(
+                "{} pendencia(s) generica(s) de reconciliacao foram descartadas antes da execucao",
+                removidas
+            );
+        }
+    }
+
+    private boolean isAlvoEspecifico(final ReconciliationTarget target) {
+        if (target == null || target.data() == null || isEscopoGenerico(target.api()) || isEscopoGenerico(target.entidade())) {
+            return false;
+        }
+        final String apiInferida = resolverApiEntidade(target.entidade());
+        return apiInferida != null && apiInferida.equalsIgnoreCase(target.api());
+    }
+
+    private boolean isEscopoGenerico(final String valor) {
+        if (valor == null || valor.isBlank()) {
+            return true;
+        }
+        final String normalizado = valor.trim().toLowerCase(Locale.ROOT);
+        return "*".equals(normalizado) || "all".equals(normalizado) || "todas".equals(normalizado);
+    }
+
+    private String resolverApiEntidade(final String entidade) {
+        if (entidade == null || entidade.isBlank()) {
+            return null;
+        }
+        return switch (entidade) {
+            case ConstantesEntidades.USUARIOS_SISTEMA,
+                 ConstantesEntidades.COLETAS,
+                 ConstantesEntidades.FRETES,
+                 ConstantesEntidades.FATURAS_GRAPHQL -> API_GRAPHQL;
+            case ConstantesEntidades.MANIFESTOS,
+                 ConstantesEntidades.COTACOES,
+                 ConstantesEntidades.LOCALIZACAO_CARGAS,
+                 ConstantesEntidades.CONTAS_A_PAGAR,
+                 ConstantesEntidades.FATURAS_POR_CLIENTE,
+                 ConstantesEntidades.INVENTARIO,
+                 ConstantesEntidades.SINISTROS -> API_DATAEXPORT;
+            case ConstantesEntidades.RASTER_VIAGENS,
+                 ConstantesEntidades.RASTER_VIAGEM_PARADAS -> ConstantesEntidades.RASTER;
+            default -> null;
+        };
+    }
+
+    private String limparEntidadeFalha(final String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        final int idxStatus = valor.indexOf('(');
+        return (idxStatus >= 0 ? valor.substring(0, idxStatus) : valor).trim();
     }
 
     private String normalizarEntidade(final String valor) {
@@ -310,6 +429,8 @@ public final class LoopReconciliationService {
             case "inventario", "inventário" -> ConstantesEntidades.INVENTARIO;
             case "sinistros", "sinistro" -> ConstantesEntidades.SINISTROS;
             case "faturas_graphql", "faturasgraphql", "faturas" -> ConstantesEntidades.FATURAS_GRAPHQL;
+            case "raster", "raster_viagens", "viagens_raster", "raster_viagem_paradas", "paradas_raster" ->
+                ConstantesEntidades.RASTER_VIAGENS;
             default -> null;
         };
     }

@@ -13,7 +13,7 @@ Conecta com:
 Fluxo geral:
 1) executarReplay() monta chave de idempotencia baseada em (data_inicio, data_fim, api, entidade, modo).
 2) Valida janela de 365 dias para permitir replay.
-3) Monta ExtracaoPorIntervaloRequest (modoLoopDaemon = false).
+3) Monta ExtracaoPorIntervaloRequest (modo backfill explicito).
 4) Delega a ExtracaoPorIntervaloUseCase para execucao completa.
 
 Estrutura interna:
@@ -135,7 +135,9 @@ public final class RecoveryUseCase {
             api,
             entidade,
             incluirFaturasGraphQL,
-            false
+            false,
+            false,
+            ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL
         );
         try {
             extracaoPorIntervaloUseCase.executar(request);

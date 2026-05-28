@@ -10,7 +10,9 @@ import java.util.Map;
 
 import br.com.extrator.dominio.dataexport.inventario.InventarioDTO;
 import br.com.extrator.integracao.ClienteApiDataExport;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.DataExportEntityExtractor;
 import br.com.extrator.integracao.mapeamento.dataexport.inventario.InventarioMapper;
@@ -21,7 +23,7 @@ import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
-public class InventarioExtractor implements DataExportEntityExtractor<InventarioDTO> {
+public class InventarioExtractor implements DataExportEntityExtractor<InventarioDTO>, ChunkedEntityExtractor<InventarioDTO> {
 
     private final ClienteApiDataExport apiClient;
     private final InventarioRepository repository;
@@ -47,6 +49,17 @@ public class InventarioExtractor implements DataExportEntityExtractor<Inventario
             return apiClient.buscarInventario(dataInicio, fim);
         }
         return apiClient.buscarInventario();
+    }
+
+    @Override
+    public ResultadoExtracao<InventarioDTO> extractInChunks(final LocalDate dataInicio,
+                                                            final LocalDate dataFim,
+                                                            final PageChunkConsumer<InventarioDTO> chunkConsumer) {
+        if (dataInicio != null) {
+            final LocalDate fim = dataFim != null ? dataFim : dataInicio;
+            return apiClient.buscarInventario(dataInicio, fim, chunkConsumer);
+        }
+        return extract(dataInicio, dataFim);
     }
 
     @Override

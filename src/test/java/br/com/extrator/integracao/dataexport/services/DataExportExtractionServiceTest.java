@@ -15,13 +15,13 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 class DataExportExtractionServiceTest {
 
     @Test
-    void modoOperacionalAindaDeveFalharParaEntidadeCoreIncompleta() throws Exception {
+    void modoOperacionalDeveMarcarParcialParaEntidadeCoreIncompleta() throws Exception {
         final String valorAnterior = System.getProperty("etl.integridade.modo");
         System.setProperty("etl.integridade.modo", "OPERACIONAL");
         try {
             final DataExportExtractionService service = new DataExportExtractionService();
             final Method method = DataExportExtractionService.class.getDeclaredMethod(
-                "deveFalharExecucaoFinal",
+                "deveMarcarExecucaoParcial",
                 ExtractionResult.class,
                 boolean.class
             );
@@ -40,10 +40,10 @@ class DataExportExtractionServiceTest {
     }
 
     @Test
-    void modoOperacionalNaoDeveFalharQuandoResultadoEstaCompleto() throws Exception {
+    void modoOperacionalNaoDeveMarcarParcialQuandoResultadoEstaCompleto() throws Exception {
         final DataExportExtractionService service = new DataExportExtractionService();
         final Method method = DataExportExtractionService.class.getDeclaredMethod(
-            "deveFalharExecucaoFinal",
+            "deveMarcarExecucaoParcial",
             ExtractionResult.class,
             boolean.class
         );

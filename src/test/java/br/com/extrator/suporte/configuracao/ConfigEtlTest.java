@@ -211,6 +211,27 @@ class ConfigEtlTest {
     }
 
     @Test
+    void deveManterMicroBatchSemLookbackMesmoComChaveLegadaConfigurada() {
+        final String modo = "etl.fretes.performance.lookback.modo";
+        final String legado = "etl.fretes.performance.lookback.dias";
+        final String microBatch = "etl.fretes.performance.lookback.micro_batch.dias";
+        final String modoAnterior = System.getProperty(modo);
+        final String legadoAnterior = System.getProperty(legado);
+        final String microBatchAnterior = System.getProperty(microBatch);
+        try {
+            System.setProperty(modo, "micro_batch");
+            System.setProperty(legado, "30");
+            System.clearProperty(microBatch);
+
+            assertEquals(0, ConfigEtl.obterFretesPerformanceLookbackDiasEfetivo());
+        } finally {
+            restaurarPropriedade(modo, modoAnterior);
+            restaurarPropriedade(legado, legadoAnterior);
+            restaurarPropriedade(microBatch, microBatchAnterior);
+        }
+    }
+
+    @Test
     void deveRespeitarOverrideDoLookbackDeFretesParaBackfill() {
         final String modo = "etl.fretes.performance.lookback.modo";
         final String backfill = "etl.fretes.performance.lookback.backfill.dias";

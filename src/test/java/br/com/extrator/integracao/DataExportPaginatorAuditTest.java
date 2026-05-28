@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -249,6 +250,61 @@ class DataExportPaginatorAuditTest {
             assertEquals(1, resultado.getPaginasProcessadas());
             assertEquals(100, resultado.getDados().size());
             assertEquals(3, chamadas.get(), "Caso ambiguo deve repetir a pagina uma vez antes de confirmar fim natural.");
+        } finally {
+            servidor.stop(0);
+        }
+    }
+
+    @Test
+    void streamingProcessaPaginaELimpaReferenciasAposChunk() throws Exception {
+        final AtomicInteger chamadas = new AtomicInteger();
+        final HttpServer servidor = HttpServer.create(new InetSocketAddress(0), 0);
+        servidor.createContext("/api/analytics/reports/8656/data", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            final int chamada = chamadas.incrementAndGet();
+            final String payload = chamada == 1
+                ? "{\"data\":[{\"sequence_number\":1},{\"sequence_number\":2}]}"
+                : "{\"data\":[]}";
+            final byte[] corpo = payload.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, corpo.length);
+            try (OutputStream output = exchange.getResponseBody()) {
+                output.write(corpo);
+            }
+        });
+        servidor.start();
+
+        try {
+            final List<Map<String, Object>> salvos = new ArrayList<>();
+            final List<List<Map<String, Object>>> referenciasChunks = new ArrayList<>();
+
+            final ResultadoExtracao<Map<String, Object>> resultado = criarPaginator(servidor).buscarDadosGenericos(
+                "exec-audit-dataexport-streaming",
+                8656,
+                "freights",
+                "service_at",
+                new TypeReference<List<Map<String, Object>>>() {
+                },
+                Instant.parse("2026-04-10T03:00:00Z"),
+                Instant.parse("2026-04-11T03:00:00Z"),
+                criarConfigPadrao(),
+                false,
+                Map.of(),
+                chunk -> {
+                    salvos.addAll(chunk);
+                    referenciasChunks.add(chunk);
+                }
+            );
+
+            assertTrue(resultado.isCompleto());
+            assertEquals(1, resultado.getPaginasProcessadas());
+            assertEquals(2, resultado.getRegistrosExtraidos());
+            assertEquals(0, resultado.getDados().size(), "Resultado streaming nao deve acumular DTOs.");
+            assertEquals(2, salvos.size());
+            assertTrue(
+                referenciasChunks.stream().allMatch(List::isEmpty),
+                "A lista da pagina deve ser limpa apos o processamento do chunk."
+            );
         } finally {
             servidor.stop(0);
         }

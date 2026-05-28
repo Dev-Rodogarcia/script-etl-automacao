@@ -20,6 +20,7 @@ Campos:
 - apiEspecifica: String (opcional, normalizado para null se blank).
 - entidadeEspecifica: String (opcional, normalizado para null se blank).
 - incluirFaturasGraphQL, modoLoopDaemon: boolean (flags de comportamento).
+- modoExecucao: classifica a carga para evitar acoplamento entre daemon, micro-batch e reconciliacao.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
@@ -33,7 +34,8 @@ public record ExtracaoPorIntervaloRequest(
     String entidadeEspecifica,
     boolean incluirFaturasGraphQL,
     boolean modoLoopDaemon,
-    boolean modoRapido24h
+    boolean modoRapido24h,
+    ModoExecucao modoExecucao
 ) {
     public ExtracaoPorIntervaloRequest(
         final LocalDate dataInicio,
@@ -46,11 +48,33 @@ public record ExtracaoPorIntervaloRequest(
         this(dataInicio, dataFim, apiEspecifica, entidadeEspecifica, incluirFaturasGraphQL, modoLoopDaemon, false);
     }
 
+    public ExtracaoPorIntervaloRequest(
+        final LocalDate dataInicio,
+        final LocalDate dataFim,
+        final String apiEspecifica,
+        final String entidadeEspecifica,
+        final boolean incluirFaturasGraphQL,
+        final boolean modoLoopDaemon,
+        final boolean modoRapido24h
+    ) {
+        this(
+            dataInicio,
+            dataFim,
+            apiEspecifica,
+            entidadeEspecifica,
+            incluirFaturasGraphQL,
+            modoLoopDaemon,
+            modoRapido24h,
+            ModoExecucao.padrao(modoLoopDaemon)
+        );
+    }
+
     public ExtracaoPorIntervaloRequest {
         Objects.requireNonNull(dataInicio, "dataInicio nao pode ser null");
         Objects.requireNonNull(dataFim, "dataFim nao pode ser null");
         apiEspecifica = normalizar(apiEspecifica);
         entidadeEspecifica = normalizar(entidadeEspecifica);
+        modoExecucao = modoExecucao == null ? ModoExecucao.padrao(modoLoopDaemon) : modoExecucao;
     }
 
     private static String normalizar(final String valor) {
@@ -59,5 +83,26 @@ public record ExtracaoPorIntervaloRequest(
         }
         final String limpo = valor.trim();
         return limpo.isEmpty() ? null : limpo;
+    }
+
+    public enum ModoExecucao {
+        INTERVALO("intervalo"),
+        MICRO_BATCH("micro_batch"),
+        RECONCILIACAO("reconciliacao"),
+        BACKFILL("backfill");
+
+        private final String modoLookbackFretes;
+
+        ModoExecucao(final String modoLookbackFretes) {
+            this.modoLookbackFretes = modoLookbackFretes;
+        }
+
+        static ModoExecucao padrao(final boolean modoLoopDaemon) {
+            return modoLoopDaemon ? MICRO_BATCH : INTERVALO;
+        }
+
+        public String modoLookbackFretes() {
+            return modoLookbackFretes;
+        }
     }
 }

@@ -9,6 +9,7 @@ import br.com.extrator.bootstrap.pipeline.IsolatedStepProcessExecutor.ApiType;
 import br.com.extrator.bootstrap.pipeline.IsolatedStepProcessExecutor.FaultMode;
 import br.com.extrator.comandos.cli.base.Comando;
 import br.com.extrator.integracao.dataexport.services.DataExportExtractionService;
+import br.com.extrator.integracao.dataexport.services.DataExportExtractionService.ExecutionSummary;
 import br.com.extrator.integracao.graphql.services.GraphQLExtractionService;
 import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
@@ -109,8 +110,23 @@ public class ExecutarStepIsoladoComando implements Comando {
                               final String entidade) {
         switch (apiType) {
             case GRAPHQL -> new GraphQLExtractionService().executar(dataInicio, dataFim, entidade);
-            case DATAEXPORT -> new DataExportExtractionService().executar(dataInicio, dataFim, entidade);
+            case DATAEXPORT -> {
+                final ExecutionSummary summary = new DataExportExtractionService().executar(dataInicio, dataFim, entidade);
+                emitirResumoDataExportIsolado(summary);
+            }
             default -> throw new IllegalArgumentException("API isolada nao suportada: " + apiType);
         }
+    }
+
+    private void emitirResumoDataExportIsolado(final ExecutionSummary summary) {
+        if (summary == null) {
+            return;
+        }
+        System.out.println(
+            "ISOLATED_STEP_RESULT api=dataexport status="
+                + summary.status().name()
+                + " failed_entities="
+                + String.join(",", summary.entidadesComFalha())
+        );
     }
 }

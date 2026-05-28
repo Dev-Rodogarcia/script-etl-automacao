@@ -43,6 +43,7 @@ class ExtracaoPorIntervaloUseCaseTest {
 
     private static final String PROP_TIMEOUT_COLETAS = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS";
     private static final String PROP_BACKFILL_MAX_EXPANSAO = "ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS";
+    private static final String PROP_LOOKBACK_MODO_FRETES = "ETL_FRETES_PERFORMANCE_LOOKBACK_MODO";
     private static final String PROP_TIMEOUT_COLETAS_INTERVALO = "etl.graphql.timeout.entidade.coletas.intervalo.ms";
     private static final String PROP_MAX_EXPANSAO_INTERVALO = "etl.referencial.coletas.backfill.max_expansao_dias.intervalo";
     private static final String PROP_MAX_FALHAS_INTERVALO = "etl.intervalo.coletas.max_consecutive_failures";
@@ -70,6 +71,7 @@ class ExtracaoPorIntervaloUseCaseTest {
         }
         System.clearProperty(PROP_TIMEOUT_COLETAS);
         System.clearProperty(PROP_BACKFILL_MAX_EXPANSAO);
+        System.clearProperty(PROP_LOOKBACK_MODO_FRETES);
         System.clearProperty(PROP_TIMEOUT_COLETAS_INTERVALO);
         System.clearProperty(PROP_MAX_EXPANSAO_INTERVALO);
         System.clearProperty(PROP_MAX_FALHAS_INTERVALO);
@@ -107,6 +109,51 @@ class ExtracaoPorIntervaloUseCaseTest {
         assertEquals(List.of("400"), List.copyOf(expansoesObservadas));
         assertEquals(timeoutAnterior, System.getProperty(PROP_TIMEOUT_COLETAS));
         assertEquals(expansaoAnterior, System.getProperty(PROP_BACKFILL_MAX_EXPANSAO));
+    }
+
+    @Test
+    void modoLoopDaemonDeveSinalizarMicroBatchSemAtivarReconciliacaoDeFretes() {
+        final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("fretes", StepStatus.SUCCESS, "ok")
+        );
+        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(42));
+        final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(integridadeValida());
+        final Queue<String> modosObservados = new ArrayDeque<>();
+
+        final GraphQLGateway gateway = (dataInicio, dataFim, entidade) -> {
+            modosObservados.add(System.getProperty(PROP_LOOKBACK_MODO_FRETES));
+            return resultados.remove();
+        };
+
+        final ExtracaoPorIntervaloUseCase useCase = criarUseCase(
+            gateway,
+            new SequencialExtractionLogQueryPort(logs),
+            new SequencialIntegridadePort(integridade)
+        );
+        final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
+            LocalDate.of(2026, 4, 27),
+            LocalDate.of(2026, 4, 28),
+            "graphql",
+            "fretes",
+            false,
+            true
+        );
+
+        assertDoesNotThrow(() -> useCase.executar(request));
+
+        assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH, request.modoExecucao());
+        assertEquals(List.of("micro_batch"), List.copyOf(modosObservados));
+    }
+
+    @Test
+    void reconciliacaoDeveDeclararModoReconciliacaoExplicitamente() throws Exception {
+        final CapturingExtracaoPorIntervaloUseCase extracao = new CapturingExtracaoPorIntervaloUseCase();
+        final ReconciliacaoUseCase useCase = new ReconciliacaoUseCase(extracao);
+
+        useCase.executar(LocalDate.of(2026, 4, 27), "graphql", "fretes", true);
+
+        assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO, extracao.requestCapturada.modoExecucao());
+        assertTrue(extracao.requestCapturada.modoLoopDaemon());
     }
 
     @Test
@@ -408,6 +455,15 @@ class ExtracaoPorIntervaloUseCaseTest {
 
         @Override
         public void executarPosExtracao(final LocalDate dataInicio, final LocalDate dataFim) {
+        }
+    }
+
+    private static final class CapturingExtracaoPorIntervaloUseCase extends ExtracaoPorIntervaloUseCase {
+        private ExtracaoPorIntervaloRequest requestCapturada;
+
+        @Override
+        public void executar(final ExtracaoPorIntervaloRequest request) {
+            this.requestCapturada = request;
         }
     }
 

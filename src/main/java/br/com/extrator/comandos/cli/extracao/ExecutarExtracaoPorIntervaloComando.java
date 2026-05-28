@@ -67,14 +67,15 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         }
 
         log.debug(
-            "Delegando extracao por intervalo para ExtracaoPorIntervaloUseCase | inicio={} | fim={} | api={} | entidade={} | incluir_faturas_graphql={} | modo_loop_daemon={} | modo_rapido_24h={}",
+            "Delegando extracao por intervalo para ExtracaoPorIntervaloUseCase | inicio={} | fim={} | api={} | entidade={} | incluir_faturas_graphql={} | modo_loop_daemon={} | modo_rapido_24h={} | modo_execucao={}",
             parametros.request.dataInicio(),
             parametros.request.dataFim(),
             parametros.request.apiEspecifica(),
             parametros.request.entidadeEspecifica(),
             parametros.request.incluirFaturasGraphQL(),
             parametros.request.modoLoopDaemon(),
-            parametros.request.modoRapido24h()
+            parametros.request.modoRapido24h(),
+            parametros.request.modoExecucao()
         );
         extracaoPorIntervaloUseCase.executar(parametros.request);
     }

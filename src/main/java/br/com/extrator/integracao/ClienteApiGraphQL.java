@@ -141,7 +141,19 @@ public class ClienteApiGraphQL {
         return coletaSupport.buscarColetas(this.executionUuid, dataInicio, dataFim);
     }
 
+    public ResultadoExtracao<ColetaNodeDTO> buscarColetas(final LocalDate dataInicio,
+                                                          final LocalDate dataFim,
+                                                          final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
+        return coletaSupport.buscarColetas(this.executionUuid, dataInicio, dataFim, chunkConsumer);
+    }
+
     public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarFretes(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<FreteNodeDTO> buscarFretes(final LocalDate dataInicio,
+                                                        final LocalDate dataFim,
+                                                        final PageChunkConsumer<FreteNodeDTO> chunkConsumer) {
         logger.info("🔍 Buscando fretes via GraphQL - Período: {} a {}", dataInicio, dataFim);
         final String intervaloServiceAt = formatarDataParaApiGraphQL(dataInicio) + " - " + formatarDataParaApiGraphQL(dataFim);
         final Map<String, Object> variaveis = Map.of("params", Map.of("serviceAt", intervaloServiceAt));
@@ -150,7 +162,8 @@ public class ClienteApiGraphQL {
             GraphQLQueries.QUERY_FRETES,
             ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FRETES),
             variaveis,
-            FreteNodeDTO.class
+            FreteNodeDTO.class,
+            chunkConsumer
         );
     }
 
@@ -164,6 +177,13 @@ public class ClienteApiGraphQL {
      */
     public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema(
             final LocalDate dataInicio, final LocalDate dataFim) {
+        return buscarUsuariosSistema(dataInicio, dataFim, null);
+    }
+
+    public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> chunkConsumer) {
         try {
             final String intervaloUpdatedAt = FormatadorData.formatarIntervaloEslCloud(dataInicio, dataFim);
             final Map<String, Object> variaveis = new HashMap<>();
@@ -174,7 +194,8 @@ public class ClienteApiGraphQL {
                 GraphQLQueries.QUERY_USUARIOS_SISTEMA,
                 ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.USUARIOS_SISTEMA),
                 variaveis,
-                br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO.class
+                br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO.class,
+                chunkConsumer
             );
         } catch (final RuntimeException e) {
             logger.warn("Falha ao buscar Usuários do Sistema (incremental): {}", e.getMessage());
@@ -231,6 +252,13 @@ public class ClienteApiGraphQL {
 
     public ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataInicio, final LocalDate dataFim) {
         return billingSupport.buscarCapaFaturas(this.executionUuid, dataInicio, dataFim);
+    }
+
+    public ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(
+            final LocalDate dataInicio,
+            final LocalDate dataFim,
+            final PageChunkConsumer<CreditCustomerBillingNodeDTO> chunkConsumer) {
+        return billingSupport.buscarCapaFaturas(this.executionUuid, dataInicio, dataFim, chunkConsumer);
     }
 
     public boolean validarAcessoApi() {

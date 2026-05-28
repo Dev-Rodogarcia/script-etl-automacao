@@ -45,24 +45,50 @@ final class GraphQLColetaSupport {
     ResultadoExtracao<ColetaNodeDTO> buscarColetas(final String executionUuid,
                                                    final LocalDate dataInicio,
                                                    final LocalDate dataFim) {
+        return buscarColetas(executionUuid, dataInicio, dataFim, null);
+    }
+
+    ResultadoExtracao<ColetaNodeDTO> buscarColetas(final String executionUuid,
+                                                   final LocalDate dataInicio,
+                                                   final LocalDate dataFim,
+                                                   final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
         logger.info("ℹ️ Coletas: consultando exclusivamente por requestDate.");
-        return GraphQLIntervaloHelper.executarPorDia(dataInicio, dataFim, data -> buscarColetasDia(executionUuid, data), "Coletas");
+        return GraphQLIntervaloHelper.executarPorDia(
+            dataInicio,
+            dataFim,
+            data -> buscarColetasDia(executionUuid, data, chunkConsumer),
+            "Coletas"
+        );
     }
 
     private ResultadoExtracao<ColetaNodeDTO> buscarColetasDia(final String executionUuid, final LocalDate data) {
-        return buscarColetasDiaComCampo(executionUuid, data, "requestDate");
+        return buscarColetasDia(executionUuid, data, null);
+    }
+
+    private ResultadoExtracao<ColetaNodeDTO> buscarColetasDia(final String executionUuid,
+                                                              final LocalDate data,
+                                                              final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
+        return buscarColetasDiaComCampo(executionUuid, data, "requestDate", chunkConsumer);
     }
 
     private ResultadoExtracao<ColetaNodeDTO> buscarColetasDiaComCampo(final String executionUuid,
                                                                       final LocalDate data,
                                                                       final String campoData) {
+        return buscarColetasDiaComCampo(executionUuid, data, campoData, null);
+    }
+
+    private ResultadoExtracao<ColetaNodeDTO> buscarColetasDiaComCampo(final String executionUuid,
+                                                                      final LocalDate data,
+                                                                      final String campoData,
+                                                                      final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
         final Map<String, Object> variaveis = Map.of("params", Map.of(campoData, data.format(FormatadorData.ISO_DATE)));
         return paginator.executarQueryPaginada(
             executionUuid,
             GraphQLQueries.QUERY_COLETAS,
             ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.COLETAS),
             variaveis,
-            ColetaNodeDTO.class
+            ColetaNodeDTO.class,
+            chunkConsumer
         );
     }
 

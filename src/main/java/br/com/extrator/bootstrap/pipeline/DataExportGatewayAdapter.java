@@ -28,10 +28,17 @@ package br.com.extrator.bootstrap.pipeline;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 import br.com.extrator.integracao.dataexport.services.DataExportExtractionService;
+import br.com.extrator.integracao.dataexport.services.DataExportExtractionService.ExecutionStatus;
+import br.com.extrator.integracao.dataexport.services.DataExportExtractionService.ExecutionSummary;
 import br.com.extrator.aplicacao.portas.DataExportGateway;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
@@ -40,6 +47,8 @@ import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
 
 public final class DataExportGatewayAdapter implements DataExportGateway {
+    private static final String ISOLATED_RESULT_PREFIX = "ISOLATED_STEP_RESULT api=dataexport";
+
     private final DataExportExtractionService service;
     private final IsolatedStepProcessExecutor isolatedExecutor;
 
@@ -62,23 +71,30 @@ public final class DataExportGatewayAdapter implements DataExportGateway {
             && (ConfigEtl.isIsolamentoProcessoAtivo() || forcarIsolamentoNoDaemon);
         final Long childPid;
         final Path childLogFile;
+        final DataExportStepSummary resumo;
         if (usarIsolamento) {
             final IsolatedStepProcessExecutor.ProcessExecutionResult processResult =
                 isolatedExecutor.executar(ApiType.DATAEXPORT, dataInicio, dataFim, filtroEntidade, resolverTimeoutIsolado(filtroEntidade));
             childPid = processResult.pid();
             childLogFile = processResult.logFile();
+            resumo = lerResumoProcessoIsolado(childLogFile)
+                .orElseGet(DataExportStepSummary::success);
         } else {
-            service.executar(dataInicio, dataFim, filtroEntidade);
+            resumo = DataExportStepSummary.from(service.executar(dataInicio, dataFim, filtroEntidade));
             childPid = null;
             childLogFile = null;
         }
         final String entidadeExecucao = filtroEntidade == null ? "dataexport" : filtroEntidade;
+        final boolean parcial = resumo.isPartialSuccess();
         return StepExecutionResult.builder("dataexport:" + entidadeExecucao, entidadeExecucao)
-            .status(StepStatus.SUCCESS)
+            .status(parcial ? StepStatus.DEGRADED : StepStatus.SUCCESS)
             .startedAt(inicio)
             .finishedAt(LocalDateTime.now())
-            .message("DataExport executado com sucesso")
+            .message(criarMensagemResultado(resumo))
             .metadata("source", "dataexport")
+            .metadata("execution_status", resumo.status())
+            .metadata("failure_mode", parcial ? "DEGRADED" : null)
+            .metadata("failed_entities", resumo.failedEntities())
             .metadata("execution_mode", usarIsolamento ? "isolated_process" : "in_process")
             .metadata("forced_by_daemon", forcarIsolamentoNoDaemon)
             .metadata("child_pid", childPid)
@@ -93,6 +109,56 @@ public final class DataExportGatewayAdapter implements DataExportGateway {
         return ConfigEtl.obterTimeoutEntidadeDataExport(filtroEntidade);
     }
 
+    private String criarMensagemResultado(final DataExportStepSummary resumo) {
+        if (resumo.isPartialSuccess()) {
+            return "DataExport concluido com status PARTIAL_SUCCESS; falhas: "
+                + String.join(", ", resumo.failedEntities());
+        }
+        return "DataExport executado com sucesso";
+    }
+
+    private Optional<DataExportStepSummary> lerResumoProcessoIsolado(final Path childLogFile) {
+        if (childLogFile == null || !Files.exists(childLogFile)) {
+            return Optional.empty();
+        }
+        try {
+            final List<String> linhas = Files.readAllLines(childLogFile, StandardCharsets.UTF_8);
+            for (int i = linhas.size() - 1; i >= 0; i--) {
+                final String linha = linhas.get(i);
+                if (linha != null && linha.contains(ISOLATED_RESULT_PREFIX)) {
+                    return Optional.of(parseResumoIsolado(linha));
+                }
+            }
+        } catch (final IOException ignored) {
+            return Optional.empty();
+        }
+        return Optional.empty();
+    }
+
+    private DataExportStepSummary parseResumoIsolado(final String linha) {
+        final String status = extrairValor(linha, "status").orElse(ExecutionStatus.SUCCESS.name());
+        final List<String> entidadesFalhas = extrairValor(linha, "failed_entities")
+            .map(valor -> valor.isBlank()
+                ? List.<String>of()
+                : List.of(valor.split(",")).stream()
+                    .map(String::trim)
+                    .filter(item -> !item.isBlank())
+                    .toList())
+            .orElse(List.of());
+        return new DataExportStepSummary(status, entidadesFalhas);
+    }
+
+    private Optional<String> extrairValor(final String linha, final String chave) {
+        final String marcador = chave + "=";
+        final int inicio = linha.indexOf(marcador);
+        if (inicio < 0) {
+            return Optional.empty();
+        }
+        final int valorInicio = inicio + marcador.length();
+        final int valorFim = linha.indexOf(' ', valorInicio);
+        return Optional.of((valorFim < 0 ? linha.substring(valorInicio) : linha.substring(valorInicio, valorFim)).trim());
+    }
+
     private String normalizeEntityFilter(final String entidade) {
         if (entidade == null) {
             return null;
@@ -105,5 +171,22 @@ public final class DataExportGatewayAdapter implements DataExportGateway {
             return null;
         }
         return normalizada;
+    }
+
+    private record DataExportStepSummary(String status, List<String> failedEntities) {
+        static DataExportStepSummary from(final ExecutionSummary summary) {
+            if (summary == null) {
+                return success();
+            }
+            return new DataExportStepSummary(summary.status().name(), List.copyOf(summary.entidadesComFalha()));
+        }
+
+        static DataExportStepSummary success() {
+            return new DataExportStepSummary(ExecutionStatus.SUCCESS.name(), List.of());
+        }
+
+        boolean isPartialSuccess() {
+            return ExecutionStatus.PARTIAL_SUCCESS.name().equals(status);
+        }
     }
 }

@@ -10,7 +10,7 @@ Conecta com:
 - ExtracaoPorIntervaloUseCase (delegacao via composicao)
 
 Fluxo geral:
-1) executar(data, incluirFaturasGraphQL) monta ExtracaoPorIntervaloRequest (data = data, modoLoopDaemon = true).
+1) executar(data, incluirFaturasGraphQL) monta ExtracaoPorIntervaloRequest (data = data, modo reconciliacao explicito).
 2) Delega a ExtracaoPorIntervaloUseCase.executar() com intervalo de 1 dia.
 3) Reusa pipeline, validacoes e integridade do fluxo de intervalo.
 
@@ -53,7 +53,9 @@ public class ReconciliacaoUseCase {
             api,
             entidade,
             incluirFaturasGraphQL,
-            true
+            true,
+            false,
+            ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO
         );
         extracaoPorIntervaloUseCase.executar(request);
     }

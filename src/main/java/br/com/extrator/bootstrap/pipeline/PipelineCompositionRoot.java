@@ -249,7 +249,7 @@ public final class PipelineCompositionRoot {
         );
         porEntidade.put(
             "dataexport",
-            parseFailureMode(config.obterTexto("etl.failure.dataexport", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
+            parseFailureMode(config.obterTexto("etl.failure.dataexport", "DEGRADE"), FailureMode.DEGRADE)
         );
         porEntidade.put(
             ConstantesEntidades.FATURAS_GRAPHQL,

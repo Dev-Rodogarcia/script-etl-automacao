@@ -44,11 +44,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.integracao.ClienteApiGraphQL;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
 import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
 import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -59,7 +61,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Deduplica por user_id (Keep Last) antes de salvar para que o log e o banco batam na validação API vs banco.
  * A carga completa de dim_usuarios é deliberadamente explícita e deve ser feita via comando dedicado.
  */
-public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDTO> {
+public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDTO>, ChunkedEntityExtractor<IndividualNodeDTO> {
 
     private static final Logger logger = LoggerFactory.getLogger(UsuarioSistemaExtractor.class);
 
@@ -91,6 +93,26 @@ public class UsuarioSistemaExtractor implements EntityExtractor<IndividualNodeDT
             dataFim
         );
         return apiClient.buscarUsuariosSistema(dataInicio, dataFim);
+    }
+
+    @Override
+    public ResultadoExtracao<IndividualNodeDTO> extractInChunks(final LocalDate dataInicio,
+                                                                final LocalDate dataFim,
+                                                                final PageChunkConsumer<IndividualNodeDTO> chunkConsumer) {
+        if (dimUsuariosVazia()) {
+            logger.warn(
+                "usuarios_sistema: dim_usuarios vazia. A extracao operacional permanecera restrita ao periodo {} a {} via updatedAt. Execute --sincronizar-usuarios para uma carga completa explicita.",
+                dataInicio,
+                dataFim
+            );
+        }
+
+        logger.info(
+            "usuarios_sistema: executando modo incremental via updatedAt para o periodo {} a {} em chunks.",
+            dataInicio,
+            dataFim
+        );
+        return apiClient.buscarUsuariosSistema(dataInicio, dataFim, chunkConsumer);
     }
 
     @Override

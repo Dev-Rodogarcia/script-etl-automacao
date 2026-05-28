@@ -138,7 +138,7 @@ class LoopReconciliationServiceStressTest {
             stateFile,
             clock,
             true,
-            5,
+            20,
             0,
             (data, api, entidade, incluirFaturasGraphQL) -> conciliadas.add(data)
         );
@@ -190,6 +190,15 @@ class LoopReconciliationServiceStressTest {
             pendingDates == null
                 ? ""
                 : pendingDates.stream().map(LocalDate::toString).reduce((a, b) -> a + "," + b).orElse("")
+        );
+        properties.setProperty(
+            "pending_targets",
+            pendingDates == null
+                ? ""
+                : pendingDates.stream()
+                    .map(data -> data + "|dataexport|manifestos")
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("")
         );
         properties.setProperty("last_error", "");
         properties.setProperty("updated_at", "2026-02-20T00:00:00");

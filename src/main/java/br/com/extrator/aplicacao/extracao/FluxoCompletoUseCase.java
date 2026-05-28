@@ -68,6 +68,7 @@ import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.configuracao.ConfigRaster;
+import br.com.extrator.suporte.configuracao.ScopedSystemPropertyOverride;
 import br.com.extrator.suporte.console.BannerUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.formatacao.FormatadorData;
@@ -80,6 +81,7 @@ public class FluxoCompletoUseCase {
     private static final LoggerConsole log = LoggerConsole.getLogger(FluxoCompletoUseCase.class);
     private static final Path ARQUIVO_ULTIMO_RUN = LogStoragePaths.RUNTIME_STATE_DIR.resolve("last_run.properties");
     private static final String PROPRIEDADE_ULTIMO_RUN = "last_successful_run";
+    private static final String PROP_LOOKBACK_MODO_FRETES = "ETL_FRETES_PERFORMANCE_LOOKBACK_MODO";
     private final PreBackfillReferencialColetasUseCase preBackfillReferencialColetasUseCase;
     private final ExecutionLockManager executionLockManager;
 
@@ -101,6 +103,13 @@ public class FluxoCompletoUseCase {
 
     public void executar(final boolean incluirFaturasGraphQL, final boolean modoLoopDaemon) throws Exception {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
+        final Map<String, String> overridesTemporarios = modoLoopDaemon
+            ? Map.of(
+                PROP_LOOKBACK_MODO_FRETES,
+                ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH.modoLookbackFretes()
+            )
+            : Map.of();
+        try (ScopedSystemPropertyOverride scopedOverride = ScopedSystemPropertyOverride.apply(overridesTemporarios)) {
         BannerUtil.exibirBannerExtracaoCompleta();
 
         final LocalDate dataFim = RelogioSistema.hoje();
@@ -396,6 +405,7 @@ public class FluxoCompletoUseCase {
         );
         } finally {
             ExecutionPlanContext.clear();
+        }
         }
         }
     }

@@ -89,6 +89,23 @@ class ExecutarExtracaoPorIntervaloComandoTest {
         assertTrue(useCase.requestCapturada.modoRapido24h());
     }
 
+    @Test
+    void modoLoopDaemonDeveGerarRequestMicroBatch() throws Exception {
+        final CapturingExtracaoPorIntervaloUseCase useCase = new CapturingExtracaoPorIntervaloUseCase();
+        final ExecutarExtracaoPorIntervaloComando comando = new ExecutarExtracaoPorIntervaloComando(useCase);
+
+        comando.executar(new String[] {
+            "--extracao-intervalo",
+            "2026-04-27",
+            "2026-04-28",
+            "--modo-loop-daemon"
+        });
+
+        assertNotNull(useCase.requestCapturada);
+        assertTrue(useCase.requestCapturada.modoLoopDaemon());
+        assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH, useCase.requestCapturada.modoExecucao());
+    }
+
     private static final class CapturingExtracaoPorIntervaloUseCase extends ExtracaoPorIntervaloUseCase {
         private ExtracaoPorIntervaloRequest requestCapturada;
 

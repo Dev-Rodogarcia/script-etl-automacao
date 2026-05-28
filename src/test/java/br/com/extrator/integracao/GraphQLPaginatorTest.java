@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -111,6 +112,60 @@ class GraphQLPaginatorTest {
         assertEquals(3, resultado.getPaginasProcessadas());
         assertEquals(28, resultado.getDados().size());
         assertEquals(3, callCount.get(), "Pagina curta com cursor valido deve permitir continuar a extracao.");
+    }
+
+    @Test
+    void deveProcessarChunkPorPaginaSemMaterializarResultadoCompleto() {
+        final AtomicInteger callCount = new AtomicInteger();
+        final List<Integer> salvos = new ArrayList<>();
+        final List<List<Integer>> referenciasChunks = new ArrayList<>();
+        final GraphQLPaginator paginator = new GraphQLPaginator(
+            LoggerFactory.getLogger(GraphQLPaginatorTest.class),
+            10,
+            3,
+            Duration.ofMinutes(10),
+            new HashMap<>(),
+            new HashSet<>(),
+            new HashMap<>(),
+            null,
+            new GraphQLPageFetcher() {
+                @Override
+                public <T> PaginatedGraphQLResponse<T> fetch(
+                    final String query,
+                    final String nomeEntidade,
+                    final Map<String, Object> variaveis,
+                    final Class<T> tipoClasse
+                ) {
+                    final int chamada = callCount.getAndIncrement();
+                    if (chamada == 0) {
+                        return cast(new ArrayList<>(List.of(1, 2)), true, "cursor-1");
+                    }
+                    return cast(new ArrayList<>(List.of(3)), false, "cursor-2");
+                }
+            }
+        );
+
+        final ResultadoExtracao<Integer> resultado = paginator.executarQueryPaginada(
+            "exec-chunked",
+            "query",
+            "freights",
+            Map.of(),
+            Integer.class,
+            chunk -> {
+                salvos.addAll(chunk);
+                referenciasChunks.add(chunk);
+            }
+        );
+
+        assertTrue(resultado.isCompleto());
+        assertEquals(2, resultado.getPaginasProcessadas());
+        assertEquals(3, resultado.getRegistrosExtraidos());
+        assertEquals(0, resultado.getDados().size(), "Resultado chunked nao deve reter DTOs acumulados.");
+        assertEquals(List.of(1, 2, 3), salvos);
+        assertTrue(
+            referenciasChunks.stream().allMatch(List::isEmpty),
+            "Depois do commit do chunk, o paginador deve limpar a lista da pagina."
+        );
     }
 
     @Test

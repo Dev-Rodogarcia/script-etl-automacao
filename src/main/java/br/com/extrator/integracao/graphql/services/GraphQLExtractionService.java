@@ -54,6 +54,7 @@ import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.dominio.graphql.coletas.ColetaNodeDTO;
 import br.com.extrator.integracao.ClienteApiDataExport;
 import br.com.extrator.integracao.ClienteApiGraphQL;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
 import br.com.extrator.persistencia.repositorio.FreteRepository;
 import br.com.extrator.persistencia.repositorio.FaturaGraphQLRepository;
@@ -63,6 +64,7 @@ import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
 import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.comum.ExtractionHelper;
@@ -515,11 +517,19 @@ public class GraphQLExtractionService {
             new ColetaRepository(),
             new ColetaMapper()
         );
-        final EntityExtractor<ColetaNodeDTO> extractorAuxiliar = new EntityExtractor<>() {
+        final ChunkedEntityExtractor<ColetaNodeDTO> extractorAuxiliar = new ChunkedEntityExtractor<>() {
             @Override
             public br.com.extrator.integracao.ResultadoExtracao<ColetaNodeDTO> extract(final LocalDate inicio,
                                                                                         final LocalDate fim) {
                 return extractor.extract(inicio, fim);
+            }
+
+            @Override
+            public br.com.extrator.integracao.ResultadoExtracao<ColetaNodeDTO> extractInChunks(
+                    final LocalDate inicio,
+                    final LocalDate fim,
+                    final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
+                return extractor.extractInChunks(inicio, fim, chunkConsumer);
             }
 
             @Override

@@ -44,11 +44,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.extrator.integracao.ClienteApiGraphQL;
+import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.persistencia.entidade.ColetaEntity;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
 import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
 import br.com.extrator.dominio.graphql.coletas.ColetaNodeDTO;
+import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -58,7 +60,7 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * 
  * @since 2.3.2 - Adicionada deduplicação preventiva por ID
  */
-public class ColetaExtractor implements EntityExtractor<ColetaNodeDTO> {
+public class ColetaExtractor implements EntityExtractor<ColetaNodeDTO>, ChunkedEntityExtractor<ColetaNodeDTO> {
     private static final Logger logger = LoggerFactory.getLogger(ColetaExtractor.class);
     
     private final ClienteApiGraphQL apiClient;
@@ -76,6 +78,13 @@ public class ColetaExtractor implements EntityExtractor<ColetaNodeDTO> {
     @Override
     public ResultadoExtracao<ColetaNodeDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
         return apiClient.buscarColetas(dataInicio, dataFim);
+    }
+
+    @Override
+    public ResultadoExtracao<ColetaNodeDTO> extractInChunks(final LocalDate dataInicio,
+                                                            final LocalDate dataFim,
+                                                            final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
+        return apiClient.buscarColetas(dataInicio, dataFim, chunkConsumer);
     }
     
     @Override

@@ -69,6 +69,7 @@ public final class GraphQLIntervaloHelper {
 
         final List<T> todas = new ArrayList<>();
         int totalPaginas = 0;
+        int totalRegistros = 0;
         boolean todasCompletas = true;
         String motivoInterrupcao = null;
 
@@ -81,13 +82,18 @@ public final class GraphQLIntervaloHelper {
             logger.info("{} - Dia {}/{}: {}", nomeEntidade, diaAtual, totalDias, dia);
 
             final ResultadoExtracao<T> resultadoDia = executarDiaComRetry(dia, executorDia, nomeEntidade, diaAtual, totalDias);
-            todas.addAll(resultadoDia.getDados());
+            final List<T> dadosDia = resultadoDia.getDados();
+            if (dadosDia != null && !dadosDia.isEmpty()) {
+                todas.addAll(dadosDia);
+            }
+            final int registrosDia = resolverTotalRegistros(resultadoDia);
+            totalRegistros += registrosDia;
             totalPaginas += resultadoDia.getPaginasProcessadas();
 
             if (resultadoDia.isCompleto()) {
-                logger.info("Dia {}/{} completo: {} registros", diaAtual, totalDias, resultadoDia.getDados().size());
+                logger.info("Dia {}/{} completo: {} registros", diaAtual, totalDias, registrosDia);
             } else {
-                logger.warn("Dia {}/{} incompleto: {} registros", diaAtual, totalDias, resultadoDia.getDados().size());
+                logger.warn("Dia {}/{} incompleto: {} registros", diaAtual, totalDias, registrosDia);
                 todasCompletas = false;
                 motivoInterrupcao = selecionarMotivoInterrupcao(motivoInterrupcao, resultadoDia.getMotivoInterrupcao());
             }
@@ -96,17 +102,17 @@ public final class GraphQLIntervaloHelper {
             diaAtual++;
         }
 
-        logger.info("Total consolidado: {} {}", todas.size(), nomeEntidade);
+        logger.info("Total consolidado: {} {}", totalRegistros, nomeEntidade);
 
         if (todasCompletas) {
-            return ResultadoExtracao.completo(todas, totalPaginas, todas.size());
+            return ResultadoExtracao.completo(todas, totalPaginas, totalRegistros);
         }
 
         return ResultadoExtracao.incompleto(
             todas,
             motivoInterrupcao != null ? motivoInterrupcao : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
             totalPaginas,
-            todas.size()
+            totalRegistros
         );
     }
 
@@ -127,6 +133,7 @@ public final class GraphQLIntervaloHelper {
 
         final List<T> todas = new ArrayList<>();
         int totalPaginas = 0;
+        int totalRegistros = 0;
         boolean todasCompletas = true;
         String motivoInterrupcao = null;
 
@@ -134,7 +141,11 @@ public final class GraphQLIntervaloHelper {
         while (!dia.isAfter(dataFim)) {
             verificarInterrupcaoCooperativa(nomeEntidade, dia);
             final ResultadoExtracao<T> resultadoDia = executarDiaComRetry(dia, executorDia, nomeEntidade, 0, 0);
-            todas.addAll(resultadoDia.getDados());
+            final List<T> dadosDia = resultadoDia.getDados();
+            if (dadosDia != null && !dadosDia.isEmpty()) {
+                todas.addAll(dadosDia);
+            }
+            totalRegistros += resolverTotalRegistros(resultadoDia);
             totalPaginas += resultadoDia.getPaginasProcessadas();
 
             if (!resultadoDia.isCompleto()) {
@@ -146,15 +157,27 @@ public final class GraphQLIntervaloHelper {
         }
 
         if (todasCompletas) {
-            return ResultadoExtracao.completo(todas, totalPaginas, todas.size());
+            return ResultadoExtracao.completo(todas, totalPaginas, totalRegistros);
         }
 
         return ResultadoExtracao.incompleto(
             todas,
             motivoInterrupcao != null ? motivoInterrupcao : ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(),
             totalPaginas,
-            todas.size()
+            totalRegistros
         );
+    }
+
+    private static <T> int resolverTotalRegistros(final ResultadoExtracao<T> resultado) {
+        if (resultado == null) {
+            return 0;
+        }
+        final int registrosExtraidos = resultado.getRegistrosExtraidos();
+        if (registrosExtraidos > 0) {
+            return registrosExtraidos;
+        }
+        final List<T> dados = resultado.getDados();
+        return dados == null ? 0 : dados.size();
     }
 
     private static <T> ResultadoExtracao<T> executarDiaComRetry(

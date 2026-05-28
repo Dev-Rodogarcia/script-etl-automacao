@@ -75,14 +75,14 @@ class LoopReconciliationServiceTest {
 
     @Test
     void deveExecutarReconciliacaoDiariaDeOntem() {
-        final List<LocalDate> datasExecutadas = new ArrayList<>();
+        final List<String> execucoes = new ArrayList<>();
         final LoopReconciliationService service = new LoopReconciliationService(
             stateFile,
             clock,
             true,
-            3,
+            20,
             1,
-            (data, api, entidade, incluirFaturasGraphQL) -> datasExecutadas.add(data)
+            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.add(data + "|" + api + "|" + entidade)
         );
 
         final var resumo = service.processarPosCiclo(
@@ -94,9 +94,13 @@ class LoopReconciliationServiceTest {
         );
 
         assertTrue(resumo.isAtivo());
-        assertEquals(1, resumo.getReconciliacoesExecutadas());
+        assertEquals(11, resumo.getReconciliacoesExecutadas());
         assertEquals(0, resumo.getFalhas());
-        assertEquals(List.of(ONTEM), datasExecutadas);
+        assertEquals(11, execucoes.size());
+        assertTrue(execucoes.stream().allMatch(execucao -> execucao.startsWith(ONTEM + "|")));
+        assertTrue(execucoes.stream().noneMatch(execucao -> execucao.contains("|null")));
+        assertTrue(execucoes.contains(ONTEM + "|graphql|fretes"));
+        assertTrue(execucoes.contains(ONTEM + "|dataexport|localizacao_cargas"));
         assertTrue(resumo.getPendenciasRestantes().isEmpty());
         assertTrue(resumo.isAgendouReconciliacaoDiaria());
         assertFalse(resumo.isPendenciaPorFalha());
@@ -130,7 +134,7 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 10, 30),
             false,
             true,
-            null
+            "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport/localizacao_cargas"
         );
 
         assertEquals(0, primeiroResumo.getReconciliacoesExecutadas());
@@ -157,7 +161,11 @@ class LoopReconciliationServiceTest {
 
     @Test
     void deveRespeitarLimiteMaximoPorCiclo() {
-        salvarEstadoInicial(ONTEM.toString(), "2026-02-17,2026-02-18,2026-02-19");
+        salvarEstadoInicial(
+            ONTEM.toString(),
+            "",
+            "2026-02-17|dataexport|manifestos,2026-02-18|dataexport|manifestos,2026-02-19|dataexport|manifestos"
+        );
 
         final List<LocalDate> datasExecutadas = new ArrayList<>();
         final LoopReconciliationService service = new LoopReconciliationService(
@@ -203,7 +211,7 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 0, 35),
             false,
             true,
-            null
+            "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport/localizacao_cargas"
         );
 
         assertEquals(0, resumo.getReconciliacoesExecutadas());
@@ -213,6 +221,66 @@ class LoopReconciliationServiceTest {
             List.of(LocalDate.of(2026, 2, 18), LocalDate.of(2026, 2, 19), LocalDate.of(2026, 2, 20)),
             resumo.getPendenciasRestantes()
         );
+    }
+
+    @Test
+    void naoDeveAgendarPendenciaGenericaQuandoFalhaNaoIdentificaEntidade() {
+        salvarEstadoInicial(ONTEM.toString(), "");
+
+        final AtomicInteger execucoes = new AtomicInteger(0);
+        final LoopReconciliationService service = new LoopReconciliationService(
+            stateFile,
+            clock,
+            true,
+            1,
+            2,
+            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.incrementAndGet()
+        );
+
+        final var resumo = service.processarPosCiclo(
+            LocalDateTime.of(2026, 2, 20, 0, 5),
+            LocalDateTime.of(2026, 2, 20, 0, 35),
+            false,
+            true,
+            "timeout HTTP 429 sem runner falhado identificavel"
+        );
+
+        assertEquals(0, execucoes.get());
+        assertEquals(0, resumo.getReconciliacoesExecutadas());
+        assertEquals(0, resumo.getFalhas());
+        assertFalse(resumo.isPendenciaPorFalha());
+        assertTrue(resumo.getPendenciasRestantes().isEmpty());
+
+        final Properties estado = carregarEstado(stateFile);
+        assertEquals("", estado.getProperty("pending_targets"));
+        assertEquals("", estado.getProperty("pending_dates"));
+    }
+
+    @Test
+    void naoDeveAgendarRunnerAgregadoSemEntidade() {
+        salvarEstadoInicial(ONTEM.toString(), "");
+
+        final AtomicInteger execucoes = new AtomicInteger(0);
+        final LoopReconciliationService service = new LoopReconciliationService(
+            stateFile,
+            clock,
+            true,
+            1,
+            0,
+            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.incrementAndGet()
+        );
+
+        final var resumo = service.processarPosCiclo(
+            LocalDateTime.of(2026, 2, 20, 6, 0),
+            LocalDateTime.of(2026, 2, 20, 6, 15),
+            false,
+            true,
+            "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport"
+        );
+
+        assertEquals(0, execucoes.get());
+        assertFalse(resumo.isPendenciaPorFalha());
+        assertTrue(resumo.getPendenciasRestantes().isEmpty());
     }
 
     @Test
@@ -279,10 +347,17 @@ class LoopReconciliationServiceTest {
     }
 
     private void salvarEstadoInicial(final String lastDailyScheduledDate, final String pendingDates) {
+        salvarEstadoInicial(lastDailyScheduledDate, pendingDates, "");
+    }
+
+    private void salvarEstadoInicial(final String lastDailyScheduledDate,
+                                     final String pendingDates,
+                                     final String pendingTargets) {
         final Properties properties = new Properties();
         properties.setProperty("last_daily_scheduled_date", lastDailyScheduledDate == null ? "" : lastDailyScheduledDate);
         properties.setProperty("last_successful_reconciliation_date", "");
         properties.setProperty("pending_dates", pendingDates == null ? "" : pendingDates);
+        properties.setProperty("pending_targets", pendingTargets == null ? "" : pendingTargets);
         properties.setProperty("last_error", "");
         properties.setProperty("updated_at", "2026-02-20T00:00:00");
 
