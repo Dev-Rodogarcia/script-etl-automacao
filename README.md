@@ -12,8 +12,8 @@ O Extrator opera em alto volume de processamento e possui forte orquestração d
 
 ```mermaid
 graph TD
-    ESLGraphQL[ESL Cloud - GraphQL API] -->|Coletas, Fretes, Usuários, Faturas| ExtratorDaemon[Java 17 CLI ETL Daemon]
-    ESLDataExport[ESL Cloud - Data Export API] -->|Manifestos, Cotações, Contas a Pagar...| ExtratorDaemon
+    ESLGraphQL[ESL Cloud - GraphQL API] -->|Coletas, Fretes, Usuários| ExtratorDaemon[Java 17 CLI ETL Daemon]
+    ESLDataExport[ESL Cloud - Data Export API] -->|Manifestos, Localização de Cargas, Cotações...| ExtratorDaemon
     RasterAPI[Raster API] -->|Viagens e Paradas| ExtratorDaemon
     
     ExtratorDaemon -->|Persistência / DDL / Views BI| SQLServer[(SQL Server DB - ETL_SISTEMA / esl_cloud)]
@@ -105,7 +105,7 @@ A aplicação busca as configurações em arquivos `.env` ou variáveis de ambie
 # --- Integrações com APIs ---
 API_BASEURL=https://rodogarcia.eslcloud.com.br
 API_REST_TOKEN=token_aqui         # Utilizado para fluxos secundários (ocorrências)
-API_GRAPHQL_TOKEN=token_aqui      # Integração de Coletas, Fretes e Faturas GraphQL
+API_GRAPHQL_TOKEN=token_aqui      # Integração de Coletas, Fretes e Usuários GraphQL
 API_DATAEXPORT_TOKEN=token_aqui   # Integração de Manifestos, Cotações e Contas a Pagar
 
 # --- Integração com API Raster ---
@@ -154,7 +154,8 @@ Para operar de forma robusta 24 horas por dia em infraestruturas instáveis, o e
 1. **Retries com Backoff Exponencial**: Falhas de conexões HTTP com a ESL Cloud são tratadas em até 3 tentativas por página, com delay progressivo.
 2. **Watchdog Global**: No ciclo do daemon, um watchdog encerra e reinicia de forma isolada steps que entrarem em loop eterno ou travamento de rede.
 3. **Lock Transacional no Banco**: O fluxo completo utiliza locks do próprio SQL Server (`sp_getapplock`) para impedir execuções simultâneas concorrentes na mesma base.
-4. **Isolamento por Processo**: Steps sensíveis ou pesados (como a extração de Faturas GraphQL) podem ser disparados pelo CLI em processos Java filhos isolados, protegendo a JVM principal contra estouros de memória.
+4. **Processamento em Micro-batches**: Suporte a execução de micro-batch para otimização e controle de memória durante a extração de grandes volumes (como via ChunkedDataExportEntityExtractor).
+5. **Isolamento por Processo**: Steps sensíveis ou pesados podem ser disparados pelo CLI em processos Java filhos isolados, protegendo a JVM principal contra estouros de memória.
 
 ---
 
@@ -202,9 +203,9 @@ java -jar target/extrator.jar --loop-daemon-stop
 1. Pare o Daemon gracioso utilizando o comando acima.
 2. Certifique-se no monitor de recursos do Windows de que o processo Java do PID correspondente foi finalizado.
 3. Execute as alterações necessárias (aplicação de scripts SQL em `/database`, build do JAR com Maven).
-4. Inicialize novamente o daemon informando as flags corretas (recomenda-se omitir faturas graphql no daemon recorrente curto):
+4. Inicialize novamente o daemon informando as flags corretas:
    ```powershell
-   java -jar target/extrator.jar --loop-daemon-start --sem-faturas-graphql
+   java -jar target/extrator.jar --loop-daemon-start
    ```
 5. Valide que o status retornou para `RUNNING`.
 
