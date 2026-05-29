@@ -14,7 +14,7 @@ class ExecutionLockUseCasesTest {
         final RecordingLockManager lockManager = new RecordingLockManager();
         final FluxoCompletoUseCase useCase = new FluxoCompletoUseCase(new PreBackfillReferencialColetasUseCase(), lockManager);
 
-        assertThrows(Exception.class, () -> useCase.executar(false, false));
+        assertThrows(Exception.class, () -> useCase.executar(false));
         assertEquals(1, lockManager.acquireCount);
     }
 
@@ -78,7 +78,7 @@ class ExecutionLockUseCasesTest {
         final RecordingLockManager lockManager = new RecordingLockManager();
         final TesteApiUseCase useCase = new TesteApiUseCase(lockManager);
 
-        assertThrows(Exception.class, () -> useCase.executar(new TesteApiRequest("graphql", null, true)));
+        assertThrows(Exception.class, () -> useCase.executar(new TesteApiRequest("graphql", null)));
         assertEquals(1, lockManager.acquireCount);
     }
 

@@ -101,7 +101,7 @@ public class FluxoCompletoUseCase {
         this.executionLockManager = executionLockManager;
     }
 
-    public void executar(final boolean incluirFaturasGraphQL, final boolean modoLoopDaemon) throws Exception {
+    public void executar(final boolean modoLoopDaemon) throws Exception {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
         final Map<String, String> overridesTemporarios = modoLoopDaemon
             ? Map.of(
@@ -116,7 +116,10 @@ public class FluxoCompletoUseCase {
         final LocalDate dataInicio = dataFim.minusDays(1);
         final ExecutionAuditPort executionAuditPort = AplicacaoContexto.executionAuditPort();
         final Map<String, ExecutionWindowPlan> planosExecucao =
-            new ExecutionWindowPlanner(executionAuditPort).planejarFluxoCompleto(dataFim, incluirFaturasGraphQL);
+            new ExecutionWindowPlanner(executionAuditPort).planejarFluxoCompleto(
+                dataFim,
+                ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH
+            );
         final LocalDate dataInicioOrquestracao = planosExecucao.values().stream()
             .map(ExecutionWindowPlan::consultaDataInicio)
             .min(LocalDate::compareTo)
@@ -141,10 +144,6 @@ public class FluxoCompletoUseCase {
         if (modoLoopDaemon) {
             log.console("Contexto: LOOP DAEMON (integridade final nao bloqueante)");
         }
-        log.console(
-            "Faturas GraphQL: {}",
-            incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)"
-        );
         log.console("Periodo base do ciclo: {} a {}", FormatadorData.formatBR(dataInicio), FormatadorData.formatBR(dataFim));
         log.console("Inicio: {}", FormatadorData.formatBR(RelogioSistema.agora()));
         log.console("=".repeat(60) + "\n");
@@ -170,7 +169,7 @@ public class FluxoCompletoUseCase {
         int totalFalhas = 0;
 
         final PipelineOrchestrator orchestrator = AplicacaoContexto.orchestratorFactory().criar();
-        final List<PipelineStep> steps = AplicacaoContexto.stepsFactory().criarStepsFluxoCompleto(incluirFaturasGraphQL, true);
+        final List<PipelineStep> steps = AplicacaoContexto.stepsFactory().criarStepsFluxoCompleto(true);
         log.info("Iniciando fluxo ETL via PipelineOrchestrator com {} steps", steps.size());
 
         final PipelineReport pipelineReport = orchestrator.executar(dataInicioOrquestracao, dataFim, steps);
@@ -247,12 +246,8 @@ public class FluxoCompletoUseCase {
                 ConstantesEntidades.INVENTARIO,
                 ConstantesEntidades.SINISTROS,
                 ConstantesEntidades.CONTAS_A_PAGAR,
-                ConstantesEntidades.FATURAS_POR_CLIENTE,
-                ConstantesEntidades.FATURAS_GRAPHQL
+                ConstantesEntidades.FATURAS_POR_CLIENTE
             ));
-            if (!incluirFaturasGraphQL) {
-                entidadesEsperadas.remove(ConstantesEntidades.FATURAS_GRAPHQL);
-            }
 
             final IntegridadeEtlPort.ResultadoIntegridade resultadoIntegridade =
                 integridadePort.validarExecucao(inicioExecucao, RelogioSistema.agora(), entidadesEsperadas, modoLoopDaemon);
@@ -316,7 +311,7 @@ public class FluxoCompletoUseCase {
         );
 
         log.info(
-            "RESUMO_EXECUTIVO | status={} | inicio={} | fim={} | duracao_seg={} | duracao_min={} | runners_ok={} | runners_falha={} | validacao_final={} | completude_total={} | completude_nao_ok={} | integridade_falhas={} | quality_ok={} | quality_falhas={} | modo_loop_daemon={} | faturas_graphql={}",
+            "RESUMO_EXECUTIVO | status={} | inicio={} | fim={} | duracao_seg={} | duracao_min={} | runners_ok={} | runners_falha={} | validacao_final={} | completude_total={} | completude_nao_ok={} | integridade_falhas={} | quality_ok={} | quality_falhas={} | modo_loop_daemon={}",
             statusExecutivo,
             FormatadorData.formatBR(inicioExecucao),
             FormatadorData.formatBR(fimExecucao),
@@ -330,8 +325,7 @@ public class FluxoCompletoUseCase {
             integridadeFalhas,
             qualidadeDadosAprovada,
             qualidadeChecksFalhas,
-            modoLoopDaemon,
-            incluirFaturasGraphQL
+            modoLoopDaemon
         );
         if (!runnersFalhados.isEmpty()) {
             log.warn("RESUMO_EXECUTIVO | runners_falhados={}", String.join(", ", runnersFalhados));
@@ -482,9 +476,6 @@ public class FluxoCompletoUseCase {
             }
         }
 
-        if (step.contains(ConstantesEntidades.FATURAS_GRAPHQL)) {
-            return "GraphQL/" + ConstantesEntidades.FATURAS_GRAPHQL;
-        }
         return null;
     }
 
@@ -591,7 +582,6 @@ public class FluxoCompletoUseCase {
             ConstantesEntidades.USUARIOS_SISTEMA,
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.FRETES,
-            ConstantesEntidades.FATURAS_GRAPHQL,
             ConstantesEntidades.MANIFESTOS,
             ConstantesEntidades.COTACOES,
             ConstantesEntidades.LOCALIZACAO_CARGAS,

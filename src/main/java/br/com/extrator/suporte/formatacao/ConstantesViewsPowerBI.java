@@ -30,7 +30,6 @@ public final class ConstantesViewsPowerBI {
         VIEWS.put("faturas_por_cliente", "vw_faturas_por_cliente_powerbi");
         VIEWS.put("fretes", "vw_fretes_powerbi");
         VIEWS.put("coletas", "vw_coletas_powerbi");
-        VIEWS.put("faturas_graphql", "vw_faturas_graphql_powerbi");
         VIEWS.put("cotacoes", "vw_cotacoes_powerbi");
         VIEWS.put("contas_a_pagar", "vw_contas_a_pagar_powerbi");
         VIEWS.put("localizacao_cargas", "vw_localizacao_cargas_powerbi");

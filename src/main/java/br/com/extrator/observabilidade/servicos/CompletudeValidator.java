@@ -90,7 +90,6 @@ public class CompletudeValidator {
     private static final Map<String, String> MAPEAMENTO_ENTIDADES_TABELAS = Map.of(
         ConstantesEntidades.FRETES, ConstantesEntidades.FRETES,
         ConstantesEntidades.COLETAS, ConstantesEntidades.COLETAS,
-        ConstantesEntidades.FATURAS_GRAPHQL, ConstantesEntidades.FATURAS_GRAPHQL,
         ConstantesEntidades.MANIFESTOS, ConstantesEntidades.MANIFESTOS,
         ConstantesEntidades.COTACOES, ConstantesEntidades.COTACOES,
         ConstantesEntidades.LOCALIZACAO_CARGAS, ConstantesEntidades.LOCALIZACAO_CARGAS,
@@ -144,11 +143,6 @@ public class CompletudeValidator {
      * @return Optional com Map contendo chave=nome_entidade e valor=contagem_esl_cloud, ou Optional.empty() se falhar
      */
     public Optional<Map<String, Integer>> buscarTotaisEslCloud(final LocalDate dataReferencia) {
-        return buscarTotaisEslCloud(dataReferencia, true);
-    }
-
-    public Optional<Map<String, Integer>> buscarTotaisEslCloud(final LocalDate dataReferencia,
-                                                                final boolean incluirFaturasGraphQL) {
         logger.info("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â Iniciando busca de totais do ESL Cloud para data: {}", dataReferencia);
         
         final Map<String, Integer> totaisEslCloud = new HashMap<>();
@@ -156,7 +150,7 @@ public class CompletudeValidator {
         try {
         // Contagens via APIs disponÃƒÆ’Ã‚Â­veis
             
-            // === API GraphQL - Fretes, Coletas e Faturas GraphQL ===
+            // === API GraphQL - Fretes e Coletas ===
             logger.info("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Buscando contagens via API GraphQL...");
             
             final var resFretes = clienteApiGraphQL.buscarFretes(dataReferencia);
@@ -166,13 +160,7 @@ public class CompletudeValidator {
             final var resColetas = clienteApiGraphQL.buscarColetas(dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.COLETAS, resColetas.getRegistrosExtraidos());
             logger.info("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Coletas: {} registros", resColetas.getRegistrosExtraidos());
-            if (incluirFaturasGraphQL) {
-                final var resFaturasGraphQL = clienteApiGraphQL.buscarCapaFaturas(dataReferencia);
-                totaisEslCloud.put(ConstantesEntidades.FATURAS_GRAPHQL, resFaturasGraphQL.getRegistrosExtraidos());
-                logger.info("Ã¢Å“â€¦ Faturas GraphQL: {} registros", resFaturasGraphQL.getRegistrosExtraidos());
-            } else {
-                logger.info("Faturas GraphQL ignoradas na busca de totais (flag --sem-faturas-graphql).");
-            }            
+
             // === API DataExport - Manifestos, CotaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes, LocalizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes, Contas a Pagar, Faturas/Cliente ===
             logger.info("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  Buscando contagens via API DataExport (ÃƒÆ’Ã‚Âºltimas 24h)...");
 
@@ -441,8 +429,7 @@ public class CompletudeValidator {
         return janelaTemporalValidator.validarJanelaTemporal(MAPEAMENTO_ENTIDADES_TABELAS.keySet(), dataReferencia);
     }
 
-    public Optional<Map<String, Integer>> buscarTotaisEslCloudJanelaPrincipal(final LocalDate dataReferencia,
-                                                                               final boolean incluirFaturasGraphQL) {
+    public Optional<Map<String, Integer>> buscarTotaisEslCloudJanelaPrincipal(final LocalDate dataReferencia) {
         final LocalDate dataInicio = dataReferencia.minusDays(1);
         logger.info(
             "Iniciando busca de totais do ESL Cloud para a janela principal {} a {} (D-1..D).",
@@ -462,14 +449,6 @@ public class CompletudeValidator {
             final var resColetas = clienteApiGraphQL.buscarColetas(dataReferencia);
             totaisEslCloud.put(ConstantesEntidades.COLETAS, resColetas.getRegistrosExtraidos());
             logger.info("GraphQL coletas: {} registros", resColetas.getRegistrosExtraidos());
-
-            if (incluirFaturasGraphQL) {
-                final var resFaturasGraphQL = clienteApiGraphQL.buscarCapaFaturas(dataReferencia);
-                totaisEslCloud.put(ConstantesEntidades.FATURAS_GRAPHQL, resFaturasGraphQL.getRegistrosExtraidos());
-                logger.info("GraphQL faturas_graphql: {} registros", resFaturasGraphQL.getRegistrosExtraidos());
-            } else {
-                logger.info("GraphQL faturas_graphql ignoradas na busca de totais (flag --sem-faturas-graphql).");
-            }
 
             logger.info(
                 "Buscando contagens via API DataExport na janela principal {} a {} (D-1..D)...",

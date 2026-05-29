@@ -31,7 +31,7 @@ import br.com.extrator.integracao.graphql.services.GraphQLExtractionService;
 import br.com.extrator.suporte.console.LoggerConsole;
 
 /**
- * Runner independente para a API GraphQL (Coletas, Fretes e Faturas GraphQL).
+ * Runner independente para a API GraphQL (Coletas, Fretes e Usuarios).
  * Refatorado para usar serviços de orquestração.
  * 
  * CORREÇÃO ALTO #2: Validação de parâmetros NULL adicionada
@@ -106,29 +106,6 @@ public final class GraphQLRunner {
         
         final GraphQLExtractionService service = new GraphQLExtractionService();
         service.execute(dataInicio, dataInicio, entidade);
-    }
-    
-    /**
-     * FASE 3: Executa extração APENAS de Faturas GraphQL para um intervalo de datas.
-     * Este método é chamado APÓS todas as outras entidades serem extraídas.
-     * 
-     * Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
-     * então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
-     * 
-     * @param dataInicio Data de início do período (não pode ser null)
-     * @param dataFim Data de fim do período (não pode ser null)
-     * @throws IllegalArgumentException Se dataInicio ou dataFim forem null, ou se dataFim < dataInicio
-     * @throws Exception Se houver falha na extração
-     */
-    @Deprecated(since = "2026-03-06", forRemoval = false)
-    public static void executarFaturasGraphQLPorIntervalo(final LocalDate dataInicio, final LocalDate dataFim) throws Exception {
-        validarIntervalo(dataInicio, dataFim);
-        
-        log.info("🔄 [FASE 3] Executando extração de Faturas GraphQL por último...");
-        log.info("📅 Período: {} a {}", dataInicio, dataFim);
-        
-        final GraphQLExtractionService service = new GraphQLExtractionService();
-        service.execute(dataInicio, dataFim, br.com.extrator.suporte.validacao.ConstantesEntidades.FATURAS_GRAPHQL);
     }
     
     /**

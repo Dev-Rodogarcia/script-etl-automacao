@@ -34,8 +34,8 @@ class LoopDaemonRunHandlerTest {
         final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
             stateStore,
             historyWriter,
-            incluirFaturas -> ciclosExecutados.incrementAndGet(),
-            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
+            () -> ciclosExecutados.incrementAndGet(),
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
             (proximoCiclo, store) -> chamadaEspera.getAndIncrement() == 0
                 ? LoopDaemonRunHandler.WaitResult.FORCE_RUN_REQUESTED
                 : LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
@@ -43,10 +43,10 @@ class LoopDaemonRunHandlerTest {
             () -> 9876L,
             30L,
             false,
-            incluirFaturas -> java.time.Duration.ofSeconds(30)
+            () -> java.time.Duration.ofSeconds(30)
         );
 
-        handler.executar(true);
+        handler.executar();
 
         assertEquals(2, ciclosExecutados.get(), "Force run deve disparar um segundo ciclo imediato");
         assertFalse(Files.exists(stateStore.getPidFile()), "PID deve ser limpo ao finalizar");
@@ -63,19 +63,19 @@ class LoopDaemonRunHandlerTest {
         final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
             stateStore,
             historyWriter,
-            incluirFaturas -> {
+            () -> {
                 throw new RuntimeException(LoopDaemonHandlerSupport.MENSAGEM_FALHA_INTEGRIDADE + " em teste");
             },
-            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 4321L,
             30L,
             false,
-            incluirFaturas -> java.time.Duration.ofSeconds(30)
+            () -> java.time.Duration.ofSeconds(30)
         );
 
-        handler.executar(true);
+        handler.executar();
 
         final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));
         final String conteudo = Files.readString(logCiclo, StandardCharsets.UTF_8);
@@ -93,7 +93,7 @@ class LoopDaemonRunHandlerTest {
             true,
             1,
             0,
-            (data, api, entidade, incluirFaturas) -> {
+            (data, api, entidade) -> {
                 throw new IllegalStateException("falha simulada");
             }
         );
@@ -101,7 +101,6 @@ class LoopDaemonRunHandlerTest {
         final ReconciliationSummary resumoComFalha = service.processarPosCiclo(
             LocalDateTime.now().minusMinutes(10),
             LocalDateTime.now(),
-            true,
             true,
             null
         );
@@ -125,7 +124,7 @@ class LoopDaemonRunHandlerTest {
         final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
             stateStore,
             historyWriter,
-            incluirFaturas -> {
+            () -> {
                 while (true) {
                     try {
                         Thread.sleep(1_000L);
@@ -134,17 +133,17 @@ class LoopDaemonRunHandlerTest {
                     }
                 }
             },
-            (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 2468L,
             30L,
             false,
-            incluirFaturas -> java.time.Duration.ofMillis(200)
+            () -> java.time.Duration.ofMillis(200)
         );
 
         final long inicioMs = System.currentTimeMillis();
-        handler.executar(false);
+        handler.executar();
         final long duracaoMs = System.currentTimeMillis() - inicioMs;
 
         final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));
@@ -166,20 +165,20 @@ class LoopDaemonRunHandlerTest {
             final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
                 stateStore,
                 historyWriter,
-                incluirFaturas -> {
+                () -> {
                     ciclosExecutados.incrementAndGet();
                     throw new RuntimeException(LoopDaemonHandlerSupport.MENSAGEM_FALHA_INTEGRIDADE + " em serie");
                 },
-                (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> null,
+                (inicio, fimExtracao, sucesso, detalheFalha) -> null,
                 (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.TIME_ELAPSED,
                 cicloLog -> () -> { },
                 () -> 97531L,
                 30L,
                 false,
-                incluirFaturas -> java.time.Duration.ofSeconds(30)
+                () -> java.time.Duration.ofSeconds(30)
             );
 
-            handler.executar(true);
+            handler.executar();
 
             final var estado = stateStore.loadState();
             assertEquals(3, ciclosExecutados.get());
@@ -207,10 +206,10 @@ class LoopDaemonRunHandlerTest {
             final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
                 stateStore,
                 historyWriter,
-                incluirFaturas -> {
+                () -> {
                     throw new ExecutionLockBusyException("etl-global-execution", -1);
                 },
-                (inicio, fimExtracao, sucesso, incluirFaturas, detalheFalha) -> {
+                (inicio, fimExtracao, sucesso, detalheFalha) -> {
                     reconciliacoes.incrementAndGet();
                     return null;
                 },
@@ -219,10 +218,10 @@ class LoopDaemonRunHandlerTest {
                 () -> 8642L,
                 30L,
                 false,
-                incluirFaturas -> java.time.Duration.ofSeconds(30)
+                () -> java.time.Duration.ofSeconds(30)
             );
 
-            handler.executar(false);
+            handler.executar();
 
             final var estado = stateStore.loadState();
             final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));

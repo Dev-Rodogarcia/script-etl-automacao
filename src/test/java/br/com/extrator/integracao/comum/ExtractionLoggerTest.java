@@ -239,7 +239,7 @@ class ExtractionLoggerTest {
 
         @Override
         public String getEntityName() {
-            return ConstantesEntidades.FATURAS_GRAPHQL;
+            return ConstantesEntidades.FRETES;
         }
 
         @Override

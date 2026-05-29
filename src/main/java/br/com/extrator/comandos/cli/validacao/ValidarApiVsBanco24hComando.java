@@ -3,13 +3,13 @@ Arquivo : src/main/java/br/com/extrator/comandos/cli/validacao/ValidarApiVsBanco
 Classe  : ValidarApiVsBanco24hComando (command)
 Pacote  : br.com.extrator.comandos.cli.validacao
 Modulo  : CLI - Validacao
-Papel   : Comando para validação 24h entre API (com faturas GraphQL) e SQL Server.
+Papel   : Comando para validação 24h entre API e SQL Server.
 Conecta com:
 - br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hUseCase
 - br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hRequest
 - br.com.extrator.suporte.tempo.RelogioSistema
 Fluxo geral:
-1) executar() extrai flags: --sem-faturas-graphql, --permitir-fallback-janela
+1) executar() extrai flags: --permitir-fallback-janela
 2) Monta ValidacaoApiBanco24hRequest com flags e data hoje
 3) Delegação a useCase.executar()
 Estrutura interna:
@@ -38,7 +38,6 @@ public class ValidarApiVsBanco24hComando implements Comando {
     public void executar(final String[] args) throws Exception {
         useCase.executar(
             new ValidacaoApiBanco24hRequest(
-                !possuiFlag(args, "--sem-faturas-graphql"),
                 possuiFlag(args, "--permitir-fallback-janela"),
                 RelogioSistema.hoje()
             )

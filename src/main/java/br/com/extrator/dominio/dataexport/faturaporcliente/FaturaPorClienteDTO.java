@@ -159,8 +159,7 @@ public class FaturaPorClienteDTO {
     @JsonProperty("fit_fte_invoices_order_number")
     private List<String> pedidosCliente;
 
-    // Campo para armazenar ID da cobrança (creditCustomerBilling) - pode estar no metadata
-    // Usado para enriquecimento via GraphQL
+    // Campo opcional para rastrear o ID de cobranca quando fornecido no payload.
     private String billingId;
 
     private final Map<String, Object> otherProperties = new LinkedHashMap<>();

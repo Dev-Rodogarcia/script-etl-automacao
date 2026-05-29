@@ -4,7 +4,7 @@ Classe  : PlanejadorEscopoExtracaoIntervalo (class)
 Pacote  : br.com.extrator.aplicacao.extracao
 Modulo  : Use Case - Extracao
 
-Papel   : Planeja escopo (steps e entidades) de extracao conforme filtros (API, entidade, flags).
+Papel   : Planeja escopo (steps e entidades) de extracao conforme filtros de API e entidade.
 
 Conecta com:
 - ExtracaoPorIntervaloUseCase (consulta para planejar steps e entidades)
@@ -12,14 +12,14 @@ Conecta com:
 - AplicacaoContexto (obtem gateways)
 
 Fluxo geral:
-1) Use case passa filtros (apiEspecifica, entidadeEspecifica, incluirFaturasGraphQL).
+1) Use case passa filtros (apiEspecifica, entidadeEspecifica).
 2) Planejar determina quais entidades sao afetadas (para validacao e integridade).
 3) Planejar cria lista de PipelineSteps a orquestrar.
 4) Retorna escopo: passos, entidades para volume, entidades para integridade.
 
 Estrutura interna:
 Metodos principais:
-- criarSteps(): retorna List<PipelineStep> conforme filtros (GraphQL, DataExport, Faturas).
+- criarSteps(): retorna List<PipelineStep> conforme filtros (GraphQL, DataExport, Raster).
 - determinarEntidadesParaLimite(): quais entidades validar limite de extracao.
 - determinarEntidadesObrigatoriasParaVolume(): entidades criticas para validacao de volume.
 - determinarEntidadesEsperadasParaIntegridade(): entidades esperadas no schema/chaves.
@@ -46,8 +46,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
 
     List<String> determinarEntidadesParaLimite(
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final List<String> entidadesParaValidar = new ArrayList<>();
 
@@ -61,9 +60,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
             if ("graphql".equalsIgnoreCase(apiEspecifica)) {
                 entidadesParaValidar.add(ConstantesEntidades.COLETAS);
                 entidadesParaValidar.add(ConstantesEntidades.FRETES);
-                if (incluirFaturasGraphQL) {
-                    entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
-                }
             } else if ("dataexport".equalsIgnoreCase(apiEspecifica)) {
                 entidadesParaValidar.add(ConstantesEntidades.MANIFESTOS);
                 entidadesParaValidar.add(ConstantesEntidades.COTACOES);
@@ -87,9 +83,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
         entidadesParaValidar.add(ConstantesEntidades.FATURAS_POR_CLIENTE);
         entidadesParaValidar.add(ConstantesEntidades.INVENTARIO);
         entidadesParaValidar.add(ConstantesEntidades.SINISTROS);
-        if (incluirFaturasGraphQL) {
-            entidadesParaValidar.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
         if (AplicacaoContexto.rasterHabilitadoParaExecucao()) {
             entidadesParaValidar.add(ConstantesEntidades.RASTER_VIAGENS);
         }
@@ -99,8 +92,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
 
     List<PipelineStep> criarSteps(
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final String entidadeNormalizada = normalizarEntidade(entidadeEspecifica);
         final List<PipelineStep> steps = new ArrayList<>();
@@ -108,7 +100,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
         if (apiEspecifica == null || apiEspecifica.isBlank()) {
             final GraphQLGateway graphQLGateway = AplicacaoContexto.graphQLGateway();
             final DataExportGateway dataExportGateway = AplicacaoContexto.dataExportGateway();
-            adicionarStepsGraphQLGranulares(steps, graphQLGateway, incluirFaturasGraphQL);
+            adicionarStepsGraphQLGranulares(steps, graphQLGateway);
             adicionarStepsDataExportGranulares(steps, dataExportGateway);
             if (AplicacaoContexto.rasterHabilitadoParaExecucao()) {
                 steps.add(new RasterPipelineStep(AplicacaoContexto.rasterGateway(), ConstantesEntidades.RASTER_VIAGENS));
@@ -119,7 +111,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
         if ("graphql".equalsIgnoreCase(apiEspecifica)) {
             final GraphQLGateway graphQLGateway = AplicacaoContexto.graphQLGateway();
             if (entidadeNormalizada == null) {
-                adicionarStepsGraphQLGranulares(steps, graphQLGateway, incluirFaturasGraphQL);
+                adicionarStepsGraphQLGranulares(steps, graphQLGateway);
                 return steps;
             }
             steps.add(new GraphQLPipelineStep(graphQLGateway, entidadeNormalizada));
@@ -148,8 +140,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
 
     Set<String> determinarEntidadesObrigatoriasParaVolume(
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final Set<String> entidades = new LinkedHashSet<>();
 
@@ -169,9 +160,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
         if (apiTodas || apiGraphQL) {
             entidades.add(ConstantesEntidades.COLETAS);
             entidades.add(ConstantesEntidades.FRETES);
-            if (incluirFaturasGraphQL) {
-                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-            }
         }
 
         if (apiTodas || apiDataExport) {
@@ -191,8 +179,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
 
     Set<String> determinarEntidadesParaResumo(
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final Set<String> entidades = new LinkedHashSet<>();
 
@@ -213,9 +200,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
             entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
             entidades.add(ConstantesEntidades.COLETAS);
             entidades.add(ConstantesEntidades.FRETES);
-            if (incluirFaturasGraphQL) {
-                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-            }
         }
 
         if (apiTodas || apiDataExport) {
@@ -237,8 +221,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
 
     Set<String> determinarEntidadesEsperadasParaIntegridade(
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final Set<String> entidades = new LinkedHashSet<>();
 
@@ -264,9 +247,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
             entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
             entidades.add(ConstantesEntidades.COLETAS);
             entidades.add(ConstantesEntidades.FRETES);
-            if (incluirFaturasGraphQL) {
-                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-            }
         }
 
         if (apiTodas || apiDataExport) {
@@ -282,15 +262,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
         return entidades;
     }
 
-    boolean isEntidadeFaturasGraphQL(final String entidadeEspecifica) {
-        if (entidadeEspecifica == null || entidadeEspecifica.isBlank()) {
-            return false;
-        }
-        return ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica)
-            || "faturas".equalsIgnoreCase(entidadeEspecifica)
-            || "faturasgraphql".equalsIgnoreCase(entidadeEspecifica);
-    }
-
     String normalizarEntidade(final String entidade) {
         if (entidade == null || entidade.isBlank()) {
             return null;
@@ -302,11 +273,6 @@ final class PlanejadorEscopoExtracaoIntervalo {
         }
         if (ConstantesEntidades.FRETES.equals(valor)) {
             return ConstantesEntidades.FRETES;
-        }
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(valor)
-            || "faturas".equals(valor)
-            || "faturasgraphql".equals(valor)) {
-            return ConstantesEntidades.FATURAS_GRAPHQL;
         }
         if (ConstantesEntidades.USUARIOS_SISTEMA.equals(valor)) {
             return ConstantesEntidades.USUARIOS_SISTEMA;
@@ -370,14 +336,10 @@ final class PlanejadorEscopoExtracaoIntervalo {
     }
 
     private void adicionarStepsGraphQLGranulares(final List<PipelineStep> steps,
-                                                 final GraphQLGateway graphQLGateway,
-                                                 final boolean incluirFaturasGraphQL) {
+                                                 final GraphQLGateway graphQLGateway) {
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.USUARIOS_SISTEMA));
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.COLETAS));
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FRETES));
-        if (incluirFaturasGraphQL) {
-            steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FATURAS_GRAPHQL));
-        }
     }
 
     private void adicionarStepsDataExportGranulares(final List<PipelineStep> steps,

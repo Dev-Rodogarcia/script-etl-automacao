@@ -16,7 +16,6 @@ Atributos: [PENDENTE]
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
@@ -38,7 +37,6 @@ final class GraphQLPaginator {
     private final Map<String, Integer> contadorFalhasConsecutivas;
     private final Set<String> entidadesComCircuitAberto;
     private final Map<String, Instant> circuitosAbertosDesde;
-    private final GraphQLPageAuditLogger pageAuditLogger;
     private final GraphQLPageFetcher pageFetcher;
 
     GraphQLPaginator(final Logger logger,
@@ -48,7 +46,6 @@ final class GraphQLPaginator {
                      final Map<String, Integer> contadorFalhasConsecutivas,
                      final Set<String> entidadesComCircuitAberto,
                      final Map<String, Instant> circuitosAbertosDesde,
-                     final GraphQLPageAuditLogger pageAuditLogger,
                      final GraphQLPageFetcher pageFetcher) {
         this.logger = logger;
         this.intervaloLogProgresso = intervaloLogProgresso;
@@ -57,7 +54,6 @@ final class GraphQLPaginator {
         this.contadorFalhasConsecutivas = contadorFalhasConsecutivas;
         this.entidadesComCircuitAberto = entidadesComCircuitAberto;
         this.circuitosAbertosDesde = circuitosAbertosDesde;
-        this.pageAuditLogger = pageAuditLogger;
         this.pageFetcher = pageFetcher;
     }
 
@@ -98,41 +94,17 @@ final class GraphQLPaginator {
         ResultadoExtracao.MotivoInterrupcao motivoInterrupcao = ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS;
 
         final int limitePaginasGeral = ConfigApi.obterLimitePaginasApiGraphQL();
-        final String nomeEntidadeFaturasGraphQL = ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.FATURAS_GRAPHQL);
         final String nomeEntidadeUsuarios = ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.USUARIOS_SISTEMA);
-        final int limitePaginas = nomeEntidadeFaturasGraphQL.equals(nomeEntidade)
-            ? ConfigApi.obterLimitePaginasFaturasGraphQL()
-            : nomeEntidadeUsuarios.equals(nomeEntidade)
-                ? ConfigApi.obterLimitePaginasUsuariosGraphQL()
+        final int limitePaginas = nomeEntidadeUsuarios.equals(nomeEntidade)
+            ? ConfigApi.obterLimitePaginasUsuariosGraphQL()
             : limitePaginasGeral;
         final int maxRegistros = nomeEntidadeUsuarios.equals(nomeEntidade)
             ? ConfigApi.obterMaxRegistrosUsuariosGraphQL()
             : ConfigApi.obterMaxRegistrosGraphQL();
-        final boolean auditar = nomeEntidadeFaturasGraphQL.equals(nomeEntidade);
-        final String runUuid = auditar ? java.util.UUID.randomUUID().toString() : null;
         final int perInt = 100;
         Integer tamanhoPaginaEsperado = null;
         int tentativasAnomaliaPagina = 0;
         final int maxTentativasAnomalia = ConfigApi.obterMaxTentativasAnomaliaPaginacaoGraphQL();
-
-        LocalDate janelaInicio = null;
-        LocalDate janelaFim = null;
-        try {
-            final Object paramsObj = variaveis != null ? variaveis.get("params") : null;
-            if (paramsObj instanceof final Map<?, ?> m) {
-                final Object v1 = m.get("issueDate");
-                final Object v2 = m.get("dueDate");
-                final Object v3 = m.get("originalDueDate");
-                final String dataStr = v1 != null ? v1.toString() : (v2 != null ? v2.toString() : (v3 != null ? v3.toString() : null));
-                if (dataStr != null && !dataStr.isBlank()) {
-                    final LocalDate d = LocalDate.parse(dataStr);
-                    janelaInicio = d;
-                    janelaFim = d;
-                }
-            }
-        } catch (final RuntimeException ignored) {
-            logger.debug("Falha ao inferir janela de auditoria da query GraphQL: {}", ignored.getMessage());
-        }
 
         while (hasNextPage) {
             try {
@@ -233,19 +205,6 @@ final class GraphQLPaginator {
                     tamanhoPaginaEsperado,
                     resposta.getHasNextPage()
                 );
-
-                if (auditar && executionUuid != null && runUuid != null) {
-                    pageAuditLogger.registrarPagina(
-                        executionUuid,
-                        runUuid,
-                        paginaAtual,
-                        perInt,
-                        janelaInicio,
-                        janelaFim,
-                        resposta,
-                        tipoClasse
-                    );
-                }
 
                 if (chunkConsumer == null) {
                     todasEntidades.addAll(resposta.getEntidades());

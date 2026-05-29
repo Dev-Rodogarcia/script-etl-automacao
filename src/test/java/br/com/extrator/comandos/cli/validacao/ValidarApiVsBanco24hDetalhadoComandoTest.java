@@ -1,7 +1,6 @@
 package br.com.extrator.comandos.cli.validacao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -19,12 +18,10 @@ class ValidarApiVsBanco24hDetalhadoComandoTest {
         comando.executar(new String[] {
             "--validar-api-banco-24h-detalhado",
             "--periodo-fechado",
-            "--sem-faturas-graphql",
             "--execution-uuid",
             "  af699a2e-0177-4c98-9ded-d0166fa4ada1  "
         });
 
-        assertFalse(useCase.request.incluirFaturasGraphQL());
         assertTrue(useCase.request.periodoFechado());
         assertEquals("af699a2e-0177-4c98-9ded-d0166fa4ada1", useCase.request.executionUuidAncora());
         assertEquals("af699a2e-0177-4c98-9ded-d0166fa4ada1", useCase.request.executionUuidAncoraOpt().orElseThrow());

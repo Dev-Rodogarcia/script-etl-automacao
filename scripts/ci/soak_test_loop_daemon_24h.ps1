@@ -1,7 +1,6 @@
 param(
     [int]$Hours = 24,
     [int]$PollMinutes = 5,
-    [switch]$ComFaturasGraphql,
     [switch]$PularValidacoesApiBanco,
     [string]$OutputPath,
     [int]$ShutdownTimeoutSeconds = 180
@@ -48,9 +47,6 @@ function Limit-RecentFiles {
 }
 
 Limit-RecentFiles -Directory $daemonRuntimeDir -Filter "soak_status_*.log" -MaxFiles 20
-
-$flagFaturas = if ($ComFaturasGraphql) { @() } else { @("--sem-faturas-graphql") }
-$modoFaturas = if ($ComFaturasGraphql) { "com faturas GraphQL" } else { "sem faturas GraphQL" }
 
 function Invoke-Extrator {
     param(
@@ -121,11 +117,11 @@ $started = $false
 $endTime = (Get-Date).AddHours([Math]::Abs($Hours))
 
 try {
-    Write-Host "Soak test do loop daemon iniciado ($modoFaturas)."
+    Write-Host "Soak test do loop daemon iniciado."
     Write-Host "Duracao alvo: $Hours hora(s). Polling a cada $PollMinutes minuto(s)."
     Write-Host "Log de snapshots: $statusLog"
 
-    Invoke-Extrator -Titulo "Etapa 1/5 - Iniciar loop daemon" -Args (@("--loop-daemon-start") + $flagFaturas)
+    Invoke-Extrator -Titulo "Etapa 1/5 - Iniciar loop daemon" -Args @("--loop-daemon-start")
     $started = $true
 
     Write-StatusSnapshot
@@ -163,8 +159,8 @@ finally {
     }
 
     if (-not $PularValidacoesApiBanco) {
-        Invoke-Extrator -Titulo "Validacao API x banco detalhada" -Args (@("--validar-api-banco-24h-detalhado") + $flagFaturas) -IgnoreFailure | Out-Null
-        Invoke-Extrator -Titulo "Validacao API x banco resumida" -Args (@("--validar-api-banco-24h") + $flagFaturas) -IgnoreFailure | Out-Null
+        Invoke-Extrator -Titulo "Validacao API x banco detalhada" -Args @("--validar-api-banco-24h-detalhado") -IgnoreFailure | Out-Null
+        Invoke-Extrator -Titulo "Validacao API x banco resumida" -Args @("--validar-api-banco-24h") -IgnoreFailure | Out-Null
     }
 }
 

@@ -19,7 +19,6 @@ class ValidarCompletudeTodasEntidadesSqlResourceTest {
             "usuarios_sistema",
             "coletas",
             "fretes",
-            "faturas_graphql",
             "manifestos",
             "cotacoes",
             "localizacao_cargas",

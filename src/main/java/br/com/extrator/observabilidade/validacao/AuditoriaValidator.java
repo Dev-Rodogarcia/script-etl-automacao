@@ -146,7 +146,6 @@ public class AuditoriaValidator {
                 ConstantesEntidades.CONTAS_A_PAGAR,
                 ConstantesEntidades.FATURAS_POR_CLIENTE,
                 ConstantesEntidades.FRETES,
-                ConstantesEntidades.FATURAS_GRAPHQL,
                 ConstantesEntidades.MANIFESTOS,
                 ConstantesEntidades.LOCALIZACAO_CARGAS
             );
@@ -176,7 +175,6 @@ public class AuditoriaValidator {
             ConstantesEntidades.CONTAS_A_PAGAR,
             ConstantesEntidades.FATURAS_POR_CLIENTE,
             ConstantesEntidades.FRETES,
-            ConstantesEntidades.FATURAS_GRAPHQL,
             ConstantesEntidades.MANIFESTOS,
             ConstantesEntidades.LOCALIZACAO_CARGAS
         );

@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
 
@@ -36,7 +36,7 @@ public final class DaemonResilienceHarness {
     public static ProbeResult executar(final Path baseDir,
                                        final LoopDaemonRunHandler.FluxoExecutor fluxoExecutor,
                                        final LoopDaemonRunHandler.CycleWaitStrategy waitStrategy,
-                                       final Function<Boolean, Duration> cycleTimeoutProvider) throws Exception {
+                                       final Supplier<Duration> cycleTimeoutProvider) throws Exception {
         Files.createDirectories(baseDir);
 
         final Path stateFile = baseDir.resolve("loop_daemon.state");
@@ -69,7 +69,7 @@ public final class DaemonResilienceHarness {
             false,
             1,
             0,
-            (data, api, entidade, incluirFaturasGraphQL) -> {
+            (data, api, entidade) -> {
                 // Reconciliacao desligada no harness.
             }
         );
@@ -88,7 +88,7 @@ public final class DaemonResilienceHarness {
         );
 
         final long inicio = System.nanoTime();
-        handler.executar(false);
+        handler.executar();
         final long duracaoMs = Duration.ofNanos(System.nanoTime() - inicio).toMillis();
 
         return new ProbeResult(

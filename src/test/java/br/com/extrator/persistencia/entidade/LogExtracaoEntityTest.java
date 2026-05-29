@@ -35,6 +35,16 @@ import br.com.extrator.persistencia.entidade.LogExtracaoEntity.StatusExtracao;
 class LogExtracaoEntityTest {
 
     @Test
+    void deveNormalizarNoopCountAusenteOuNegativo() {
+        final LogExtracaoEntity log = new LogExtracaoEntity();
+
+        assertEquals(0, log.getNoopCount());
+
+        log.setNoopCount(-3);
+        assertEquals(0, log.getNoopCount());
+    }
+
+    @Test
     void deveMapearStatusEspecificosSemCoercao() {
         assertEquals(StatusExtracao.COMPLETO, StatusExtracao.fromString("COMPLETO"));
         assertEquals(StatusExtracao.INCOMPLETO_LIMITE, StatusExtracao.fromString("INCOMPLETO_LIMITE"));
@@ -60,4 +70,3 @@ class LogExtracaoEntityTest {
         assertThrows(IllegalArgumentException.class, () -> StatusExtracao.fromString(" "));
     }
 }
-

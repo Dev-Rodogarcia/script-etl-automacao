@@ -13,8 +13,6 @@ class ValidacaoEtlExtremaUseCaseTest {
     void devePularStressRepetitivoParaUsuariosSistema() {
         assertFalse(ValidacaoEtlExtremaUseCase.deveExecutarStressApi(ConstantesEntidades.USUARIOS_SISTEMA));
         assertFalse(ValidacaoEtlExtremaUseCase.deveExecutarReplayIdempotencia(ConstantesEntidades.USUARIOS_SISTEMA));
-        assertFalse(ValidacaoEtlExtremaUseCase.deveExecutarStressApi(ConstantesEntidades.FATURAS_GRAPHQL));
-        assertTrue(ValidacaoEtlExtremaUseCase.deveExecutarReplayIdempotencia(ConstantesEntidades.FATURAS_GRAPHQL));
     }
 
     @Test

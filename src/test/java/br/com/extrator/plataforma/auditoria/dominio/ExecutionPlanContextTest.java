@@ -61,11 +61,11 @@ class ExecutionPlanContextTest {
             LocalDateTime.of(2026, 4, 22, 0, 0),
             LocalDateTime.of(2026, 4, 23, 23, 59, 59)
         );
-        ExecutionPlanContext.setPlanos(Map.of("faturas_graphql", plano));
+        ExecutionPlanContext.setPlanos(Map.of("fretes", plano));
 
         final AtomicReference<ExecutionWindowPlan> capturado = new AtomicReference<>();
         final Thread worker = new Thread(() ->
-            capturado.set(ExecutionPlanContext.getPlano("faturas_graphql").orElse(null))
+            capturado.set(ExecutionPlanContext.getPlano("fretes").orElse(null))
         );
         worker.start();
         worker.join();

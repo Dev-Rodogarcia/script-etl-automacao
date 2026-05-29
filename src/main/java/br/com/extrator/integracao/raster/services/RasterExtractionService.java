@@ -64,6 +64,7 @@ public class RasterExtractionService {
             result.getStatus(),
             extractor.getUltimaQuantidadeParadas(),
             result.getPaginasProcessadas(),
+            extractor.getUltimasParadasNoOpIdempotente(),
             montarMensagemParadas(result)
         );
     }

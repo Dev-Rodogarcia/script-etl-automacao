@@ -10,7 +10,7 @@ Conecta com:
 - ExtracaoPorIntervaloUseCase (delegacao via composicao)
 
 Fluxo geral:
-1) executar(data, incluirFaturasGraphQL) monta ExtracaoPorIntervaloRequest (data = data, modo reconciliacao explicito).
+1) executar(data, api, entidade) monta ExtracaoPorIntervaloRequest (data = data, modo reconciliacao explicito).
 2) Delega a ExtracaoPorIntervaloUseCase.executar() com intervalo de 1 dia.
 3) Reusa pipeline, validacoes e integridade do fluxo de intervalo.
 
@@ -18,7 +18,7 @@ Estrutura interna:
 Atributos-chave:
 - extracaoPorIntervaloUseCase: delegacao para fluxo de intervalo (composicao).
 Metodos principais:
-- executar(LocalDate, boolean): ponto de entrada, monta request e delega.
+- executar(LocalDate, String, String): ponto de entrada, monta request e delega.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
@@ -39,20 +39,18 @@ public class ReconciliacaoUseCase {
         );
     }
 
-    public void executar(final LocalDate data, final boolean incluirFaturasGraphQL) throws Exception {
-        executar(data, null, null, incluirFaturasGraphQL);
+    public void executar(final LocalDate data) throws Exception {
+        executar(data, null, null);
     }
 
     public void executar(final LocalDate data,
                          final String api,
-                         final String entidade,
-                         final boolean incluirFaturasGraphQL) throws Exception {
+                         final String entidade) throws Exception {
         final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
             data,
             data,
             api,
             entidade,
-            incluirFaturasGraphQL,
             true,
             false,
             ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO

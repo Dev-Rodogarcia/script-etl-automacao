@@ -582,13 +582,6 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                 WHERE %s
                   AND id IS NOT NULL
                 """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
-            case ConstantesEntidades.FATURAS_GRAPHQL ->
-                """
-                SELECT CAST(id AS VARCHAR(50)) AS chave
-                FROM dbo.faturas_graphql
-                WHERE %s
-                  AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
             case ConstantesEntidades.USUARIOS_SISTEMA ->
                 """
                 SELECT CAST(user_id AS VARCHAR(50)) AS chave
@@ -726,13 +719,6 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                 WHERE %s
                   AND id IS NOT NULL
                 """.formatted(condicaoFiltroBanco(entidade, filtroEstritoDataExtracao));
-            case ConstantesEntidades.FATURAS_GRAPHQL ->
-                """
-                SELECT CAST(id AS VARCHAR(50)) AS chave, metadata
-                FROM dbo.faturas_graphql
-                WHERE %s
-                  AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
             case ConstantesEntidades.USUARIOS_SISTEMA ->
                 """
                 SELECT CAST(user_id AS VARCHAR(50)) AS chave, nome, data_atualizacao
@@ -862,13 +848,6 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                 """
                 SELECT id AS chave, metadata
                 FROM dbo.coletas
-                WHERE %s
-                  AND id IS NOT NULL
-                """.formatted(condicaoFiltroBanco(entidade));
-            case ConstantesEntidades.FATURAS_GRAPHQL ->
-                """
-                SELECT CAST(id AS VARCHAR(50)) AS chave, metadata
-                FROM dbo.faturas_graphql
                 WHERE %s
                   AND id IS NOT NULL
                 """.formatted(condicaoFiltroBanco(entidade));
@@ -1072,8 +1051,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
                     ? "(data_extracao >= ? AND data_extracao <= ?)"
                     : "((data_extracao >= ? AND data_extracao <= ?)"
                         + " OR (COALESCE(issue_date, data_transacao, data_liquidacao, CAST(data_criacao AS DATE)) BETWEEN ? AND ?))";
-            case ConstantesEntidades.FATURAS_POR_CLIENTE,
-                 ConstantesEntidades.FATURAS_GRAPHQL ->
+            case ConstantesEntidades.FATURAS_POR_CLIENTE ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
             case ConstantesEntidades.USUARIOS_SISTEMA ->
                 "(ativo = 1 AND ((origem_atualizado_em >= ? AND origem_atualizado_em <= ?)"
@@ -1122,8 +1100,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
 
         if (ConstantesEntidades.MANIFESTOS.equals(entidade)
             || ConstantesEntidades.COTACOES.equals(entidade)
-            || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(entidade)
-            || ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)) {
+            || ConstantesEntidades.FATURAS_POR_CLIENTE.equals(entidade)) {
             return;
         }
 

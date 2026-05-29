@@ -50,7 +50,7 @@ echo AUDITAR ESTRUTURA DA API
 echo ================================================================
 echo.
 echo Cobertura atual:
-echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   GraphQL   = coletas, fretes, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo.
 

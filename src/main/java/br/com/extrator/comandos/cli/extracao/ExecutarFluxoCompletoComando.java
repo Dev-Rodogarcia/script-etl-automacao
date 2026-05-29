@@ -11,8 +11,8 @@ Conecta com:
 - LoggerConsole (suporte.console)
 
 Fluxo geral:
-1) executar(String[] args) detecta flags: --sem-faturas-graphql, --modo-loop-daemon.
-2) Delega a FluxoCompletoUseCase.executar(incluirFaturasGraphQL, modoLoopDaemon).
+1) executar(String[] args) detecta flags de modo de execucao.
+2) Delega a FluxoCompletoUseCase.executar(modoLoopDaemon).
 
 Estrutura interna:
 Atributos-chave:
@@ -29,7 +29,6 @@ import br.com.extrator.suporte.console.LoggerConsole;
 
 public class ExecutarFluxoCompletoComando implements Comando {
     private static final LoggerConsole log = LoggerConsole.getLogger(ExecutarFluxoCompletoComando.class);
-    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     private static final String FLAG_MODO_LOOP_DAEMON = "--modo-loop-daemon";
 
     private final FluxoCompletoUseCase fluxoCompletoUseCase;
@@ -44,15 +43,13 @@ public class ExecutarFluxoCompletoComando implements Comando {
 
     @Override
     public void executar(final String[] args) throws Exception {
-        final boolean incluirFaturasGraphQL = !possuiFlag(args, FLAG_SEM_FATURAS_GRAPHQL);
         final boolean modoLoopDaemon = possuiFlag(args, FLAG_MODO_LOOP_DAEMON);
 
         log.debug(
-            "Delegando fluxo completo para FluxoCompletoUseCase | incluir_faturas_graphql={} | modo_loop_daemon={}",
-            incluirFaturasGraphQL,
+            "Delegando fluxo completo para FluxoCompletoUseCase | modo_loop_daemon={}",
             modoLoopDaemon
         );
-        fluxoCompletoUseCase.executar(incluirFaturasGraphQL, modoLoopDaemon);
+        fluxoCompletoUseCase.executar(modoLoopDaemon);
     }
 
     private boolean possuiFlag(final String[] args, final String flag) {

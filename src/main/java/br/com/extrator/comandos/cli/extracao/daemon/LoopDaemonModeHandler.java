@@ -28,5 +28,5 @@ package br.com.extrator.comandos.cli.extracao.daemon;
 
 @FunctionalInterface
 public interface LoopDaemonModeHandler {
-    void executar(boolean incluirFaturasGraphQL) throws Exception;
+    void executar() throws Exception;
 }

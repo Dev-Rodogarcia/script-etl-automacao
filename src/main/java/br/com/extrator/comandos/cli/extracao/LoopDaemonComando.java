@@ -36,7 +36,6 @@ import br.com.extrator.comandos.cli.base.Comando;
 import br.com.extrator.comandos.cli.extracao.daemon.DaemonHistoryWriter;
 import br.com.extrator.comandos.cli.extracao.daemon.DaemonLifecycleService;
 import br.com.extrator.comandos.cli.extracao.daemon.DaemonStateStore;
-import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonHandlerSupport;
 import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonModeHandler;
 import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonRunHandler;
 import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonStartHandler;
@@ -77,12 +76,11 @@ public class LoopDaemonComando implements Comando {
 
     @Override
     public void executar(final String[] args) throws Exception {
-        final boolean incluirFaturasGraphQL = !possuiFlag(args, LoopDaemonHandlerSupport.FLAG_SEM_FATURAS_GRAPHQL);
         final LoopDaemonModeHandler handler = handlers.get(modo);
         if (handler == null) {
             throw new IllegalStateException("Modo de loop daemon nao suportado: " + modo);
         }
-        handler.executar(incluirFaturasGraphQL);
+        handler.executar();
     }
 
     private Map<Modo, LoopDaemonModeHandler> criarHandlersPadrao() {
@@ -103,15 +101,4 @@ public class LoopDaemonComando implements Comando {
         return mapa;
     }
 
-    private boolean possuiFlag(final String[] args, final String flag) {
-        if (args == null || flag == null) {
-            return false;
-        }
-        for (final String arg : args) {
-            if (arg != null && flag.equalsIgnoreCase(arg.trim())) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

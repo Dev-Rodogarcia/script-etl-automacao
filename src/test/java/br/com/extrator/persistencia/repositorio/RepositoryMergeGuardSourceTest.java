@@ -35,10 +35,6 @@ class RepositoryMergeGuardSourceTest {
             List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.localizacao_hash", "source.localizacao_hash")
         );
         assertMergeGuard(
-            "src/main/java/br/com/extrator/persistencia/repositorio/FaturaGraphQLRepository.java",
-            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "target.updated_at", "source.updated_at")
-        );
-        assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/UsuarioSistemaRepository.java",
             List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND", "T.data_atualizacao", "S.data_atualizacao")
         );

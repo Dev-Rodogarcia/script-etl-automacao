@@ -138,7 +138,7 @@ final class CompletudeJanelaTemporalValidator {
         final LocalDate dataReferencia
     ) {
         return switch (entidade) {
-            case ConstantesEntidades.FRETES, ConstantesEntidades.COLETAS, ConstantesEntidades.FATURAS_GRAPHQL ->
+            case ConstantesEntidades.FRETES, ConstantesEntidades.COLETAS ->
                 contarRegistrosApiGraphQL(entidade, timestamps, dataReferencia);
             case ConstantesEntidades.MANIFESTOS,
                 ConstantesEntidades.COTACOES,

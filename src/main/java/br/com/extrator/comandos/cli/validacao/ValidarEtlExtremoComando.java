@@ -20,7 +20,6 @@ public class ValidarEtlExtremoComando implements Comando {
     public void executar(final String[] args) throws Exception {
         useCase.executar(
             new ValidacaoEtlExtremaRequest(
-                !possuiFlag(args, "--sem-faturas-graphql"),
                 possuiFlag(args, "--periodo-fechado"),
                 possuiFlag(args, "--permitir-fallback-janela"),
                 resolverStressRepeticoes(args),

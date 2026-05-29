@@ -105,16 +105,6 @@ public final class ConstantesApiGraphQL {
             true                            // suportaIntervalo (SUPORTA)
         ),
 
-        // FATURAS_GRAPHQL - CreditCustomerBilling
-        // FASE 2: CORRIGIDO - Alterado de dueDate para issueDate (data de emissão é mais precisa para filtro)
-        ConstantesEntidades.FATURAS_GRAPHQL,
-        new ConfiguracaoGraphQL(
-            "issueDate",                    // campoFiltro (CORRIGIDO: era dueDate)
-            GraphQLQueries.QUERY_FATURAS,   // query
-            "creditCustomerBilling",        // nomeEntidadeApi
-            false                           // suportaIntervalo (NÃO suporta)
-        ),
-
         // USUARIOS_SISTEMA - Individual
         ConstantesEntidades.USUARIOS_SISTEMA,
         new ConfiguracaoGraphQL(

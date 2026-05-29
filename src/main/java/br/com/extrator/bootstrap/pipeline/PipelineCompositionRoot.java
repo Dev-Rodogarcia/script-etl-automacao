@@ -154,15 +154,9 @@ public final class PipelineCompositionRoot {
         );
     }
 
-    public List<PipelineStep> criarStepsFluxoCompleto(
-        final boolean incluirFaturasGraphQL,
-        final boolean incluirDataQuality
-    ) {
-        final ExtractorRegistry registry = criarRegistryFluxoCompleto(incluirFaturasGraphQL, incluirDataQuality);
+    public List<PipelineStep> criarStepsFluxoCompleto(final boolean incluirDataQuality) {
+        final ExtractorRegistry registry = criarRegistryFluxoCompleto(incluirDataQuality);
         final List<String> ordem = new ArrayList<>(List.of("graphql", "dataexport"));
-        if (incluirFaturasGraphQL) {
-            ordem.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
         if (ConfigRaster.isHabilitadoParaExecucao()) {
             ordem.add(ConstantesEntidades.RASTER_VIAGENS);
         }
@@ -172,10 +166,7 @@ public final class PipelineCompositionRoot {
         return registry.listarPorEntidades(ordem);
     }
 
-    public ExtractorRegistry criarRegistryFluxoCompleto(
-        final boolean incluirFaturasGraphQL,
-        final boolean incluirDataQuality
-    ) {
+    public ExtractorRegistry criarRegistryFluxoCompleto(final boolean incluirDataQuality) {
         final ExtractorRegistry registry = new ExtractorRegistry();
         registry.registrar("graphql", () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), "graphql"));
         registry.registrar("dataexport", () -> new DataExportPipelineStep(new DataExportGatewayAdapter(), "dataexport"));
@@ -184,19 +175,12 @@ public final class PipelineCompositionRoot {
             () -> new RasterPipelineStep(new RasterGatewayAdapter(), ConstantesEntidades.RASTER_VIAGENS)
         );
 
-        if (incluirFaturasGraphQL) {
-            registry.registrar(
-                ConstantesEntidades.FATURAS_GRAPHQL,
-                () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), ConstantesEntidades.FATURAS_GRAPHQL)
-            );
-        }
-
         if (incluirDataQuality) {
             registry.registrar(
                 "quality",
                 () -> new DataQualityPipelineStep(
                     criarDataQualityService(),
-                    criarEntidadesPadraoDataQuality(incluirFaturasGraphQL)
+                    criarEntidadesPadraoDataQuality()
                 )
             );
         }
@@ -222,8 +206,8 @@ public final class PipelineCompositionRoot {
         );
     }
 
-    private List<String> criarEntidadesPadraoDataQuality(final boolean incluirFaturasGraphQL) {
-        final List<String> entidades = new ArrayList<>(List.of(
+    private List<String> criarEntidadesPadraoDataQuality() {
+        return List.of(
             ConstantesEntidades.USUARIOS_SISTEMA,
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.FRETES,
@@ -234,11 +218,7 @@ public final class PipelineCompositionRoot {
             ConstantesEntidades.FATURAS_POR_CLIENTE,
             ConstantesEntidades.INVENTARIO,
             ConstantesEntidades.SINISTROS
-        ));
-        if (incluirFaturasGraphQL) {
-            entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
-        return List.copyOf(entidades);
+        );
     }
 
     private Map<String, FailureMode> criarPoliticaFalhaPorEntidade() {
@@ -250,10 +230,6 @@ public final class PipelineCompositionRoot {
         porEntidade.put(
             "dataexport",
             parseFailureMode(config.obterTexto("etl.failure.dataexport", "DEGRADE"), FailureMode.DEGRADE)
-        );
-        porEntidade.put(
-            ConstantesEntidades.FATURAS_GRAPHQL,
-            parseFailureMode(config.obterTexto("etl.failure.faturas_graphql", "ABORT_PIPELINE"), FailureMode.ABORT_PIPELINE)
         );
         porEntidade.put(
             ConstantesEntidades.RASTER_VIAGENS,

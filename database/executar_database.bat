@@ -158,7 +158,6 @@ echo [ETAPA] Migrations...
 for %%F in (
     "migrations\001_criar_tabela_schema_migrations.sql"
     "migrations\002_corrigir_constraint_manifestos.sql"
-    "migrations\003_corrigir_tipo_datetime_faturas_graphql.sql"
     "migrations\004_adicionar_request_hour_coletas.sql"
     "migrations\005_alinhar_sys_execution_history_schema.sql"
     "migrations\006_alterar_fretes_indicadores_gestao.sql"
@@ -178,6 +177,8 @@ for %%F in (
     "migrations\020_adicionar_tipo_motorista_manifestos.sql"
     "migrations\021_materializar_comprovante_inventario.sql"
     "migrations\022_corrigir_volumes_fretes_faturamento.sql"
+    "migrations\023_adicionar_noop_count_log_extracoes.sql"
+    "migrations\024_drop_faturas_graphql.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -215,7 +216,6 @@ for %%F in (
     "views\011_criar_view_faturas_por_cliente_powerbi.sql"
     "views\012_criar_view_fretes_powerbi.sql"
     "views\013_criar_view_coletas_powerbi.sql"
-    "views\014_criar_view_faturas_graphql_powerbi.sql"
     "views\015_criar_view_cotacoes_powerbi.sql"
     "views\016_criar_view_contas_a_pagar_powerbi.sql"
     "views\017_criar_view_localizacao_cargas_powerbi.sql"
@@ -247,9 +247,7 @@ for %%F in (
     "validacao\025_validar_views_dimensao.sql"
     "validacao\026_validar_tipo_destroy_user_id.sql"
     "validacao\028_validacao_rapida_extracao.sql"
-    "validacao\029_verificar_duplicacao_faturas.sql"
     "validacao\032_validar_orfaos_manifestos_coletas.sql"
-    "validacao\033_validar_orfaos_fretes_faturas_graphql.sql"
     "validacao\034_validar_schema_recriacao.sql"
     "validacao\036_validar_volumes_fretes_faturamento.sql"
 ) do (
@@ -309,7 +307,6 @@ for %%F in (
     "tabelas\005_criar_tabela_localizacao_cargas.sql"
     "tabelas\006_criar_tabela_contas_a_pagar.sql"
     "tabelas\007_criar_tabela_faturas_por_cliente.sql"
-    "tabelas\008_criar_tabela_faturas_graphql.sql"
     "tabelas\009_criar_tabela_log_extracoes.sql"
     "tabelas\010_criar_tabela_page_audit.sql"
     "tabelas\011_criar_tabela_dim_usuarios.sql"

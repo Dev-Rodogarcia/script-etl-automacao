@@ -19,7 +19,6 @@ INSERT INTO @tabelas (nome) VALUES
     (N'localizacao_cargas_regiao_destino_alias'),
     (N'contas_a_pagar'),
     (N'faturas_por_cliente'),
-    (N'faturas_graphql'),
     (N'log_extracoes'),
     (N'page_audit'),
     (N'dim_usuarios'),
@@ -47,7 +46,6 @@ INSERT INTO @views (nome) VALUES
     (N'vw_faturas_por_cliente_powerbi'),
     (N'vw_fretes_powerbi'),
     (N'vw_coletas_powerbi'),
-    (N'vw_faturas_graphql_powerbi'),
     (N'vw_cotacoes_powerbi'),
     (N'vw_contas_a_pagar_powerbi'),
     (N'vw_localizacao_cargas_powerbi'),
@@ -72,7 +70,6 @@ DECLARE @migrations TABLE (migration_id NVARCHAR(255) NOT NULL);
 INSERT INTO @migrations (migration_id) VALUES
     (N'001_criar_tabela_schema_migrations'),
     (N'002_corrigir_constraint_manifestos'),
-    (N'003_corrigir_tipo_datetime_faturas_graphql'),
     (N'004_adicionar_request_hour_coletas'),
     (N'005_alinhar_sys_execution_history_schema'),
     (N'006_alterar_fretes_indicadores_gestao'),
@@ -91,7 +88,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'019_adicionar_comprovante_fretes_performance'),
     (N'020_adicionar_tipo_motorista_manifestos'),
     (N'021_materializar_comprovante_inventario'),
-    (N'022_corrigir_volumes_fretes_faturamento');
+    (N'022_corrigir_volumes_fretes_faturamento'),
+    (N'023_adicionar_noop_count_log_extracoes'),
+    (N'024_drop_faturas_graphql');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -116,6 +115,9 @@ IF COL_LENGTH(N'dbo.fretes', N'fit_dpn_performance_finished_at') IS NULL
 
 IF COL_LENGTH(N'dbo.fretes', N'corporation_sequence_number') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.corporation_sequence_number', N'Coluna da migration 006 ausente');
+
+IF COL_LENGTH(N'dbo.log_extracoes', N'noop_count') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.log_extracoes.noop_count', N'Coluna da migration 023 ausente');
 
 IF COL_LENGTH(N'dbo.fretes', N'cortesia') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.cortesia', N'Coluna da migration 012 ausente');

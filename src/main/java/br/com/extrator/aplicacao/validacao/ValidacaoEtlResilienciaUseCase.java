@@ -220,7 +220,7 @@ public class ValidacaoEtlResilienciaUseCase {
 
         final DaemonResilienceHarness.ProbeResult probe = DaemonResilienceHarness.executar(
             baseDir,
-            incluirFaturasGraphQL -> {
+            () -> {
                 final int ciclo = ciclosExecutados.incrementAndGet();
                 observacoes.add(executarPipeline("loop-saudavel-" + ciclo, FaultMode.NONE).cycleObservation("healthy"));
             },
@@ -228,7 +228,7 @@ public class ValidacaoEtlResilienciaUseCase {
                 || Duration.between(inicioTeste, LocalDateTime.now()).compareTo(request.duracaoMaxima()) >= 0
                 ? LoopDaemonRunHandler.WaitResult.STOP_REQUESTED
                 : LoopDaemonRunHandler.WaitResult.FORCE_RUN_REQUESTED,
-            incluirFaturasGraphQL -> TIMEOUT_CICLO_LOOP
+            () -> TIMEOUT_CICLO_LOOP
         );
 
         final boolean semRunningInfinito = !"RUNNING".equalsIgnoreCase(probe.finalState().getProperty("status", ""));
@@ -605,12 +605,12 @@ public class ValidacaoEtlResilienciaUseCase {
         final Path baseDir = logsDir.resolve("resilience_watchdog_" + FILE_TS.format(RelogioSistema.agora()));
         final DaemonResilienceHarness.ProbeResult probe = DaemonResilienceHarness.executar(
             baseDir,
-            incluirFaturasGraphQL -> executarHangNaoCooperativoEmProcessoIsolado(
+            () -> executarHangNaoCooperativoEmProcessoIsolado(
                 IsolatedStepProcessExecutor.ApiType.GRAPHQL,
                 "coletas"
             ),
             (proximoCiclo, stateStore) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
-            incluirFaturasGraphQL -> TIMEOUT_WATCHDOG
+            () -> TIMEOUT_WATCHDOG
         );
         final String logCiclo = probe.cycleLogs().isEmpty()
             ? ""
@@ -649,7 +649,7 @@ public class ValidacaoEtlResilienciaUseCase {
 
         final DaemonResilienceHarness.ProbeResult probe = DaemonResilienceHarness.executar(
             baseDir,
-            incluirFaturasGraphQL -> {
+            () -> {
                 final int indice = ciclosExecutados.getAndIncrement();
                 final FaultMode modo = modos.get(Math.min(indice, modos.size() - 1));
                 final PipelineRunSummary summary = executarPipeline("auto-chaos-" + indice, modo);
@@ -661,7 +661,7 @@ public class ValidacaoEtlResilienciaUseCase {
             (proximoCiclo, stateStore) -> ciclosExecutados.get() >= request.maxCycles()
                 ? LoopDaemonRunHandler.WaitResult.STOP_REQUESTED
                 : LoopDaemonRunHandler.WaitResult.FORCE_RUN_REQUESTED,
-            incluirFaturasGraphQL -> TIMEOUT_CICLO_LOOP
+            () -> TIMEOUT_CICLO_LOOP
         );
 
         final long ciclosComFalha = observacoes.stream().filter(CycleObservation::hasFailure).count();

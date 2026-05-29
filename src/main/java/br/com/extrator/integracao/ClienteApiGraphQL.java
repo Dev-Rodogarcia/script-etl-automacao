@@ -32,10 +32,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.extrator.integracao.constantes.ConstantesApiGraphQL;
 import br.com.extrator.integracao.graphql.GraphQLQueries;
-import br.com.extrator.persistencia.repositorio.PageAuditRepository;
 import br.com.extrator.dominio.graphql.bancos.BankAccountNodeDTO;
 import br.com.extrator.dominio.graphql.coletas.ColetaNodeDTO;
-import br.com.extrator.dominio.graphql.faturas.CreditCustomerBillingNodeDTO;
 import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.formatacao.FormatadorData;
@@ -63,7 +61,6 @@ public class ClienteApiGraphQL {
     private final GraphQLLookupSupport lookupSupport;
     private final GraphQLPaginator paginator;
     private final GraphQLColetaSupport coletaSupport;
-    private final GraphQLBillingSupport billingSupport;
     private String executionUuid;
 
     public ClienteApiGraphQL() {
@@ -94,7 +91,6 @@ public class ClienteApiGraphQL {
             typedResponseParser,
             this.requestFactory
         );
-        final GraphQLPageAuditLogger pageAuditLogger = new GraphQLPageAuditLogger(new PageAuditRepository());
         this.paginator = new GraphQLPaginator(
             logger,
             INTERVALO_LOG_PROGRESSO,
@@ -103,7 +99,6 @@ public class ClienteApiGraphQL {
             this.contadorFalhasConsecutivas,
             this.entidadesComCircuitAberto,
             this.circuitosAbertosDesde,
-            pageAuditLogger,
             httpExecutor::executarQueryGraphQLTipado
         );
         final GraphQLSchemaInspector schemaInspector = new GraphQLSchemaInspector(
@@ -114,7 +109,6 @@ public class ClienteApiGraphQL {
             this.requestFactory
         );
         this.coletaSupport = new GraphQLColetaSupport(logger, schemaInspector, this.paginator);
-        this.billingSupport = new GraphQLBillingSupport(logger, schemaInspector, this.paginator);
         this.connectivityValidator = new GraphQLConnectivityValidator(
             this.clienteHttp,
             this.mapeadorJson,
@@ -246,39 +240,8 @@ public class ClienteApiGraphQL {
         }
     }
 
-    public ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataReferencia) {
-        return billingSupport.buscarCapaFaturas(this.executionUuid, dataReferencia);
-    }
-
-    public ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(final LocalDate dataInicio, final LocalDate dataFim) {
-        return billingSupport.buscarCapaFaturas(this.executionUuid, dataInicio, dataFim);
-    }
-
-    public ResultadoExtracao<CreditCustomerBillingNodeDTO> buscarCapaFaturas(
-            final LocalDate dataInicio,
-            final LocalDate dataFim,
-            final PageChunkConsumer<CreditCustomerBillingNodeDTO> chunkConsumer) {
-        return billingSupport.buscarCapaFaturas(this.executionUuid, dataInicio, dataFim, chunkConsumer);
-    }
-
     public boolean validarAcessoApi() {
         return connectivityValidator.validarAcessoApi();
-    }
-
-    public java.util.Optional<CreditCustomerBillingNodeDTO> enriquecerFatura(final String billingId) {
-        return lookupSupport.enriquecerFatura(billingId);
-    }
-
-    public java.util.Optional<CreditCustomerBillingNodeDTO> enriquecerFaturaPorDocumento(final String document) {
-        return lookupSupport.enriquecerFaturaPorDocumento(document);
-    }
-
-    public java.util.Optional<CreditCustomerBillingNodeDTO> buscarCapaFaturaPorId(final Long billingId) {
-        return lookupSupport.buscarCapaFaturaPorId(billingId);
-    }
-
-    public java.util.Optional<CreditCustomerBillingNodeDTO> buscarDadosCobranca(final Long billingId) {
-        return lookupSupport.buscarDadosCobranca(billingId);
     }
 
     public java.util.Optional<BankAccountNodeDTO> buscarDetalhesBanco(final Integer bankAccountId) {

@@ -459,9 +459,6 @@ public class IsolatedStepProcessExecutor {
         if (apiType == ApiType.DATAEXPORT) {
             return ConfigEtl.obterTimeoutStepDataExport();
         }
-        if (entidade != null && "faturas_graphql".equalsIgnoreCase(entidade)) {
-            return ConfigEtl.obterTimeoutStepFaturasGraphQL();
-        }
         if (entidade == null || entidade.isBlank() || "all".equalsIgnoreCase(entidade)) {
             return ConfigEtl.obterTimeoutStepGraphQLCompleto();
         }

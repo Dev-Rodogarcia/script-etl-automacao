@@ -141,48 +141,6 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         );
     }
 
-    /**
-     * Lista IDs de accounting_credit_id presentes em fretes e ausentes em faturas_graphql.
-     * A busca e limitada ao periodo operacional de service_date/servico_em.
-     */
-    public List<Long> listarAccountingCreditIdsOrfaos(final LocalDate dataInicio,
-                                                      final LocalDate dataFim,
-                                                      final int limite) throws SQLException {
-        if (dataInicio == null || dataFim == null || dataFim.isBefore(dataInicio)) {
-            return List.of();
-        }
-
-        final int limiteEfetivo = Math.max(1, Math.min(limite, 5000));
-        final String sql = """
-            SELECT DISTINCT TOP (%d) CAST(f.accounting_credit_id AS BIGINT) AS accounting_credit_id
-            FROM dbo.fretes f
-            WHERE f.accounting_credit_id IS NOT NULL
-              AND COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
-              AND NOT EXISTS (
-                    SELECT 1
-                    FROM dbo.faturas_graphql fg
-                    WHERE fg.id = f.accounting_credit_id
-              )
-            ORDER BY CAST(f.accounting_credit_id AS BIGINT)
-            """.formatted(limiteEfetivo);
-
-        final List<Long> ids = new ArrayList<>();
-        try (Connection conexao = obterConexao();
-             PreparedStatement ps = conexao.prepareStatement(sql)) {
-            ps.setObject(1, dataInicio, Types.DATE);
-            ps.setObject(2, dataFim, Types.DATE);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    final long id = rs.getLong("accounting_credit_id");
-                    if (!rs.wasNull()) {
-                        ids.add(id);
-                    }
-                }
-            }
-        }
-        return ids;
-    }
-
     public int removerAusentesNoPeriodo(final LocalDate dataInicio,
                                         final LocalDate dataFim,
                                         final Collection<Long> idsPresentes) throws SQLException {

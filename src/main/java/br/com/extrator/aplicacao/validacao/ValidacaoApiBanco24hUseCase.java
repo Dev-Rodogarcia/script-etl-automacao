@@ -61,8 +61,7 @@ public class ValidacaoApiBanco24hUseCase {
         ConstantesEntidades.LOCALIZACAO_CARGAS,
         ConstantesEntidades.FRETES,
         ConstantesEntidades.CONTAS_A_PAGAR,
-        ConstantesEntidades.COLETAS,
-        ConstantesEntidades.FATURAS_GRAPHQL
+        ConstantesEntidades.COLETAS
     );
 
     private record JanelaExecucao(
@@ -93,28 +92,18 @@ public class ValidacaoApiBanco24hUseCase {
             "Modo rapido: o criterio de aprovacao usa a ultima janela COMPLETA registrada em log_extracoes; api_bruto_atual entra apenas como telemetria operacional e nao representa necessariamente 24h corridas."
         );
         log.info(
-            "Faturas GraphQL: {}",
-            request.incluirFaturasGraphQL() ? "INCLUIDO" : "DESABILITADO (--sem-faturas-graphql)"
-        );
-        log.info(
             "Fallback de janela sem periodo: {}",
             request.permitirFallbackJanela() ? "ATIVADO" : "DESATIVADO"
         );
         log.console("=".repeat(72));
 
         final CompletudeValidator validator = new CompletudeValidator();
-        final Optional<Map<String, Integer>> totaisApiOpt = validator.buscarTotaisEslCloudJanelaPrincipal(
-            dataReferencia,
-            request.incluirFaturasGraphQL()
-        );
+        final Optional<Map<String, Integer>> totaisApiOpt = validator.buscarTotaisEslCloudJanelaPrincipal(dataReferencia);
         if (totaisApiOpt.isEmpty()) {
             throw new RuntimeException("Nao foi possivel obter totais da API em tempo real.");
         }
 
         final Map<String, Integer> totaisApi = new LinkedHashMap<>(totaisApiOpt.get());
-        if (!request.incluirFaturasGraphQL()) {
-            totaisApi.remove(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
 
         int totalOk = 0;
         int totalFalhas = 0;
@@ -155,10 +144,7 @@ public class ValidacaoApiBanco24hUseCase {
                 final int apiCountLog = janela.apiCount != null ? janela.apiCount : esperadoUnico;
                 final int diff = bancoCount - esperadoPersistido;
                 final int deltaApiBrutoAtual = apiCount - esperadoUnico;
-                final boolean tolerarBackfillFaturas =
-                    ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade) && bancoCount >= esperadoPersistido;
-
-                if (diff == 0 || tolerarBackfillFaturas) {
+                if (diff == 0) {
                     totalOk++;
                     registrarSucesso(
                         entidade,
@@ -170,7 +156,7 @@ public class ValidacaoApiBanco24hUseCase {
                         diff,
                         deltaApiBrutoAtual,
                         janela,
-                        tolerarBackfillFaturas
+                        false
                     );
                     continue;
                 }
@@ -475,7 +461,6 @@ public class ValidacaoApiBanco24hUseCase {
             case ConstantesEntidades.FRETES -> ConstantesEntidades.FRETES;
             case ConstantesEntidades.CONTAS_A_PAGAR -> ConstantesEntidades.CONTAS_A_PAGAR;
             case ConstantesEntidades.COLETAS -> ConstantesEntidades.COLETAS;
-            case ConstantesEntidades.FATURAS_GRAPHQL -> ConstantesEntidades.FATURAS_GRAPHQL;
             default -> throw new IllegalArgumentException("Entidade nao suportada na comparacao API x Banco: " + entidade);
         };
     }

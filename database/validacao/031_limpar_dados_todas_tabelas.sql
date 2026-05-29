@@ -23,7 +23,6 @@ BEGIN TRY
     DELETE FROM dbo.raster_viagens;
     DELETE FROM dbo.manifestos;
     DELETE FROM dbo.fretes;
-    DELETE FROM dbo.faturas_graphql;
     DELETE FROM dbo.faturas_por_cliente;
     DELETE FROM dbo.cotacoes;
     DELETE FROM dbo.localizacao_cargas;

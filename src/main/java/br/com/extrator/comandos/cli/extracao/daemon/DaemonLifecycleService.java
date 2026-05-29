@@ -29,7 +29,6 @@ Metodos principais:
 - extrairPrimeiroToken(...1 args): realiza operacao relacionada a "extrair primeiro token".
 - resolverExecutavelJava(): realiza operacao relacionada a "resolver executavel java".
 Atributos-chave:
-- FLAG_SEM_FATURAS_GRAPHQL: campo de estado para "flag sem faturas graphql".
 - FLAG_LOOP_DAEMON_RUN: campo de estado para "flag loop daemon run".
 - stateStore: campo de estado para "state store".
 - daemonStdoutFile: campo de estado para "daemon stdout file".
@@ -67,7 +66,6 @@ import org.slf4j.LoggerFactory;
  */
 public final class DaemonLifecycleService {
     private static final Logger logger = LoggerFactory.getLogger(DaemonLifecycleService.class);
-    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     private static final String FLAG_LOOP_DAEMON_RUN = "--loop-daemon-run";
     private static final String MAIN_CLASS_NAME = "br.com.extrator.bootstrap.Main";
     private static final String RUNTIME_JAR_PREFIX = "extrator-daemon-runtime";
@@ -153,7 +151,7 @@ public final class DaemonLifecycleService {
         }
     }
 
-    public List<String> construirComandoFilho(final boolean incluirFaturasGraphQL) throws URISyntaxException {
+    public List<String> construirComandoFilho() throws URISyntaxException {
         final List<String> comando = new ArrayList<>();
         comando.add(resolverExecutavelJava());
         comando.add("-Dfile.encoding=UTF-8");
@@ -168,9 +166,6 @@ public final class DaemonLifecycleService {
             comando.add("-jar");
             comando.add(jarRuntime.toString());
             comando.add(FLAG_LOOP_DAEMON_RUN);
-            if (!incluirFaturasGraphQL) {
-                comando.add(FLAG_SEM_FATURAS_GRAPHQL);
-            }
             return comando;
         }
 
@@ -182,9 +177,6 @@ public final class DaemonLifecycleService {
         comando.add(classpath);
         comando.add(MAIN_CLASS_NAME);
         comando.add(FLAG_LOOP_DAEMON_RUN);
-        if (!incluirFaturasGraphQL) {
-            comando.add(FLAG_SEM_FATURAS_GRAPHQL);
-        }
         return comando;
     }
 

@@ -60,7 +60,6 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 public class TesteApiUseCase {
     private static final String EXECUTION_LOCK_RESOURCE = "etl-global-execution";
     private static final Logger logger = LoggerFactory.getLogger(TesteApiUseCase.class);
-    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     private final ExecutionLockManager executionLockManager;
 
     public TesteApiUseCase() {
@@ -74,16 +73,6 @@ public class TesteApiUseCase {
     public void executar(final TesteApiRequest request) throws Exception {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
         final String tipoApi = request.tipoApi();
-        boolean incluirFaturasGraphQL = request.incluirFaturasGraphQL();
-        final boolean somenteFaturasGraphQL = isEntidadeFaturasGraphQL(request.entidade());
-
-        if (somenteFaturasGraphQL && !incluirFaturasGraphQL) {
-            logger.warn(
-                "Flag {} ignorada porque a entidade solicitada e explicitamente faturas_graphql.",
-                FLAG_SEM_FATURAS_GRAPHQL
-            );
-            incluirFaturasGraphQL = true;
-        }
 
         final LocalDate dataFim = RelogioSistema.hoje();
         final LocalDate dataInicio = dataFim.minusDays(1);
@@ -97,25 +86,15 @@ public class TesteApiUseCase {
                 + dataFim.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                 + " (janela principal D-1..D; nao representa 24h corridas)"
         );
-        if ("graphql".equalsIgnoreCase(tipoApi) && request.entidade() == null) {
-            System.out.println(
-                "Faturas GraphQL: "
-                    + (incluirFaturasGraphQL
-                        ? "INCLUIDO (fase final)"
-                        : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")")
-            );
-        }
         System.out.println();
 
         try {
             final LocalDateTime inicioExecucao = RelogioSistema.agora();
-            executarApi(tipoApi, dataInicio, dataFim, request.entidade(), incluirFaturasGraphQL, somenteFaturasGraphQL);
+            executarApi(tipoApi, dataInicio, dataFim, request.entidade());
             validarStatusDasEntidadesExecutadas(
                 inicioExecucao,
                 tipoApi,
-                request.entidade(),
-                incluirFaturasGraphQL,
-                somenteFaturasGraphQL
+                request.entidade()
             );
 
             BannerUtil.exibirBannerSucesso();
@@ -145,18 +124,10 @@ public class TesteApiUseCase {
     private void executarApi(final String tipoApi,
                              final LocalDate dataInicio,
                              final LocalDate dataFim,
-                             final String entidade,
-                             final boolean incluirFaturasGraphQL,
-                             final boolean somenteFaturasGraphQL) throws Exception {
+                             final String entidade) throws Exception {
         switch (tipoApi == null ? "" : tipoApi.toLowerCase()) {
-            case "graphql" -> executarGraphQL(
-                dataInicio,
-                dataFim,
-                entidade,
-                incluirFaturasGraphQL,
-                somenteFaturasGraphQL
-            );
-            case "dataexport" -> executarDataExport(dataInicio, dataFim, entidade, incluirFaturasGraphQL);
+            case "graphql" -> executarGraphQL(dataInicio, dataFim, entidade);
+            case "dataexport" -> executarDataExport(dataInicio, dataFim, entidade);
             case "raster" -> executarRaster(dataInicio, dataFim, entidade);
             default -> {
                 System.err.println("ERRO: Tipo de API invalido: " + tipoApi);
@@ -168,25 +139,13 @@ public class TesteApiUseCase {
 
     private void executarGraphQL(final LocalDate dataInicio,
                                  final LocalDate dataFim,
-                                 final String entidade,
-                                 final boolean incluirFaturasGraphQL,
-                                 final boolean somenteFaturasGraphQL) throws Exception {
+                                 final String entidade) throws Exception {
         final List<PipelineStep> steps = new ArrayList<>();
 
-        if (somenteFaturasGraphQL) {
-            logger.info("Executando somente Faturas GraphQL para o periodo {} a {}", dataInicio, dataFim);
-            steps.add(new GraphQLPipelineStep(AplicacaoContexto.graphQLGateway(), ConstantesEntidades.FATURAS_GRAPHQL));
-        } else if (entidade != null && !entidade.isBlank()) {
+        if (entidade != null && !entidade.isBlank()) {
             steps.add(new GraphQLPipelineStep(AplicacaoContexto.graphQLGateway(), normalizarEntidadeGraphQL(entidade)));
         } else {
             steps.add(new GraphQLPipelineStep(AplicacaoContexto.graphQLGateway(), "graphql"));
-        }
-
-        if (!somenteFaturasGraphQL && (entidade == null || entidade.isBlank()) && incluirFaturasGraphQL) {
-            logger.info("[FASE 3] Executando Faturas GraphQL por ultimo no teste de API...");
-            steps.add(new GraphQLPipelineStep(AplicacaoContexto.graphQLGateway(), ConstantesEntidades.FATURAS_GRAPHQL));
-        } else if (!somenteFaturasGraphQL && (entidade == null || entidade.isBlank())) {
-            logger.info("[FASE 3] Faturas GraphQL desabilitado no teste de API (flag {}).", FLAG_SEM_FATURAS_GRAPHQL);
         }
 
         executarPipeline(dataInicio, dataFim, steps, "teste GraphQL");
@@ -194,13 +153,8 @@ public class TesteApiUseCase {
 
     private void executarDataExport(final LocalDate dataInicio,
                                     final LocalDate dataFim,
-                                    final String entidade,
-                                    final boolean incluirFaturasGraphQL) {
+                                    final String entidade) {
         final List<PipelineStep> steps = new ArrayList<>();
-
-        if (!incluirFaturasGraphQL) {
-            logger.info("Flag {} ignorada para DataExport.", FLAG_SEM_FATURAS_GRAPHQL);
-        }
 
         if (entidade != null && !entidade.isBlank()) {
             steps.add(new DataExportPipelineStep(AplicacaoContexto.dataExportGateway(), normalizarEntidadeDataExport(entidade)));
@@ -257,14 +211,10 @@ public class TesteApiUseCase {
 
     private void validarStatusDasEntidadesExecutadas(final LocalDateTime inicioExecucao,
                                                      final String tipoApi,
-                                                     final String entidade,
-                                                     final boolean incluirFaturasGraphQL,
-                                                     final boolean somenteFaturasGraphQL) {
+                                                     final String entidade) {
         final List<String> esperadas = obterEntidadesEsperadas(
             tipoApi,
-            entidade,
-            incluirFaturasGraphQL,
-            somenteFaturasGraphQL
+            entidade
         );
         if (esperadas.isEmpty()) {
             return;
@@ -304,18 +254,11 @@ public class TesteApiUseCase {
     }
 
     private List<String> obterEntidadesEsperadas(final String tipoApi,
-                                                 final String entidade,
-                                                 final boolean incluirFaturasGraphQL,
-                                                 final boolean somenteFaturasGraphQL) {
+                                                 final String entidade) {
         final Set<String> entidades = new LinkedHashSet<>();
         final String tipo = tipoApi == null ? "" : tipoApi.toLowerCase();
 
         if ("graphql".equals(tipo)) {
-            if (somenteFaturasGraphQL) {
-                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-                return new ArrayList<>(entidades);
-            }
-
             if (entidade != null && !entidade.isBlank()) {
                 entidades.add(normalizarEntidadeGraphQL(entidade));
                 return new ArrayList<>(entidades);
@@ -324,9 +267,6 @@ public class TesteApiUseCase {
             entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
             entidades.add(ConstantesEntidades.COLETAS);
             entidades.add(ConstantesEntidades.FRETES);
-            if (incluirFaturasGraphQL) {
-                entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-            }
             return new ArrayList<>(entidades);
         }
 
@@ -352,19 +292,9 @@ public class TesteApiUseCase {
         return new ArrayList<>(entidades);
     }
 
-    private boolean isEntidadeFaturasGraphQL(final String entidade) {
-        if (entidade == null || entidade.isBlank()) {
-            return false;
-        }
-        return "faturas_graphql".equalsIgnoreCase(entidade)
-            || "faturas".equalsIgnoreCase(entidade)
-            || "faturasgraphql".equalsIgnoreCase(entidade);
-    }
-
     private String normalizarEntidadeGraphQL(final String entidade) {
         final String valor = entidade == null ? "" : entidade.trim().toLowerCase();
         return switch (valor) {
-            case "faturas", "faturasgraphql" -> ConstantesEntidades.FATURAS_GRAPHQL;
             case "usuarios" -> ConstantesEntidades.USUARIOS_SISTEMA;
             default -> valor;
         };

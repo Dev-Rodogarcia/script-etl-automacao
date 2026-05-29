@@ -31,7 +31,6 @@ import java.time.LocalDate;
 import br.com.extrator.aplicacao.portas.GraphQLGateway;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
-import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class GraphQLPipelineStep implements PipelineStep {
     private final GraphQLGateway gateway;
@@ -64,9 +63,6 @@ public final class GraphQLPipelineStep implements PipelineStep {
 
     @Override
     public Duration obterTimeoutExecucao() {
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidade)) {
-            return ConfigEtl.obterTimeoutStepFaturasGraphQL();
-        }
         if ("graphql".equalsIgnoreCase(entidade)) {
             return ConfigEtl.obterTimeoutStepGraphQLCompleto();
         }

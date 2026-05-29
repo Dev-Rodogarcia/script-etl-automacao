@@ -1,7 +1,6 @@
 package br.com.extrator.plataforma.auditoria.aplicacao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,6 +12,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
+import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest.ModoExecucao;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
@@ -100,7 +100,8 @@ class ExecutionWindowPlannerTest {
 
         final ExecutionWindowPlan plano = planner.planejarEntidade(
             ConstantesEntidades.LOCALIZACAO_CARGAS,
-            LocalDate.of(2026, 3, 25)
+            LocalDate.of(2026, 3, 25),
+            ModoExecucao.INTERVALO
         );
 
         assertEquals(LocalDate.of(2025, 12, 26), plano.consultaDataInicio());
@@ -108,19 +109,26 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
-    void naoDeveIncluirFaturasGraphqlQuandoFlagEstiverDesabilitada() {
-        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+    void deveLimitarLocalizacaoCargasNoMicroBatchMesmoComWatermarkAntigo() {
+        final LocalDateTime watermark = LocalDateTime.of(2026, 1, 1, 5, 30);
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
 
-        final var planos = planner.planejarFluxoCompleto(LocalDate.of(2026, 3, 25), false);
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.LOCALIZACAO_CARGAS,
+            LocalDate.of(2026, 3, 25),
+            ModoExecucao.MICRO_BATCH
+        );
 
-        assertFalse(planos.containsKey(ConstantesEntidades.FATURAS_GRAPHQL));
+        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
+        assertEquals(watermark, plano.confirmacaoInicio());
     }
 
     @Test
     void deveIncluirInventarioESinistrosNoFluxoCompleto() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 
-        final var planos = planner.planejarFluxoCompleto(LocalDate.of(2026, 3, 25), false);
+        final var planos = planner.planejarFluxoCompleto(LocalDate.of(2026, 3, 25));
 
         assertTrue(planos.containsKey(ConstantesEntidades.INVENTARIO));
         assertTrue(planos.containsKey(ConstantesEntidades.SINISTROS));
@@ -139,21 +147,6 @@ class ExecutionWindowPlannerTest {
         );
 
         assertEquals(LocalDate.of(2026, 3, 10), plano.consultaDataInicio());
-        assertEquals(watermark, plano.confirmacaoInicio());
-    }
-
-    @Test
-    void deveLimitarConsultaDeFaturasGraphqlMesmoComWatermarkAntigo() {
-        final LocalDateTime watermark = LocalDateTime.of(2026, 3, 1, 5, 30);
-        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
-
-        final ExecutionWindowPlan plano = planner.planejarEntidade(
-            ConstantesEntidades.FATURAS_GRAPHQL,
-            LocalDate.of(2026, 3, 25)
-        );
-
-        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
-        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
         assertEquals(watermark, plano.confirmacaoInicio());
     }
 

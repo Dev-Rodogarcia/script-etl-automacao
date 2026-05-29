@@ -40,15 +40,6 @@ WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
 UNION ALL
 
 SELECT
-    'faturas_graphql' AS entidade,
-    COUNT(*) AS total_registros,
-    MAX(data_extracao) AS ultima_extracao
-FROM dbo.faturas_graphql
-WHERE data_extracao >= DATEADD(hour, -24, GETDATE())
-
-UNION ALL
-
-SELECT
     'manifestos' AS entidade,
     COUNT(*) AS total_registros,
     MAX(data_extracao) AS ultima_extracao

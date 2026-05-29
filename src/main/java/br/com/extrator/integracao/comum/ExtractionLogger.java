@@ -256,8 +256,6 @@ public class ExtractionLogger {
                 log.info("Nenhum registro para salvar (lista vazia)");
             }
             
-            totalUnicos = ajustarTotalUnicosAposSalvamento(entityName, totalUnicos, registrosSalvos);
-
             final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
             final int totalRecebido = totalRecebidoApi;
@@ -579,19 +577,6 @@ public class ExtractionLogger {
         }
 
         return extractor != null && extractor.permiteConcluirComInvalidosAuditados();
-    }
-
-    private int ajustarTotalUnicosAposSalvamento(final String entityName,
-                                                  final int totalUnicosAtual,
-                                                  final int registrosSalvos) {
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entityName) && registrosSalvos > totalUnicosAtual) {
-            log.info("   - {}: ajuste de total_unicos apos backfill referencial (api_unicos={} | total_processado={})",
-                entityName,
-                formatarNumero(totalUnicosAtual),
-                formatarNumero(registrosSalvos));
-            return registrosSalvos;
-        }
-        return totalUnicosAtual;
     }
 
     private String montarPrefixoEntidade(final String emoji) {

@@ -32,7 +32,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -79,7 +78,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -127,7 +125,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -179,7 +176,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -224,7 +220,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -243,7 +238,7 @@ class GraphQLPaginatorTest {
             "exec-null",
             "query",
             "freights",
-            null,
+            Map.of(),
             Integer.class
         );
 
@@ -267,7 +262,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             entidadesComCircuitoAberto,
             circuitosAbertosDesde,
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -305,7 +299,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -347,7 +340,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -388,7 +380,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -427,7 +418,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(
@@ -468,7 +458,6 @@ class GraphQLPaginatorTest {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(

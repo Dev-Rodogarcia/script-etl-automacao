@@ -28,7 +28,6 @@ class ValidacaoApiBanco24hDetalhadaUseCaseTest {
         System.setProperty("ETL_LATE_DATA_AUTO_REPLAY_MAX_ATTEMPTS", "1");
         final ValidacaoApiBanco24hDetalhadaRequest request = new ValidacaoApiBanco24hDetalhadaRequest(
             true,
-            true,
             false,
             LocalDate.of(2026, 4, 15)
         );
@@ -70,7 +69,6 @@ class ValidacaoApiBanco24hDetalhadaUseCaseTest {
     void naoDeveExecutarReplayAutomaticoParaDivergenciaDeConteudo() {
         System.setProperty("ETL_LATE_DATA_AUTO_REPLAY_ENABLED", "true");
         final ValidacaoApiBanco24hDetalhadaRequest request = new ValidacaoApiBanco24hDetalhadaRequest(
-            true,
             true,
             false,
             LocalDate.of(2026, 4, 15)

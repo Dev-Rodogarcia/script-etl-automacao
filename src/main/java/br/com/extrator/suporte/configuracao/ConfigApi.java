@@ -132,17 +132,6 @@ public final class ConfigApi {
         );
     }
 
-    public static int obterLimitePaginasFaturasGraphQL() {
-        return ConfigValueParser.parseInt(
-            ConfigSource.obterConfiguracao("API_GRAPHQL_FATURAS_MAX_PAGINAS", "api.graphql.faturas.max_paginas"),
-            200,
-            value -> value > 0,
-            logger,
-            "api.graphql.faturas.max_paginas",
-            "200"
-        );
-    }
-
     public static int obterLimitePaginasUsuariosGraphQL() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao("API_GRAPHQL_USUARIOS_MAX_PAGINAS", "api.graphql.usuarios.max_paginas"),
@@ -151,17 +140,6 @@ public final class ConfigApi {
             logger,
             "api.graphql.usuarios.max_paginas",
             "5000"
-        );
-    }
-
-    public static int obterDiasJanelaFaturasGraphQL() {
-        return ConfigValueParser.parseInt(
-            ConfigSource.obterConfiguracao("API_GRAPHQL_FATURAS_DIAS_JANELA", "api.graphql.faturas.dias_janela"),
-            2,
-            value -> value > 0,
-            logger,
-            "api.graphql.faturas.dias_janela",
-            "2"
         );
     }
 

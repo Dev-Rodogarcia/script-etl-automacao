@@ -8,7 +8,6 @@ REM
 REM Conecta com:
 REM - call: %~dp0mvn.bat
 REM - call: :AUTH_CHECK
-REM - call: :ASK_FATURAS_GRAPHQL_LOOP
 REM - java -jar: %~dp0target\extrator.jar
 REM
 REM Fluxo geral:
@@ -21,8 +20,6 @@ REM - JAVA_HOME: controle de estado do script.
 REM - LOOP_STATUS_AUTH_CACHE: controle de estado do script.
 REM - OP: controle de estado do script.
 REM - AUTH_ACTION: controle de estado do script.
-REM - FLAG_FATURAS_GRAPHQL: controle de estado do script.
-REM - OP_FATURAS: controle de estado do script.
 REM [DOC-FILE-END]===========================================================
 
 REM Em cmd.exe, set /p com entrada redirecionada falha com CP 65001.
@@ -41,7 +38,7 @@ echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos^)
 echo ================================================================
 echo.
 echo Cobertura do loop:
-echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   GraphQL   = coletas, fretes, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo   Raster    = raster_viagens e raster_viagem_paradas ^(quando RASTER_ENABLED/credenciais habilitarem^)
 echo.
@@ -104,8 +101,7 @@ echo ================================================================
 echo 01. Iniciar loop de extracao ^(segundo plano, continua mesmo fechando terminal^)
 echo 02. Status do loop de extracao
 echo 03. Parar loop de extracao
-echo 04. Reconfigurar Faturas GraphQL do loop ^(reinicia loop^)
-echo 05. Acompanhar logs da extracao ^(tempo real^)
+echo 04. Acompanhar logs da extracao ^(tempo real^)
 echo 00. Voltar
 echo.
 set "OP="
@@ -122,10 +118,8 @@ if "%OP%"=="2" goto :STATUS
 if "%OP%"=="02" goto :STATUS
 if "%OP%"=="3" goto :STOP
 if "%OP%"=="03" goto :STOP
-if "%OP%"=="4" goto :RECONFIG_DAEMON
-if "%OP%"=="04" goto :RECONFIG_DAEMON
-if "%OP%"=="5" goto :TAIL_LOGS
-if "%OP%"=="05" goto :TAIL_LOGS
+if "%OP%"=="4" goto :TAIL_LOGS
+if "%OP%"=="04" goto :TAIL_LOGS
 if "%OP%"=="0" goto :EXIT_LOOP
 if "%OP%"=="00" goto :EXIT_LOOP
 
@@ -136,20 +130,12 @@ goto :MENU
 :START
 call :AUTH_CHECK LOOP_START "Iniciar loop daemon"
 if errorlevel 1 goto :MENU
-call :ASK_FATURAS_GRAPHQL_LOOP
-if errorlevel 1 goto :MENU
 call :EXECUTION_SAFETY_GATE "Iniciar loop daemon"
 if errorlevel 1 goto :MENU
 
-if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
-  echo Iniciando loop daemon com Faturas GraphQL DESABILITADO...
-  echo As trilhas DataExport de inventario/sinistros e Raster habilitada permanecem ativas no loop.
-  java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-start --sem-faturas-graphql
-) else (
-  echo Iniciando loop daemon com Faturas GraphQL INCLUIDO...
-  echo As trilhas DataExport de inventario/sinistros e Raster habilitada permanecem ativas no loop.
-  java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-start
-)
+echo Iniciando loop daemon...
+echo As trilhas DataExport de inventario/sinistros e Raster habilitada permanecem ativas no loop.
+java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-start
 echo.
 pause
 goto :MENU
@@ -166,23 +152,6 @@ goto :MENU
 call :AUTH_CHECK LOOP_STOP "Parar loop daemon"
 if errorlevel 1 goto :MENU
 java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-stop
-echo.
-pause
-goto :MENU
-
-:RECONFIG_DAEMON
-call :AUTH_CHECK LOOP_RECONFIG "Reconfigurar Faturas GraphQL do loop daemon"
-if errorlevel 1 goto :MENU
-call :ASK_FATURAS_GRAPHQL_LOOP
-if errorlevel 1 goto :MENU
-
-echo Reiniciando loop daemon com nova configuracao de Faturas GraphQL...
-java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-stop >nul 2>&1
-if /i "%FLAG_FATURAS_GRAPHQL%"=="--sem-faturas-graphql" (
-  java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-start --sem-faturas-graphql
-) else (
-  java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --loop-daemon-start
-)
 echo.
 pause
 goto :MENU
@@ -355,52 +324,6 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%AUTH_CONTEXT_FILE_PATH%") do (
 )
 if defined AUTH_SESSION_ACTIONS set "AUTH_SESSION_ACTIVE=1"
 exit /b 0
-
-:ASK_FATURAS_GRAPHQL_LOOP
-set "FLAG_FATURAS_GRAPHQL="
-echo.
-echo ================================================================
-echo CONFIGURAR FATURAS GRAPHQL NO LOOP
-echo ================================================================
-echo 01. Incluir Faturas GraphQL
-echo 02. Desabilitar Faturas GraphQL ^(--sem-faturas-graphql^)
-echo 00. Cancelar inicio do loop
-echo.
-set "OP_FATURAS="
-set /p OP_FATURAS="Escolha uma opcao: " || (
-  echo Entrada encerrada. Cancelando configuracao de Faturas GraphQL.
-  exit /b 1
-)
-set "OP_FATURAS=%OP_FATURAS: =%"
-
-if "%OP_FATURAS%"=="1" (
-  set "FLAG_FATURAS_GRAPHQL="
-  exit /b 0
-)
-if "%OP_FATURAS%"=="01" (
-  set "FLAG_FATURAS_GRAPHQL="
-  exit /b 0
-)
-if "%OP_FATURAS%"=="2" (
-  set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-  exit /b 0
-)
-if "%OP_FATURAS%"=="02" (
-  set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-  exit /b 0
-)
-if "%OP_FATURAS%"=="0" (
-  echo Inicio do loop cancelado.
-  exit /b 1
-)
-if "%OP_FATURAS%"=="00" (
-  echo Inicio do loop cancelado.
-  exit /b 1
-)
-
-echo Opcao invalida.
-timeout /t 2 /nobreak >nul 2>&1
-goto :ASK_FATURAS_GRAPHQL_LOOP
 
 :END
 popd

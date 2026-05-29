@@ -84,7 +84,7 @@ class SqlServerDataQualityQueryAdapterTest {
         MDC.put(ExecutionContext.MDC_EXECUTION_ID, "exec-123");
         try {
             final long incompletos = adapter.contarLinhasIncompletas(
-                "faturas_graphql",
+                "fretes",
                 LocalDate.of(2026, 4, 17),
                 LocalDate.of(2026, 4, 23)
             );
@@ -92,7 +92,7 @@ class SqlServerDataQualityQueryAdapterTest {
             assertEquals(0L, incompletos);
             assertTrue(capture.sql().contains("FROM dbo.sys_execution_audit"));
             assertEquals("exec-123", capture.parameters().get(1));
-            assertEquals("faturas_graphql", capture.parameters().get(2));
+            assertEquals("fretes", capture.parameters().get(2));
         } finally {
             MDC.clear();
         }
@@ -114,7 +114,8 @@ class SqlServerDataQualityQueryAdapterTest {
             );
 
             assertEquals(0L, incompletos);
-            assertTrue(capture.sql().contains("(db_persistidos + noop_count) < api_total_unico"));
+            assertTrue(capture.sql().contains("db_persistidos, noop_count, invalid_count"));
+            assertTrue(capture.sql().contains("api_total_unico - (db_persistidos + noop_count) > 1"));
             assertTrue(capture.sql().contains("invalid_count > 0"));
             assertEquals("exec-noop-123", capture.parameters().get(1));
             assertEquals("sinistros", capture.parameters().get(2));
@@ -131,7 +132,7 @@ class SqlServerDataQualityQueryAdapterTest {
             new SqlServerDataQualityQueryAdapter(() -> connection);
 
         ExecutionPlanContext.setPlanos(Map.of(
-            "faturas_graphql",
+            "fretes",
             new ExecutionWindowPlan(
                 LocalDate.of(2026, 4, 22),
                 LocalDate.of(2026, 4, 23),
@@ -141,14 +142,14 @@ class SqlServerDataQualityQueryAdapterTest {
         ));
         try {
             final long incompletos = adapter.contarLinhasIncompletas(
-                "faturas_graphql",
+                "fretes",
                 LocalDate.of(2026, 4, 17),
                 LocalDate.of(2026, 4, 23)
             );
 
             assertEquals(0L, incompletos);
             assertTrue(capture.sql().contains("FROM dbo.log_extracoes"));
-            assertEquals("faturas_graphql", capture.parameters().get(1));
+            assertEquals("fretes", capture.parameters().get(1));
             assertEquals("%2026-04-22 a 2026-04-23%", capture.parameters().get(2));
             assertEquals("%2026-04-22%2026-04-23%", capture.parameters().get(3));
         } finally {

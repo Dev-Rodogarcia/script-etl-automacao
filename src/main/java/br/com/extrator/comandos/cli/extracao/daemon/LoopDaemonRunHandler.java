@@ -36,7 +36,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
@@ -51,7 +50,7 @@ import br.com.extrator.suporte.observabilidade.ExecutionContext;
 public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     @FunctionalInterface
     public interface FluxoExecutor {
-        void executar(boolean incluirFaturasGraphQL) throws Exception;
+        void executar() throws Exception;
     }
 
     @FunctionalInterface
@@ -59,7 +58,6 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         ReconciliationSummary processar(LocalDateTime inicio,
                                         LocalDateTime fimExtracao,
                                         boolean cicloSucesso,
-                                        boolean incluirFaturasGraphQL,
                                         String detalheFalhaCiclo);
     }
 
@@ -88,7 +86,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     private final LongSupplier pidSupplier;
     private final long intervaloMinutos;
     private final boolean registrarShutdownHook;
-    private final Function<Boolean, Duration> cycleTimeoutProvider;
+    private final java.util.function.Supplier<Duration> cycleTimeoutProvider;
 
     public LoopDaemonRunHandler(final DaemonStateStore stateStore, final DaemonHistoryWriter historyWriter) {
         this(
@@ -114,7 +112,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                          final LongSupplier pidSupplier,
                          final long intervaloMinutos,
                          final boolean registrarShutdownHook,
-                         final Function<Boolean, Duration> cycleTimeoutProvider) {
+                         final java.util.function.Supplier<Duration> cycleTimeoutProvider) {
         this.stateStore = stateStore;
         this.historyWriter = historyWriter;
         this.fluxoExecutor = fluxoExecutor;
@@ -128,16 +126,15 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     }
 
     @Override
-    public void executar(final boolean incluirFaturasGraphQL) throws Exception {
+    public void executar() throws Exception {
         LoopDaemonHandlerSupport.garantirDiretorioLogs(stateStore, historyWriter);
         stateStore.clearFileIfExists(stateStore.getStopFile());
         stateStore.clearFileIfExists(stateStore.getForceRunFile());
         final int limiteAlertasConsecutivos = ConfigEtl.obterLoopDaemonMaxConsecutiveAlertCycles();
 
         final long pid = pidSupplier.getAsLong();
-        final String modoFaturas = LoopDaemonHandlerSupport.descreverModoFaturas(incluirFaturasGraphQL);
         stateStore.syncPidFile(pid);
-        stateStore.saveState("RUNNING", pid, "Daemon iniciado e aguardando ciclos. " + modoFaturas, null, null, 0, 0);
+        stateStore.saveState("RUNNING", pid, "Daemon iniciado e aguardando ciclos.", null, null, 0, 0);
 
         if (registrarShutdownHook) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -165,7 +162,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             stateStore.saveState(
                 "RUNNING",
                 pid,
-                "Executando ciclo de extracao. cycle_id=" + cycleId + " " + modoFaturas + " | log_ciclo=" + cicloLog.toAbsolutePath(),
+                "Executando ciclo de extracao. cycle_id=" + cycleId + " | log_ciclo=" + cicloLog.toAbsolutePath(),
                 inicio.toString(),
                 null
             );
@@ -176,7 +173,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             String detalhe = "Ciclo concluido com sucesso.";
             try {
                 try (AutoCloseable ignored = teeFactory.abrir(cicloLog)) {
-                    executarFluxoComWatchdog(incluirFaturasGraphQL);
+                    executarFluxoComWatchdog();
                 }
             } catch (final Error e) {
                 throw e;
@@ -212,7 +209,6 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                     inicio,
                     fimExtracao,
                     sucesso,
-                    incluirFaturasGraphQL,
                     sucesso ? null : detalhe
                 );
             historyWriter.registerReconciliationHistory(inicio, fimExtracao, sucesso, resumoReconciliacao, cicloLog);
@@ -263,7 +259,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             stateStore.saveState(
                 statusDaemon,
                 pid,
-                detalheOperacional + " cycle_id=" + cycleId + " " + modoFaturas + " | log_ciclo=" + cicloLog.toAbsolutePath(),
+                detalheOperacional + " cycle_id=" + cycleId + " | log_ciclo=" + cicloLog.toAbsolutePath(),
                 fim.toString(),
                 proximo.toString(),
                 consecutiveAlertCycles,
@@ -286,7 +282,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                 stateStore.saveState(
                     "RUNNING",
                     pid,
-                    "Disparo manual detectado: iniciando novo ciclo imediato. " + modoFaturas,
+                    "Disparo manual detectado: iniciando novo ciclo imediato.",
                     fim.toString(),
                     null
                 );
@@ -330,14 +326,12 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     private ReconciliationSummary processarReconciliacao(final LocalDateTime inicio,
                                                          final LocalDateTime fimExtracao,
                                                          final boolean cicloSucesso,
-                                                         final boolean incluirFaturasGraphQL,
                                                          final String detalheFalhaCiclo) {
         try {
             return reconciliationProcessor.processar(
                 inicio,
                 fimExtracao,
                 cicloSucesso,
-                incluirFaturasGraphQL,
                 detalheFalhaCiclo
             );
         } catch (final RuntimeException e) {
@@ -397,8 +391,8 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             && resumoReconciliacao.getFalhas() > 0;
     }
 
-    private static void executarFluxoCompletoPadrao(final boolean incluirFaturasGraphQL) throws Exception {
-        new FluxoCompletoUseCase().executar(incluirFaturasGraphQL, true);
+    private static void executarFluxoCompletoPadrao() throws Exception {
+        new FluxoCompletoUseCase().executar(true);
     }
 
     private static ReconciliationProcessor criarProcessadorReconciliacaoPadrao() {
@@ -429,23 +423,23 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         return DaemonCycleTee.abrir(cicloLog);
     }
 
-    private void executarFluxoComWatchdog(final boolean incluirFaturasGraphQL) throws Exception {
-        final Duration timeout = resolverTimeoutCiclo(incluirFaturasGraphQL);
+    private void executarFluxoComWatchdog() throws Exception {
+        final Duration timeout = resolverTimeoutCiclo();
         OperationTimeoutGuard.executar(
             "ciclo_loop_daemon",
             timeout,
             () -> {
-                fluxoExecutor.executar(incluirFaturasGraphQL);
+                fluxoExecutor.executar();
                 return null;
             }
         );
     }
 
-    private Duration resolverTimeoutCiclo(final boolean incluirFaturasGraphQL) {
+    private Duration resolverTimeoutCiclo() {
         if (cycleTimeoutProvider == null) {
-            return ConfigEtl.obterTimeoutCicloDaemon(incluirFaturasGraphQL);
+            return ConfigEtl.obterTimeoutCicloDaemon();
         }
-        final Duration timeout = cycleTimeoutProvider.apply(incluirFaturasGraphQL);
-        return timeout == null ? ConfigEtl.obterTimeoutCicloDaemon(incluirFaturasGraphQL) : timeout;
+        final Duration timeout = cycleTimeoutProvider.get();
+        return timeout == null ? ConfigEtl.obterTimeoutCicloDaemon() : timeout;
     }
 }

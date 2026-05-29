@@ -134,7 +134,6 @@ public class ExtracaoPorIntervaloUseCase {
         final LocalDate dataFim = request.dataFim();
         final String apiEspecifica = request.apiEspecifica();
         final String entidadeEspecifica = request.entidadeEspecifica();
-        final boolean incluirFaturasGraphQL = request.incluirFaturasGraphQL();
         final boolean modoLoopDaemon = request.modoLoopDaemon();
 
         BannerUtil.exibirBannerExtracaoPorIntervalo();
@@ -155,10 +154,6 @@ public class ExtracaoPorIntervaloUseCase {
             log.console("API: TODAS");
             log.console("Entidade: TODAS");
         }
-        log.console(
-            "Faturas GraphQL: {}",
-            descreverFaturasGraphQL(apiEspecifica, incluirFaturasGraphQL)
-        );
         if (modoRapido24h) {
             log.console("Modo rapido 24h: ATIVO (sem pre-backfill e sem pos-hidratacao referencial de coletas)");
         }
@@ -237,8 +232,7 @@ public class ExtracaoPorIntervaloUseCase {
                 bloco,
                 validador,
                 apiEspecifica,
-                entidadeEspecifica,
-                incluirFaturasGraphQL
+                entidadeEspecifica
             );
 
             if (!podeExecutar) {
@@ -255,8 +249,7 @@ public class ExtracaoPorIntervaloUseCase {
             final PipelineOrchestrator orchestrator = AplicacaoContexto.orchestratorFactory().criar();
             final List<PipelineStep> steps = planejadorEscopo.criarSteps(
                 apiEspecifica,
-                entidadeEspecifica,
-                incluirFaturasGraphQL
+                entidadeEspecifica
             );
             final PipelineReport pipelineReport = orchestrator.executar(bloco.dataInicio, bloco.dataFim, steps);
             blocoComFalha = registrarResultadosBloco(numeroBloco, totalBlocos, pipelineReport, falhasBloco);
@@ -280,8 +273,7 @@ public class ExtracaoPorIntervaloUseCase {
                 inicioExecucaoBloco,
                 fimExecucaoBloco,
                 apiEspecifica,
-                entidadeEspecifica,
-                incluirFaturasGraphQL
+                entidadeEspecifica
             );
             resumosEntidades.addAll(montarResumoBloco(
                 bloco,
@@ -295,7 +287,6 @@ public class ExtracaoPorIntervaloUseCase {
                 fimExecucaoBloco,
                 apiEspecifica,
                 entidadeEspecifica,
-                incluirFaturasGraphQL,
                 modoLoopDaemon,
                 logsBloco
             );
@@ -445,14 +436,12 @@ public class ExtracaoPorIntervaloUseCase {
         final BlocoPeriodo bloco,
         final ValidadorLimiteExtracao validador,
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         boolean todasPermitidas = true;
         for (final String entidade : planejadorEscopo.determinarEntidadesParaLimite(
             apiEspecifica,
-            entidadeEspecifica,
-            incluirFaturasGraphQL
+            entidadeEspecifica
         )) {
             final ValidadorLimiteExtracao.ResultadoValidacao resultado =
                 validador.validarLimiteExtracao(entidade, bloco.dataInicio, bloco.dataFim);
@@ -552,14 +541,12 @@ public class ExtracaoPorIntervaloUseCase {
         final LocalDateTime inicioExecucaoBloco,
         final LocalDateTime fimExecucaoBloco,
         final String apiEspecifica,
-        final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL
+        final String entidadeEspecifica
     ) {
         final Map<String, Optional<LogExtracaoInfo>> logsBloco = new LinkedHashMap<>();
         final Set<String> entidadesResumo = planejadorEscopo.determinarEntidadesParaResumo(
             apiEspecifica,
-            entidadeEspecifica,
-            incluirFaturasGraphQL
+            entidadeEspecifica
         );
         if (entidadesResumo.isEmpty()) {
             return logsBloco;
@@ -822,15 +809,6 @@ public class ExtracaoPorIntervaloUseCase {
         return "OK";
     }
 
-    static String descreverFaturasGraphQL(final String apiEspecifica,
-                                          final boolean incluirFaturasGraphQL) {
-        if ("dataexport".equalsIgnoreCase(apiEspecifica)
-            || ConstantesEntidades.RASTER.equalsIgnoreCase(apiEspecifica)) {
-            return "NAO SE APLICA";
-        }
-        return incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (flag --sem-faturas-graphql)";
-    }
-
     private Integer primeiroNaoNulo(final Integer primeiro, final Integer segundo) {
         return primeiro != null ? primeiro : segundo;
     }
@@ -845,15 +823,13 @@ public class ExtracaoPorIntervaloUseCase {
         final LocalDateTime fimExecucaoBloco,
         final String apiEspecifica,
         final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL,
         final boolean modoLoopDaemon,
         final Map<String, Optional<LogExtracaoInfo>> logsBloco
     ) {
         final List<String> falhas = new ArrayList<>();
         final Set<String> entidadesObrigatorias = planejadorEscopo.determinarEntidadesObrigatoriasParaVolume(
             apiEspecifica,
-            entidadeEspecifica,
-            incluirFaturasGraphQL
+            entidadeEspecifica
         );
 
         if (entidadesObrigatorias.isEmpty()) {
@@ -915,8 +891,7 @@ public class ExtracaoPorIntervaloUseCase {
 
         final Set<String> entidadesIntegridade = planejadorEscopo.determinarEntidadesEsperadasParaIntegridade(
             apiEspecifica,
-            entidadeEspecifica,
-            incluirFaturasGraphQL
+            entidadeEspecifica
         );
         if (!entidadesIntegridade.isEmpty()) {
             final IntegridadeEtlPort integridadePort = AplicacaoContexto.integridadeEtlPort();

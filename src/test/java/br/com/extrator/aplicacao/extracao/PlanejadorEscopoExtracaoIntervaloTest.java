@@ -57,10 +57,10 @@ class PlanejadorEscopoExtracaoIntervaloTest {
     }
 
     @Test
-    void deveCriarStepsGranularesParaEscopoCompletoSemFaturasGraphql() {
+    void deveCriarStepsGranularesParaEscopoCompleto() {
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps(null, null, false)
+        final List<String> steps = planejador.criarSteps(null, null)
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -83,10 +83,10 @@ class PlanejadorEscopoExtracaoIntervaloTest {
     }
 
     @Test
-    void deveCriarStepsGranularesParaApiGraphqlComFaturasQuandoNaoHouverEntidadeEspecifica() {
+    void deveCriarStepsGranularesParaApiGraphqlQuandoNaoHouverEntidadeEspecifica() {
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps("graphql", null, true)
+        final List<String> steps = planejador.criarSteps("graphql", null)
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -95,8 +95,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
             List.of(
                 "graphql:usuarios_sistema",
                 "graphql:coletas",
-                "graphql:fretes",
-                "graphql:faturas_graphql"
+                "graphql:fretes"
             ),
             steps
         );
@@ -106,7 +105,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
     void deveCriarStepRasterQuandoApiRasterForInformada() {
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps("raster", null, false)
+        final List<String> steps = planejador.criarSteps("raster", null)
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -120,7 +119,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
         escreverCampoContexto("dataExportGateway", null);
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps("raster", null, false)
+        final List<String> steps = planejador.criarSteps("raster", null)
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -133,7 +132,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
         escreverCampoContexto("graphQLGateway", null);
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps("dataexport", "sinistros", false)
+        final List<String> steps = planejador.criarSteps("dataexport", "sinistros")
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -146,7 +145,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
         escreverCampoContexto("dataExportGateway", null);
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps("graphql", "coletas", false)
+        final List<String> steps = planejador.criarSteps("graphql", "coletas")
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -159,7 +158,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
         AplicacaoContexto.registrarRasterHabilitadoParaExecucao(true);
         final PlanejadorEscopoExtracaoIntervalo planejador = new PlanejadorEscopoExtracaoIntervalo();
 
-        final List<String> steps = planejador.criarSteps(null, null, false)
+        final List<String> steps = planejador.criarSteps(null, null)
             .stream()
             .map(PipelineStep::obterNomeEtapa)
             .toList();
@@ -188,7 +187,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
 
         assertEquals(
             java.util.Set.of("raster_viagens", "raster_viagem_paradas"),
-            planejador.determinarEntidadesObrigatoriasParaVolume("raster", null, false)
+            planejador.determinarEntidadesObrigatoriasParaVolume("raster", null)
         );
     }
 

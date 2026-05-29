@@ -46,7 +46,7 @@ public final class LoopDaemonStatusHandler implements LoopDaemonModeHandler {
     }
 
     @Override
-    public void executar(final boolean incluirFaturasGraphQL) throws Exception {
+    public void executar() throws Exception {
         LoopDaemonHandlerSupport.garantirDiretorioLogs(stateStore, historyWriter);
         final OptionalLong pidArquivo = stateStore.readPidFile();
         final OptionalLong pidOpt = lifecycleService.localizarPidDaemonAtivo();

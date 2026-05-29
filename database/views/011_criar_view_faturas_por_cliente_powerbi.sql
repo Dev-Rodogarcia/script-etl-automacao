@@ -37,9 +37,9 @@ SELECT
     fpc.numero_nfse AS [NFS-e/Número],
     fpc.serie_nfse AS [NFS-e/Série],
     fpc.numero_nfse AS [fit_nse_number],
-    fg.nfse_numero AS [N° NFS-e],
-    fg.carteira_banco AS [Carteira/Descrição],
-    fg.instrucao_boleto AS [Instrução Customizada],
+    fpc.numero_nfse AS [N° NFS-e],
+    CAST(NULL AS NVARCHAR(50)) AS [Carteira/Descrição],
+    CAST(NULL AS NVARCHAR(MAX)) AS [Instrução Customizada],
     CASE WHEN fpc.fit_ant_document IS NOT NULL THEN 'Faturado' ELSE 'Aguardando Faturamento' END AS [Status do Processo],
     fpc.fit_ant_document AS [Fatura/N° Documento],
     CONVERT(NVARCHAR(10), datas.fit_ant_issue_date, 23) AS [Fatura/Emissão],
@@ -77,27 +77,5 @@ OUTER APPLY (
             LTRIM(RTRIM(COALESCE(CONVERT(NVARCHAR(50), fpc.pagador_documento), N''))),
             N'.', N''), N'-', N''), N'/', N''), N' ', N''), CHAR(9), N''), CHAR(160), N'') AS documento_limpo
     ) limpeza
-) documentos
-OUTER APPLY (
-    -- Mantem o enriquecimento 1:1 e evita multiplicar faturas quando ha varios titulos com o mesmo document.
-    SELECT TOP (1)
-        fg.nfse_numero,
-        fg.carteira_banco,
-        fg.instrucao_boleto
-    FROM dbo.faturas_graphql fg
-    WHERE fg.document = fpc.fit_ant_document
-    ORDER BY
-        CASE
-            WHEN datas.fit_ant_issue_date IS NOT NULL AND TRY_CONVERT(DATE, fg.issue_date) = datas.fit_ant_issue_date THEN 0
-            WHEN datas.fit_ant_issue_date IS NULL THEN 1
-            ELSE 2
-        END,
-        CASE
-            WHEN datas.fit_ant_issue_date IS NOT NULL AND TRY_CONVERT(DATE, fg.issue_date) IS NOT NULL
-                THEN ABS(DATEDIFF(DAY, TRY_CONVERT(DATE, fg.issue_date), datas.fit_ant_issue_date))
-            ELSE 2147483647
-        END,
-        TRY_CONVERT(DATE, fg.issue_date) DESC,
-        fg.id DESC
-) fg;
+) documentos;
 GO

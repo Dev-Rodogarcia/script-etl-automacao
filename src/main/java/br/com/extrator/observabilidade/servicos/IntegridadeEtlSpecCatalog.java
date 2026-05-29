@@ -97,13 +97,6 @@ final class IntegridadeEtlSpecCatalog {
             List.of("identificador_unico"),
             List.of("identificador_unico", "metadata", "data_extracao")
         ));
-        specs.put(ConstantesEntidades.FATURAS_GRAPHQL, new IntegridadeEtlSpec(
-            ConstantesEntidades.FATURAS_GRAPHQL,
-            ConstantesEntidades.FATURAS_GRAPHQL,
-            "data_extracao",
-            List.of("id"),
-            List.of("id", "metadata", "data_extracao")
-        ));
         return Map.copyOf(specs);
     }
 }

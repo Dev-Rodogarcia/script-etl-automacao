@@ -20,7 +20,7 @@ class RecoveryUseCaseTest {
         final RecoveryUseCase useCase = new RecoveryUseCase();
         assertThrows(
             IllegalArgumentException.class,
-            () -> useCase.executarReplay(LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 1), null, null, true)
+            () -> useCase.executarReplay(LocalDate.of(2026, 1, 2), LocalDate.of(2026, 1, 1), null, null)
         );
     }
 
@@ -35,7 +35,7 @@ class RecoveryUseCaseTest {
         );
 
         assertDoesNotThrow(() ->
-            useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true)
+            useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes")
         );
 
         assertEquals(0, extracao.execucoes.get());
@@ -53,7 +53,7 @@ class RecoveryUseCaseTest {
             Clock.fixed(Instant.parse("2026-04-13T03:00:00Z"), ZoneOffset.UTC)
         );
 
-        useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true);
+        useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes");
 
         assertEquals(1, extracao.execucoes.get());
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL, extracao.requestCapturada.modoExecucao());
@@ -74,7 +74,7 @@ class RecoveryUseCaseTest {
 
         assertThrows(
             IllegalStateException.class,
-            () -> useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true)
+            () -> useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes")
         );
 
         assertEquals(1, gate.failedCalls.get());
@@ -95,7 +95,7 @@ class RecoveryUseCaseTest {
 
         final IllegalStateException erro = assertThrows(
             IllegalStateException.class,
-            () -> useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes", true)
+            () -> useCase.executarReplay(LocalDate.of(2026, 4, 10), LocalDate.of(2026, 4, 10), "graphql", "fretes")
         );
 
         assertEquals("falha simulada", erro.getMessage());

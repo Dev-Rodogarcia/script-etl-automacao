@@ -48,7 +48,7 @@ import br.com.extrator.suporte.console.LoggerConsole;
  * Exporta as entidades finais de dominio e dimensoes operacionais para arquivos CSV.
  * Tabelas internas de auditoria permanecem disponiveis para exportacao explicita,
  * mas ficam fora da exportacao padrao.
- * Inclui: Cotacoes, Coletas, Contas a Pagar, Faturas por Cliente, Faturas GraphQL,
+ * Inclui: Cotacoes, Coletas, Contas a Pagar, Faturas por Cliente,
  *         Fretes, Manifestos, Localizacao de Cargas, Inventario, Sinistros,
  *         Raster Viagens, Raster Paradas, dim_usuarios
  */
@@ -57,7 +57,6 @@ public class ExportadorCSV {
     private static final String ENTIDADE_COLETAS = "coletas";
     private static final String ENTIDADE_CONTAS_A_PAGAR = "contas_a_pagar";
     private static final String ENTIDADE_FATURAS_POR_CLIENTE = "faturas_por_cliente";
-    private static final String ENTIDADE_FATURAS_GRAPHQL = "faturas_graphql";
     private static final String ENTIDADE_FRETES = "fretes";
     private static final String ENTIDADE_MANIFESTOS = "manifestos";
     private static final String ENTIDADE_LOCALIZACAO_CARGAS = "localizacao_cargas";
@@ -74,7 +73,6 @@ public class ExportadorCSV {
         ENTIDADE_COLETAS,
         ENTIDADE_CONTAS_A_PAGAR,
         ENTIDADE_FATURAS_POR_CLIENTE,
-        ENTIDADE_FATURAS_GRAPHQL,
         ENTIDADE_FRETES,
         ENTIDADE_MANIFESTOS,
         ENTIDADE_LOCALIZACAO_CARGAS,

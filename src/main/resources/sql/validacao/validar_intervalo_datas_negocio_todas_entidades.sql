@@ -115,18 +115,5 @@ FROM (
         MAX(CAST(data_extracao AS DATETIME2)) AS max_data_extracao
     FROM dbo.faturas_por_cliente
 
-    UNION ALL
-
-    SELECT
-        'dbo.faturas_graphql' AS tabela,
-        COUNT_BIG(*) AS total_registros,
-        SUM(CASE WHEN CAST(issue_date AS DATE) >= @inicio AND CAST(issue_date AS DATE) < @fim_exclusivo THEN 1 ELSE 0 END) AS dentro_intervalo,
-        SUM(CASE WHEN CAST(issue_date AS DATE) < @inicio THEN 1 ELSE 0 END) AS antes_intervalo,
-        SUM(CASE WHEN CAST(issue_date AS DATE) >= @fim_exclusivo THEN 1 ELSE 0 END) AS depois_intervalo,
-        MIN(CAST(issue_date AS DATETIME2)) AS min_data_negocio,
-        MAX(CAST(issue_date AS DATETIME2)) AS max_data_negocio,
-        MIN(CAST(data_extracao AS DATETIME2)) AS min_data_extracao,
-        MAX(CAST(data_extracao AS DATETIME2)) AS max_data_extracao
-    FROM dbo.faturas_graphql
 ) v
 ORDER BY v.tabela;

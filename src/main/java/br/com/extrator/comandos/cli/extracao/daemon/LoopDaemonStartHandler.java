@@ -47,10 +47,9 @@ public final class LoopDaemonStartHandler implements LoopDaemonModeHandler {
     }
 
     @Override
-    public void executar(final boolean incluirFaturasGraphQL) throws Exception {
+    public void executar() throws Exception {
         LoopDaemonHandlerSupport.garantirDiretorioLogs(stateStore, historyWriter);
         final OptionalLong pidExistente = lifecycleService.localizarPidDaemonAtivo();
-        final String modoFaturas = LoopDaemonHandlerSupport.descreverModoFaturas(incluirFaturasGraphQL);
 
         if (pidExistente.isPresent()) {
             stateStore.syncPidFile(pidExistente.getAsLong());
@@ -62,7 +61,7 @@ public final class LoopDaemonStartHandler implements LoopDaemonModeHandler {
             stateStore.saveState(
                 statusAtual,
                 pidExistente.getAsLong(),
-                "Loop daemon ja estava em execucao. Ciclo imediato solicitado manualmente. " + modoFaturas,
+                "Loop daemon ja estava em execucao. Ciclo imediato solicitado manualmente.",
                 ultimoCiclo,
                 proximoCiclo
             );
@@ -76,11 +75,11 @@ public final class LoopDaemonStartHandler implements LoopDaemonModeHandler {
         stateStore.clearFileIfExists(stateStore.getStopFile());
         stateStore.clearFileIfExists(stateStore.getForceRunFile());
 
-        final List<String> comando = lifecycleService.construirComandoFilho(incluirFaturasGraphQL);
+        final List<String> comando = lifecycleService.construirComandoFilho();
         final Process processo = lifecycleService.startChildProcess(comando);
         final long pid = processo.pid();
         stateStore.syncPidFile(pid);
-        stateStore.saveState("STARTING", pid, "Processo daemon iniciado. " + modoFaturas, null, null);
+        stateStore.saveState("STARTING", pid, "Processo daemon iniciado.", null, null);
 
         Thread.sleep(1200L);
         if (!processo.isAlive()) {
@@ -92,7 +91,6 @@ public final class LoopDaemonStartHandler implements LoopDaemonModeHandler {
         }
 
         System.out.println("Loop daemon iniciado com sucesso. PID: " + pid);
-        System.out.println(modoFaturas);
         System.out.println("Log do daemon: " + DaemonPaths.DAEMON_STDOUT_FILE.toAbsolutePath());
     }
 }

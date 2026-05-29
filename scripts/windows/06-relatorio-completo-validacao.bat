@@ -16,7 +16,7 @@ echo.
 echo Este script executa a validacao completa do ETL sem alterar producao
 echo por padrao. Testes que reescrevem dados ^(idempotencia e hidratacao^)
 echo so rodam com confirmacao explicita.
-echo Cobertura operacional considerada: coletas, fretes, faturas_graphql, manifestos, cotacoes,
+echo Cobertura operacional considerada: coletas, fretes, manifestos, cotacoes,
 echo localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros e Raster quando habilitada.
 echo.
 
@@ -63,9 +63,6 @@ if defined JAVA_HOME (
 call :AUTH_CHECK RUN_BATERIA_EXTREMA "Executar bateria extrema e relatorio de saude do ETL"
 if errorlevel 1 exit /b 1
 
-call :CONFIGURAR_FATURAS_GRAPHQL
-if errorlevel 1 exit /b 1
-
 call :CONFIGURAR_IDEMPOTENCIA
 if errorlevel 1 exit /b 1
 
@@ -76,7 +73,6 @@ call :CONFIGURAR_STRESS
 if errorlevel 1 exit /b 1
 
 set "CMD_FLAGS=--periodo-fechado --permitir-fallback-janela --stress-repeticoes %STRESS_REPETICOES%"
-if defined FLAG_SEM_FATURAS_GRAPHQL set "CMD_FLAGS=!CMD_FLAGS! --sem-faturas-graphql"
 if defined FLAG_EXECUTAR_IDEMPOTENCIA set "CMD_FLAGS=!CMD_FLAGS! --executar-idempotencia"
 if defined FLAG_EXECUTAR_HIDRATACAO set "CMD_FLAGS=!CMD_FLAGS! --executar-hidratacao-orfaos"
 
@@ -102,19 +98,6 @@ echo Referencias novas esperadas nos relatorios: inventario, sinistros e Raster 
 echo.
 pause
 endlocal & exit /b %RET_CODE%
-
-:CONFIGURAR_FATURAS_GRAPHQL
-set "FLAG_SEM_FATURAS_GRAPHQL="
-echo Incluir Faturas GraphQL na bateria? ^(1=Sim, 2=Nao^)
-set /p "OP_FATURAS=> " || exit /b 1
-set "OP_FATURAS=%OP_FATURAS: =%"
-if "%OP_FATURAS%"=="1" exit /b 0
-if "%OP_FATURAS%"=="2" (
-    set "FLAG_SEM_FATURAS_GRAPHQL=1"
-    exit /b 0
-)
-echo Opcao invalida.
-exit /b 1
 
 :CONFIGURAR_IDEMPOTENCIA
 set "FLAG_EXECUTAR_IDEMPOTENCIA="

@@ -82,13 +82,12 @@ class LoopReconciliationServiceTest {
             true,
             20,
             1,
-            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.add(data + "|" + api + "|" + entidade)
+            (data, api, entidade) -> execucoes.add(data + "|" + api + "|" + entidade)
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 9, 0),
             LocalDateTime.of(2026, 2, 20, 9, 30),
-            true,
             true,
             null
         );
@@ -122,7 +121,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             0,
-            (data, api, entidade, incluirFaturasGraphQL) -> {
+            (data, api, entidade) -> {
                 if (tentativas.incrementAndGet() == 1) {
                     throw new IllegalStateException("falha simulada");
                 }
@@ -133,7 +132,6 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 10, 0),
             LocalDateTime.of(2026, 2, 20, 10, 30),
             false,
-            true,
             "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport/localizacao_cargas"
         );
 
@@ -145,7 +143,6 @@ class LoopReconciliationServiceTest {
         final var segundoResumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 11, 0),
             LocalDateTime.of(2026, 2, 20, 11, 30),
-            true,
             true,
             null
         );
@@ -174,14 +171,13 @@ class LoopReconciliationServiceTest {
             true,
             2,
             0,
-            (data, api, entidade, incluirFaturasGraphQL) -> datasExecutadas.add(data)
+            (data, api, entidade) -> datasExecutadas.add(data)
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 12, 0),
             LocalDateTime.of(2026, 2, 20, 12, 30),
             true,
-            false,
             null
         );
 
@@ -201,7 +197,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             2,
-            (data, api, entidade, incluirFaturasGraphQL) -> {
+            (data, api, entidade) -> {
                 throw new IllegalStateException("falha simulada");
             }
         );
@@ -210,7 +206,6 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 0, 5),
             LocalDateTime.of(2026, 2, 20, 0, 35),
             false,
-            true,
             "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport/localizacao_cargas"
         );
 
@@ -234,14 +229,13 @@ class LoopReconciliationServiceTest {
             true,
             1,
             2,
-            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.incrementAndGet()
+            (data, api, entidade) -> execucoes.incrementAndGet()
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 0, 5),
             LocalDateTime.of(2026, 2, 20, 0, 35),
             false,
-            true,
             "timeout HTTP 429 sem runner falhado identificavel"
         );
 
@@ -267,14 +261,13 @@ class LoopReconciliationServiceTest {
             true,
             1,
             0,
-            (data, api, entidade, incluirFaturasGraphQL) -> execucoes.incrementAndGet()
+            (data, api, entidade) -> execucoes.incrementAndGet()
         );
 
         final var resumo = service.processarPosCiclo(
             LocalDateTime.of(2026, 2, 20, 6, 0),
             LocalDateTime.of(2026, 2, 20, 6, 15),
             false,
-            true,
             "Fluxo completo concluido com falhas parciais. Runners falhados: DataExport"
         );
 
@@ -291,7 +284,7 @@ class LoopReconciliationServiceTest {
             false,
             2,
             1,
-            (data, api, entidade, incluirFaturasGraphQL) -> {
+            (data, api, entidade) -> {
                 throw new IllegalStateException("nao deveria executar");
             }
         );
@@ -300,7 +293,6 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 9, 0),
             LocalDateTime.of(2026, 2, 20, 9, 30),
             false,
-            true,
             null
         );
 
@@ -322,7 +314,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             0,
-            (data, api, entidade, incluirFaturasGraphQL) -> {
+            (data, api, entidade) -> {
                 execucoes.add(data + "|" + api + "|" + entidade);
                 throw new IllegalStateException("falha segmentada");
             }
@@ -332,7 +324,6 @@ class LoopReconciliationServiceTest {
             LocalDateTime.of(2026, 2, 20, 6, 0),
             LocalDateTime.of(2026, 2, 20, 6, 15),
             false,
-            true,
             "Fluxo completo concluido com falhas parciais. Runners falhados: GraphQL/fretes"
         );
 

@@ -87,7 +87,7 @@ public final class LoopReconciliationService {
 
     @FunctionalInterface
     public interface ReconciliationExecutor {
-        void execute(LocalDate data, String api, String entidade, boolean incluirFaturasGraphQL) throws Exception;
+        void execute(LocalDate data, String api, String entidade) throws Exception;
     }
 
     private final LoopReconciliationStateStore stateStore;
@@ -123,15 +123,13 @@ public final class LoopReconciliationService {
             ConfigLoop.isReconciliacaoAtiva(),
             ConfigLoop.obterReconciliacaoMaxPorCiclo(),
             ConfigLoop.obterReconciliacaoDiasRetroativosFalha(),
-            (data, api, entidade, incluirFaturasGraphQL) ->
-                reconciliacaoUseCase.executar(data, api, entidade, incluirFaturasGraphQL)
+            reconciliacaoUseCase::executar
         );
     }
 
     public ReconciliationSummary processarPosCiclo(final LocalDateTime inicioCiclo,
                                                    final LocalDateTime fimCiclo,
                                                    final boolean cicloSucesso,
-                                                   final boolean incluirFaturasGraphQL,
                                                    final String detalheFalhaCiclo) {
         if (!ativo) {
             return ReconciliationSummary.inativo();
@@ -150,7 +148,7 @@ public final class LoopReconciliationService {
         final List<String> detalhesFalha = new ArrayList<>();
 
         if (estado.lastDailyScheduledDate == null || estado.lastDailyScheduledDate.isBefore(ontem)) {
-            agendarEscoposParaData(estado, ontem, resolverEscoposDiarios(incluirFaturasGraphQL));
+            agendarEscoposParaData(estado, ontem, resolverEscoposDiarios());
             estado.lastDailyScheduledDate = ontem;
             agendouDiaria = true;
             logger.info("Reconciliacao diaria agendada para {} com escopos explicitos", ontem);
@@ -177,7 +175,7 @@ public final class LoopReconciliationService {
                     target.api() == null ? "all" : target.api(),
                     target.entidade() == null ? "all" : target.entidade()
                 );
-                executor.execute(target.data(), target.api(), target.entidade(), incluirFaturasGraphQL);
+                executor.execute(target.data(), target.api(), target.entidade());
                 estado.pendingTargets.remove(target);
                 estado.lastSuccessfulReconciliationDate = maiorData(estado.lastSuccessfulReconciliationDate, target.data());
                 executadas++;
@@ -286,7 +284,6 @@ public final class LoopReconciliationService {
         final String apiInformada = switch (runner) {
             case API_GRAPHQL -> API_GRAPHQL;
             case API_DATAEXPORT -> API_DATAEXPORT;
-            case "faturasgraphql" -> API_GRAPHQL;
             case ConstantesEntidades.RASTER -> ConstantesEntidades.RASTER;
             default -> null;
         };
@@ -308,14 +305,11 @@ public final class LoopReconciliationService {
         return new ReconciliationTarget(LocalDate.MIN, api, entidade);
     }
 
-    private List<ReconciliationTarget> resolverEscoposDiarios(final boolean incluirFaturasGraphQL) {
+    private List<ReconciliationTarget> resolverEscoposDiarios() {
         final List<ReconciliationTarget> escopos = new ArrayList<>();
         escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.USUARIOS_SISTEMA));
         escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.COLETAS));
         escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.FRETES));
-        if (incluirFaturasGraphQL) {
-            escopos.add(alvoDiario(API_GRAPHQL, ConstantesEntidades.FATURAS_GRAPHQL));
-        }
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.MANIFESTOS));
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.COTACOES));
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.LOCALIZACAO_CARGAS));
@@ -388,8 +382,7 @@ public final class LoopReconciliationService {
         return switch (entidade) {
             case ConstantesEntidades.USUARIOS_SISTEMA,
                  ConstantesEntidades.COLETAS,
-                 ConstantesEntidades.FRETES,
-                 ConstantesEntidades.FATURAS_GRAPHQL -> API_GRAPHQL;
+                 ConstantesEntidades.FRETES -> API_GRAPHQL;
             case ConstantesEntidades.MANIFESTOS,
                  ConstantesEntidades.COTACOES,
                  ConstantesEntidades.LOCALIZACAO_CARGAS,
@@ -428,7 +421,6 @@ public final class LoopReconciliationService {
                 ConstantesEntidades.FATURAS_POR_CLIENTE;
             case "inventario", "inventário" -> ConstantesEntidades.INVENTARIO;
             case "sinistros", "sinistro" -> ConstantesEntidades.SINISTROS;
-            case "faturas_graphql", "faturasgraphql", "faturas" -> ConstantesEntidades.FATURAS_GRAPHQL;
             case "raster", "raster_viagens", "viagens_raster", "raster_viagem_paradas", "paradas_raster" ->
                 ConstantesEntidades.RASTER_VIAGENS;
             default -> null;

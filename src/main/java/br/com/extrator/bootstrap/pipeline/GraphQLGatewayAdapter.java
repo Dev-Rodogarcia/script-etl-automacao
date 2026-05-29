@@ -37,7 +37,6 @@ import br.com.extrator.aplicacao.portas.GraphQLGateway;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
 import br.com.extrator.bootstrap.pipeline.IsolatedStepProcessExecutor.ApiType;
-import br.com.extrator.suporte.validacao.ConstantesEntidades;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
 
@@ -75,20 +74,6 @@ public final class GraphQLGatewayAdapter implements GraphQLGateway {
             childLogFile = null;
         }
 
-        if (filtroEntidade != null && ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(filtroEntidade)) {
-            return StepExecutionResult.builder("graphql:faturas_graphql", ConstantesEntidades.FATURAS_GRAPHQL)
-                .status(StepStatus.SUCCESS)
-                .startedAt(inicio)
-                .finishedAt(LocalDateTime.now())
-                .message("GraphQL faturas executado com sucesso")
-                .metadata("source", "graphql")
-                .metadata("execution_mode", usarIsolamento ? "isolated_process" : "in_process")
-                .metadata("forced_by_daemon", forcarIsolamentoNoDaemon)
-                .metadata("child_pid", childPid)
-                .metadata("child_log_file", childLogFile == null ? null : childLogFile.toString())
-                .build();
-        }
-
         final String entidadeExecucao = filtroEntidade == null ? "graphql" : filtroEntidade;
         return StepExecutionResult.builder("graphql:" + entidadeExecucao, entidadeExecucao)
             .status(StepStatus.SUCCESS)
@@ -104,9 +89,6 @@ public final class GraphQLGatewayAdapter implements GraphQLGateway {
     }
 
     private java.time.Duration resolverTimeoutIsolado(final String filtroEntidade) {
-        if (filtroEntidade != null && ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(filtroEntidade)) {
-            return ConfigEtl.obterTimeoutStepFaturasGraphQL();
-        }
         if (filtroEntidade == null || filtroEntidade.isBlank()) {
             return ConfigEtl.obterTimeoutStepGraphQLCompleto();
         }

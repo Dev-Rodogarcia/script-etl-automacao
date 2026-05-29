@@ -14,7 +14,7 @@ Conecta com:
 - ValidacaoApiBanco24hDetalhadaRepository (para queries em banco)
 
 Fluxo geral:
-1) criarEntidades() retorna lista de 8 entidades (ou 9 com FATURAS_GRAPHQL).
+1) criarEntidades() retorna lista das entidades ativas para validacao detalhada.
 2) Para cada entidade: carregaDados(), mapeia DTOs, deuplica, gera hashes por chave.
 3) Retorna ResultadoApiChaves com contas (bruto, unico, invalidos), chaves, hashes, detalhe.
 
@@ -23,23 +23,20 @@ Atributos-chave:
 - clienteDataExport, clienteGraphQL: clientes API.
 - mappers: diversos mappers de DTO -> Entity.
 - metadataHasher: para SHA256 de metadados.
-- repository: para consultas auxiliares (faturas orfaas).
+- repository: para consultas auxiliares de janela/log.
 Metodos principais:
-- criarEntidades(Connection, LocalDate, LocalDate, boolean): cria lista com 8-9 entidades.
+- criarEntidades(Connection, LocalDate, LocalDate): cria lista de entidades ativas.
 - carregarManifestos/Cotacoes/Localizacao/...(): metodos para cada entidade (DataExport).
 - carregarFretes/Coletas(): metodos para GraphQL.
-- carregarFaturasGraphQL(Connection, LocalDate, LocalDate): faturas com fallback para orfaas.
 - carregarDataExport/carregarGraphQL(): templates genericos para coleta, mapeamento, deduplicacao, hashing.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.validacao;
 
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.EntidadeValidacao;
-import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.JanelaExecucao;
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.PeriodoConsulta;
 import static br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaTypes.ResultadoApiChaves;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -78,7 +75,6 @@ import br.com.extrator.integracao.mapeamento.dataexport.localizacaocarga.Localiz
 import br.com.extrator.integracao.mapeamento.dataexport.manifestos.ManifestoMapper;
 import br.com.extrator.integracao.mapeamento.dataexport.sinistros.SinistroMapper;
 import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
-import br.com.extrator.dominio.graphql.faturas.CreditCustomerBillingNodeDTO;
 import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
@@ -87,8 +83,6 @@ import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 final class ValidacaoApiBanco24hDetalhadaApiCollector {
-    private static final int LIMITE_BACKFILL_FATURAS_ORFAAS = 2000;
-
     private final ClienteApiDataExport clienteDataExport;
     private final ClienteApiGraphQL clienteGraphQL;
     private final ManifestoMapper manifestoMapper;
@@ -163,7 +157,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final LocalDate dataReferencia,
         final LocalDate dataInicio,
         final LocalDate dataFim,
-        final boolean incluirFaturasGraphQL,
         final boolean permitirFallbackJanela,
         final Map<String, PeriodoConsulta> periodosPorEntidade
     ) {
@@ -172,7 +165,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             dataReferencia,
             dataInicio,
             dataFim,
-            incluirFaturasGraphQL,
             permitirFallbackJanela,
             periodosPorEntidade,
             Optional.empty()
@@ -184,7 +176,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final LocalDate dataReferencia,
         final LocalDate dataInicio,
         final LocalDate dataFim,
-        final boolean incluirFaturasGraphQL,
         final boolean permitirFallbackJanela,
         final Map<String, PeriodoConsulta> periodosPorEntidade,
         final Optional<String> executionUuidAncora
@@ -200,9 +191,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             ConstantesEntidades.INVENTARIO,
             ConstantesEntidades.SINISTROS
         ));
-        if (incluirFaturasGraphQL) {
-            entidadesSolicitadas.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
         entidadesSolicitadas.add(ConstantesEntidades.USUARIOS_SISTEMA);
         return criarEntidades(
             conexao,
@@ -273,18 +261,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
                 entidades.add(new EntidadeValidacao(entidade, () -> carregarFretes(periodo.inicio(), periodo.fim())));
             } else if (ConstantesEntidades.COLETAS.equals(entidade)) {
                 entidades.add(new EntidadeValidacao(entidade, () -> carregarColetas(periodo.inicio(), periodo.fim())));
-            } else if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)) {
-                entidades.add(new EntidadeValidacao(
-                    entidade,
-                    () -> carregarFaturasGraphQL(
-                        conexao,
-                        dataReferencia,
-                        periodo.inicio(),
-                        periodo.fim(),
-                        permitirFallbackJanela,
-                        executionUuidAncora
-                    )
-                ));
             }
         }
         return entidades;
@@ -504,114 +480,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             ColetaEntity::getMetadata,
             ConstantesEntidades.COLETAS
         );
-    }
-
-    private ResultadoApiChaves carregarFaturasGraphQL(
-        final Connection conexao,
-        final LocalDate dataReferencia,
-        final LocalDate dataInicio,
-        final LocalDate dataFim,
-        final boolean permitirFallbackJanela,
-        final Optional<String> executionUuidAncora
-    ) throws SQLException {
-        final ResultadoExtracao<CreditCustomerBillingNodeDTO> resultado =
-            clienteGraphQL.buscarCapaFaturas(dataInicio, dataFim);
-        final List<CreditCustomerBillingNodeDTO> dtos = resultado.getDados() != null ? resultado.getDados() : List.of();
-        final int bruto = dtos.size();
-        int invalidos = 0;
-
-        final Map<Long, CreditCustomerBillingNodeDTO> porId = new LinkedHashMap<>();
-        for (final CreditCustomerBillingNodeDTO dto : dtos) {
-            if (dto == null || dto.getId() == null) {
-                invalidos++;
-                continue;
-            }
-            porId.put(dto.getId(), dto);
-        }
-
-        final Optional<JanelaExecucao> janelaFretesAncorada = executionUuidAncora
-            .flatMap(executionUuid ->
-                buscarJanelaFretesAncorada(conexao, executionUuid)
-            );
-        final Optional<JanelaExecucao> janelaFretesOpt = janelaFretesAncorada.isPresent()
-            ? janelaFretesAncorada
-            : repository.buscarUltimaJanelaCompletaDoDia(
-                conexao,
-                ConstantesEntidades.FRETES,
-                dataReferencia,
-                dataInicio,
-                dataFim,
-                permitirFallbackJanela
-            );
-        final List<Long> idsFretesJanela = janelaFretesOpt.isPresent()
-            ? repository.listarAccountingCreditIdsFretes(
-                conexao,
-                janelaFretesOpt.get(),
-                LIMITE_BACKFILL_FATURAS_ORFAAS
-            )
-            : List.of();
-        final Map<String, String> hashesPorChave = new LinkedHashMap<>();
-        final Map<String, String> metadataPorChave = new LinkedHashMap<>();
-        final Set<String> caminhosEstruturais = new HashSet<>();
-        for (final Map.Entry<Long, CreditCustomerBillingNodeDTO> entry : porId.entrySet()) {
-            final String metadata = MapperUtil.toJson(entry.getValue());
-            final String chave = String.valueOf(entry.getKey());
-            metadataPorChave.put(chave, metadata);
-            hashesPorChave.put(
-                chave,
-                metadataHasher.hashMetadata(
-                    ConstantesEntidades.FATURAS_GRAPHQL,
-                    metadata
-                )
-            );
-            caminhosEstruturais.addAll(extrairCaminhosMetadata(metadata));
-        }
-
-        final String detalheFretes = janelaFretesOpt
-            .map(janela -> "ids_fretes_janela="
-                + idsFretesJanela.size()
-                + " | fretes_janela=["
-                + janela.inicio()
-                + " .. "
-                + janela.fim()
-                + "]"
-                + " | fretes_alinhados_periodo="
-                + janela.alinhadaAoPeriodo()
-                + " | fretes_origem_janela="
-                + (janelaFretesAncorada.isPresent() ? "EXECUTION_AUDIT" : "LOG_EXTRACOES"))
-            .orElse("ids_fretes_janela=0 | fretes_janela=NAO_ENCONTRADA");
-
-        return new ResultadoApiChaves(
-            bruto,
-            hashesPorChave.size(),
-            invalidos,
-            new HashSet<>(hashesPorChave.keySet()),
-            hashesPorChave,
-            Map.of(),
-            detalheFretes + " | tolerancia_excedentes_referenciais_ativa=true",
-            idsFretesJanela.stream().map(String::valueOf).collect(Collectors.toSet()),
-            metadataPorChave,
-            resultado.isCompleto(),
-            resultado.getMotivoInterrupcao(),
-            resultado.getPaginasProcessadas(),
-            caminhosEstruturais
-        );
-    }
-
-    private Optional<JanelaExecucao> buscarJanelaFretesAncorada(final Connection conexao,
-                                                                final String executionUuidAncora) {
-        if (executionUuidAncora == null || executionUuidAncora.isBlank()) {
-            return Optional.empty();
-        }
-        try {
-            return repository.buscarJanelaEstruturadaDaExecucao(
-                conexao,
-                executionUuidAncora,
-                ConstantesEntidades.FRETES
-            );
-        } catch (final SQLException e) {
-            throw new RuntimeException("Falha ao resolver janela ancorada de fretes", e);
-        }
     }
 
     private <DTO, ENTITY> ResultadoApiChaves carregarDataExport(

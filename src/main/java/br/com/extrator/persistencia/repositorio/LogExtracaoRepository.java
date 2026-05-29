@@ -56,8 +56,8 @@ public class LogExtracaoRepository {
     public void gravarLogExtracao(final LogExtracaoEntity logExtracao) {
         final String sql = """
             INSERT INTO dbo.log_extracoes
-            (entidade, timestamp_inicio, timestamp_fim, status_final, registros_extraidos, paginas_processadas, mensagem)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (entidade, timestamp_inicio, timestamp_fim, status_final, registros_extraidos, paginas_processadas, noop_count, mensagem)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
         
         try (Connection conn = GerenciadorConexao.obterConexao();
@@ -67,9 +67,10 @@ public class LogExtracaoRepository {
             stmt.setTimestamp(2, Timestamp.valueOf(logExtracao.getTimestampInicio()));
             stmt.setTimestamp(3, Timestamp.valueOf(logExtracao.getTimestampFim()));
             stmt.setString(4, logExtracao.getStatusFinal().getValor());
-            stmt.setInt(5, logExtracao.getRegistrosExtraidos());
-            stmt.setInt(6, logExtracao.getPaginasProcessadas());
-            stmt.setString(7, logExtracao.getMensagem());
+            stmt.setInt(5, inteiroSeguro(logExtracao.getRegistrosExtraidos()));
+            stmt.setInt(6, inteiroSeguro(logExtracao.getPaginasProcessadas()));
+            stmt.setInt(7, inteiroSeguro(logExtracao.getNoopCount()));
+            stmt.setString(8, logExtracao.getMensagem());
             
             final int linhasAfetadas = stmt.executeUpdate();
             
@@ -91,7 +92,7 @@ public class LogExtracaoRepository {
     public Optional<LogExtracaoEntity> buscarUltimoLogPorEntidade(final String entidade) {
         final String sql = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
-                   registros_extraidos, paginas_processadas, mensagem
+                   registros_extraidos, paginas_processadas, noop_count, mensagem
             FROM dbo.log_extracoes
             WHERE entidade = ?
             ORDER BY timestamp_fim DESC
@@ -112,6 +113,7 @@ public class LogExtracaoRepository {
                     log.setStatusFinal(StatusExtracao.fromString(rs.getString("status_final")));
                     log.setRegistrosExtraidos(rs.getInt("registros_extraidos"));
                     log.setPaginasProcessadas(rs.getInt("paginas_processadas"));
+                    log.setNoopCount(rs.getInt("noop_count"));
                     log.setMensagem(rs.getString("mensagem"));
                     
                     return Optional.of(log);
@@ -139,7 +141,7 @@ public class LogExtracaoRepository {
                                                                                        final LocalDateTime fimExecucao) {
         final String sql = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
-                   registros_extraidos, paginas_processadas, mensagem
+                   registros_extraidos, paginas_processadas, noop_count, mensagem
             FROM dbo.log_extracoes
             WHERE entidade = ?
               AND timestamp_fim >= ?
@@ -185,7 +187,7 @@ public class LogExtracaoRepository {
         // Formato esperado na mensagem: "Período: YYYY-MM-DD a YYYY-MM-DD"
         final String sqlComPeriodo = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
-                   registros_extraidos, paginas_processadas, mensagem
+                   registros_extraidos, paginas_processadas, noop_count, mensagem
             FROM dbo.log_extracoes
             WHERE entidade = ?
               AND (mensagem LIKE ? OR mensagem LIKE ?)
@@ -222,7 +224,7 @@ public class LogExtracaoRepository {
         // QUALQUER uma das datas do período (início OU fim)
         final String sqlComUmaDatas = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
-                   registros_extraidos, paginas_processadas, mensagem
+                   registros_extraidos, paginas_processadas, noop_count, mensagem
             FROM dbo.log_extracoes
             WHERE entidade = ?
               AND (mensagem LIKE ? OR mensagem LIKE ?)
@@ -253,7 +255,7 @@ public class LogExtracaoRepository {
         final LocalDateTime limiteRecente = LocalDateTime.now().minusHours(24);
         final String sqlUltimoRecente = """
             SELECT TOP 1 id, entidade, timestamp_inicio, timestamp_fim, status_final,
-                   registros_extraidos, paginas_processadas, mensagem
+                   registros_extraidos, paginas_processadas, noop_count, mensagem
             FROM dbo.log_extracoes
             WHERE entidade = ?
               AND timestamp_fim >= ?
@@ -293,8 +295,13 @@ public class LogExtracaoRepository {
         log.setStatusFinal(StatusExtracao.fromString(rs.getString("status_final")));
         log.setRegistrosExtraidos(rs.getInt("registros_extraidos"));
         log.setPaginasProcessadas(rs.getInt("paginas_processadas"));
+        log.setNoopCount(rs.getInt("noop_count"));
         log.setMensagem(rs.getString("mensagem"));
         return log;
+    }
+
+    private int inteiroSeguro(final Integer valor) {
+        return valor == null ? 0 : Math.max(0, valor);
     }
     
 }

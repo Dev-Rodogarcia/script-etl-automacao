@@ -10,12 +10,11 @@ Conecta com:
 - Nenhuma (DTO puro)
 
 Fluxo geral:
-1) Record com 3 campos: incluirFaturasGraphQL, permitirFallbackJanela, dataReferenciaSistema.
+1) Record com campos de fallback de janela e data de referencia.
 2) Compact constructor valida dataReferenciaSistema nao-null.
 
 Estrutura interna:
 Campos:
-- incluirFaturasGraphQL: boolean (incluir FATURAS_GRAPHQL).
 - permitirFallbackJanela: boolean (permitir fallback sem filtro periodo).
 - dataReferenciaSistema: LocalDate (data de referencia).
 [DOC-FILE-END]============================================================== */
@@ -25,7 +24,6 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 public record ValidacaoApiBanco24hRequest(
-    boolean incluirFaturasGraphQL,
     boolean permitirFallbackJanela,
     LocalDate dataReferenciaSistema
 ) {

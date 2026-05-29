@@ -10,7 +10,7 @@ Conecta com:
 - br.com.extrator.suporte.console.LoggerConsole
 Fluxo geral:
 1) executar() valida args (data início/fim obrigatórias em ISO_DATE)
-2) Parse de flags: --api [graphql|dataexport], --entidade, --sem-faturas-graphql
+2) Parse de flags: --api [graphql|dataexport|raster], --entidade
 3) Delegação a RecoveryUseCase.executarReplay()
 Estrutura interna:
 Atributos: log [static], DATE_FORMAT [static]
@@ -50,14 +50,9 @@ public final class RecoveryComando implements Comando {
 
         String api = null;
         String entidade = null;
-        boolean incluirFaturasGraphQL = true;
 
         for (int i = 3; i < args.length; i++) {
             final String arg = args[i];
-            if ("--sem-faturas-graphql".equalsIgnoreCase(arg)) {
-                incluirFaturasGraphQL = false;
-                continue;
-            }
             if ("--api".equalsIgnoreCase(arg) && i + 1 < args.length) {
                 api = args[++i];
                 continue;
@@ -68,12 +63,12 @@ public final class RecoveryComando implements Comando {
         }
 
         final RecoveryUseCase useCase = new RecoveryUseCase();
-        useCase.executarReplay(dataInicio, dataFim, api, entidade, incluirFaturasGraphQL);
+        useCase.executarReplay(dataInicio, dataFim, api, entidade);
     }
 
     private void imprimirUso() {
         log.console("Uso:");
-        log.console("  --recovery YYYY-MM-DD YYYY-MM-DD [--api graphql|dataexport] [--entidade nome] [--sem-faturas-graphql]");
+        log.console("  --recovery YYYY-MM-DD YYYY-MM-DD [--api graphql|dataexport] [--entidade nome]");
         log.console("Exemplo:");
         log.console("  --recovery 2026-01-01 2026-01-31 --api graphql --entidade coletas");
     }

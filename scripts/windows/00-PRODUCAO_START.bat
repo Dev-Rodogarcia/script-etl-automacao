@@ -68,11 +68,11 @@ echo 07. Exportar CSV
 echo 08. Auditar estrutura das APIs
 echo 09. Ver ajuda de comandos
 echo 10. Gerenciar usuarios de acesso ^(tecla U^)
-echo 11. Extracao rapida ultimas 24h ^(sem faturas GraphQL/replay^)
+echo 11. Extracao rapida ultimas 24h ^(sem replay^)
 echo 00. Sair
 echo.
 echo Cobertura atual do ETL:
-echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   GraphQL   = coletas, fretes, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo   Raster    = raster_viagens e raster_viagem_paradas ^(quando RASTER_ENABLED/credenciais habilitarem^)
 echo.
@@ -119,7 +119,7 @@ goto :MENU
 if "%~2"=="" (
     echo.
     echo ERRO: Data de inicio nao informada para o modo automatico.
-    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql] [--modo-rapido-24h]
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-rapido-24h]
     echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport inventario
     echo Exemplo Raster:     00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 raster
     set "AUTO_EXIT=1"
@@ -128,7 +128,7 @@ if "%~2"=="" (
 if "%~3"=="" (
     echo.
     echo ERRO: Data de fim nao informada para o modo automatico.
-    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql] [--modo-rapido-24h]
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-rapido-24h]
     echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport sinistros
     echo Exemplo Raster:     00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 raster
     set "AUTO_EXIT=1"
@@ -152,7 +152,7 @@ if errorlevel 1 (
 if "%~2"=="" (
     echo.
     echo ERRO: Data de inicio nao informada para o modo automatico.
-    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql] [--modo-rapido-24h]
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-rapido-24h]
     echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport inventario
     echo Exemplo Raster:     00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 raster
     set "AUTO_EXIT=1"
@@ -161,7 +161,7 @@ if "%~2"=="" (
 if "%~3"=="" (
     echo.
     echo ERRO: Data de fim nao informada para o modo automatico.
-    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--sem-faturas-graphql^|--com-faturas-graphql] [--modo-rapido-24h]
+    echo Uso: 00-PRODUCAO_START.bat --auto-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-rapido-24h]
     echo Exemplo DataExport: 00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 dataexport sinistros
     echo Exemplo Raster:     00-PRODUCAO_START.bat --auto-intervalo 2026-04-01 2026-04-02 raster
     set "AUTO_EXIT=1"
@@ -281,7 +281,6 @@ if not defined RAPIDA_DATA_FIM (
 )
 echo.
 echo Executando extracao rapida D-1..D: !RAPIDA_DATA_INICIO! a !RAPIDA_DATA_FIM!
-echo Faturas GraphQL: DESABILITADO
 echo Replay/pre-backfill referencial: DESABILITADO
 echo Raster: INCLUIDA se habilitada por configuracao/credenciais
 call :EXPORT_AUTH_SESSION
@@ -291,7 +290,7 @@ set "PREV_MENU_CHILD=%EXTRATOR_MENU_CHILD%"
 set "EXTRATOR_SKIP_AUTH_CHECK=1"
 set "EXTRATOR_NONINTERACTIVE=1"
 set "EXTRATOR_MENU_CHILD=1"
-call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "!RAPIDA_DATA_INICIO!" "!RAPIDA_DATA_FIM!" "--sem-faturas-graphql" "--modo-rapido-24h"
+call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "!RAPIDA_DATA_INICIO!" "!RAPIDA_DATA_FIM!" "--modo-rapido-24h"
 set "RUN_11_EXIT=!ERRORLEVEL!"
 if defined PREV_SKIP_AUTH_CHECK (
     set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"

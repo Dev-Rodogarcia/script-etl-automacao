@@ -21,7 +21,6 @@ Metodos principais:
 Atributos-chave:
 - COLETAS: campo de estado para "coletas".
 - FRETES: campo de estado para "fretes".
-- FATURAS_GRAPHQL: campo de estado para "faturas graphql".
 - USUARIOS_SISTEMA: campo de estado para "usuarios sistema".
 - MANIFESTOS: campo de estado para "manifestos".
 - COTACOES: campo de estado para "cotacoes".
@@ -32,7 +31,6 @@ Atributos-chave:
 - ALIASES_LOCALIZACAO: campo de estado para "aliases localizacao".
 - ALIASES_CONTAS_PAGAR: campo de estado para "aliases contas pagar".
 - ALIASES_FATURAS_CLIENTE: campo de estado para "aliases faturas cliente".
-- ALIASES_FATURAS_GRAPHQL: campo de estado para "aliases faturas graphql".
 [DOC-FILE-END]============================================================== */
 
 package br.com.extrator.suporte.validacao;
@@ -53,7 +51,6 @@ public final class ConstantesEntidades {
     public static final String COLETAS = "coletas";
     public static final String COLETAS_REFERENCIAL = "coletas_referencial";
     public static final String FRETES = "fretes";
-    public static final String FATURAS_GRAPHQL = "faturas_graphql";
     public static final String USUARIOS_SISTEMA = "usuarios_sistema";
     
     // ========== ENTIDADES DATA EXPORT ==========
@@ -78,7 +75,6 @@ public final class ConstantesEntidades {
     public static final String[] ALIASES_FATURAS_CLIENTE = {"faturas_por_cliente", "faturasporcliente", "faturas por cliente", "faturas-por-cliente"};
     public static final String[] ALIASES_INVENTARIO = {"inventario", "inventário"};
     public static final String[] ALIASES_SINISTROS = {"sinistros", "sinistro"};
-    public static final String[] ALIASES_FATURAS_GRAPHQL = {"faturas_graphql", "faturas"};
     public static final String[] ALIASES_RASTER = {"raster", "raster_viagens", "viagens_raster", "raster_viagem_paradas", "paradas_raster"};
     
     // ========== STATUS DE EXTRAÇÃO ==========

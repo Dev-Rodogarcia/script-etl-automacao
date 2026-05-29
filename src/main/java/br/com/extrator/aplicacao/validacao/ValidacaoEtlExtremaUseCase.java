@@ -75,7 +75,7 @@ public class ValidacaoEtlExtremaUseCase {
             final LocalDate dataReferencia = repository.resolverDataReferenciaLogs(conexao, request.dataReferenciaSistema());
             final LocalDate dataInicio = dataReferencia.minusDays(1);
             final LocalDate dataFim = request.periodoFechado() ? dataReferencia.minusDays(1) : dataReferencia;
-            final List<EntitySpec> entidades = detectarEntidades(conexao, request.incluirFaturasGraphQL());
+            final List<EntitySpec> entidades = detectarEntidades(conexao);
             final List<String> nomesEntidades = entidades.stream().map(EntitySpec::entidade).toList();
 
             log.console("\n" + "=".repeat(96));
@@ -163,8 +163,7 @@ public class ValidacaoEtlExtremaUseCase {
             final IdempotencyAnalysis idempotencyAnalysis = request.executarIdempotencia()
                 ? executarTesteIdempotencia(
                     dataInicio,
-                    dataFim,
-                    request.incluirFaturasGraphQL()
+                    dataFim
                 )
                 : IdempotencyAnalysis.skipped("Teste desabilitado para evitar escrita nao-confirmada em producao.");
             globalProblems.addAll(idempotencyAnalysis.problems());
@@ -293,8 +292,7 @@ public class ValidacaoEtlExtremaUseCase {
     }
 
     static boolean deveExecutarStressApi(final String entidade) {
-        return !ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade)
-            && !ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade);
+        return !ConstantesEntidades.USUARIOS_SISTEMA.equals(entidade);
     }
 
     static boolean deveExecutarReplayIdempotencia(final String entidade) {
@@ -397,11 +395,6 @@ public class ValidacaoEtlExtremaUseCase {
         final Set<String> extra = new TreeSet<>(dbKeys);
         extra.removeAll(api.chaves());
         final Set<String> extraEfetivo = new TreeSet<>(extra);
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entity.entidade())
-            && api.chavesToleradasNoBanco() != null
-            && !api.chavesToleradasNoBanco().isEmpty()) {
-            extraEfetivo.removeIf(api.chavesToleradasNoBanco()::contains);
-        }
 
         int divergentRecords = 0;
         int divergentFields = 0;
@@ -607,37 +600,6 @@ public class ValidacaoEtlExtremaUseCase {
             }
         }
 
-        if (entidades.contains(ConstantesEntidades.FRETES) && entidades.contains(ConstantesEntidades.FATURAS_GRAPHQL)) {
-            final Optional<JanelaExecucao> janelaFretesOpt = buscarJanelaEntidade(
-                conexao,
-                ConstantesEntidades.FRETES,
-                dataReferencia,
-                dataInicio,
-                dataFim,
-                permitirFallbackJanela
-            );
-            if (janelaFretesOpt.isEmpty()) {
-                problems.add("Sem janela COMPLETA para avaliar integridade referencial de fretes.");
-                suggestions.add("Garantir log_extracoes completo e mensagem de periodo para fretes.");
-            } else {
-                final JanelaExecucao janelaFretes = janelaFretesOpt.get();
-                final String sql = """
-                    SELECT COUNT(*)
-                    FROM dbo.fretes f
-                    WHERE f.data_extracao >= ? AND f.data_extracao <= ?
-                      AND f.accounting_credit_id IS NOT NULL
-                      AND NOT EXISTS (
-                          SELECT 1 FROM dbo.faturas_graphql fg WHERE fg.id = f.accounting_credit_id
-                      )
-                    """;
-                final int orfaos = executarCount(conexao, sql, janelaFretes.inicio(), janelaFretes.fim());
-                if (orfaos > 0) {
-                    problems.add("Fretes sem fatura GraphQL vinculada: " + orfaos);
-                    suggestions.add("Revisar enriquecimento/accounting_credit_id de fretes.");
-                }
-            }
-        }
-
         return new ReferentialIntegrityAnalysis(problems, suggestions, problems.size());
     }
 
@@ -816,22 +778,21 @@ public class ValidacaoEtlExtremaUseCase {
 
     private IdempotencyAnalysis executarTesteIdempotencia(
         final LocalDate dataInicio,
-        final LocalDate dataFim,
-        final boolean incluirFaturasGraphQL
+        final LocalDate dataFim
     ) {
         final List<String> problems = new ArrayList<>();
         final List<String> suggestions = new ArrayList<>();
         try (Connection beforeConn = GerenciadorConexao.obterConexao()) {
-            final List<EntitySpec> entidades = detectarEntidades(beforeConn, incluirFaturasGraphQL).stream()
+            final List<EntitySpec> entidades = detectarEntidades(beforeConn).stream()
                 .filter(entity -> deveExecutarReplayIdempotencia(entity.entidade()))
                 .toList();
             final String baseline = fingerprintBanco(beforeConn, entidades);
-            executarReplayIdempotentePorEntidade(dataInicio, dataFim, incluirFaturasGraphQL, entidades);
+            executarReplayIdempotentePorEntidade(dataInicio, dataFim, entidades);
             final String afterFirst;
             try (Connection middleConn = GerenciadorConexao.obterConexao()) {
                 afterFirst = fingerprintBanco(middleConn, entidades);
             }
-            executarReplayIdempotentePorEntidade(dataInicio, dataFim, incluirFaturasGraphQL, entidades);
+            executarReplayIdempotentePorEntidade(dataInicio, dataFim, entidades);
             final String afterSecond;
             try (Connection finalConn = GerenciadorConexao.obterConexao()) {
                 afterSecond = fingerprintBanco(finalConn, entidades);
@@ -852,19 +813,16 @@ public class ValidacaoEtlExtremaUseCase {
     private void executarReplayIdempotentePorEntidade(
         final LocalDate dataInicio,
         final LocalDate dataFim,
-        final boolean incluirFaturasGraphQL,
         final List<EntitySpec> entidades
     ) throws Exception {
         final ExtracaoPorIntervaloUseCase useCase = new ExtracaoPorIntervaloUseCase();
         for (final EntitySpec entidade : entidades) {
-            final boolean incluirFaturasNoRequest =
-                incluirFaturasGraphQL || ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade.entidade());
             final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
                 dataInicio,
                 dataFim,
                 resolverApiParaReplayIdempotente(entidade.entidade()),
                 entidade.entidade(),
-                incluirFaturasNoRequest,
+                false,
                 false
             );
             useCase.executar(request);
@@ -874,8 +832,7 @@ public class ValidacaoEtlExtremaUseCase {
     private String resolverApiParaReplayIdempotente(final String entidade) {
         return switch (entidade) {
             case ConstantesEntidades.COLETAS,
-                 ConstantesEntidades.FRETES,
-                 ConstantesEntidades.FATURAS_GRAPHQL -> "graphql";
+                 ConstantesEntidades.FRETES -> "graphql";
             case ConstantesEntidades.MANIFESTOS,
                  ConstantesEntidades.COTACOES,
                  ConstantesEntidades.LOCALIZACAO_CARGAS,
@@ -1030,10 +987,7 @@ public class ValidacaoEtlExtremaUseCase {
         }
     }
 
-    private List<EntitySpec> detectarEntidades(
-        final Connection conexao,
-        final boolean incluirFaturasGraphQL
-    ) throws SQLException {
+    private List<EntitySpec> detectarEntidades(final Connection conexao) throws SQLException {
         final List<EntitySpec> candidatos = new ArrayList<>(List.of(
             new EntitySpec(ConstantesEntidades.COLETAS, "coletas", "data_extracao", List.of("id"), "sequence_code"),
             new EntitySpec(ConstantesEntidades.FRETES, "fretes", "data_extracao", List.of("id"), null),
@@ -1043,9 +997,6 @@ public class ValidacaoEtlExtremaUseCase {
             new EntitySpec(ConstantesEntidades.CONTAS_A_PAGAR, "contas_a_pagar", "data_extracao", List.of("sequence_code"), "sequence_code"),
             new EntitySpec(ConstantesEntidades.FATURAS_POR_CLIENTE, "faturas_por_cliente", "data_extracao", List.of("unique_id"), null)
         ));
-        if (incluirFaturasGraphQL) {
-            candidatos.add(new EntitySpec(ConstantesEntidades.FATURAS_GRAPHQL, "faturas_graphql", "data_extracao", List.of("id"), null));
-        }
         candidatos.add(new EntitySpec(ConstantesEntidades.USUARIOS_SISTEMA, "dim_usuarios", "data_atualizacao", List.of("user_id"), null));
 
         final List<EntitySpec> ativas = new ArrayList<>();
@@ -1141,30 +1092,15 @@ public class ValidacaoEtlExtremaUseCase {
                 case ConstantesEntidades.FATURAS_POR_CLIENTE -> "unique_id";
                 case ConstantesEntidades.FRETES -> "CAST(id AS VARCHAR(50))";
                 case ConstantesEntidades.COLETAS -> "id";
-                case ConstantesEntidades.FATURAS_GRAPHQL -> "CAST(id AS VARCHAR(50))";
                 default -> throw new IllegalArgumentException("Entidade nao suportada no fingerprint: " + entidade.entidade());
             };
-            final String sql;
-            if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade.entidade())) {
-                sql = "SELECT " + keyExpr + " AS chave, document, issue_date, due_date, original_due_date,"
-                    + " value, value_to_pay, discount_value, interest_value, type, sequence_code,"
-                    + " competence_month, competence_year, corporation_id, corporation_name, corporation_cnpj,"
-                    + " nfse_numero, carteira_banco, instrucao_boleto, banco_nome, metodo_pagamento"
-                    + " FROM dbo." + entidade.table()
-                    + " WHERE " + keyExpr + " IS NOT NULL ORDER BY chave";
-            } else {
-                sql = "SELECT " + keyExpr + " AS chave, metadata FROM dbo." + entidade.table()
-                    + " WHERE " + keyExpr + " IS NOT NULL ORDER BY chave";
-            }
+            final String sql = "SELECT " + keyExpr + " AS chave, metadata FROM dbo." + entidade.table()
+                + " WHERE " + keyExpr + " IS NOT NULL ORDER BY chave";
             try (PreparedStatement stmt = conexao.prepareStatement(sql); ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String chave = rs.getString("chave");
                     if (usaSomenteChaveNoFingerprint(entidade.entidade())) {
                         fragments.add(entidade.entidade() + "|" + chave);
-                        continue;
-                    }
-                    if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade.entidade())) {
-                        fragments.add(entidade.entidade() + "|" + chave + "|" + fingerprintFaturaGraphQL(rs));
                         continue;
                     }
                     fragments.add(
@@ -1190,37 +1126,6 @@ public class ValidacaoEtlExtremaUseCase {
                  ConstantesEntidades.CONTAS_A_PAGAR -> true;
             default -> false;
         };
-    }
-
-    private String fingerprintFaturaGraphQL(final ResultSet rs) throws SQLException {
-        return sha256(String.join(
-            "|",
-            coluna(rs, "document"),
-            coluna(rs, "issue_date"),
-            coluna(rs, "due_date"),
-            coluna(rs, "original_due_date"),
-            coluna(rs, "value"),
-            coluna(rs, "value_to_pay"),
-            coluna(rs, "discount_value"),
-            coluna(rs, "interest_value"),
-            coluna(rs, "type"),
-            coluna(rs, "sequence_code"),
-            coluna(rs, "competence_month"),
-            coluna(rs, "competence_year"),
-            coluna(rs, "corporation_id"),
-            coluna(rs, "corporation_name"),
-            coluna(rs, "corporation_cnpj"),
-            coluna(rs, "nfse_numero"),
-            coluna(rs, "carteira_banco"),
-            coluna(rs, "instrucao_boleto"),
-            coluna(rs, "banco_nome"),
-            coluna(rs, "metodo_pagamento")
-        ));
-    }
-
-    private String coluna(final ResultSet rs, final String nomeColuna) throws SQLException {
-        final Object valor = rs.getObject(nomeColuna);
-        return safe(valor == null ? null : String.valueOf(valor));
     }
 
     private ReportFiles persistirReport(final FinalReport report) throws IOException {

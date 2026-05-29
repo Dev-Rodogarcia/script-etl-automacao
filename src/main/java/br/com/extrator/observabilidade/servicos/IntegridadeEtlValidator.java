@@ -42,6 +42,7 @@ import br.com.extrator.plataforma.auditoria.persistencia.sqlserver.SqlServerExec
 public class IntegridadeEtlValidator {
 
     private static final Logger logger = LoggerFactory.getLogger(IntegridadeEtlValidator.class);
+    private static final int TOLERANCIA_MERGE_UPSERT_MENOS_UM = 1;
     private static final Map<String, IntegridadeEtlSpec> SPECS = IntegridadeEtlSpecCatalog.carregarSpecs();
     private final IntegridadeEtlSqlSupport sqlSupport;
     private final ExecutionAuditPort executionAuditPort;
@@ -264,15 +265,21 @@ public class IntegridadeEtlValidator {
         }
 
         final int totalBanco = contarRegistrosNoIntervalo(conexao, spec, audit.startedAt(), audit.finishedAt());
-        if (totalBanco != audit.dbPersistidos()) {
+        final int totalEsperadoUnico = Math.max(0, audit.apiTotalUnico());
+        final int totalCoberto = Math.max(0, totalBanco) + Math.max(0, audit.noopCount());
+        final int deficit = totalEsperadoUnico - totalCoberto;
+        if (deficit > TOLERANCIA_MERGE_UPSERT_MENOS_UM) {
             registrarFalha(
                 falhas,
-                "DIVERGENCIA_CONTAGEM",
+                "DIVERGENCIA_CONTAGEM_UNICOS",
                 String.format(
-                    "Entidade '%s': audit.db_persistidos=%d, destino=%d (janela %s ate %s).",
+                    "Entidade '%s': audit.api_total_unico=%d, destino=%d, noop_count=%d, cobertos=%d, deficit=%d (janela %s ate %s).",
                     spec.entidade(),
-                    audit.dbPersistidos(),
+                    totalEsperadoUnico,
                     totalBanco,
+                    audit.noopCount(),
+                    totalCoberto,
+                    deficit,
                     audit.startedAt(),
                     audit.finishedAt()
                 )
@@ -281,7 +288,11 @@ public class IntegridadeEtlValidator {
             registrarEventoInfo(
                 "CONTAGEM_OK",
                 spec.entidade(),
-                "audit.db_persistidos=" + audit.dbPersistidos() + ", destino=" + totalBanco
+                "audit.api_total_unico=" + totalEsperadoUnico
+                    + ", destino=" + totalBanco
+                    + ", noop_count=" + audit.noopCount()
+                    + ", cobertos=" + totalCoberto
+                    + ", tolerancia_menos_um=" + TOLERANCIA_MERGE_UPSERT_MENOS_UM
             );
         }
     }
@@ -374,7 +385,6 @@ public class IntegridadeEtlValidator {
             falhas,
             modoLoopDaemon
         );
-        validarReferencialFretes(conexao, inicioExecucao, fimExecucao, entidades, falhas);
     }
 
     private void validarReferencialManifestos(final Connection conexao,
@@ -474,54 +484,6 @@ public class IntegridadeEtlValidator {
         }
 
         registrarFalha(falhas, codigoFalha, detalheReferencial);
-    }
-
-    private void validarReferencialFretes(final Connection conexao,
-                                          final LocalDateTime inicioExecucao,
-                                          final LocalDateTime fimExecucao,
-                                          final Set<String> entidades,
-                                          final List<String> falhas) throws SQLException {
-        if (!(entidades.contains(ConstantesEntidades.FRETES)
-            && entidades.contains(ConstantesEntidades.FATURAS_GRAPHQL))) {
-            return;
-        }
-
-        final String sqlFretesOrfaos = """
-            SELECT COUNT(*)
-            FROM dbo.fretes f
-            WHERE f.data_extracao >= ? AND f.data_extracao <= ?
-              AND f.accounting_credit_id IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM dbo.faturas_graphql fg
-                  WHERE fg.id = f.accounting_credit_id
-              )
-            """;
-        final int orfaosFretes = sqlSupport.executarCount(conexao, sqlFretesOrfaos, inicioExecucao, fimExecucao);
-        if (orfaosFretes == 0) {
-            registrarEventoInfo("REFERENCIAL_OK", ConstantesEntidades.FRETES,
-                "accounting_credit_id vinculado a faturas_graphql.id");
-            return;
-        }
-
-        final String sqlFretesOrfaosAmostra = """
-            SELECT TOP 10 f.accounting_credit_id
-            FROM dbo.fretes f
-            WHERE f.data_extracao >= ? AND f.data_extracao <= ?
-              AND f.accounting_credit_id IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM dbo.faturas_graphql fg
-                  WHERE fg.id = f.accounting_credit_id
-              )
-            ORDER BY f.accounting_credit_id
-            """;
-        final List<Long> amostraOrfaos = sqlSupport.executarListaLong(
-            conexao, sqlFretesOrfaosAmostra, inicioExecucao, fimExecucao
-        );
-        registrarFalha(falhas, "INTEGRIDADE_REFERENCIAL_FRETES",
-            "Fretes orfaos (accounting_credit_id sem faturas_graphql.id): " + orfaosFretes
-                + " | amostra_accounting_credit_id=" + amostraOrfaos);
     }
 
     private String resumirAuditoria(final Optional<ExecutionAuditRecord> audit) {

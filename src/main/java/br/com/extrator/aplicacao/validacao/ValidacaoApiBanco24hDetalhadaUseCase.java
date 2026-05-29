@@ -99,13 +99,12 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             comparator,
             apiCollector,
             new ValidacaoApiBanco24hDetalhadaReporter(log, comparator),
-            (dataInicio, dataFim, incluirFaturasGraphQL) -> new ExtracaoPorIntervaloUseCase().executar(
+            (dataInicio, dataFim) -> new ExtracaoPorIntervaloUseCase().executar(
                 new ExtracaoPorIntervaloRequest(
                     dataInicio,
                     dataFim,
                     null,
                     null,
-                    incluirFaturasGraphQL,
                     false
                 )
             )
@@ -125,13 +124,12 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             comparator,
             apiCollector,
             reporter,
-            (dataInicio, dataFim, incluirFaturasGraphQL) -> new ExtracaoPorIntervaloUseCase().executar(
+            (dataInicio, dataFim) -> new ExtracaoPorIntervaloUseCase().executar(
                 new ExtracaoPorIntervaloRequest(
                     dataInicio,
                     dataFim,
                     null,
                     null,
-                    incluirFaturasGraphQL,
                     false
                 )
             )
@@ -173,8 +171,7 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             }
             lateDataReplayExecutor.replay(
                 execucao.dataInicio(),
-                execucao.dataFim(),
-                request.incluirFaturasGraphQL()
+                execucao.dataFim()
             );
             execucao = executarComparacao(request);
             resumo = reporter.reportar(execucao.resultados());
@@ -202,7 +199,7 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             final LocalDate dataFim = request.periodoFechado() ? dataReferencia.minusDays(1) : dataReferencia;
             dataInicioResultado = dataInicio;
             dataFimResultado = dataFim;
-            final Set<String> entidadesSolicitadas = entidadesSolicitadas(request.incluirFaturasGraphQL());
+            final Set<String> entidadesSolicitadas = entidadesSolicitadas();
 
             log.console("\n" + "=".repeat(88));
             log.info("VALIDACAO DETALHADA | JANELA OPERACIONAL RECENTE | API (POSTMAN-LIKE) x BANCO | COMPARACAO CHAVE A CHAVE");
@@ -250,7 +247,6 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
                 dataReferencia,
                 dataInicio,
                 dataFim,
-                request.incluirFaturasGraphQL(),
                 request.permitirFallbackJanela(),
                 periodosPorEntidade,
                 executionUuidAncora
@@ -340,8 +336,8 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
         return periodos.isEmpty() ? Map.of() : Map.copyOf(periodos);
     }
 
-    private Set<String> entidadesSolicitadas(final boolean incluirFaturasGraphQL) {
-        final Set<String> entidades = new LinkedHashSet<>(List.of(
+    private Set<String> entidadesSolicitadas() {
+        return new LinkedHashSet<>(List.of(
             ConstantesEntidades.FRETES,
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.MANIFESTOS,
@@ -353,15 +349,11 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             ConstantesEntidades.SINISTROS,
             ConstantesEntidades.USUARIOS_SISTEMA
         ));
-        if (incluirFaturasGraphQL) {
-            entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
-        return entidades;
     }
 
     @FunctionalInterface
     interface LateDataReplayExecutor {
-        void replay(LocalDate dataInicio, LocalDate dataFim, boolean incluirFaturasGraphQL) throws Exception;
+        void replay(LocalDate dataInicio, LocalDate dataFim) throws Exception;
     }
 
     private record ExecucaoDetalhada(

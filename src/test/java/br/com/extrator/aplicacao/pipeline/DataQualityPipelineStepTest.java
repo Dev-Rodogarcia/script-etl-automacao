@@ -25,20 +25,20 @@ class DataQualityPipelineStepTest {
             List.of(
                 new StaticCheck(
                     "schema",
-                    new DataQualityCheckResult("faturas_graphql", "schema", false, 1.0, 0.0, "schema=v1 esperado=v2")
+                    new DataQualityCheckResult("fretes", "schema", false, 1.0, 0.0, "schema=v1 esperado=v2")
                 )
             ),
             5,
             "v2",
             0
         );
-        final DataQualityPipelineStep step = new DataQualityPipelineStep(service, List.of("faturas_graphql"));
+        final DataQualityPipelineStep step = new DataQualityPipelineStep(service, List.of("fretes"));
 
         final StepExecutionResult result = step.executar(LocalDate.of(2026, 3, 9), LocalDate.of(2026, 3, 9));
 
         assertEquals(StepStatus.FAILED, result.getStatus());
         assertEquals(1L, result.getMetadata().get("checks_failed"));
-        assertTrue(String.valueOf(result.getMetadata().get("checks_failed_detail")).contains("faturas_graphql:schema"));
+        assertTrue(String.valueOf(result.getMetadata().get("checks_failed_detail")).contains("fretes:schema"));
         assertTrue(result.getMessage().contains("checks_failed=1"));
         assertTrue(result.getMessage().contains("schema=v1 esperado=v2"));
     }

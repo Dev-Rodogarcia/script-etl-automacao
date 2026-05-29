@@ -134,7 +134,7 @@ public final class AplicacaoContexto {
     }
 
     public static PipelineStepsFactory stepsFactory() {
-        return stepsFactory != null ? stepsFactory : (inc, qual) -> {
+        return stepsFactory != null ? stepsFactory : qual -> {
             throw new IllegalStateException("AplicacaoContexto nao inicializado: PipelineStepsFactory ausente.");
         };
     }

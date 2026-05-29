@@ -1,8 +1,6 @@
 package br.com.extrator.comandos.cli.extracao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -15,14 +13,13 @@ import br.com.extrator.comandos.cli.extracao.daemon.LoopDaemonModeHandler;
 class LoopDaemonComandoDispatchTest {
 
     @Test
-    void deveRoteiarModoStartComFlagSemFaturas() throws Exception {
+    void deveRoteiarModoStart() throws Exception {
         final RegistroHandlers registro = new RegistroHandlers();
         final LoopDaemonComando comando = new LoopDaemonComando(Modo.START, registro.handlers);
 
-        comando.executar(new String[] {"--loop-daemon-start", "--sem-faturas-graphql"});
+        comando.executar(new String[] {"--loop-daemon-start"});
 
         assertEquals(1, registro.startChamadas);
-        assertFalse(registro.startIncluiuFaturasGraphQL);
         assertEquals(0, registro.runChamadas);
     }
 
@@ -34,7 +31,6 @@ class LoopDaemonComandoDispatchTest {
         comando.executar(new String[] {"--loop-daemon-run"});
 
         assertEquals(1, registro.runChamadas);
-        assertTrue(registro.runIncluiuFaturasGraphQL);
         assertEquals(0, registro.startChamadas);
     }
 
@@ -43,22 +39,18 @@ class LoopDaemonComandoDispatchTest {
         private int stopChamadas;
         private int statusChamadas;
         private int runChamadas;
-        private boolean startIncluiuFaturasGraphQL;
-        private boolean runIncluiuFaturasGraphQL;
 
         private final Map<Modo, LoopDaemonModeHandler> handlers;
 
         private RegistroHandlers() {
             final Map<Modo, LoopDaemonModeHandler> mapa = new EnumMap<>(Modo.class);
-            mapa.put(Modo.START, incluirFaturasGraphQL -> {
+            mapa.put(Modo.START, () -> {
                 startChamadas++;
-                startIncluiuFaturasGraphQL = incluirFaturasGraphQL;
             });
-            mapa.put(Modo.STOP, incluirFaturasGraphQL -> stopChamadas++);
-            mapa.put(Modo.STATUS, incluirFaturasGraphQL -> statusChamadas++);
-            mapa.put(Modo.RUN, incluirFaturasGraphQL -> {
+            mapa.put(Modo.STOP, () -> stopChamadas++);
+            mapa.put(Modo.STATUS, () -> statusChamadas++);
+            mapa.put(Modo.RUN, () -> {
                 runChamadas++;
-                runIncluiuFaturasGraphQL = incluirFaturasGraphQL;
             });
             this.handlers = mapa;
         }

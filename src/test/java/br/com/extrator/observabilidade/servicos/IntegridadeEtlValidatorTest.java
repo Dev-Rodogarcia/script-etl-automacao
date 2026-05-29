@@ -1,5 +1,6 @@
 package br.com.extrator.observabilidade.servicos;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
@@ -64,45 +65,71 @@ class IntegridadeEtlValidatorTest {
     }
 
     @Test
-    void deveFalharQuandoFreteReferenciarFaturaGraphqlInexistente() throws Exception {
-        try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:int_fretes?mode=memory&cache=shared")) {
+    void deveAceitarDivergenciaDeUmRegistroAMenosEmMergeUpsert() throws Exception {
+        try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:int_faturas?mode=memory&cache=shared")) {
             conexao.createStatement().execute("ATTACH DATABASE ':memory:' AS dbo");
-            conexao.createStatement().execute("CREATE TABLE dbo.fretes (accounting_credit_id INTEGER, data_extracao TIMESTAMP)");
-            conexao.createStatement().execute("CREATE TABLE dbo.faturas_graphql (id INTEGER)");
-            inserirDataExtracao(conexao, "INSERT INTO dbo.fretes (accounting_credit_id, data_extracao) VALUES (?, ?)", 321L);
+            conexao.createStatement().execute("CREATE TABLE dbo.faturas_por_cliente (data_extracao TIMESTAMP)");
+            inserirDataExtracao(conexao, "INSERT INTO dbo.faturas_por_cliente (data_extracao) VALUES (?)", null);
+            inserirDataExtracao(conexao, "INSERT INTO dbo.faturas_por_cliente (data_extracao) VALUES (?)", null);
 
             final IntegridadeEtlValidator validator = new IntegridadeEtlValidator(
                 new StubExecutionAuditPort(),
                 new SqliteIntegridadeEtlSqlSupport()
             );
             final List<String> falhas = new ArrayList<>();
+            final ExecutionAuditRecord audit = new ExecutionAuditRecord(
+                "exec-merge",
+                ConstantesEntidades.FATURAS_POR_CLIENTE,
+                LocalDateTime.of(2026, 4, 1, 0, 0),
+                LocalDateTime.of(2026, 4, 1, 23, 59),
+                LocalDateTime.of(2026, 4, 1, 0, 0),
+                LocalDateTime.of(2026, 4, 1, 23, 59),
+                "COMPLETO",
+                3,
+                3,
+                3,
+                3,
+                true,
+                null,
+                1,
+                0,
+                0,
+                LocalDateTime.of(2026, 4, 1, 0, 0),
+                LocalDateTime.of(2026, 4, 1, 23, 59),
+                "--fluxo-completo",
+                "cycle-merge",
+                null
+            );
+            final IntegridadeEtlSpec spec = new IntegridadeEtlSpec(
+                ConstantesEntidades.FATURAS_POR_CLIENTE,
+                ConstantesEntidades.FATURAS_POR_CLIENTE,
+                "data_extracao",
+                List.of("unique_id"),
+                List.of("unique_id", "metadata", "data_extracao")
+            );
 
             final Method method = IntegridadeEtlValidator.class.getDeclaredMethod(
-                "validarReferencialFretes",
+                "validarComAuditoriaEstruturada",
                 Connection.class,
-                LocalDateTime.class,
-                LocalDateTime.class,
-                Set.class,
+                IntegridadeEtlSpec.class,
+                Optional.class,
+                String.class,
                 List.class
             );
             method.setAccessible(true);
-            method.invoke(
-                validator,
-                conexao,
-                LocalDateTime.of(2026, 4, 1, 0, 0),
-                LocalDateTime.of(2026, 4, 1, 23, 59),
-                Set.of(ConstantesEntidades.FRETES, ConstantesEntidades.FATURAS_GRAPHQL),
-                falhas
-            );
+            method.invoke(validator, conexao, spec, Optional.of(audit), "exec-merge", falhas);
 
-            assertTrue(falhas.stream().anyMatch(falha -> falha.contains("INTEGRIDADE_REFERENCIAL_FRETES")));
+            assertFalse(falhas.stream().anyMatch(falha -> falha.contains("DIVERGENCIA_CONTAGEM")));
         }
     }
 
     private void inserirDataExtracao(final Connection conexao, final String sql, final Long valor) throws Exception {
         try (PreparedStatement ps = conexao.prepareStatement(sql)) {
-            ps.setLong(1, valor);
-            ps.setTimestamp(2, Timestamp.valueOf(LocalDateTime.of(2026, 4, 1, 10, 0)));
+            int parametro = 1;
+            if (valor != null) {
+                ps.setLong(parametro++, valor);
+            }
+            ps.setTimestamp(parametro, Timestamp.valueOf(LocalDateTime.of(2026, 4, 1, 10, 0)));
             ps.executeUpdate();
         }
     }

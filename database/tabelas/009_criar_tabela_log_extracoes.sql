@@ -13,6 +13,7 @@ BEGIN
         status_final NVARCHAR(20) NOT NULL,
         registros_extraidos INT NOT NULL,
         paginas_processadas INT NOT NULL,
+        noop_count INT NOT NULL CONSTRAINT DF_log_extracoes_noop_count DEFAULT (0),
         mensagem NVARCHAR(MAX)
     );
     

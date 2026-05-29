@@ -7,14 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest.ModoExecucao;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.features.fretes.aplicacao.FretesExecutionWindowStrategy;
+import br.com.extrator.features.localizacao.aplicacao.LocalizacaoCargasExecutionWindowStrategy;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class ExecutionWindowPlanner {
     private static final int REPLAY_MINIMO_DIAS = 7;
-    private static final int REPLAY_LOCALIZACAO_CARGAS_DIAS = 90;
     private final ExecutionAuditPort executionAuditPort;
     private final Map<String, FeatureExecutionWindowStrategy> strategies;
 
@@ -23,23 +24,34 @@ public final class ExecutionWindowPlanner {
         this.strategies = registrarStrategies();
     }
 
+    public Map<String, ExecutionWindowPlan> planejarFluxoCompleto(final LocalDate dataReferenciaFim) {
+        return planejarFluxoCompleto(dataReferenciaFim, ModoExecucao.INTERVALO);
+    }
+
     public Map<String, ExecutionWindowPlan> planejarFluxoCompleto(final LocalDate dataReferenciaFim,
-                                                                  final boolean incluirFaturasGraphQL) {
+                                                                  final ModoExecucao modoExecucao) {
         final Map<String, ExecutionWindowPlan> planos = new LinkedHashMap<>();
-        for (final String entidade : entidadesPadrao(incluirFaturasGraphQL)) {
-            planos.put(entidade, planejarEntidade(entidade, dataReferenciaFim));
+        for (final String entidade : entidadesPadrao()) {
+            planos.put(entidade, planejarEntidade(entidade, dataReferenciaFim, modoExecucao));
         }
         return Map.copyOf(planos);
     }
 
     public ExecutionWindowPlan planejarEntidade(final String entidade, final LocalDate dataReferenciaFim) {
+        return planejarEntidade(entidade, dataReferenciaFim, ModoExecucao.INTERVALO);
+    }
+
+    public ExecutionWindowPlan planejarEntidade(final String entidade,
+                                                final LocalDate dataReferenciaFim,
+                                                final ModoExecucao modoExecucao) {
         final FeatureExecutionWindowStrategy strategy = strategies.get(entidade);
         if (strategy == null) {
             throw new IllegalArgumentException("Nenhuma strategy de janela registrada para a entidade '" + entidade + "'.");
         }
         return strategy.planejar(
             dataReferenciaFim,
-            executionAuditPort.buscarWatermarkConfirmado(entidade)
+            executionAuditPort.buscarWatermarkConfirmado(entidade),
+            modoExecucao
         );
     }
 
@@ -49,21 +61,13 @@ public final class ExecutionWindowPlanner {
         registrarReplay(registradas, ConstantesEntidades.MANIFESTOS);
         registradas.put(ConstantesEntidades.FRETES, new FretesExecutionWindowStrategy());
         registrarReplay(registradas, ConstantesEntidades.COTACOES);
-        registradas.put(
-            ConstantesEntidades.LOCALIZACAO_CARGAS,
-            new RegisteredExecutionWindowStrategy(
-                ConstantesEntidades.LOCALIZACAO_CARGAS,
-                REPLAY_LOCALIZACAO_CARGAS_DIAS,
-                true
-            )
-        );
+        registradas.put(ConstantesEntidades.LOCALIZACAO_CARGAS, new LocalizacaoCargasExecutionWindowStrategy());
         registrarReplay(registradas, ConstantesEntidades.FATURAS_POR_CLIENTE);
 
         registrarJanelaDiaria(registradas, ConstantesEntidades.USUARIOS_SISTEMA);
         registrarJanelaDiaria(registradas, ConstantesEntidades.CONTAS_A_PAGAR);
         registrarJanelaDiaria(registradas, ConstantesEntidades.INVENTARIO);
         registrarJanelaDiaria(registradas, ConstantesEntidades.SINISTROS);
-        registrarJanelaDiariaSemReplayRetroativo(registradas, ConstantesEntidades.FATURAS_GRAPHQL);
         return Map.copyOf(registradas);
     }
 
@@ -77,13 +81,8 @@ public final class ExecutionWindowPlanner {
         registradas.put(entidade, new RegisteredExecutionWindowStrategy(entidade, 2, true));
     }
 
-    private void registrarJanelaDiariaSemReplayRetroativo(final Map<String, FeatureExecutionWindowStrategy> registradas,
-                                                          final String entidade) {
-        registradas.put(entidade, new RegisteredExecutionWindowStrategy(entidade, 2, false));
-    }
-
-    private List<String> entidadesPadrao(final boolean incluirFaturasGraphQL) {
-        final List<String> entidades = new java.util.ArrayList<>(List.of(
+    private List<String> entidadesPadrao() {
+        return List.of(
             ConstantesEntidades.USUARIOS_SISTEMA,
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.FRETES,
@@ -94,11 +93,7 @@ public final class ExecutionWindowPlanner {
             ConstantesEntidades.SINISTROS,
             ConstantesEntidades.CONTAS_A_PAGAR,
             ConstantesEntidades.FATURAS_POR_CLIENTE
-        ));
-        if (incluirFaturasGraphQL) {
-            entidades.add(ConstantesEntidades.FATURAS_GRAPHQL);
-        }
-        return List.copyOf(entidades);
+        );
     }
 
     private static final class RegisteredExecutionWindowStrategy implements FeatureExecutionWindowStrategy {

@@ -82,9 +82,6 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
     private static final double LIMIAR_INVENTARIO_VARIACAO_PERCENTUAL_ABERTO = 0.01d;
     private static final int LIMIAR_INVENTARIO_DIVERGENCIA_ABSOLUTO_ABERTO = 30;
     private static final double LIMIAR_INVENTARIO_DIVERGENCIA_PERCENTUAL_ABERTO = 0.012d;
-    private static final int LIMIAR_FATURAS_GRAPHQL_VARIACAO_ABSOLUTO_ABERTO = 15;
-    private static final double LIMIAR_FATURAS_GRAPHQL_VARIACAO_PERCENTUAL_ABERTO = 0.03d;
-
     private final ValidacaoApiBanco24hDetalhadaRepository repository;
     private boolean periodoFechadoContexto;
 
@@ -199,16 +196,6 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         final Set<String> excedentes = new HashSet<>(chavesBanco);
         excedentes.removeAll(api.chaves());
 
-        int excedentesTolerados = 0;
-        if (ConstantesEntidades.FATURAS_GRAPHQL.equals(entidade)
-            && !excedentes.isEmpty()
-            && api.chavesToleradasNoBanco() != null
-            && !api.chavesToleradasNoBanco().isEmpty()) {
-            final int antes = excedentes.size();
-            excedentes.removeIf(api.chavesToleradasNoBanco()::contains);
-            excedentesTolerados = antes - excedentes.size();
-        }
-
         final Set<String> chavesComparaveis = new HashSet<>(api.chaves());
         chavesComparaveis.retainAll(chavesBanco);
         final Set<String> divergenciasDados = new HashSet<>();
@@ -263,9 +250,6 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             if (divergenciasSuprimidasModoFechado > 0) {
                 detalhe.append(" | divergencias_suprimidas=").append(divergenciasSuprimidasModoFechado);
             }
-        }
-        if (excedentesTolerados > 0) {
-            detalhe.append(" | excedentes_tolerados_referenciais=").append(excedentesTolerados);
         }
         if (janelaEstruturada.isPresent() && executionUuidAncora.isPresent()) {
             detalhe.append(" | origem_janela=EXECUTION_AUDIT");
@@ -323,7 +307,6 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
             || localizacaoCargasMarginalmenteDinamicas(resultado)
             || faturasPorClienteMarginalmenteDinamicas(resultado)
             || inventarioMarginalmenteDinamico(resultado)
-            || faturasGraphqlMarginaisToleradas(resultado)
             || contasAPagarMarginaisToleradas(resultado);
     }
 
@@ -541,29 +524,6 @@ final class ValidacaoApiBanco24hDetalhadaComparator {
         return resultado.faltantes() <= limiteCompletude
             && resultado.excedentes() <= limiteCompletude
             && resultado.divergenciasDados() <= limiteDivergencia
-            && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
-    }
-
-    private boolean faturasGraphqlMarginaisToleradas(final ResultadoComparacao resultado) {
-        if (periodoFechadoContexto
-            || !ConstantesEntidades.FATURAS_GRAPHQL.equals(resultado.entidade())
-            || resultado.divergenciasDados() != 0) {
-            return false;
-        }
-        final int base = Math.max(resultado.apiUnico(), resultado.banco());
-        final int limiteCompletude = ajustarLimitePorIdade(
-            resultado,
-            calcularLimite(
-                base,
-                LIMIAR_FATURAS_GRAPHQL_VARIACAO_PERCENTUAL_ABERTO,
-                2,
-                LIMIAR_FATURAS_GRAPHQL_VARIACAO_ABSOLUTO_ABERTO
-            ),
-            2,
-            10
-        );
-        return resultado.faltantes() <= limiteCompletude
-            && resultado.excedentes() <= limiteCompletude
             && Math.abs(resultado.apiUnico() - resultado.banco()) <= limiteCompletude;
     }
 

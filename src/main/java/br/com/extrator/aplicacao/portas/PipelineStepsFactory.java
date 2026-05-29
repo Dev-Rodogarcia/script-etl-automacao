@@ -11,12 +11,12 @@ Conecta com:
 - Use cases (obtém steps via factory)
 
 Fluxo geral:
-1) criarStepsFluxoCompleto(incluirFaturas, incluirQuality) retorna List<PipelineStep>.
+1) criarStepsFluxoCompleto(incluirQuality) retorna List<PipelineStep>.
 2) Factory abstracta criacao e decisoes de quais steps incluir.
 
 Estrutura interna:
 Metodos principais:
-- criarStepsFluxoCompleto(boolean, boolean): List<PipelineStep>.
+- criarStepsFluxoCompleto(boolean): List<PipelineStep>.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.portas;
 
@@ -25,5 +25,5 @@ import java.util.List;
 import br.com.extrator.aplicacao.pipeline.PipelineStep;
 
 public interface PipelineStepsFactory {
-    List<PipelineStep> criarStepsFluxoCompleto(boolean incluirFaturasGraphQL, boolean incluirDataQuality);
+    List<PipelineStep> criarStepsFluxoCompleto(boolean incluirDataQuality);
 }

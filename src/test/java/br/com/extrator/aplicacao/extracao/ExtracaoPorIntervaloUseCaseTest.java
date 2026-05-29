@@ -150,7 +150,7 @@ class ExtracaoPorIntervaloUseCaseTest {
         final CapturingExtracaoPorIntervaloUseCase extracao = new CapturingExtracaoPorIntervaloUseCase();
         final ReconciliacaoUseCase useCase = new ReconciliacaoUseCase(extracao);
 
-        useCase.executar(LocalDate.of(2026, 4, 27), "graphql", "fretes", true);
+        useCase.executar(LocalDate.of(2026, 4, 27), "graphql", "fretes");
 
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO, extracao.requestCapturada.modoExecucao());
         assertTrue(extracao.requestCapturada.modoLoopDaemon());
@@ -317,17 +317,6 @@ class ExtracaoPorIntervaloUseCaseTest {
         );
 
         assertEquals("TIMEOUT", reason);
-    }
-
-    @Test
-    void deveInformarFaturasGraphqlComoNaoAplicavelParaRasterEDataExport() {
-        assertEquals("NAO SE APLICA", ExtracaoPorIntervaloUseCase.descreverFaturasGraphQL("raster", true));
-        assertEquals("NAO SE APLICA", ExtracaoPorIntervaloUseCase.descreverFaturasGraphQL("dataexport", true));
-        assertEquals("INCLUIDO", ExtracaoPorIntervaloUseCase.descreverFaturasGraphQL("graphql", true));
-        assertEquals(
-            "DESABILITADO (flag --sem-faturas-graphql)",
-            ExtracaoPorIntervaloUseCase.descreverFaturasGraphQL(null, false)
-        );
     }
 
     private ExtracaoPorIntervaloUseCase criarUseCase(

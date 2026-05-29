@@ -9,7 +9,6 @@ WITH EntidadesEsperadas AS (
     SELECT 'usuarios_sistema' AS entidade
     UNION ALL SELECT 'coletas'
     UNION ALL SELECT 'fretes'
-    UNION ALL SELECT 'faturas_graphql'
     UNION ALL SELECT 'manifestos'
     UNION ALL SELECT 'cotacoes'
     UNION ALL SELECT 'localizacao_cargas'
@@ -67,16 +66,6 @@ ContagensBanco AS (
           AND f.data_extracao >= u.timestamp_inicio
           AND f.data_extracao <= u.timestamp_fim
     WHERE u.entidade = 'fretes'
-    GROUP BY u.entidade
-
-    UNION ALL
-    SELECT u.entidade, COUNT(fg.id)
-    FROM UltimasExtracoes u
-    LEFT JOIN dbo.faturas_graphql fg
-           ON u.entidade = 'faturas_graphql'
-          AND fg.data_extracao >= u.timestamp_inicio
-          AND fg.data_extracao <= u.timestamp_fim
-    WHERE u.entidade = 'faturas_graphql'
     GROUP BY u.entidade
 
     UNION ALL

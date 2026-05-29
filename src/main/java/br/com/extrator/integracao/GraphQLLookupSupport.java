@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 
 import br.com.extrator.integracao.graphql.GraphQLQueries;
 import br.com.extrator.dominio.graphql.bancos.BankAccountNodeDTO;
-import br.com.extrator.dominio.graphql.faturas.CreditCustomerBillingNodeDTO;
 
 final class GraphQLLookupSupport {
     @FunctionalInterface
@@ -41,76 +40,6 @@ final class GraphQLLookupSupport {
     GraphQLLookupSupport(final TypedQueryExecutor queryExecutor, final Logger logger) {
         this.queryExecutor = queryExecutor;
         this.logger = logger;
-    }
-
-    Optional<CreditCustomerBillingNodeDTO> enriquecerFatura(final String billingId) {
-        if (billingId == null || billingId.isBlank()) {
-            logger.warn("Tentativa de enriquecer fatura com ID nulo ou vazio");
-            return Optional.empty();
-        }
-
-        return buscarPrimeiraEntidade(
-            "enriquecer fatura",
-            "creditCustomerBilling",
-            GraphQLQueries.QUERY_ENRIQUECER_FATURAS,
-            Map.of("id", billingId),
-            CreditCustomerBillingNodeDTO.class,
-            billingId
-        );
-    }
-
-    Optional<CreditCustomerBillingNodeDTO> enriquecerFaturaPorDocumento(final String document) {
-        if (document == null || document.isBlank()) {
-            logger.warn("Tentativa de enriquecer fatura com documento nulo ou vazio");
-            return Optional.empty();
-        }
-
-        final Optional<CreditCustomerBillingNodeDTO> resultado = buscarPrimeiraEntidade(
-            "enriquecer fatura por documento",
-            "creditCustomerBilling",
-            GraphQLQueries.QUERY_ENRIQUECER_FATURAS_POR_DOCUMENTO,
-            Map.of("document", document),
-            CreditCustomerBillingNodeDTO.class,
-            document
-        );
-        if (resultado.isPresent()) {
-            logger.debug("Fatura encontrada via documento: {}", document);
-        } else {
-            logger.debug("Fatura nao encontrada via documento: {}", document);
-        }
-        return resultado;
-    }
-
-    Optional<CreditCustomerBillingNodeDTO> buscarCapaFaturaPorId(final Long billingId) {
-        if (billingId == null) {
-            logger.warn("Tentativa de buscar capa de fatura com ID nulo");
-            return Optional.empty();
-        }
-
-        return buscarPrimeiraEntidade(
-            "buscar capa da fatura por ID",
-            "creditCustomerBilling",
-            GraphQLQueries.QUERY_FATURAS,
-            Map.of("params", Map.of("id", String.valueOf(billingId))),
-            CreditCustomerBillingNodeDTO.class,
-            String.valueOf(billingId)
-        );
-    }
-
-    Optional<CreditCustomerBillingNodeDTO> buscarDadosCobranca(final Long billingId) {
-        if (billingId == null) {
-            logger.warn("Tentativa de buscar dados de cobranca com ID nulo");
-            return Optional.empty();
-        }
-
-        return buscarPrimeiraEntidade(
-            "buscar dados de cobranca",
-            "creditCustomerBilling",
-            GraphQLQueries.QUERY_ENRIQUECER_COBRANCA_NFSE,
-            Map.of("id", billingId.toString()),
-            CreditCustomerBillingNodeDTO.class,
-            String.valueOf(billingId)
-        );
     }
 
     Optional<BankAccountNodeDTO> buscarDetalhesBanco(final Integer bankAccountId) {

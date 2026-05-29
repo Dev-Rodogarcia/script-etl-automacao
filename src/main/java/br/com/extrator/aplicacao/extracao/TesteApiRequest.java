@@ -18,13 +18,11 @@ Estrutura interna:
 Campos:
 - tipoApi: String (graphql ou dataexport).
 - entidade: String (opcional, null para todas).
-- incluirFaturasGraphQL: boolean (flag para incluir faturas GraphQL).
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 public record TesteApiRequest(
     String tipoApi,
-    String entidade,
-    boolean incluirFaturasGraphQL
+    String entidade
 ) {
 }

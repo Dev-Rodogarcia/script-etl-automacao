@@ -10,12 +10,11 @@ Conecta com:
 - Nenhuma (DTO puro)
 
 Fluxo geral:
-1) Record imutavel com 4 campos: incluirFaturasGraphQL, periodoFechado, permitirFallbackJanela, dataReferenciaSistema.
+1) Record imutavel com flags de periodo/fallback e dataReferenciaSistema.
 2) Compact constructor valida dataReferenciaSistema nao-null.
 
 Estrutura interna:
 Campos:
-- incluirFaturasGraphQL: boolean (incluir entidade FATURAS_GRAPHQL).
 - periodoFechado: boolean (modo fechado para comparacao em periodos).
 - permitirFallbackJanela: boolean (permitir fallback sem filtro periodo em log_extracoes).
 - dataReferenciaSistema: LocalDate (data de referencia para buscas).
@@ -27,17 +26,15 @@ import java.util.Objects;
 import java.util.Optional;
 
 public record ValidacaoApiBanco24hDetalhadaRequest(
-    boolean incluirFaturasGraphQL,
     boolean periodoFechado,
     boolean permitirFallbackJanela,
     LocalDate dataReferenciaSistema,
     String executionUuidAncora
 ) {
-    public ValidacaoApiBanco24hDetalhadaRequest(final boolean incluirFaturasGraphQL,
-                                                final boolean periodoFechado,
+    public ValidacaoApiBanco24hDetalhadaRequest(final boolean periodoFechado,
                                                 final boolean permitirFallbackJanela,
                                                 final LocalDate dataReferenciaSistema) {
-        this(incluirFaturasGraphQL, periodoFechado, permitirFallbackJanela, dataReferenciaSistema, null);
+        this(periodoFechado, permitirFallbackJanela, dataReferenciaSistema, null);
     }
 
     public ValidacaoApiBanco24hDetalhadaRequest {

@@ -19,7 +19,7 @@ Campos:
 - dataInicio, dataFim: LocalDate (obrigatorios, validados).
 - apiEspecifica: String (opcional, normalizado para null se blank).
 - entidadeEspecifica: String (opcional, normalizado para null se blank).
-- incluirFaturasGraphQL, modoLoopDaemon: boolean (flags de comportamento).
+- modoLoopDaemon, modoRapido24h: boolean (flags de comportamento).
 - modoExecucao: classifica a carga para evitar acoplamento entre daemon, micro-batch e reconciliacao.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
@@ -32,7 +32,6 @@ public record ExtracaoPorIntervaloRequest(
     LocalDate dataFim,
     String apiEspecifica,
     String entidadeEspecifica,
-    boolean incluirFaturasGraphQL,
     boolean modoLoopDaemon,
     boolean modoRapido24h,
     ModoExecucao modoExecucao
@@ -42,10 +41,9 @@ public record ExtracaoPorIntervaloRequest(
         final LocalDate dataFim,
         final String apiEspecifica,
         final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL,
         final boolean modoLoopDaemon
     ) {
-        this(dataInicio, dataFim, apiEspecifica, entidadeEspecifica, incluirFaturasGraphQL, modoLoopDaemon, false);
+        this(dataInicio, dataFim, apiEspecifica, entidadeEspecifica, modoLoopDaemon, false);
     }
 
     public ExtracaoPorIntervaloRequest(
@@ -53,7 +51,6 @@ public record ExtracaoPorIntervaloRequest(
         final LocalDate dataFim,
         final String apiEspecifica,
         final String entidadeEspecifica,
-        final boolean incluirFaturasGraphQL,
         final boolean modoLoopDaemon,
         final boolean modoRapido24h
     ) {
@@ -62,7 +59,6 @@ public record ExtracaoPorIntervaloRequest(
             dataFim,
             apiEspecifica,
             entidadeEspecifica,
-            incluirFaturasGraphQL,
             modoLoopDaemon,
             modoRapido24h,
             ModoExecucao.padrao(modoLoopDaemon)

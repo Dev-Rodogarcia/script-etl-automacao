@@ -35,7 +35,6 @@ public final class GraphQLPaginatorChaosHarness {
             new HashMap<>(),
             new HashSet<>(),
             new HashMap<>(),
-            null,
             new GraphQLPageFetcher() {
                 @Override
                 public <T> PaginatedGraphQLResponse<T> fetch(

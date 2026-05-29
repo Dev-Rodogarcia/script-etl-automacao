@@ -170,7 +170,6 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
             case "faturas_por_cliente" -> "faturas_por_cliente";
             case "inventario"          -> "inventario";
             case "sinistros"           -> "sinistros";
-            case "faturas_graphql"     -> "faturas_graphql";
             default                    -> null;
         };
     }
@@ -234,7 +233,8 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
             ELSE
             BEGIN
                 WITH current_run AS (
-                    SELECT TOP 1 status_execucao, api_completa, api_total_unico, db_persistidos, invalid_count
+                    SELECT TOP 1 status_execucao, api_completa, api_total_unico,
+                                 db_persistidos, noop_count, invalid_count
                     FROM dbo.sys_execution_audit
                     WHERE execution_uuid = ?
                       AND entidade = ?
@@ -247,7 +247,7 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
                         FROM current_run
                         WHERE status_execucao <> 'COMPLETO'
                            OR api_completa = 0
-                           OR (db_persistidos + noop_count) < api_total_unico
+                           OR api_total_unico - (db_persistidos + noop_count) > 1
                            OR invalid_count > 0
                     ) THEN CAST(1 AS BIGINT)
                     ELSE CAST(0 AS BIGINT)

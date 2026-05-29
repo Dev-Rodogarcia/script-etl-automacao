@@ -203,6 +203,7 @@ public class ExtractionResult {
             status, // String - será convertido para enum internamente
             registrosParaLog,
             paginasProcessadas,
+            registrosNoOpIdempotente,
             mensagem
         );
     }

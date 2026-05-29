@@ -487,14 +487,6 @@ public final class ConfigEtl {
         ));
     }
 
-    public static Duration obterTimeoutStepFaturasGraphQL() {
-        return Duration.ofMillis(obterLongComFallback(
-            "ETL_PIPELINE_TIMEOUT_STEP_FATURAS_GRAPHQL_MS",
-            "etl.pipeline.timeout.step.faturas_graphql.ms",
-            7_200_000L
-        ));
-    }
-
     public static Duration obterTimeoutEntidadeGraphQLColetasIntervalo() {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_INTERVALO_MS",
@@ -510,8 +502,6 @@ public final class ConfigEtl {
             padrao = 1_800_000L;
         } else if ("FRETES".equals(chave)) {
             padrao = 900_000L;
-        } else if ("FATURAS_GRAPHQL".equals(chave)) {
-            padrao = 7_200_000L;
         } else {
             padrao = 600_000L;
         }
@@ -557,14 +547,7 @@ public final class ConfigEtl {
         ));
     }
 
-    public static Duration obterTimeoutCicloDaemon(final boolean incluirFaturasGraphQL) {
-        if (incluirFaturasGraphQL) {
-            return Duration.ofMillis(obterLongComFallback(
-                "ETL_DAEMON_CYCLE_TIMEOUT_COM_FATURAS_MS",
-                "etl.daemon.cycle.timeout.com_faturas.ms",
-                14_400_000L
-            ));
-        }
+    public static Duration obterTimeoutCicloDaemon() {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_DAEMON_CYCLE_TIMEOUT_MS",
             "etl.daemon.cycle.timeout.ms",

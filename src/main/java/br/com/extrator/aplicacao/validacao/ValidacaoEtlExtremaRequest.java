@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 public record ValidacaoEtlExtremaRequest(
-    boolean incluirFaturasGraphQL,
     boolean periodoFechado,
     boolean permitirFallbackJanela,
     int repeticoesStress,

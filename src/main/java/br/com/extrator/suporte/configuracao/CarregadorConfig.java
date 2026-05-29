@@ -133,14 +133,6 @@ public final class CarregadorConfig {
         return ConfigApi.obterLimitePaginasApiGraphQL();
     }
 
-    public static int obterLimitePaginasFaturasGraphQL() {
-        return ConfigApi.obterLimitePaginasFaturasGraphQL();
-    }
-
-    public static int obterDiasJanelaFaturasGraphQL() {
-        return ConfigApi.obterDiasJanelaFaturasGraphQL();
-    }
-
     public static int obterLimitePaginasApiDataExport() {
         return ConfigApi.obterLimitePaginasApiDataExport();
     }

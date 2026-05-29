@@ -185,66 +185,6 @@ public final class GraphQLQueries {
             }""";
     
     /**
-     * Query para buscar Capa de Faturas (CreditCustomerBilling)
-     * Tipo GraphQL: CreditCustomerBilling
-     * Campo de filtro: dueDate, issueDate ou originalDueDate (aceita apenas uma data específica)
-     */
-    public static final String QUERY_FATURAS = """
-            query ExtrairFaturas_Billing_Final($params: CreditCustomerBillingInput!, $after: String) {
-              creditCustomerBilling(params: $params, first: 100, after: $after) {
-                pageInfo { hasNextPage endCursor }
-                edges {
-                  node {
-                    id
-                    document
-                    dueDate
-                    issueDate
-                    value
-                    paidValue
-                    valueToPay
-                    discountValue
-                    interestValue
-                    paid
-                    type
-                    comments
-                    sequenceCode
-                    competenceMonth
-                    competenceYear
-                    ticketAccountId
-                    customer {
-                      id
-                      nickname
-                      person { name cnpj }
-                    }
-                    corporation {
-                      id
-                      person { nickname cnpj }
-                    }
-                    installments {
-                      id
-                      position
-                      sequenceCode
-                      value
-                      valueToPay
-                      dueDate
-                      originalDueDate
-                      status
-                      paymentMethod
-                      accountingCredit {
-                        document
-                      }
-                      accountingBankAccount {
-                        bankName
-                        portfolioVariation
-                        customInstruction
-                      }
-                    }
-                  }
-                }
-              }
-            }""";
-    
-    /**
      * Query para buscar NFSe diretamente
      * Tipo GraphQL: Nfse
      * Campo de filtro: issuedAt (aceita intervalo "data_inicio - data_fim")
@@ -277,16 +217,6 @@ public final class GraphQLQueries {
      */
     public static final String QUERY_TESTE = "{ __schema { queryType { name } } }";
     
-    /**
-     * Query de introspection para descobrir campos de CreditCustomerBillingInput
-     */
-    public static final String INTROSPECTION_CREDIT_CUSTOMER_BILLING = """
-            query CamposCreditCustomerBillingInput {
-              __type(name: "CreditCustomerBillingInput") {
-                inputFields { name }
-              }
-            }""";
-
     /**
      * Query de introspection para descobrir campos de PickInput.
      * Usada para decidir dinamicamente filtros válidos (requestDate/serviceDate).
@@ -341,99 +271,6 @@ public final class GraphQLQueries {
                   node {
                     id
                     name
-                  }
-                }
-              }
-            }""";
-    
-    /**
-     * Query para enriquecer Faturas por Cliente com dados financeiros.
-     * Busca Nº NFS-e, Carteira e Instrução Customizada via creditCustomerBilling.
-     * 
-     * Tipo GraphQL: CreditCustomerBilling
-     * Parâmetro: id (ID da cobrança)
-     * 
-     * Campos extraídos:
-     * - nfse_numero: accountingCredit.document (da primeira parcela)
-     * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
-     * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
-     */
-    public static final String QUERY_ENRIQUECER_FATURAS = """
-            query EnriquecerFaturas($id: ID!) {
-              creditCustomerBilling(params: { id: $id }) {
-                edges {
-                  node {
-                    id
-                    installments {
-                      accountingCredit {
-                        document
-                      }
-                      accountingBankAccount {
-                        bankName
-                        portfolioVariation
-                        customInstruction
-                      }
-                    }
-                  }
-                }
-              }
-            }""";
-    
-    /**
-     * Query para enriquecer faturas por número do documento (fallback quando billingId não está disponível).
-     * Parâmetro: document (número do documento da fatura, ex: "112025/1-3")
-     * 
-     * Campos extraídos:
-     * - nfse_numero: accountingCredit.document (da primeira parcela)
-     * - carteira_banco: accountingBankAccount.portfolioVariation (da primeira parcela)
-     * - instrucao_boleto: accountingBankAccount.customInstruction (da primeira parcela)
-     */
-    public static final String QUERY_ENRIQUECER_FATURAS_POR_DOCUMENTO = """
-            query EnriquecerFaturasPorDocumento($document: String!) {
-              creditCustomerBilling(params: { document: $document }, first: 1) {
-                edges {
-                  node {
-                    id
-                    installments {
-                      accountingCredit {
-                        document
-                      }
-                      accountingBankAccount {
-                        bankName
-                        portfolioVariation
-                        customInstruction
-                      }
-                    }
-                  }
-                }
-              }
-            }""";
-    
-    /**
-     * Query para enriquecer cobrança individual com NFS-e e ID do banco.
-     * Usada dentro do loop de enriquecimento para cada fatura.
-     * 
-     * Parâmetro: id (ID da cobrança - creditCustomerBilling)
-     * 
-     * Campos extraídos:
-     * - ticketAccountId: ID para buscar detalhes do banco depois
-     * - nfse_numero: accountingCredit.document (da primeira parcela)
-     * - metodo_pagamento: installments[0].paymentMethod
-     */
-    public static final String QUERY_ENRIQUECER_COBRANCA_NFSE = """
-            query EnriquecerCobranca_Nfse($id: ID!) {
-              creditCustomerBilling(params: { id: $id }) {
-                edges {
-                  node {
-                    id
-                    ticketAccountId
-                    installments {
-                      id
-                      paymentMethod
-                      accountingCredit {
-                        document
-                      }
-                    }
                   }
                 }
               }

@@ -9,7 +9,7 @@ Conecta com:
 - br.com.extrator.aplicacao.validacao.ValidacaoApiBanco24hDetalhadaRequest
 - br.com.extrator.suporte.tempo.RelogioSistema
 Fluxo geral:
-1) executar() extrai flags: --sem-faturas-graphql, --periodo-fechado, --permitir-fallback-janela
+1) executar() extrai flags: --periodo-fechado, --permitir-fallback-janela
 2) Monta ValidacaoApiBanco24hDetalhadaRequest com flags e data hoje
 3) Delegação a useCase.executar()
 Estrutura interna:
@@ -38,7 +38,6 @@ public class ValidarApiVsBanco24hDetalhadoComando implements Comando {
     public void executar(final String[] args) throws Exception {
         useCase.executar(
             new ValidacaoApiBanco24hDetalhadaRequest(
-                !possuiFlag(args, "--sem-faturas-graphql"),
                 possuiFlag(args, "--periodo-fechado"),
                 possuiFlag(args, "--permitir-fallback-janela"),
                 RelogioSistema.hoje(),

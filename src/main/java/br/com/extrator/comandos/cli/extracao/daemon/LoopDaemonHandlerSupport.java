@@ -18,10 +18,8 @@ Fluxo geral:
 Estrutura interna:
 Metodos principais:
 - garantirDiretorioLogs(...2 args): prepara diretorios necessarios.
-- descreverModoFaturas(...1 args): descreve modo com/sem faturas.
 - ehFalhaIntegridadeOperacional(...1 args): detecta falha de integridade no encadeamento.
 Atributos-chave:
-- FLAG_SEM_FATURAS_GRAPHQL: flag CLI para desabilitar faturas.
 - FLAG_MODO_LOOP_DAEMON: flag interna para modo daemon.
 - INTERVALO_MINUTOS_PADRAO: intervalo padrao entre ciclos.
 [DOC-FILE-END]============================================================== */
@@ -32,7 +30,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 public final class LoopDaemonHandlerSupport {
-    public static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
     public static final String FLAG_MODO_LOOP_DAEMON = "--modo-loop-daemon";
     public static final String MENSAGEM_FALHA_INTEGRIDADE = "Fluxo completo interrompido por falha de integridade";
     public static final long INTERVALO_MINUTOS_PADRAO = 30L;
@@ -47,12 +44,6 @@ public final class LoopDaemonHandlerSupport {
         if (!Files.exists(DaemonPaths.RUNTIME_DIR)) {
             Files.createDirectories(DaemonPaths.RUNTIME_DIR);
         }
-    }
-
-    public static String descreverModoFaturas(final boolean incluirFaturasGraphQL) {
-        return "Faturas GraphQL: " + (incluirFaturasGraphQL
-            ? "INCLUIDO"
-            : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
     }
 
     public static String valorOuNull(final String valor) {

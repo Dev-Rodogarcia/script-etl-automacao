@@ -77,8 +77,7 @@ public final class RecoveryUseCase {
         final LocalDate dataInicio,
         final LocalDate dataFim,
         final String api,
-        final String entidade,
-        final boolean incluirFaturasGraphQL
+        final String entidade
     ) throws Exception {
         Objects.requireNonNull(dataInicio, "dataInicio nao pode ser null");
         Objects.requireNonNull(dataFim, "dataFim nao pode ser null");
@@ -134,7 +133,6 @@ public final class RecoveryUseCase {
             dataFim,
             api,
             entidade,
-            incluirFaturasGraphQL,
             false,
             false,
             ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL
@@ -162,10 +160,9 @@ public final class RecoveryUseCase {
 
     public void executarBackfillHistorico(
         final LocalDate dataInicio,
-        final LocalDate dataFim,
-        final boolean incluirFaturasGraphQL
+        final LocalDate dataFim
     ) throws Exception {
-        executarReplay(dataInicio, dataFim, null, null, incluirFaturasGraphQL);
+        executarReplay(dataInicio, dataFim, null, null);
     }
 
     private String resolveExecutionUuid() {

@@ -41,22 +41,11 @@ class DaemonLifecycleServiceTest {
     void deveMontarComandoFilhoComFlagLoopDaemon() throws Exception {
         final DaemonLifecycleService service = novoService();
 
-        final List<String> comando = service.construirComandoFilho(true);
+        final List<String> comando = service.construirComandoFilho();
 
         assertFalse(comando.isEmpty(), "Comando do processo filho nao pode ser vazio");
         assertTrue(comando.stream().anyMatch(arg -> arg.contains("java")), "Comando deve conter executavel Java");
         assertTrue(comando.contains("--loop-daemon-run"), "Comando deve conter flag de loop daemon");
-        assertFalse(comando.contains("--sem-faturas-graphql"), "Modo padrao deve incluir faturas GraphQL");
-    }
-
-    @Test
-    void deveIncluirFlagSemFaturasQuandoDesabilitado() throws Exception {
-        final DaemonLifecycleService service = novoService();
-
-        final List<String> comando = service.construirComandoFilho(false);
-
-        assertTrue(comando.contains("--loop-daemon-run"), "Comando deve conter flag de loop daemon");
-        assertTrue(comando.contains("--sem-faturas-graphql"), "Comando deve carregar flag de desabilitar faturas GraphQL");
     }
 
     @Test
@@ -82,7 +71,7 @@ class DaemonLifecycleServiceTest {
         final String comandoDaemon =
             "\"C:\\Program Files\\Eclipse Adoptium\\jdk-25.0.2.10-hotspot\\bin\\java.exe\" "
                 + "-jar C:\\repo\\logs\\daemon\\runtime\\extrator-daemon-runtime-1.jar "
-                + "--loop-daemon-run --sem-faturas-graphql";
+                + "--loop-daemon-run";
 
         assertTrue(DaemonLifecycleService.ehComandoLoopDaemon(comandoDaemon));
         assertFalse(DaemonLifecycleService.ehComandoStepIsoladoDoDaemon(comandoDaemon));
@@ -106,7 +95,7 @@ class DaemonLifecycleServiceTest {
             System.setProperty(chaveIgnorada, "pt");
 
             final DaemonLifecycleService service = novoService();
-            final List<String> comando = service.construirComandoFilho(false);
+            final List<String> comando = service.construirComandoFilho();
 
             assertTrue(comando.contains("-D" + chaveApi + "=500"));
             assertTrue(comando.contains("-D" + chaveEtl + "=5400000"));

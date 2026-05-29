@@ -61,20 +61,6 @@ query Q($params: PickInput!, $after: String){
 }
 """.strip()
 
-GRAPHQL_QUERY_FATURAS = """
-query Q($params: CreditCustomerBillingInput!, $after: String){
-  creditCustomerBilling(params:$params, after:$after, first:100){
-    edges{ node{
-      id document dueDate issueDate value paidValue valueToPay discountValue
-      interestValue paid type comments sequenceCode competenceMonth competenceYear
-      ticketAccountId
-    } }
-    pageInfo{ hasNextPage endCursor }
-  }
-}
-""".strip()
-
-
 ENTITIES: list[EntityConfig] = [
     EntityConfig(
         name="manifestos",
@@ -153,15 +139,6 @@ ENTITIES: list[EntityConfig] = [
         key_fn_name="graphql_id",
         graphql_query=GRAPHQL_QUERY_COLETAS,
         graphql_entity="pick",
-    ),
-    EntityConfig(
-        name="faturas_graphql",
-        api_kind="graphql",
-        table="faturas_graphql",
-        key_sql="CAST(id AS VARCHAR(50))",
-        key_fn_name="graphql_id",
-        graphql_query=GRAPHQL_QUERY_FATURAS,
-        graphql_entity="creditCustomerBilling",
     ),
 ]
 
@@ -624,4 +601,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

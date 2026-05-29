@@ -23,7 +23,6 @@ REM 2) Monta o comando Java para API/entidade escolhida.
 REM 3) Executa o teste e retorna codigo de status.
 REM
 REM Variaveis-chave:
-REM - FLAG_FATURAS_GRAPHQL: controle de estado do script.
 REM - API: controle de estado do script.
 REM - ENTIDADE: controle de estado do script.
 REM - JAVA_HOME: controle de estado do script.
@@ -32,8 +31,6 @@ REM [DOC-FILE-END]===========================================================
 
 REM Ajusta code page para evitar erros de parsing com acentos e parenteses
 if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 1252 >nul
-set "FLAG_FATURAS_GRAPHQL="
-
 REM ================================================================
 REM Script: 02-testar_api_especifica.bat
 REM Finalidade:
@@ -41,15 +38,14 @@ REM   Executa testes da API especifica informada como parametro ou via menu inte
 REM   Valores aceitos: 'graphql', 'dataexport' ou 'raster'.
 REM
 REM Uso:
-REM   02-testar_api_especifica.bat [api] [entidade] [--sem-faturas-graphql]
+REM   02-testar_api_especifica.bat [api] [entidade]
 REM
 REM Parametros (opcionais):
 REM   %1  Nome da API a testar: graphql | dataexport | raster
 REM   %2  Entidade (opcional):
-REM       GraphQL -> coletas | fretes | faturas_graphql | usuarios_sistema
+REM       GraphQL -> coletas | fretes | usuarios_sistema
 REM       DataExport -> manifestos | cotacoes | localizacao_cargas | contas_a_pagar | faturas_por_cliente | inventario | sinistros
 REM       Raster -> raster_viagens ^(tambem valida raster_viagem_paradas^)
-REM   %3  Flag opcional: --sem-faturas-graphql (somente para GraphQL sem entidade especifica)
 REM
 REM Se nenhum parametro for informado, exibe menu interativo.
 REM ================================================================
@@ -58,15 +54,10 @@ REM Se parametros foram fornecidos, usar diretamente
 if not "%~1"=="" (
     set "API=%~1"
     set "ENTIDADE=%~2"
-    set "FLAG_FATURAS_GRAPHQL=%~3"
-    if /i "!ENTIDADE!"=="--sem-faturas-graphql" (
-        set "ENTIDADE="
-        set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    )
-    if not "%~4"=="" (
+    if not "%~3"=="" (
         echo ERRO: Parametros em excesso.
         echo.
-        echo Uso: 02-testar_api_especifica.bat [api] [entidade] [--sem-faturas-graphql]
+        echo Uso: 02-testar_api_especifica.bat [api] [entidade]
         echo.
         pause
         exit /b 1
@@ -120,10 +111,9 @@ echo   2. Entidade especifica
 echo.
 set /p "OPCAO_ESCOPO=Digite sua opcao (1 ou 2): "
 
-if "%OPCAO_ESCOPO%"=="1" (
-    set "ENTIDADE="
-    if /i "%API%"=="graphql" goto :CONFIGURAR_FATURAS_GRAPHQL
-    goto :RUN
+    if "%OPCAO_ESCOPO%"=="1" (
+        set "ENTIDADE="
+        goto :RUN
 )
 if "%OPCAO_ESCOPO%"=="2" (
     goto :CHOOSE_SPECIFIC_ENTITY
@@ -141,19 +131,17 @@ echo TESTE DE API: %API% - ENTIDADE ESPECIFICA
 echo ================================================================
 echo.
 
-if /i "%API%"=="graphql" (
-    echo Entidades disponiveis:
-    echo   1. Coletas
-    echo   2. Fretes
-    echo   3. Faturas GraphQL
-    echo   4. Usuarios do Sistema
-    echo.
-    set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2, 3 ou 4^): "
+    if /i "%API%"=="graphql" (
+        echo Entidades disponiveis:
+        echo   1. Coletas
+        echo   2. Fretes
+        echo   3. Usuarios do Sistema
+        echo.
+        set /p "OPCAO_ENTIDADE=Digite sua opcao ^(1, 2 ou 3^): "
     
-    if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
-    if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
-    if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=faturas_graphql"
-    if "!OPCAO_ENTIDADE!"=="4" set "ENTIDADE=usuarios_sistema"
+        if "!OPCAO_ENTIDADE!"=="1" set "ENTIDADE=coletas"
+        if "!OPCAO_ENTIDADE!"=="2" set "ENTIDADE=fretes"
+        if "!OPCAO_ENTIDADE!"=="3" set "ENTIDADE=usuarios_sistema"
     
     if "!ENTIDADE!"=="" (
         echo.
@@ -228,13 +216,11 @@ exit /b 1
 if "%ENTIDADE%"=="" goto :RUN
 if /i "%ENTIDADE%"=="coletas" goto :RUN
 if /i "%ENTIDADE%"=="fretes" goto :RUN
-if /i "%ENTIDADE%"=="faturas_graphql" goto :RUN
-if /i "%ENTIDADE%"=="faturas" goto :RUN
 if /i "%ENTIDADE%"=="usuarios_sistema" goto :RUN
 if /i "%ENTIDADE%"=="usuarios" goto :RUN
 echo ERRO: Entidade '%ENTIDADE%' invalida para API GraphQL!
 echo.
-echo Entidades suportadas: coletas, fretes, faturas_graphql, faturas, usuarios_sistema, usuarios
+echo Entidades suportadas: coletas, fretes, usuarios_sistema, usuarios
 echo.
 pause
 exit /b 1
@@ -285,13 +271,6 @@ if /i "%API%"=="dataexport" (
 )
 if /i "%API%"=="raster" (
     echo COBERTURA RASTER: raster_viagens e raster_viagem_paradas
-)
-if /i "%API%"=="graphql" if "%ENTIDADE%"=="" (
-    if defined FLAG_FATURAS_GRAPHQL (
-        echo FATURAS GRAPHQL: DESABILITADO
-    ) else (
-        echo FATURAS GRAPHQL: INCLUIDO
-    )
 )
 echo ================================================================
 echo.
@@ -345,7 +324,6 @@ if errorlevel 1 exit /b 1
 
 set "CMD_ARGS=--testar-api %API%"
 if not "%ENTIDADE%"=="" set "CMD_ARGS=%CMD_ARGS% %ENTIDADE%"
-if defined FLAG_FATURAS_GRAPHQL set "CMD_ARGS=%CMD_ARGS% %FLAG_FATURAS_GRAPHQL%"
 echo Executando: java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" %CMD_ARGS%
 echo.
 
@@ -379,38 +357,6 @@ exit /b 1
 echo.
 pause
 exit /b 0
-
-:CONFIGURAR_FATURAS_GRAPHQL
-set "FLAG_FATURAS_GRAPHQL="
-echo.
-echo ================================================================
-echo CONFIGURACAO DE FATURAS GRAPHQL
-echo ================================================================
-echo Esta etapa pode demorar bastante quando incluida.
-echo.
-
-:PERGUNTAR_FATURAS_GRAPHQL
-set /p INCLUIR_FATURAS_GRAPHQL="Incluir Faturas GraphQL neste teste? (1=Sim, 2=Nao, S/N): "
-
-if /i "%INCLUIR_FATURAS_GRAPHQL%"=="S" (
-    set "FLAG_FATURAS_GRAPHQL="
-    goto :RUN
-)
-if "%INCLUIR_FATURAS_GRAPHQL%"=="1" (
-    set "FLAG_FATURAS_GRAPHQL="
-    goto :RUN
-)
-if /i "%INCLUIR_FATURAS_GRAPHQL%"=="N" (
-    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    goto :RUN
-)
-if "%INCLUIR_FATURAS_GRAPHQL%"=="2" (
-    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    goto :RUN
-)
-
-echo Opcao invalida. Digite 1, 2, S ou N.
-goto :PERGUNTAR_FATURAS_GRAPHQL
 
 :AUTH_CHECK
 if /i "%EXTRATOR_SKIP_AUTH_CHECK%"=="1" exit /b 0

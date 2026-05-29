@@ -15,7 +15,6 @@ REM Conecta com:
 REM - call: %~dp0mvn.bat
 REM - mvn (build/test/execucao Java)
 REM - call: :AUTH_CHECK
-REM - call: :CONFIGURAR_FATURAS_GRAPHQL
 REM - java -jar: target\extrator.jar
 REM
 REM Fluxo geral:
@@ -24,13 +23,10 @@ REM 2) Executa o jar com comando alvo.
 REM 3) Consolida log e retorno da rodada.
 REM
 REM Variaveis-chave:
-REM - FLAG_FATURAS_GRAPHQL: controle de estado do script.
 REM - JAVA_HOME: controle de estado do script.
 REM - JAVA_EXIT_CODE: controle de estado do script.
 REM - RET_CODE: controle de estado do script.
 REM [DOC-FILE-END]===========================================================
-
-set "FLAG_FATURAS_GRAPHQL="
 
 REM ================================================================
 REM Script: 01-executar_extracao_completa.bat
@@ -52,7 +48,7 @@ echo ================================================================
 echo INICIANDO EXTRACAO COMPLETA DE DADOS
 echo ================================================================
 echo Escopo operacional desta rodada:
-echo   GraphQL   = coletas, fretes, faturas_graphql, usuarios_sistema
+echo   GraphQL   = coletas, fretes, usuarios_sistema
 echo   DataExport = manifestos, cotacoes, localizacao_cargas, contas_a_pagar, faturas_por_cliente, inventario, sinistros
 echo   Raster    = raster_viagens e raster_viagem_paradas ^(quando RASTER_ENABLED/credenciais habilitarem^)
 echo.
@@ -144,25 +140,12 @@ if errorlevel 1 (
     endlocal & exit /b 1
 )
 
-call :CONFIGURAR_FATURAS_GRAPHQL "%~1"
-if errorlevel 1 (
-    endlocal & exit /b 1
-)
-
-if defined FLAG_FATURAS_GRAPHQL (
-    echo Executando: java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
-) else (
-    echo Executando: java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo
-)
+echo Executando: java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo
 echo.
 echo ATENCAO: Este processo pode demorar varios minutos...
 echo.
 
-if defined FLAG_FATURAS_GRAPHQL (
-    java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo %FLAG_FATURAS_GRAPHQL%
-) else (
-    java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo
-)
+java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --fluxo-completo
 set "JAVA_EXIT_CODE=%ERRORLEVEL%"
 
 if "%JAVA_EXIT_CODE%"=="0" (
@@ -206,60 +189,3 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:CONFIGURAR_FATURAS_GRAPHQL
-set "FLAG_FATURAS_GRAPHQL="
-set /a FATURAS_TENTATIVAS=0
-
-if /i "%~1"=="--sem-faturas-graphql" (
-    echo.
-    echo Faturas GraphQL: DESABILITADO por parametro informado.
-    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    exit /b 0
-)
-
-if /i "%~1"=="--com-faturas-graphql" (
-    echo.
-    echo Faturas GraphQL: INCLUIDO por parametro informado.
-    set "FLAG_FATURAS_GRAPHQL="
-    exit /b 0
-)
-
-echo.
-echo ================================================================
-echo CONFIGURACAO DE FATURAS GRAPHQL
-echo ================================================================
-echo Esta entidade passa por enriquecimento e pode demorar bastante.
-echo.
-
-:PERGUNTAR_FATURAS
-set /a FATURAS_TENTATIVAS+=1
-set /p INCLUIR_FATURAS="Incluir Faturas GraphQL nesta execucao? (1=Sim, 2=Nao, S/N): "
-
-if /i "%INCLUIR_FATURAS%"=="S" (
-    echo Faturas GraphQL: INCLUIDO.
-    exit /b 0
-)
-
-if "%INCLUIR_FATURAS%"=="1" (
-    echo Faturas GraphQL: INCLUIDO.
-    exit /b 0
-)
-
-if /i "%INCLUIR_FATURAS%"=="N" (
-    echo Faturas GraphQL: DESABILITADO.
-    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    exit /b 0
-)
-
-if "%INCLUIR_FATURAS%"=="2" (
-    echo Faturas GraphQL: DESABILITADO.
-    set "FLAG_FATURAS_GRAPHQL=--sem-faturas-graphql"
-    exit /b 0
-)
-
-echo Opcao invalida. Digite 1, 2, S ou N.
-if %FATURAS_TENTATIVAS% GEQ 10 (
-    echo ERRO: Numero maximo de tentativas atingido ao configurar Faturas GraphQL.
-    exit /b 1
-)
-goto :PERGUNTAR_FATURAS

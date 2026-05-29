@@ -20,17 +20,14 @@ Metodos principais:
 - pausar(): realiza operacao relacionada a "pausar".
 - retomar(): realiza operacao relacionada a "retomar".
 - parar(): encerra recursos e finaliza operacao com seguranca.
-- alternarFaturasGraphQL(): realiza operacao relacionada a "alternar faturas graph ql".
 - imprimirStatus(): realiza operacao relacionada a "imprimir status".
 - executarCiclo(): executa o fluxo principal desta responsabilidade.
 - possuiFlag(...2 args): realiza operacao relacionada a "possui flag".
 Atributos-chave:
 - log: campo de estado para "log".
-- FLAG_SEM_FATURAS_GRAPHQL: campo de estado para "flag sem faturas graphql".
 - running: campo de estado para "running".
 - paused: campo de estado para "paused".
 - executing: campo de estado para "executing".
-- incluirFaturasGraphQL: campo de estado para "incluir faturas graph ql".
 - scheduler: campo de estado para "scheduler".
 - future: campo de estado para "future".
 - nextRunAt: campo de estado para "next run at".
@@ -54,12 +51,10 @@ import br.com.extrator.suporte.console.LoggerConsole;
 
 public class LoopExtracaoComando implements Comando {
     private static final LoggerConsole log = LoggerConsole.getLogger(LoopExtracaoComando.class);
-    private static final String FLAG_SEM_FATURAS_GRAPHQL = "--sem-faturas-graphql";
 
     private volatile boolean running = false;
     private volatile boolean paused = false;
     private volatile boolean executing = false;
-    private volatile boolean incluirFaturasGraphQL = true;
 
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> future;
@@ -68,12 +63,9 @@ public class LoopExtracaoComando implements Comando {
 
     @Override
     public void executar(final String[] args) throws Exception {
-        incluirFaturasGraphQL = !possuiFlag(args, FLAG_SEM_FATURAS_GRAPHQL);
-
         log.console("=".repeat(80));
         log.info("LOOP DE EXTRACAO A CADA 30 MINUTOS");
         log.info("Se uma entidade falhar, sera reextraida no proximo ciclo.");
-        log.info("Faturas GraphQL no loop: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
         log.console("=".repeat(80));
 
         imprimirStatus();
@@ -81,7 +73,7 @@ public class LoopExtracaoComando implements Comando {
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 log.console("");
-                log.console("[I] Iniciar  [N] Nova imediata  [P] Pausar  [R] Retomar  [G] Alternar Faturas GraphQL  [S] Parar  [T] Status  [X] Sair");
+                log.console("[I] Iniciar  [N] Nova imediata  [P] Pausar  [R] Retomar  [S] Parar  [T] Status  [X] Sair");
                 System.out.print("Opcao: ");
 
                 final String opcao = scanner.nextLine().trim();
@@ -93,8 +85,6 @@ public class LoopExtracaoComando implements Comando {
                     pausar();
                 } else if ("R".equalsIgnoreCase(opcao)) {
                     retomar();
-                } else if ("G".equalsIgnoreCase(opcao)) {
-                    alternarFaturasGraphQL();
                 } else if ("S".equalsIgnoreCase(opcao)) {
                     parar();
                 } else if ("T".equalsIgnoreCase(opcao)) {
@@ -177,15 +167,9 @@ public class LoopExtracaoComando implements Comando {
         imprimirStatus();
     }
 
-    private void alternarFaturasGraphQL() {
-        incluirFaturasGraphQL = !incluirFaturasGraphQL;
-        log.info("Faturas GraphQL agora esta {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
-    }
-
     private void imprimirStatus() {
         final String status = running ? (paused ? "PAUSADO" : "ATIVO") : "INATIVO";
         log.info("Status atual: {}", status);
-        log.info("Faturas GraphQL: {}", incluirFaturasGraphQL ? "INCLUIDO" : "DESABILITADO (" + FLAG_SEM_FATURAS_GRAPHQL + ")");
 
         if (nextRunAt != null) {
             final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
@@ -217,7 +201,7 @@ public class LoopExtracaoComando implements Comando {
             ls.iniciarCaptura("extracao_dados_loop");
             String statusExecucao = "SUCCESS";
             try {
-                new FluxoCompletoUseCase().executar(incluirFaturasGraphQL, false);
+                new FluxoCompletoUseCase().executar(false);
             } catch (final Exception e) {
                 statusExecucao = "ERROR";
                 throw e;
@@ -243,18 +227,6 @@ public class LoopExtracaoComando implements Comando {
 
         log.info("Extracao concluida em {} (duracao {}m {}s) | Proxima em {} (em {}m {}s)",
             fim.format(fmt), dm, ds, nextRunAt.format(fmt), mm, ss);
-        log.console("Durante a espera: [N] Nova imediata  [P] Pausar  [R] Retomar  [G] Alternar Faturas GraphQL  [S] Parar  [T] Status  [X] Parar/Sair");
-    }
-
-    private boolean possuiFlag(final String[] args, final String flag) {
-        if (args == null || flag == null) {
-            return false;
-        }
-        for (final String arg : args) {
-            if (arg != null && flag.equalsIgnoreCase(arg.trim())) {
-                return true;
-            }
-        }
-        return false;
+        log.console("Durante a espera: [N] Nova imediata  [P] Pausar  [R] Retomar  [S] Parar  [T] Status  [X] Parar/Sair");
     }
 }

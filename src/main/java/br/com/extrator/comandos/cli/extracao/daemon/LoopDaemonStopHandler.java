@@ -45,7 +45,7 @@ public final class LoopDaemonStopHandler implements LoopDaemonModeHandler {
     }
 
     @Override
-    public void executar(final boolean incluirFaturasGraphQL) throws Exception {
+    public void executar() throws Exception {
         LoopDaemonHandlerSupport.garantirDiretorioLogs(stateStore, historyWriter);
         final List<ProcessHandle> processosAtivos = lifecycleService.localizarProcessosAlvoParada();
         if (processosAtivos.isEmpty()) {

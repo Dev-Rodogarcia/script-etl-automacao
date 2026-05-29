@@ -9,7 +9,6 @@ Conecta com:
 - ClienteApiGraphQL (api)
 - ColetaRepository (db.repository)
 - FreteRepository (db.repository)
-- FaturaGraphQLRepository (db.repository)
 - FaturaPorClienteRepository (db.repository)
 - LogExtracaoRepository (db.repository)
 - UsuarioSistemaRepository (db.repository)
@@ -29,7 +28,6 @@ Metodos principais:
 - extractUsuarios(...3 args): realiza operacao relacionada a "extract usuarios".
 - extractColetas(...2 args): realiza operacao relacionada a "extract coletas".
 - extractFretes(...2 args): realiza operacao relacionada a "extract fretes".
-- extractFaturasGraphQL(...2 args): realiza operacao relacionada a "extract faturas graph ql".
 - exibirResumoConsolidado(...2 args): realiza operacao relacionada a "exibir resumo consolidado".
 - formatarNumero(...1 args): realiza operacao relacionada a "formatar numero".
 Atributos-chave:
@@ -46,7 +44,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
@@ -57,8 +54,6 @@ import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.PageChunkConsumer;
 import br.com.extrator.persistencia.repositorio.ColetaRepository;
 import br.com.extrator.persistencia.repositorio.FreteRepository;
-import br.com.extrator.persistencia.repositorio.FaturaGraphQLRepository;
-import br.com.extrator.persistencia.repositorio.FaturaPorClienteRepository;
 import br.com.extrator.persistencia.repositorio.LogExtracaoRepository;
 import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
 import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
@@ -72,7 +67,6 @@ import br.com.extrator.integracao.comum.ExtractionLogger;
 import br.com.extrator.integracao.comum.ExtractionResult;
 import br.com.extrator.integracao.graphql.extractors.ColetaExtractor;
 import br.com.extrator.integracao.graphql.extractors.FreteExtractor;
-import br.com.extrator.integracao.graphql.extractors.FaturaGraphQLExtractor;
 import br.com.extrator.integracao.graphql.extractors.UsuarioSistemaExtractor;
 import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionAuditRecorder;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
@@ -164,7 +158,6 @@ public class GraphQLExtractionService {
      * @param entidade Nome da entidade específica (null = todas)
      * @throws RuntimeException Se houver falha crítica na extração
      */
-    // Referência para a entidade específica (usada na lógica de faturas_graphql)
     private String entidadeEspecifica;
     
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
@@ -191,8 +184,6 @@ public class GraphQLExtractionService {
 
             final boolean executarColetas = shouldExecute(entidade, ConstantesEntidades.COLETAS);
             final boolean executarFretes = shouldExecute(entidade, ConstantesEntidades.FRETES);
-            final boolean executarFaturasGraphql = shouldExecute(entidade, ConstantesEntidades.FATURAS_GRAPHQL,
-                ConstantesEntidades.ALIASES_FATURAS_GRAPHQL);
             final boolean executarUsuariosSistema = shouldExecute(entidade, ConstantesEntidades.USUARIOS_SISTEMA);
             boolean coletasConcluidasComSucesso = !executarColetas;
 
@@ -298,51 +289,6 @@ public class GraphQLExtractionService {
                 aplicarDelayEntreEntidades();
             }
 
-            // FASE 3: FATURAS_GRAPHQL foi movido para ser executado POR ÚLTIMO
-            // A extração de faturas_graphql agora é controlada pelos comandos (ExecutarFluxoCompletoComando
-            // e ExecutarExtracaoPorIntervaloComando) que chamam GraphQLRunner.executarFaturasGraphQLPorIntervalo()
-            // APÓS todas as outras entidades serem extraídas.
-            //
-            // Motivo: O enriquecimento de faturas_graphql é muito demorado (50+ minutos),
-            // então as outras entidades são priorizadas para garantir dados parciais atualizados no BI.
-            //
-            // Se executarFaturasGraphql for true E estivermos em modo de extração específica de faturas_graphql,
-            // executamos aqui. Caso contrário, deixamos para o comando orquestrador.
-            final boolean isSomenteFaturasGraphQL = entidadeEspecifica != null
-                && (ConstantesEntidades.FATURAS_GRAPHQL.equalsIgnoreCase(entidadeEspecifica)
-                || java.util.Arrays.stream(ConstantesEntidades.ALIASES_FATURAS_GRAPHQL)
-                    .anyMatch(alias -> alias.equalsIgnoreCase(entidadeEspecifica)));
-
-            if (executarFaturasGraphql && isSomenteFaturasGraphQL) {
-                // Extração específica de faturas_graphql foi solicitada explicitamente
-                try {
-                    final ExtractionResult result = executarComTimeout(
-                        ConstantesEntidades.FATURAS_GRAPHQL,
-                        () -> {
-                            final ExecutionDates datas =
-                                resolverDatasExecucao(ConstantesEntidades.FATURAS_GRAPHQL, dataInicio, dataFim);
-                            return extractFaturasGraphQL(datas.inicio(), datas.fim());
-                        }
-                    );
-                    if (result != null) {
-                        resultados.add(result);
-                    }
-                } catch (final Exception e) {
-                    registrarFalhaEntidade(
-                        resultados,
-                        ConstantesEntidades.FATURAS_GRAPHQL,
-                        "Faturas GraphQL",
-                        e,
-                        dataInicio,
-                        dataFim
-                    );
-                }
-                aplicarDelayEntreEntidades();
-            } else if (executarFaturasGraphql) {
-                // Faturas GraphQL será executado POR ÚLTIMO pelo comando orquestrador
-                log.info("[INFO] Faturas GraphQL sera extraido POR ULTIMO apos todas as outras entidades (FASE 3)");
-            }
-
             // Resumo consolidado final
             exibirResumoConsolidado(resultados, inicioExecucao);
 
@@ -437,17 +383,6 @@ public class GraphQLExtractionService {
     private boolean shouldExecute(final String entidade, final String entityName) {
         return entidade == null || entidade.isBlank() || entityName.equalsIgnoreCase(entidade);
     }
-    
-    private boolean shouldExecute(final String entidade, final String entityName, final String[] aliases) {
-        if (entidade == null || entidade.isBlank()) {
-            return true;
-        }
-        if (entityName.equalsIgnoreCase(entidade)) {
-            return true;
-        }
-        return Arrays.stream(aliases).anyMatch(alias -> alias.equalsIgnoreCase(entidade));
-    }
-    
     
     protected void validarInfraestrutura() {
         ConfigBanco.validarConexaoBancoDados();
@@ -585,21 +520,6 @@ public class GraphQLExtractionService {
         return result;
     }
     
-    protected ExtractionResult extractFaturasGraphQL(final LocalDate dataInicio, final LocalDate dataFim) {
-        final FaturaGraphQLExtractor extractor = new FaturaGraphQLExtractor(
-            apiClient,
-            new FaturaGraphQLRepository(),
-            new FaturaPorClienteRepository(),
-            new FreteRepository(),
-            log
-        );
-        
-        final ExtractionResult result = logger.executeWithLogging(extractor, dataInicio, dataFim, extractor.getEmoji());
-        registrarResultadoExecucao(result);
-        
-        return result;
-    }
-
     /**
      * Exibe resumo consolidado de todas as extrações GraphQL executadas.
      */
@@ -852,8 +772,7 @@ public class GraphQLExtractionService {
         return List.of(
             ConstantesEntidades.USUARIOS_SISTEMA,
             ConstantesEntidades.COLETAS,
-            ConstantesEntidades.FRETES,
-            ConstantesEntidades.FATURAS_GRAPHQL
+            ConstantesEntidades.FRETES
         ).contains(entidade);
     }
 }

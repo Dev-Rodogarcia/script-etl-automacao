@@ -57,6 +57,7 @@ public class LogExtracaoEntity {
     private StatusExtracao statusFinal;
     private Integer registrosExtraidos;
     private Integer paginasProcessadas;
+    private Integer noopCount = 0;
     private String mensagem;
     
     public enum StatusExtracao {
@@ -106,12 +107,19 @@ public class LogExtracaoEntity {
     public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
                            final StatusExtracao statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
                            final String mensagem) {
+        this(entidade, timestampInicio, timestampFim, statusFinal, registrosExtraidos, paginasProcessadas, 0, mensagem);
+    }
+
+    public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
+                           final StatusExtracao statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
+                           final Integer noopCount, final String mensagem) {
         this.entidade = entidade;
         this.timestampInicio = timestampInicio;
         this.timestampFim = timestampFim;
         this.statusFinal = statusFinal;
         this.registrosExtraidos = registrosExtraidos;
         this.paginasProcessadas = paginasProcessadas;
+        this.noopCount = noopCount == null ? 0 : Math.max(0, noopCount);
         this.mensagem = mensagem;
     }
     
@@ -121,12 +129,19 @@ public class LogExtracaoEntity {
     public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
                            final String statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
                            final String mensagem) {
+        this(entidade, timestampInicio, timestampFim, statusFinal, registrosExtraidos, paginasProcessadas, 0, mensagem);
+    }
+
+    public LogExtracaoEntity(final String entidade, final LocalDateTime timestampInicio, final LocalDateTime timestampFim,
+                           final String statusFinal, final Integer registrosExtraidos, final Integer paginasProcessadas,
+                           final Integer noopCount, final String mensagem) {
         this.entidade = entidade;
         this.timestampInicio = timestampInicio;
         this.timestampFim = timestampFim;
         this.statusFinal = StatusExtracao.fromString(statusFinal);
         this.registrosExtraidos = registrosExtraidos;
         this.paginasProcessadas = paginasProcessadas;
+        this.noopCount = noopCount == null ? 0 : Math.max(0, noopCount);
         this.mensagem = mensagem;
     }
     
@@ -186,6 +201,14 @@ public class LogExtracaoEntity {
     public void setPaginasProcessadas(final Integer paginasProcessadas) {
         this.paginasProcessadas = paginasProcessadas;
     }
+
+    public Integer getNoopCount() {
+        return noopCount == null ? 0 : noopCount;
+    }
+
+    public void setNoopCount(final Integer noopCount) {
+        this.noopCount = noopCount == null ? 0 : Math.max(0, noopCount);
+    }
     
     public String getMensagem() {
         return mensagem;
@@ -205,8 +228,8 @@ public class LogExtracaoEntity {
                 ", statusFinal=" + statusFinal +
                 ", registrosExtraidos=" + registrosExtraidos +
                 ", paginasProcessadas=" + paginasProcessadas +
+                ", noopCount=" + getNoopCount() +
                 ", mensagem='" + mensagem + '\'' +
                 '}';
     }
 }
-

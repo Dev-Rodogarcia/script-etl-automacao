@@ -14,7 +14,7 @@ Fontes usadas para montar este documento:
 - Quase todas as tabelas operacionais têm `metadata`, que guarda o **payload bruto completo** da origem.
 - Quase todas as tabelas de extração têm `data_extracao`, que representa **quando o ETL gravou ou atualizou** aquela linha.
 - Nem todo campo lido da API é promovido a coluna física. Quando isso acontece, o dado continua disponível em `metadata`.
-- `faturas_por_cliente.serie_nfse` existe fisicamente, mas costuma ser preenchida na etapa de **enriquecimento por tabela ponte** com `fretes` e `faturas_graphql`.
+- `faturas_por_cliente.serie_nfse` existe fisicamente e pode ser enriquecida a partir dos dados materializados de `fretes`.
 - A fonte canônica para recriação do schema fica em `database/*.sql`, mesmo quando o Java também mantém DDL defensivo de fallback.
 - Divergências mapeadas nesta conferência estão resumidas em `database/DIVERGENCIAS_CODIGO_SCHEMA.md`.
 
@@ -69,7 +69,6 @@ ORDER BY data_extracao DESC;
 | `dbo.faturas_por_cliente` | Negócio | Data Export + enriquecimento | 1 linha por vínculo de faturamento | `unique_id` |
 | `dbo.inventario` | Negócio | Data Export | 1 linha por ordem/minuta consolidada por chave técnica | `identificador_unico` |
 | `dbo.sinistros` | Negócio | Data Export | 1 linha por sinistro + NF consolidada por chave técnica | `identificador_unico` |
-| `dbo.faturas_graphql` | Negócio | GraphQL `creditCustomerBilling` | 1 linha por billing | `id` |
 | `dbo.raster_viagens` | Negócio | Raster `getEventoFimViagem` | 1 linha por viagem/SM | `cod_solicitacao` |
 | `dbo.raster_viagem_paradas` | Negócio | Raster `getEventoFimViagem.ColetasEntregas` | 1 linha por parada da viagem | `cod_solicitacao`, `ordem` |
 | `dbo.dim_usuarios` | Referência | GraphQL `individual` | 1 linha por usuário | `user_id` |
@@ -94,10 +93,8 @@ ORDER BY data_extracao DESC;
 
 - `dbo.manifestos.pick_sequence_code = dbo.coletas.sequence_code`
   - relação já endurecida no schema por FK seletiva `FK_manifestos_pick_sequence_code_coletas` quando não há órfãos
-- `dbo.fretes.accounting_credit_id = dbo.faturas_graphql.id`
 - `dbo.inventario.numero_minuta = dbo.fretes.corporation_sequence_number`
 - `dbo.sinistros.corporation_sequence_number = dbo.fretes.corporation_sequence_number`
-- `dbo.faturas_graphql.document = dbo.faturas_por_cliente.fit_ant_document`
 - `dbo.fretes.nfse_number` e `dbo.fretes.nfse_series` alimentam `dbo.faturas_por_cliente.numero_nfse` e `dbo.faturas_por_cliente.serie_nfse`
 - `dbo.coletas.cancellation_user_id` e `dbo.coletas.destroy_user_id` podem ser ligados a `dbo.dim_usuarios.user_id`
 - `dbo.raster_viagem_paradas.cod_solicitacao = dbo.raster_viagens.cod_solicitacao`
@@ -549,7 +546,7 @@ ORDER BY data_extracao DESC;
 - Chaves: PK `unique_id`
 - Observações importantes:
   - `unique_id` é um identificador canônico calculado pela aplicação, normalmente baseado em hash.
-  - `numero_nfse` e `serie_nfse` podem ser enriquecidos depois cruzando `faturas_graphql` e `fretes`.
+  - `numero_nfse` e `serie_nfse` podem ser enriquecidos depois cruzando os dados materializados de `fretes`.
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
@@ -569,7 +566,7 @@ ORDER BY data_extracao DESC;
 | `data_vencimento_fatura` | `DATE` | Data de vencimento da fatura. |
 | `data_baixa_fatura` | `DATE` | Data de baixa/liquidação da fatura. |
 | `fit_ant_ils_original_due_date` | `DATE` | Vencimento original legado da fatura. |
-| `fit_ant_document` | `NVARCHAR(50)` | Documento legado da fatura, usado como ponte para `faturas_graphql.document`. |
+| `fit_ant_document` | `NVARCHAR(50)` | Documento legado da fatura. |
 | `fit_ant_issue_date` | `DATE` | Data de emissão legada da fatura. |
 | `fit_ant_value` | `DECIMAL(18,2)` | Valor legado da fatura. |
 | `filial` | `NVARCHAR(255)` | Filial do faturamento. |
@@ -587,45 +584,6 @@ ORDER BY data_extracao DESC;
 | `notas_fiscais` | `NVARCHAR(MAX)` | Lista textual de notas fiscais. |
 | `pedidos_cliente` | `NVARCHAR(MAX)` | Lista textual de pedidos do cliente. |
 | `metadata` | `NVARCHAR(MAX)` | JSON bruto do relatório de faturamento. |
-| `data_extracao` | `DATETIME2` | Momento da gravação/atualização no banco. |
-
-### `dbo.faturas_graphql`
-
-- Fonte: GraphQL `creditCustomerBilling`
-- Grão: 1 linha por billing
-- Chaves: PK `id`
-- Observação importante: `status`, `original_due_date`, `nfse_numero`, `carteira_banco`, `instrucao_boleto`, `banco_nome` e `metodo_pagamento` são lidos da **primeira parcela** (`installments[0]`) quando existe.
-
-| Coluna | Tipo | Descrição |
-| --- | --- | --- |
-| `id` | `BIGINT` | ID técnico do billing. |
-| `document` | `NVARCHAR(50)` | Documento/número principal da cobrança. |
-| `issue_date` | `DATE` | Data de emissão. |
-| `due_date` | `DATE` | Data de vencimento atual. |
-| `original_due_date` | `DATE` | Vencimento original da primeira parcela. |
-| `value` | `DECIMAL(18,2)` | Valor nominal do billing. |
-| `paid_value` | `DECIMAL(18,2)` | Valor pago. |
-| `value_to_pay` | `DECIMAL(18,2)` | Valor ainda a pagar. |
-| `discount_value` | `DECIMAL(18,2)` | Valor de desconto. |
-| `interest_value` | `DECIMAL(18,2)` | Valor de juros. |
-| `paid` | `BIT` | Flag de pagamento. |
-| `status` | `NVARCHAR(50)` | Status da primeira parcela. |
-| `type` | `NVARCHAR(50)` | Tipo do billing. |
-| `comments` | `NVARCHAR(MAX)` | Comentários livres da cobrança. |
-| `sequence_code` | `INT` | Código sequencial da cobrança. |
-| `competence_month` | `INT` | Mês de competência. |
-| `competence_year` | `INT` | Ano de competência. |
-| `created_at` | `DATETIMEOFFSET` | Data/hora de criação. |
-| `updated_at` | `DATETIMEOFFSET` | Data/hora de atualização. |
-| `corporation_id` | `BIGINT` | ID da corporação. |
-| `corporation_name` | `NVARCHAR(255)` | Nome/apelido da corporação. |
-| `corporation_cnpj` | `NVARCHAR(50)` | CNPJ da corporação. |
-| `nfse_numero` | `VARCHAR(50)` | Documento da NFS-e da primeira parcela (`accountingCredit.document`). |
-| `carteira_banco` | `VARCHAR(50)` | Carteira/variação da conta bancária. |
-| `instrucao_boleto` | `NVARCHAR(MAX)` | Instrução customizada de boleto. |
-| `banco_nome` | `VARCHAR(100)` | Nome do banco da cobrança. |
-| `metodo_pagamento` | `VARCHAR(50)` | Método de pagamento da primeira parcela. |
-| `metadata` | `NVARCHAR(MAX)` | JSON bruto do billing GraphQL. |
 | `data_extracao` | `DATETIME2` | Momento da gravação/atualização no banco. |
 
 ### `dbo.raster_viagens`
@@ -734,6 +692,7 @@ ORDER BY data_extracao DESC;
 | `status_final` | `NVARCHAR(20)` | Status final resumido da extração. |
 | `registros_extraidos` | `INT` | Quantidade de registros extraídos. |
 | `paginas_processadas` | `INT` | Quantidade de páginas processadas. |
+| `noop_count` | `INT` | Quantidade de merges sem alteração efetiva. |
 | `mensagem` | `NVARCHAR(MAX)` | Mensagem textual complementar. |
 
 ### `dbo.page_audit`
