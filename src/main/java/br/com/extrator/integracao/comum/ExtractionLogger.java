@@ -215,7 +215,7 @@ public class ExtractionLogger {
                     final Duration duracaoSalvamento = Duration.between(inicioSalvamento, fimSalvamento);
                     final boolean isDataExportExtractor = extractor instanceof DataExportEntityExtractor;
 
-                    if (totalRecebidoApi != totalUnicos) {
+                    if (totalRecebidoApi > totalUnicos) {
                         final int duplicadosRemovidos = totalRecebidoApi - totalUnicos;
                         final double percentualDuplicados = (duplicadosRemovidos * 100.0) / Math.max(1, totalRecebidoApi);
                         log.warn("   Duplicados removidos: {} ({}% do total)",
@@ -259,6 +259,11 @@ public class ExtractionLogger {
             final LocalDateTime fim = RelogioSistema.agora();
             final Duration duracaoTotal = Duration.between(inicio, fim);
             final int totalRecebido = totalRecebidoApi;
+            totalUnicos = ajustarTotalUnicosAposSalvamento(
+                totalUnicos,
+                registrosSalvos,
+                extractor instanceof DataExportEntityExtractor
+            );
             final int deltaIgnorados = Math.max(0, totalUnicos - registrosSalvos);
             final boolean salvamentoConsistente = registrosSalvos == totalUnicos;
             final boolean invalidosDentroTolerancia =
@@ -512,6 +517,15 @@ public class ExtractionLogger {
         sb.append(" | invalid_count=").append(registrosInvalidos);
         
         return sb.toString();
+    }
+
+    private int ajustarTotalUnicosAposSalvamento(final int totalUnicos,
+                                                 final int registrosSalvos,
+                                                 final boolean dataExportExtractor) {
+        if (dataExportExtractor || registrosSalvos <= totalUnicos) {
+            return totalUnicos;
+        }
+        return registrosSalvos;
     }
 
     private String determinarStatusFinal(final ResultadoExtracao<?> resultado,

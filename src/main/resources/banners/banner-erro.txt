@@ -1,7 +1,7 @@
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║                      ❌ ERRO NA EXTRAÇÃO                                  ║
+║                       ❌ ERRO NA EXTRAÇÃO                                 ║
 ║                                                                           ║
 ║              💡 "Erros são apenas features não documentadas"              ║
 ║              @valentelucass • lucasmac.dev@gmail.com                      ║

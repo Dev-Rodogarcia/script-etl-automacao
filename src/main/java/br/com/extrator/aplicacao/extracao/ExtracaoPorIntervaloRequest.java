@@ -61,7 +61,7 @@ public record ExtracaoPorIntervaloRequest(
             entidadeEspecifica,
             modoLoopDaemon,
             modoRapido24h,
-            ModoExecucao.padrao(modoLoopDaemon)
+            ModoExecucao.padrao(modoLoopDaemon, modoRapido24h)
         );
     }
 
@@ -70,7 +70,7 @@ public record ExtracaoPorIntervaloRequest(
         Objects.requireNonNull(dataFim, "dataFim nao pode ser null");
         apiEspecifica = normalizar(apiEspecifica);
         entidadeEspecifica = normalizar(entidadeEspecifica);
-        modoExecucao = modoExecucao == null ? ModoExecucao.padrao(modoLoopDaemon) : modoExecucao;
+        modoExecucao = modoExecucao == null ? ModoExecucao.padrao(modoLoopDaemon, modoRapido24h) : modoExecucao;
     }
 
     private static String normalizar(final String valor) {
@@ -93,8 +93,8 @@ public record ExtracaoPorIntervaloRequest(
             this.modoLookbackFretes = modoLookbackFretes;
         }
 
-        static ModoExecucao padrao(final boolean modoLoopDaemon) {
-            return modoLoopDaemon ? MICRO_BATCH : INTERVALO;
+        static ModoExecucao padrao(final boolean modoLoopDaemon, final boolean modoRapido24h) {
+            return modoLoopDaemon || modoRapido24h ? MICRO_BATCH : INTERVALO;
         }
 
         public String modoLookbackFretes() {

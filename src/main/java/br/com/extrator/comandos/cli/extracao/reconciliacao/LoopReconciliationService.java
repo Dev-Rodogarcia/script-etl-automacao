@@ -317,6 +317,7 @@ public final class LoopReconciliationService {
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.FATURAS_POR_CLIENTE));
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.INVENTARIO));
         escopos.add(alvoDiario(API_DATAEXPORT, ConstantesEntidades.SINISTROS));
+        escopos.add(alvoDiario(ConstantesEntidades.RASTER, ConstantesEntidades.RASTER_VIAGENS));
         return List.copyOf(escopos);
     }
 
