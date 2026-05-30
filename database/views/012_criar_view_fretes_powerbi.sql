@@ -100,6 +100,7 @@ SELECT
     f.filial_nome AS [Filial],
     f.filial_nome AS [Filial Emissora],
     indicador_base.filial_responsavel_destino AS [Responsável pela Região de Destino],
+    indicador_base.filial_responsavel_destino_key AS [Responsável Região Destino Key],
     f.filial_apelido AS [Filial Apelido],
     f.filial_cnpj AS [Filial CNPJ],
     f.tabela_preco_nome AS [Tabela de Preço],
@@ -245,7 +246,8 @@ OUTER APPLY (
     SELECT
         COALESCE(CAST(f.data_previsao_entrega AS DATE), CAST(lc.predicted_delivery_at AS DATE)) AS previsao_entrega_oficial,
         COALESCE(f.fit_dpn_performance_finished_at, f.finished_at) AS finalizacao_performance_oficial,
-        COALESCE(NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), ''), f.filial_nome) AS filial_responsavel_destino
+        COALESCE(NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), ''), f.filial_nome) AS filial_responsavel_destino,
+        COALESCE(lc.destination_branch_key, f.filial_nome_key, N'sem_responsavel') AS filial_responsavel_destino_key
 ) AS indicador_base
 OUTER APPLY (
     SELECT

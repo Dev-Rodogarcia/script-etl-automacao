@@ -26,6 +26,7 @@ SELECT
     branch_nickname                                 AS [Unidade_Origem],    -- Nova
     requester_name                                  AS [Solicitante],
     user_name                                       AS [Usuário],
+    user_name_key                                   AS [Usuario Key],
     user_name                                       AS [Setor_Usuario],     -- Nova (Placeholder)
     company_name                                    AS [Empresa],
 

@@ -12,6 +12,14 @@ Você atua como Engenheiro de Software Principal neste repositório (Java 17 CLI
 
 ---
 
+## 🗄️ Topologia de Bancos de Dados e Fronteiras Arquiteturais
+
+* **`ETL_SISTEMA` (`esl_cloud`):** Trate este banco como domínio exclusivo do pipeline de extração e como fonte de verdade analítica. Este repositório é o único local autorizado para aplicar DDL/DML estrutural neste banco. Crie colunas computadas, chaves, índices, tabelas base, views operacionais (`dbo.vw_*_powerbi`) e views analíticas exclusivamente via `database/migrations` e mantenha os scripts base sincronizados. O backend do Dashboard deve consumir este banco estritamente em modo **READ-ONLY** (`SELECT`).
+* **`DASHBOARDS`:** Trate este banco como produção exclusiva da aplicação web. Ele armazena somente estado interno do portal: ACL (papéis, permissões, usuários e setores), sessões, configurações e auditoria administrativa. Não aplique DDL/DML deste repositório no banco `DASHBOARDS`. A única fonte de verdade estrutural dele é o **Flyway** do monorepo Dashboard em `backend/src/main/resources/db/migration`. O Hibernate do portal deve operar com `ddl-auto=none`; DDL em runtime pelo Java é terminantemente proibido.
+* **`DASHBOARDS_DEV`:** Trate este banco como sandbox de desenvolvimento local do portal, usado pelo profile `dev` e por `.env.development.local`. Ele existe para evitar acidentes e poluição de dados na produção. Preserve o contrato do validador `DevDatabaseIsolationValidator`, que executa *fast-fail* e aborta o startup do backend do Dashboard quando o ambiente de desenvolvimento tenta conectar a JDBC principal ao banco `DASHBOARDS` de produção.
+
+---
+
 ## 🧠 Diretrizes de Performance e Dados (Data Quality)
 
 * **Materialização Obrigatória:** Regras de BI complexas, filtros de elegibilidade pesados ou cruzamentos textuais não devem ser processados sob demanda dentro das views de apresentação. Realize o processamento textual pesado e as validações durante a carga (Load) no Java e salve o resultado em colunas físicas (ex: `BIT`, `TINYINT`) indexadas nas tabelas base.

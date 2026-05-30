@@ -90,7 +90,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'021_materializar_comprovante_inventario'),
     (N'022_corrigir_volumes_fretes_faturamento'),
     (N'023_adicionar_noop_count_log_extracoes'),
-    (N'024_drop_faturas_graphql');
+    (N'024_drop_faturas_graphql'),
+    (N'025_materializar_chave_responsavel_destino'),
+    (N'026_materializar_chave_usuario_cotacoes');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -128,6 +130,12 @@ IF COL_LENGTH(N'dbo.fretes', N'data_referencia_faturamento') IS NULL
 IF COL_LENGTH(N'dbo.fretes', N'is_elegivel_faturamento') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.is_elegivel_faturamento', N'Coluna da migration 016 ausente');
 
+IF COL_LENGTH(N'dbo.fretes', N'filial_nome_key') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.filial_nome_key', N'Chave materializada de filial/responsavel fallback ausente');
+
+IF COL_LENGTH(N'dbo.cotacoes', N'user_name_key') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.cotacoes.user_name_key', N'Chave materializada de usuario emissor de cotacao ausente');
+
 IF COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.inventario.flag_comprovante_anexado', N'Flag materializada de comprovante anexado ausente');
 
@@ -142,6 +150,9 @@ IF COL_LENGTH(N'dbo.localizacao_cargas', N'status_normalized') IS NULL
 
 IF COL_LENGTH(N'dbo.localizacao_cargas', N'taxed_weight_decimal') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.taxed_weight_decimal', N'Coluna da migration 017 ausente');
+
+IF COL_LENGTH(N'dbo.localizacao_cargas', N'destination_branch_key') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.destination_branch_key', N'Chave materializada de responsavel destino ausente');
 
 IF NOT EXISTS (
     SELECT 1
@@ -162,10 +173,81 @@ IF NOT EXISTS (
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
+    WHERE name = N'IX_fretes_faturamento_responsavel_key'
+      AND object_id = OBJECT_ID(N'dbo.fretes')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fretes_faturamento_responsavel_key', N'Indice da migration 025 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fretes_performance_previsao_key'
+      AND object_id = OBJECT_ID(N'dbo.fretes')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fretes_performance_previsao_key', N'Indice da migration 025 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
     WHERE name = N'IX_localizacao_tracking_dashboard'
       AND object_id = OBJECT_ID(N'dbo.localizacao_cargas')
 )
     INSERT INTO @falhas VALUES (N'INDICE', N'IX_localizacao_tracking_dashboard', N'Indice da migration 017 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_localizacao_destination_branch_key'
+      AND object_id = OBJECT_ID(N'dbo.localizacao_cargas')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_localizacao_destination_branch_key', N'Indice da migration 025 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_cotacoes_requested_at_usuario_key'
+      AND object_id = OBJECT_ID(N'dbo.cotacoes')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_cotacoes_requested_at_usuario_key', N'Indice da migration 026 ausente');
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_cotacoes_usuario_key_requested_at'
+      AND object_id = OBJECT_ID(N'dbo.cotacoes')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_cotacoes_usuario_key_requested_at', N'Indice legado com usuario como chave lider deve ser removido');
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.indexes i
+    WHERE i.name = N'IX_cotacoes_requested_at_usuario_key'
+      AND i.object_id = OBJECT_ID(N'dbo.cotacoes')
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes i
+    INNER JOIN sys.index_columns ic1
+        ON ic1.object_id = i.object_id
+       AND ic1.index_id = i.index_id
+       AND ic1.key_ordinal = 1
+    INNER JOIN sys.columns c1
+        ON c1.object_id = ic1.object_id
+       AND c1.column_id = ic1.column_id
+    INNER JOIN sys.index_columns ic2
+        ON ic2.object_id = i.object_id
+       AND ic2.index_id = i.index_id
+       AND ic2.key_ordinal = 2
+    INNER JOIN sys.columns c2
+        ON c2.object_id = ic2.object_id
+       AND c2.column_id = ic2.column_id
+    WHERE i.name = N'IX_cotacoes_requested_at_usuario_key'
+      AND i.object_id = OBJECT_ID(N'dbo.cotacoes')
+      AND c1.name = N'requested_at'
+      AND ic1.is_descending_key = 1
+      AND c2.name = N'user_name_key'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_cotacoes_requested_at_usuario_key', N'Ordem esperada: requested_at DESC como chave lider e user_name_key como segunda chave');
 
 IF NOT EXISTS (
     SELECT 1
@@ -191,6 +273,22 @@ IF NOT EXISTS (
       AND name = N'Volumes'
 )
     INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Volumes]', N'Coluna do KPI Volumes ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
+      AND name = N'Responsável Região Destino Key'
+)
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Responsável Região Destino Key]', N'Chave controlada para filtro de responsavel ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_cotacoes_powerbi')
+      AND name = N'Usuario Key'
+)
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_cotacoes_powerbi.[Usuario Key]', N'Chave controlada para filtro de usuario emissor ausente');
 
 IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_fretes_powerbi')) NOT LIKE N'%lc.invoices_volumes%'
     INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_fretes_powerbi.[Volumes]', N'Volumes deve usar localizacao_cargas.invoices_volumes como fonte oficial');

@@ -24,6 +24,7 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "[Nº Minuta]");
         assertContem(sql, "[Filial Emissora]");
         assertContem(sql, "[Responsável pela Região de Destino]");
+        assertContem(sql, "[Responsável Região Destino Key]");
         assertContem(sql, "[Data de Finalização]");
         assertContem(sql, "[Finalização da Performance]");
         assertContem(sql, "[Performance Diferença de Dias]");
@@ -160,12 +161,53 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "migrations\\020_adicionar_tipo_motorista_manifestos.sql");
         assertContem(sql, "migrations\\021_materializar_comprovante_inventario.sql");
         assertContem(sql, "migrations\\022_corrigir_volumes_fretes_faturamento.sql");
+        assertContem(sql, "migrations\\025_materializar_chave_responsavel_destino.sql");
+        assertContem(sql, "migrations\\026_materializar_chave_usuario_cotacoes.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
         assertContem(validacao, "019_adicionar_comprovante_fretes_performance");
         assertContem(validacao, "021_materializar_comprovante_inventario");
         assertContem(validacao, "022_corrigir_volumes_fretes_faturamento");
+        assertContem(validacao, "025_materializar_chave_responsavel_destino");
+        assertContem(validacao, "026_materializar_chave_usuario_cotacoes");
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Comprovante Anexado]");
+        assertContem(validacao, "dbo.vw_fretes_powerbi.[Responsável Região Destino Key]");
+        assertContem(validacao, "dbo.vw_cotacoes_powerbi.[Usuario Key]");
         assertContem(validacao, "lc.invoices_volumes");
+    }
+
+    @Test
+    void migrationResponsavelDestinoDeveMaterializarChaveEIndices() throws IOException {
+        final String migrationSql = lerSql("database/migrations/025_materializar_chave_responsavel_destino.sql");
+        final String tabelaFretesSql = lerSql("database/tabelas/002_criar_tabela_fretes.sql");
+        final String tabelaLocalizacaoSql = lerSql("database/tabelas/005_criar_tabela_localizacao_cargas.sql");
+        final String indicesSql = lerSql("database/indices/001_criar_indices_performance.sql");
+
+        assertContem(tabelaFretesSql, "filial_nome_key AS NULLIF(LOWER(LTRIM(RTRIM(filial_nome))), N'') PERSISTED");
+        assertContem(tabelaLocalizacaoSql, "destination_branch_key AS NULLIF(LOWER(LTRIM(RTRIM(destination_branch_nickname))), N'') PERSISTED");
+        assertContem(migrationSql, "IX_fretes_faturamento_responsavel_key");
+        assertContem(migrationSql, "IX_localizacao_destination_branch_key");
+        assertContem(migrationSql, "views\\012_criar_view_fretes_powerbi.sql");
+        assertContem(indicesSql, "IX_fretes_faturamento_responsavel_key");
+        assertContem(indicesSql, "IX_localizacao_destination_branch_key");
+        assertSemMojibake(migrationSql, "database/migrations/025_materializar_chave_responsavel_destino.sql");
+    }
+
+    @Test
+    void cotacoesPowerBiDeveMaterializarChaveUsuarioEmissor() throws IOException {
+        final String viewSql = lerSql("database/views/015_criar_view_cotacoes_powerbi.sql");
+        final String tabelaSql = lerSql("database/tabelas/004_criar_tabela_cotacoes.sql");
+        final String migrationSql = lerSql("database/migrations/026_materializar_chave_usuario_cotacoes.sql");
+        final String indicesSql = lerSql("database/indices/001_criar_indices_performance.sql");
+
+        assertContem(viewSql, "user_name                                       AS [Usuário]");
+        assertContem(viewSql, "user_name_key                                   AS [Usuario Key]");
+        assertContem(tabelaSql, "user_name_key AS NULLIF(LOWER(LTRIM(RTRIM(user_name))), N'') PERSISTED");
+        assertContem(migrationSql, "ADD user_name_key AS NULLIF(LOWER(LTRIM(RTRIM(user_name))), N'') PERSISTED");
+        assertContem(migrationSql, "IX_cotacoes_usuario_key_requested_at");
+        assertContem(migrationSql, "views\\015_criar_view_cotacoes_powerbi.sql");
+        assertContem(indicesSql, "IX_cotacoes_usuario_key_requested_at");
+        assertSemMojibake(viewSql, "database/views/015_criar_view_cotacoes_powerbi.sql");
+        assertSemMojibake(migrationSql, "database/migrations/026_materializar_chave_usuario_cotacoes.sql");
     }
 
     @Test

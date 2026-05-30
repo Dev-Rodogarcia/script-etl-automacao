@@ -24,6 +24,7 @@ BEGIN
         invoices_value DECIMAL(18, 2),
         total_value DECIMAL(18, 2),
         user_name NVARCHAR(255),
+        user_name_key AS NULLIF(LOWER(LTRIM(RTRIM(user_name))), N'') PERSISTED,
         branch_nickname NVARCHAR(255),
         company_name NVARCHAR(255),
         requester_name NVARCHAR(255),

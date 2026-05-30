@@ -10,6 +10,15 @@
 
 PRINT 'Iniciando criacao de indices de performance...';
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET NUMERIC_ROUNDABORT OFF;
+GO
+
 -- ============================================================================
 -- MANIFESTOS - Indices para otimizar queries de auditoria e busca
 -- ============================================================================
@@ -81,6 +90,26 @@ BEGIN
 END
 ELSE
     PRINT '    Indice IX_cotacoes_requested_at ja existe';
+
+-- Indice para filtro sargavel por periodo e usuario emissor de cotacao
+-- O dashboard sempre reduz a maior volumetria por requested_at; usuario e filtro opcional.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_cotacoes_usuario_key_requested_at' AND object_id = OBJECT_ID('dbo.cotacoes'))
+BEGIN
+    DROP INDEX IX_cotacoes_usuario_key_requested_at ON dbo.cotacoes;
+    PRINT '  Indice legado IX_cotacoes_usuario_key_requested_at removido';
+END
+
+IF COL_LENGTH('dbo.cotacoes', 'user_name_key') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_cotacoes_requested_at_usuario_key' AND object_id = OBJECT_ID('dbo.cotacoes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_cotacoes_requested_at_usuario_key
+    ON dbo.cotacoes(requested_at DESC, user_name_key)
+    INCLUDE (sequence_code, user_name, customer_name, branch_nickname, total_value, taxed_weight, cte_issued_at, nfse_issued_at);
+
+    PRINT '  Indice IX_cotacoes_requested_at_usuario_key criado';
+END
+ELSE
+    PRINT '    Indice IX_cotacoes_requested_at_usuario_key ja existe ou coluna user_name_key ausente';
 
 -- ============================================================================
 -- CONTAS A PAGAR - Indices para otimizar queries
@@ -207,6 +236,32 @@ END
 ELSE
     PRINT '    Indice IX_fretes_faturamento_data_elegivel ja existe';
 
+-- Indice para filtros de faturamento por responsavel materializado
+IF COL_LENGTH('dbo.fretes', 'filial_nome_key') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_fretes_faturamento_responsavel_key' AND object_id = OBJECT_ID('dbo.fretes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_faturamento_responsavel_key
+    ON dbo.fretes(data_referencia_faturamento DESC, filial_nome_key, is_elegivel_faturamento)
+    INCLUDE (id, corporation_sequence_number, valor_total, subtotal, status, filial_nome, pagador_nome, classificacao_nome);
+
+    PRINT '  Indice IX_fretes_faturamento_responsavel_key criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_faturamento_responsavel_key ja existe ou coluna filial_nome_key ausente';
+
+-- Indice para filtros de performance por previsao e responsavel fallback
+IF COL_LENGTH('dbo.fretes', 'filial_nome_key') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_fretes_performance_previsao_key' AND object_id = OBJECT_ID('dbo.fretes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_performance_previsao_key
+    ON dbo.fretes(data_previsao_entrega, filial_nome_key)
+    INCLUDE (id, corporation_sequence_number, finished_at, fit_dpn_performance_finished_at, status, valor_notas, taxed_weight, filial_nome, data_extracao);
+
+    PRINT '  Indice IX_fretes_performance_previsao_key criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_performance_previsao_key ja existe ou coluna filial_nome_key ausente';
+
 -- ============================================================================
 -- LOCALIZACAO DE CARGAS - Indices para otimizar queries
 -- ============================================================================
@@ -248,6 +303,19 @@ BEGIN
 END
 ELSE
     PRINT '    Indice IX_localizacao_tracking_dashboard ja existe';
+
+-- Indice para resolver responsavel de destino por chave materializada
+IF COL_LENGTH('dbo.localizacao_cargas', 'destination_branch_key') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_localizacao_destination_branch_key' AND object_id = OBJECT_ID('dbo.localizacao_cargas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_localizacao_destination_branch_key
+    ON dbo.localizacao_cargas(destination_branch_key, sequence_number)
+    INCLUDE (destination_branch_nickname, destination_location_name, predicted_delivery_at, invoices_volumes, data_extracao);
+
+    PRINT '  Indice IX_localizacao_destination_branch_key criado';
+END
+ELSE
+    PRINT '    Indice IX_localizacao_destination_branch_key ja existe ou coluna destination_branch_key ausente';
 
 -- Indice para reduzir I/O do MERGE por hash operacional
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_localizacao_hash_upsert' AND object_id = OBJECT_ID('dbo.localizacao_cargas'))

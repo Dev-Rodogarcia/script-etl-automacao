@@ -41,6 +41,7 @@ BEGIN
         destino_cidade NVARCHAR(255),
         destino_uf NVARCHAR(10),
         filial_nome NVARCHAR(255),
+        filial_nome_key AS NULLIF(LOWER(LTRIM(RTRIM(filial_nome))), N'') PERSISTED,
         filial_apelido NVARCHAR(255),
         numero_nota_fiscal NVARCHAR(MAX),
         tabela_preco_nome NVARCHAR(255),

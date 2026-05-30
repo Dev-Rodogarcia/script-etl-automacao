@@ -23,6 +23,7 @@ BEGIN
         predicted_delivery_at DATETIMEOFFSET, -- Previsão Entrega/Previsão de entrega
         destination_location_name NVARCHAR(255), -- Região Destino
         destination_branch_nickname NVARCHAR(255), -- Filial Destino
+        destination_branch_key AS NULLIF(LOWER(LTRIM(RTRIM(destination_branch_nickname))), N'') PERSISTED,
         classification NVARCHAR(255), -- Classificação
         status NVARCHAR(50), -- Status Carga
         status_normalized NVARCHAR(50), -- Status normalizado para regras de painel
