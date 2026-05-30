@@ -41,6 +41,7 @@ class CommandRegistryTest {
         final Map<String, Comando> comandos = CommandRegistry.criarMapaComandos();
         assertTrue(comandos.containsKey("--fluxo-completo"));
         assertTrue(comandos.containsKey("--recovery"));
+        assertTrue(comandos.containsKey("--expurgo-orfaos"));
         assertTrue(comandos.containsKey("--loop-daemon-run"));
         assertTrue(comandos.containsKey("--auth-check"));
         assertTrue(comandos.containsKey("--sincronizar-usuarios"));

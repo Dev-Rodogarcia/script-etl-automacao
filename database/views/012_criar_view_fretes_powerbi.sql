@@ -150,6 +150,7 @@ SELECT
             FROM dbo.inventario AS inv
             WHERE inv.numero_minuta = f.corporation_sequence_number
               AND inv.flag_comprovante_anexado = 1
+              AND COALESCE(inv.excluido_na_origem, 0) = 0
         )
             THEN N'Sim'
         ELSE N'Não'
@@ -242,6 +243,7 @@ SELECT
 FROM dbo.fretes AS f
 LEFT JOIN dbo.localizacao_cargas AS lc
     ON lc.sequence_number = f.corporation_sequence_number
+   AND COALESCE(lc.excluido_na_origem, 0) = 0
 OUTER APPLY (
     SELECT
         COALESCE(CAST(f.data_previsao_entrega AS DATE), CAST(lc.predicted_delivery_at AS DATE)) AS previsao_entrega_oficial,
@@ -260,7 +262,8 @@ OUTER APPLY (
                 CAST(indicador_base.finalizacao_performance_oficial AS DATE)
             )
         END AS performance_diferenca_dias
-) AS indicador_perf;
+) AS indicador_perf
+WHERE COALESCE(f.excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_fretes_powerbi criada/atualizada com sucesso!';

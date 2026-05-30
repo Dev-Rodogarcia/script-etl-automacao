@@ -12,7 +12,7 @@ Conecta com:
 Fluxo geral:
 1) Interpreta parametros e escopo de extracao.
 2) Dispara runners/extratores conforme alvo.
-3) Consolida status final e tratamento de falhas.
+3) Aguarda conclusao observavel de cada reconciliacao antes de consolidar status.
 
 Estrutura interna:
 Metodos principais:
@@ -54,6 +54,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -87,7 +90,7 @@ public final class LoopReconciliationService {
 
     @FunctionalInterface
     public interface ReconciliationExecutor {
-        void execute(LocalDate data, String api, String entidade) throws Exception;
+        CompletionStage<Void> execute(LocalDate data, String api, String entidade);
     }
 
     private final LoopReconciliationStateStore stateStore;
@@ -175,7 +178,7 @@ public final class LoopReconciliationService {
                     target.api() == null ? "all" : target.api(),
                     target.entidade() == null ? "all" : target.entidade()
                 );
-                executor.execute(target.data(), target.api(), target.entidade());
+                aguardarConclusao(executor.execute(target.data(), target.api(), target.entidade()));
                 estado.pendingTargets.remove(target);
                 estado.lastSuccessfulReconciliationDate = maiorData(estado.lastSuccessfulReconciliationDate, target.data());
                 executadas++;
@@ -210,6 +213,31 @@ public final class LoopReconciliationService {
             agendouDiaria,
             adicionouPorFalha
         );
+    }
+
+    private void aguardarConclusao(final CompletionStage<Void> execucao) throws Exception {
+        if (execucao == null) {
+            throw new IllegalStateException("Executor de reconciliacao retornou CompletionStage null");
+        }
+        try {
+            execucao.toCompletableFuture().join();
+        } catch (final CompletionException | CancellationException e) {
+            throw descompactarFalhaAssincrona(e);
+        }
+    }
+
+    private Exception descompactarFalhaAssincrona(final RuntimeException erro) {
+        final Throwable causa = erro.getCause();
+        if (causa instanceof Error error) {
+            throw error;
+        }
+        if (causa instanceof Exception exception) {
+            return exception;
+        }
+        if (causa == null) {
+            return erro;
+        }
+        return new RuntimeException("Falha nao tratada na reconciliacao assincrona", causa);
     }
 
     private boolean agendarPendenciasPorFalha(final ReconciliationState estado,

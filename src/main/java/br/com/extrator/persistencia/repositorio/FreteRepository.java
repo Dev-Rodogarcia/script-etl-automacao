@@ -81,7 +81,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         "fiscal_cfop_code", "fiscal_tax_value", "fiscal_pis_value", "fiscal_cofins_value", "filial_apelido",
         "cte_id", "cte_emission_type", "cte_created_at", "fiscal_calculation_basis", "fiscal_tax_rate",
         "fiscal_pis_rate", "fiscal_cofins_rate", "fiscal_has_difal", "fiscal_difal_origin",
-        "fiscal_difal_destination", "metadata", "data_extracao"
+        "fiscal_difal_destination", "metadata", "data_extracao", "excluido_na_origem"
     );
     private static final List<String> COLUNAS_ATUALIZAVEIS = List.copyOf(COLUNAS_MERGE.subList(1, COLUNAS_MERGE.size()));
     private static final String DATA_REFERENCIA_FATURAMENTO_SQL = "COALESCE(source.cte_issued_at, source.servico_em)";
@@ -613,7 +613,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
-                ?, ?
+                ?, ?, CAST(0 AS bit)
             ))
                 AS source (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
                            finished_at, fit_dpn_performance_finished_at, corporation_sequence_number,
@@ -627,9 +627,9 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                            fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
                            filial_apelido, cte_id, cte_emission_type, cte_created_at,
                            fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
-                           metadata, data_extracao)
+                           metadata, data_extracao, excluido_na_origem)
             ON target.id = source.id
-            WHEN MATCHED AND %s THEN
+            WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
                     servico_em = source.servico_em,
                     criado_em = source.criado_em,
@@ -726,7 +726,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     fiscal_difal_origin = source.fiscal_difal_origin,
                     fiscal_difal_destination = source.fiscal_difal_destination,
                     metadata = source.metadata,
-                    data_extracao = source.data_extracao
+                    data_extracao = source.data_extracao,
+                    excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
                         finished_at, fit_dpn_performance_finished_at, corporation_sequence_number,
@@ -740,7 +741,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
                         filial_apelido, cte_id, cte_emission_type, cte_created_at,
                         fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
-                        metadata, data_extracao)
+                        metadata, data_extracao, excluido_na_origem)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.cortesia, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega, source.service_date,
                         source.finished_at, source.fit_dpn_performance_finished_at, source.corporation_sequence_number,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
@@ -753,7 +754,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         source.fiscal_cst_type, source.fiscal_cfop_code, source.fiscal_tax_value, source.fiscal_pis_value, source.fiscal_cofins_value,
                         source.filial_apelido, source.cte_id, source.cte_emission_type, source.cte_created_at,
                         source.fiscal_calculation_basis, source.fiscal_tax_rate, source.fiscal_pis_rate, source.fiscal_cofins_rate, source.fiscal_has_difal, source.fiscal_difal_origin, source.fiscal_difal_destination,
-                        source.metadata, source.data_extracao);
+                        source.metadata, source.data_extracao, source.excluido_na_origem);
             """, tabelaAlvo, freshnessGuard, DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL,
             DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL);
 

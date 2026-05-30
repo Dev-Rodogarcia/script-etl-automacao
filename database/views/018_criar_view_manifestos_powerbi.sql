@@ -180,7 +180,8 @@ OUTER APPLY (
         THEN N'Agregado'
         ELSE N'Terceiro / Autônomo'
     END AS tipo_motorista
-) tipo_motorista;
+) tipo_motorista
+WHERE COALESCE(excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_manifestos_powerbi criada/atualizada com sucesso!';

@@ -46,7 +46,8 @@ SELECT
     END AS [Tratativa/Solução],
     metadata AS [Metadata],
     data_extracao AS [Data de extracao]
-FROM dbo.sinistros;
+FROM dbo.sinistros
+WHERE COALESCE(excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_sinistros_powerbi criada/atualizada com sucesso!';

@@ -92,7 +92,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'023_adicionar_noop_count_log_extracoes'),
     (N'024_drop_faturas_graphql'),
     (N'025_materializar_chave_responsavel_destino'),
-    (N'026_materializar_chave_usuario_cotacoes');
+    (N'026_materializar_chave_usuario_cotacoes'),
+    (N'027_adicionar_excluido_na_origem');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -153,6 +154,41 @@ IF COL_LENGTH(N'dbo.localizacao_cargas', N'taxed_weight_decimal') IS NULL
 
 IF COL_LENGTH(N'dbo.localizacao_cargas', N'destination_branch_key') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.destination_branch_key', N'Chave materializada de responsavel destino ausente');
+
+DECLARE @softDeleteTables TABLE (
+    tabela NVARCHAR(128) NOT NULL,
+    indice SYSNAME NOT NULL
+);
+
+INSERT INTO @softDeleteTables (tabela, indice) VALUES
+    (N'dbo.coletas', N'IX_coletas_ativos_origem'),
+    (N'dbo.fretes', N'IX_fretes_ativos_origem'),
+    (N'dbo.manifestos', N'IX_manifestos_ativos_origem'),
+    (N'dbo.cotacoes', N'IX_cotacoes_ativos_origem'),
+    (N'dbo.localizacao_cargas', N'IX_localizacao_cargas_ativos_origem'),
+    (N'dbo.contas_a_pagar', N'IX_contas_a_pagar_ativos_origem'),
+    (N'dbo.faturas_por_cliente', N'IX_faturas_por_cliente_ativos_origem'),
+    (N'dbo.inventario', N'IX_inventario_ativos_origem'),
+    (N'dbo.sinistros', N'IX_sinistros_ativos_origem'),
+    (N'dbo.dim_usuarios', N'IX_dim_usuarios_ativos_origem'),
+    (N'dbo.raster_viagens', N'IX_raster_viagens_ativos_origem'),
+    (N'dbo.raster_viagem_paradas', N'IX_raster_viagem_paradas_ativos_origem');
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'COLUNA', tabela + N'.excluido_na_origem', N'Coluna de soft delete da migration 027 ausente'
+FROM @softDeleteTables
+WHERE COL_LENGTH(tabela, N'excluido_na_origem') IS NULL;
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'INDICE', indice, N'Indice filtrado de ativos da migration 027 ausente ou sem filtro esperado'
+FROM @softDeleteTables sdt
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes i
+    WHERE i.name = sdt.indice
+      AND i.object_id = OBJECT_ID(sdt.tabela)
+      AND i.filter_definition LIKE N'%excluido_na_origem%'
+);
 
 IF NOT EXISTS (
     SELECT 1
@@ -292,6 +328,26 @@ IF NOT EXISTS (
 
 IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_fretes_powerbi')) NOT LIKE N'%lc.invoices_volumes%'
     INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_fretes_powerbi.[Volumes]', N'Volumes deve usar localizacao_cargas.invoices_volumes como fonte oficial');
+
+DECLARE @viewsSoftDelete TABLE (nome SYSNAME NOT NULL);
+INSERT INTO @viewsSoftDelete (nome) VALUES
+    (N'vw_faturas_por_cliente_powerbi'),
+    (N'vw_fretes_powerbi'),
+    (N'vw_coletas_powerbi'),
+    (N'vw_cotacoes_powerbi'),
+    (N'vw_contas_a_pagar_powerbi'),
+    (N'vw_localizacao_cargas_powerbi'),
+    (N'vw_manifestos_powerbi'),
+    (N'vw_inventario_powerbi'),
+    (N'vw_sinistros_powerbi'),
+    (N'vw_raster_sm_transit_time'),
+    (N'vw_dim_clientes'),
+    (N'vw_dim_usuarios');
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'VIEW_DEFINICAO', N'dbo.' + nome, N'View de consumo deve filtrar excluido_na_origem por padrao'
+FROM @viewsSoftDelete
+WHERE OBJECT_DEFINITION(OBJECT_ID(N'dbo.' + nome)) NOT LIKE N'%excluido_na_origem%';
 
 IF EXISTS (
     SELECT 1

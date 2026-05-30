@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
@@ -71,6 +72,7 @@ public final class DaemonResilienceHarness {
             0,
             (data, api, entidade) -> {
                 // Reconciliacao desligada no harness.
+                return CompletableFuture.completedFuture(null);
             }
         );
         final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(

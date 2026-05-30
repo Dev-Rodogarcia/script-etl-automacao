@@ -47,6 +47,12 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -82,7 +88,10 @@ class LoopReconciliationServiceTest {
             true,
             20,
             1,
-            (data, api, entidade) -> execucoes.add(data + "|" + api + "|" + entidade)
+            (data, api, entidade) -> {
+                execucoes.add(data + "|" + api + "|" + entidade);
+                return sucesso();
+            }
         );
 
         final var resumo = service.processarPosCiclo(
@@ -123,8 +132,9 @@ class LoopReconciliationServiceTest {
             0,
             (data, api, entidade) -> {
                 if (tentativas.incrementAndGet() == 1) {
-                    throw new IllegalStateException("falha simulada");
+                    return falha("falha simulada");
                 }
+                return sucesso();
             }
         );
 
@@ -171,7 +181,10 @@ class LoopReconciliationServiceTest {
             true,
             2,
             0,
-            (data, api, entidade) -> datasExecutadas.add(data)
+            (data, api, entidade) -> {
+                datasExecutadas.add(data);
+                return sucesso();
+            }
         );
 
         final var resumo = service.processarPosCiclo(
@@ -197,9 +210,7 @@ class LoopReconciliationServiceTest {
             true,
             1,
             2,
-            (data, api, entidade) -> {
-                throw new IllegalStateException("falha simulada");
-            }
+            (data, api, entidade) -> falha("falha simulada")
         );
 
         final var resumo = service.processarPosCiclo(
@@ -229,7 +240,10 @@ class LoopReconciliationServiceTest {
             true,
             1,
             2,
-            (data, api, entidade) -> execucoes.incrementAndGet()
+            (data, api, entidade) -> {
+                execucoes.incrementAndGet();
+                return sucesso();
+            }
         );
 
         final var resumo = service.processarPosCiclo(
@@ -261,7 +275,10 @@ class LoopReconciliationServiceTest {
             true,
             1,
             0,
-            (data, api, entidade) -> execucoes.incrementAndGet()
+            (data, api, entidade) -> {
+                execucoes.incrementAndGet();
+                return sucesso();
+            }
         );
 
         final var resumo = service.processarPosCiclo(
@@ -316,7 +333,7 @@ class LoopReconciliationServiceTest {
             0,
             (data, api, entidade) -> {
                 execucoes.add(data + "|" + api + "|" + entidade);
-                throw new IllegalStateException("falha segmentada");
+                return falha("falha segmentada");
             }
         );
 
@@ -335,6 +352,58 @@ class LoopReconciliationServiceTest {
         final Properties estado = carregarEstado(stateFile);
         assertEquals("2026-02-20|graphql|fretes", estado.getProperty("pending_targets"));
         assertEquals(HOJE.toString(), estado.getProperty("pending_dates"));
+    }
+
+    @Test
+    void deveAguardarCompletionStageAntesDeConcluirReconciliacao() throws Exception {
+        salvarEstadoInicial(ONTEM.toString(), "", "2026-02-19|dataexport|manifestos");
+
+        final CountDownLatch chamadaExecutor = new CountDownLatch(1);
+        final CompletableFuture<Void> execucaoEmAndamento = new CompletableFuture<>();
+        final LoopReconciliationService service = new LoopReconciliationService(
+            stateFile,
+            clock,
+            true,
+            1,
+            0,
+            (data, api, entidade) -> {
+                chamadaExecutor.countDown();
+                return execucaoEmAndamento;
+            }
+        );
+
+        final ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            final Future<LoopReconciliationService.ReconciliationSummary> resultado =
+                worker.submit(() -> service.processarPosCiclo(
+                    LocalDateTime.of(2026, 2, 20, 10, 0),
+                    LocalDateTime.of(2026, 2, 20, 10, 30),
+                    true,
+                    null
+                ));
+
+            assertTrue(chamadaExecutor.await(1, TimeUnit.SECONDS), "Executor de reconciliacao deve ser chamado");
+            assertFalse(resultado.isDone(), "Loop nao deve concluir enquanto o CompletionStage estiver pendente");
+
+            execucaoEmAndamento.complete(null);
+
+            final var resumo = resultado.get(1, TimeUnit.SECONDS);
+            assertEquals(1, resumo.getReconciliacoesExecutadas());
+            assertEquals(0, resumo.getFalhas());
+            assertTrue(resumo.getPendenciasRestantes().isEmpty());
+            assertEquals("", carregarEstado(stateFile).getProperty("pending_targets"));
+        } finally {
+            execucaoEmAndamento.complete(null);
+            worker.shutdownNow();
+        }
+    }
+
+    private static CompletableFuture<Void> sucesso() {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    private static CompletableFuture<Void> falha(final String mensagem) {
+        return CompletableFuture.failedFuture(new IllegalStateException(mensagem));
     }
 
     private void salvarEstadoInicial(final String lastDailyScheduledDate, final String pendingDates) {

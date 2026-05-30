@@ -440,6 +440,20 @@ public final class ConfigEtl {
         );
     }
 
+    public static int obterOrphanReconciliationBatchSize() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_ORPHAN_RECONCILIATION_BATCH_SIZE",
+                "etl.orphan_reconciliation.batch_size"
+            ),
+            500,
+            value -> value > 0 && value <= 5_000,
+            null,
+            null,
+            null
+        );
+    }
+
     public static Duration obterTimeoutStepPadrao() {
         return Duration.ofMillis(obterLongComFallback(
             "ETL_PIPELINE_TIMEOUT_STEP_PADRAO_MS",

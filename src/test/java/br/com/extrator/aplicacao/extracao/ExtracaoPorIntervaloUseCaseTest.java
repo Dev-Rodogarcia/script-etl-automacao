@@ -150,7 +150,7 @@ class ExtracaoPorIntervaloUseCaseTest {
         final CapturingExtracaoPorIntervaloUseCase extracao = new CapturingExtracaoPorIntervaloUseCase();
         final ReconciliacaoUseCase useCase = new ReconciliacaoUseCase(extracao);
 
-        useCase.executar(LocalDate.of(2026, 4, 27), "graphql", "fretes");
+        useCase.executar(LocalDate.of(2026, 4, 27), "graphql", "fretes").join();
 
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO, extracao.requestCapturada.modoExecucao());
         assertTrue(extracao.requestCapturada.modoLoopDaemon());

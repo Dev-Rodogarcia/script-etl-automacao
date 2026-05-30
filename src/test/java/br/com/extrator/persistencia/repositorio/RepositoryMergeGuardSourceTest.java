@@ -40,7 +40,7 @@ class RepositoryMergeGuardSourceTest {
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/FaturaPorClienteRepository.java",
-            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND %s THEN", "construirExpressaoFreshness(\"target\")", "construirExpressaoFreshness(\"source\")")
+            List.of("WITH (HOLDLOCK)", "WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN", "construirExpressaoFreshness(\"target\")", "construirExpressaoFreshness(\"source\")")
         );
         assertMergeGuard(
             "src/main/java/br/com/extrator/persistencia/repositorio/ContasAPagarRepository.java",

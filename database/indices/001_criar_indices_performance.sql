@@ -360,6 +360,156 @@ ELSE
     PRINT '    Indice IX_inventario_comprovante_minuta ja existe';
 
 -- ============================================================================
+-- SOFT DELETE - Indices filtrados para reconciliacao de ativos na origem
+-- ============================================================================
+
+PRINT 'Criando indices filtrados para registros ativos na origem...';
+
+IF COL_LENGTH('dbo.coletas', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_coletas_ativos_origem' AND object_id = OBJECT_ID('dbo.coletas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_coletas_ativos_origem
+    ON dbo.coletas(id)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_coletas_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_coletas_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.fretes', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_fretes_ativos_origem' AND object_id = OBJECT_ID('dbo.fretes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_ativos_origem
+    ON dbo.fretes(id)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_fretes_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.manifestos', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_manifestos_ativos_origem' AND object_id = OBJECT_ID('dbo.manifestos'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_manifestos_ativos_origem
+    ON dbo.manifestos(chave_merge_hash)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_manifestos_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_manifestos_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.cotacoes', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_cotacoes_ativos_origem' AND object_id = OBJECT_ID('dbo.cotacoes'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_cotacoes_ativos_origem
+    ON dbo.cotacoes(sequence_code)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_cotacoes_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_cotacoes_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.localizacao_cargas', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_localizacao_cargas_ativos_origem' AND object_id = OBJECT_ID('dbo.localizacao_cargas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_localizacao_cargas_ativos_origem
+    ON dbo.localizacao_cargas(sequence_number)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_localizacao_cargas_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_localizacao_cargas_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.contas_a_pagar', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_contas_a_pagar_ativos_origem' AND object_id = OBJECT_ID('dbo.contas_a_pagar'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_contas_a_pagar_ativos_origem
+    ON dbo.contas_a_pagar(sequence_code)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_contas_a_pagar_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_contas_a_pagar_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.faturas_por_cliente', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_faturas_por_cliente_ativos_origem' AND object_id = OBJECT_ID('dbo.faturas_por_cliente'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_faturas_por_cliente_ativos_origem
+    ON dbo.faturas_por_cliente(unique_id)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_faturas_por_cliente_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_faturas_por_cliente_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.inventario', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_inventario_ativos_origem' AND object_id = OBJECT_ID('dbo.inventario'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_inventario_ativos_origem
+    ON dbo.inventario(identificador_unico)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_inventario_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_inventario_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.sinistros', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_sinistros_ativos_origem' AND object_id = OBJECT_ID('dbo.sinistros'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_sinistros_ativos_origem
+    ON dbo.sinistros(identificador_unico)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_sinistros_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_sinistros_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.dim_usuarios', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_dim_usuarios_ativos_origem' AND object_id = OBJECT_ID('dbo.dim_usuarios'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_dim_usuarios_ativos_origem
+    ON dbo.dim_usuarios(user_id)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_dim_usuarios_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_dim_usuarios_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.raster_viagens', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_raster_viagens_ativos_origem' AND object_id = OBJECT_ID('dbo.raster_viagens'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_raster_viagens_ativos_origem
+    ON dbo.raster_viagens(cod_solicitacao)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_raster_viagens_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_raster_viagens_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+IF COL_LENGTH('dbo.raster_viagem_paradas', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_raster_viagem_paradas_ativos_origem' AND object_id = OBJECT_ID('dbo.raster_viagem_paradas'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_raster_viagem_paradas_ativos_origem
+    ON dbo.raster_viagem_paradas(cod_solicitacao, ordem)
+    WHERE excluido_na_origem = 0;
+
+    PRINT '  Indice IX_raster_viagem_paradas_ativos_origem criado';
+END
+ELSE
+    PRINT '    Indice IX_raster_viagem_paradas_ativos_origem ja existe ou coluna excluido_na_origem ausente';
+
+-- ============================================================================
 -- LOG_EXTRACOES - Indices para otimizar queries de auditoria
 -- ============================================================================
 
@@ -393,7 +543,11 @@ FROM sys.indexes i
 INNER JOIN sys.partitions p ON i.object_id = p.object_id AND i.index_id = p.index_id
 INNER JOIN sys.allocation_units a ON p.partition_id = a.container_id
 WHERE i.name LIKE 'IX_%'
-  AND OBJECT_NAME(i.object_id) IN ('manifestos', 'cotacoes', 'contas_a_pagar', 'coletas', 'fretes', 'localizacao_cargas', 'inventario', 'log_extracoes')
+  AND OBJECT_NAME(i.object_id) IN (
+      'manifestos', 'cotacoes', 'contas_a_pagar', 'coletas', 'fretes', 'localizacao_cargas',
+      'faturas_por_cliente', 'inventario', 'sinistros', 'dim_usuarios', 'raster_viagens',
+      'raster_viagem_paradas', 'log_extracoes'
+  )
 GROUP BY i.object_id, i.name, i.type_desc
 ORDER BY Tabela, Nome_Indice;
 

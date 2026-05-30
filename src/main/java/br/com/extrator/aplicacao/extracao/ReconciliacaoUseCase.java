@@ -12,18 +12,20 @@ Conecta com:
 Fluxo geral:
 1) executar(data, api, entidade) monta ExtracaoPorIntervaloRequest (data = data, modo reconciliacao explicito).
 2) Delega a ExtracaoPorIntervaloUseCase.executar() com intervalo de 1 dia.
-3) Reusa pipeline, validacoes e integridade do fluxo de intervalo.
+3) Retorna CompletableFuture<Void> concluido apenas apos o fluxo delegado encerrar.
+4) Reusa pipeline, validacoes e integridade do fluxo de intervalo.
 
 Estrutura interna:
 Atributos-chave:
 - extracaoPorIntervaloUseCase: delegacao para fluxo de intervalo (composicao).
 Metodos principais:
-- executar(LocalDate, String, String): ponto de entrada, monta request e delega.
+- executar(LocalDate, String, String): ponto de entrada, monta request, delega e expoe conclusao observavel.
 [DOC-FILE-END]============================================================== */
 package br.com.extrator.aplicacao.extracao;
 
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 public class ReconciliacaoUseCase {
     private final ExtracaoPorIntervaloUseCase extracaoPorIntervaloUseCase;
@@ -39,13 +41,13 @@ public class ReconciliacaoUseCase {
         );
     }
 
-    public void executar(final LocalDate data) throws Exception {
-        executar(data, null, null);
+    public CompletableFuture<Void> executar(final LocalDate data) {
+        return executar(data, null, null);
     }
 
-    public void executar(final LocalDate data,
-                         final String api,
-                         final String entidade) throws Exception {
+    public CompletableFuture<Void> executar(final LocalDate data,
+                                            final String api,
+                                            final String entidade) {
         final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
             data,
             data,
@@ -55,6 +57,11 @@ public class ReconciliacaoUseCase {
             false,
             ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO
         );
-        extracaoPorIntervaloUseCase.executar(request);
+        try {
+            extracaoPorIntervaloUseCase.executar(request);
+            return CompletableFuture.completedFuture(null);
+        } catch (final Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 }

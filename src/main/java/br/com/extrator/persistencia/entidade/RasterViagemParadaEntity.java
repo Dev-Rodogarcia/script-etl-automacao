@@ -28,6 +28,7 @@ public class RasterViagemParadaEntity {
     private String referenciaUltimaPosicao;
     private String metadata;
     private Instant dataExtracao;
+    private boolean excluidoNaOrigem;
 
     public Long getCodSolicitacao() {
         return codSolicitacao;
@@ -211,5 +212,13 @@ public class RasterViagemParadaEntity {
 
     public void setDataExtracao(final Instant dataExtracao) {
         this.dataExtracao = dataExtracao;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

@@ -175,7 +175,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
             MERGE INTO %s WITH (HOLDLOCK) AS target
             USING %s
             ON target.sequence_code = source.sequence_code
-            WHEN MATCHED AND %s THEN
+            WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
                     document_number = source.document_number,
                     issue_date = source.issue_date,
@@ -204,7 +204,8 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     nome_usuario = source.nome_usuario,
                     reconciliado = source.reconciliado,
                     metadata = source.metadata,
-                    data_extracao = source.data_extracao
+                    data_extracao = source.data_extracao,
+                    excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     sequence_code, document_number, issue_date, tipo_lancamento,
@@ -214,7 +215,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     nome_fornecedor, nome_filial, nome_centro_custo, valor_centro_custo,
                     classificacao_contabil, descricao_contabil, valor_contabil, area_lancamento,
                     observacoes, descricao_despesa, nome_usuario, reconciliado,
-                    metadata, data_extracao
+                    metadata, data_extracao, excluido_na_origem
                 )
                 VALUES (
                     source.sequence_code, source.document_number, source.issue_date, source.tipo_lancamento,
@@ -224,7 +225,7 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     source.nome_fornecedor, source.nome_filial, source.nome_centro_custo, source.valor_centro_custo,
                     source.classificacao_contabil, source.descricao_contabil, source.valor_contabil, source.area_lancamento,
                     source.observacoes, source.descricao_despesa, source.nome_usuario, source.reconciliado,
-                    source.metadata, source.data_extracao
+                    source.metadata, source.data_extracao, source.excluido_na_origem
                 );
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
@@ -269,7 +270,8 @@ public class ContasAPagarRepository extends AbstractRepository<ContasAPagarDataE
                     ? AS nome_usuario,
                     ? AS reconciliado,
                     ? AS metadata,
-                    ? AS data_extracao
+                    ? AS data_extracao,
+                    CAST(0 AS bit) AS excluido_na_origem
             ) AS source
             """;
     }

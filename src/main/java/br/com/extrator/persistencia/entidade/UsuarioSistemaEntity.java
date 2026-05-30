@@ -43,6 +43,7 @@ public class UsuarioSistemaEntity {
     private LocalDateTime origemAtualizadoEm;
     private LocalDateTime dataAtualizacao;
     private LocalDateTime ultimaExtracaoEm;
+    private boolean excluidoNaOrigem;
 
     public Long getUserId() {
         return userId;
@@ -90,5 +91,13 @@ public class UsuarioSistemaEntity {
 
     public void setUltimaExtracaoEm(final LocalDateTime ultimaExtracaoEm) {
         this.ultimaExtracaoEm = ultimaExtracaoEm;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

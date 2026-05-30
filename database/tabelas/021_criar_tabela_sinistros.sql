@@ -34,10 +34,20 @@ BEGIN
         dealing_type NVARCHAR(100) NULL,
         solution_type NVARCHAR(100) NULL,
         metadata NVARCHAR(MAX) NULL,
-        data_extracao DATETIME2 DEFAULT GETDATE()
+        data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_sinistros_excluido_na_origem DEFAULT (0)
     );
 
     CREATE INDEX IX_sinistros_sequence_code ON dbo.sinistros (sequence_code);
     CREATE INDEX IX_sinistros_minuta ON dbo.sinistros (corporation_sequence_number);
+END
+GO
+
+IF COL_LENGTH(N'dbo.sinistros', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.sinistros
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_sinistros_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna sinistros.excluido_na_origem adicionada em tabela existente.';
 END
 GO

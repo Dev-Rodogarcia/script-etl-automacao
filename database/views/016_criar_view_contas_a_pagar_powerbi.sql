@@ -39,7 +39,8 @@ SELECT
     END AS [Conciliado],
     metadata AS [Metadata],
     data_extracao AS [Data de extracao]
-FROM dbo.contas_a_pagar;
+FROM dbo.contas_a_pagar
+WHERE COALESCE(excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_contas_a_pagar_powerbi criada/atualizada com sucesso!';

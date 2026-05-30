@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -93,9 +94,7 @@ class LoopDaemonRunHandlerTest {
             true,
             1,
             0,
-            (data, api, entidade) -> {
-                throw new IllegalStateException("falha simulada");
-            }
+            (data, api, entidade) -> CompletableFuture.failedFuture(new IllegalStateException("falha simulada"))
         );
 
         final ReconciliationSummary resumoComFalha = service.processarPosCiclo(

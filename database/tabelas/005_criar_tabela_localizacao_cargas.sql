@@ -37,7 +37,8 @@ BEGIN
         localizacao_hash CHAR(64), -- Hash operacional para UPSERT sem refresh destrutivo
 
         -- Coluna de Auditoria
-        data_extracao DATETIME2 DEFAULT GETDATE() -- Dados da extracao...
+        data_extracao DATETIME2 DEFAULT GETDATE(), -- Dados da extracao...
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_localizacao_cargas_excluido_na_origem DEFAULT (0)
     );
     
     PRINT 'Tabela localizacao_cargas criada com sucesso!';
@@ -45,5 +46,14 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela localizacao_cargas já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.localizacao_cargas', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.localizacao_cargas
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_localizacao_cargas_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna localizacao_cargas.excluido_na_origem adicionada em tabela existente.';
 END
 GO

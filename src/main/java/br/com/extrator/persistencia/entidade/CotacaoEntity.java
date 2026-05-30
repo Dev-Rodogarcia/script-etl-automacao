@@ -104,6 +104,7 @@ public class CotacaoEntity {
 
     // --- Coluna de Metadados ---
     private String metadata;
+    private boolean excluidoNaOrigem;
 
     // --- Getters e Setters ---
 
@@ -403,5 +404,13 @@ public class CotacaoEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

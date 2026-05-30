@@ -77,5 +77,6 @@ OUTER APPLY (
             LTRIM(RTRIM(COALESCE(CONVERT(NVARCHAR(50), fpc.pagador_documento), N''))),
             N'.', N''), N'-', N''), N'/', N''), N' ', N''), CHAR(9), N''), CHAR(160), N'') AS documento_limpo
     ) limpeza
-) documentos;
+) documentos
+WHERE COALESCE(fpc.excluido_na_origem, 0) = 0;
 GO

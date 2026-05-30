@@ -181,6 +181,7 @@ for %%F in (
     "migrations\024_drop_faturas_graphql.sql"
     "migrations\025_materializar_chave_responsavel_destino.sql"
     "migrations\026_materializar_chave_usuario_cotacoes.sql"
+    "migrations\027_adicionar_excluido_na_origem.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F

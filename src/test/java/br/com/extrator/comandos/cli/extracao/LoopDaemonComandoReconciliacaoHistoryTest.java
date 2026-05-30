@@ -34,6 +34,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,6 +73,7 @@ class LoopDaemonComandoReconciliacaoHistoryTest {
                 0,
                 (data, api, entidade) -> {
                     // no-op
+                    return CompletableFuture.completedFuture(null);
                 }
             );
             final ReconciliationSummary resumo = service.processarPosCiclo(inicio, fimExtracao, true, null);

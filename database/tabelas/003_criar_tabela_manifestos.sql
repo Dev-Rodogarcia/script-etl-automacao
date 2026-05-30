@@ -120,6 +120,7 @@ BEGIN
 
         -- Coluna de Auditoria
         data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_manifestos_excluido_na_origem DEFAULT (0),
 
         -- Constraint UNIQUE alinhada com a chave de MERGE
         CONSTRAINT UQ_manifestos_chave_composta UNIQUE (chave_merge_hash)
@@ -130,6 +131,15 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela manifestos já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.manifestos', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.manifestos
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_manifestos_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna manifestos.excluido_na_origem adicionada em tabela existente.';
 END
 GO
 

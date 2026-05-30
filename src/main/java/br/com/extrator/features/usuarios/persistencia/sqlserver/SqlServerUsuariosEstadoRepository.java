@@ -102,8 +102,8 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                                     final LocalDateTime observadoEm) throws SQLException {
         final String sql = """
             MERGE dbo.dim_usuarios AS T
-            USING (VALUES (?, ?, ?, ?, ?, ?))
-                AS S (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
+            USING (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+                AS S (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
             ON T.user_id = S.user_id
             WHEN MATCHED THEN
                 UPDATE SET
@@ -111,10 +111,11 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                     T.ativo = S.ativo,
                     T.origem_atualizado_em = S.origem_atualizado_em,
                     T.data_atualizacao = S.data_atualizacao,
-                    T.ultima_extracao_em = S.ultima_extracao_em
+                    T.ultima_extracao_em = S.ultima_extracao_em,
+                    T.excluido_na_origem = S.excluido_na_origem
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
-                VALUES (S.user_id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em);
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+                VALUES (S.user_id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem);
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setLong(1, usuario.getUserId());

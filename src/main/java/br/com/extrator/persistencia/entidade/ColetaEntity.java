@@ -119,6 +119,7 @@ public class ColetaEntity {
 
     // --- Coluna de Metadados ---
     private String metadata;
+    private boolean excluidoNaOrigem;
 
     // --- Getters e Setters ---
 
@@ -540,5 +541,13 @@ public class ColetaEntity {
 
     public void setNumeroTentativas(final Integer numeroTentativas) {
         this.numeroTentativas = numeroTentativas;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

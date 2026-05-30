@@ -11,6 +11,7 @@ BEGIN
         [user_id] [bigint] NOT NULL,
         [nome] [nvarchar](255) NULL,
         [data_atualizacao] [datetime] DEFAULT GETDATE(),
+        [excluido_na_origem] [bit] NOT NULL CONSTRAINT DF_dim_usuarios_excluido_na_origem DEFAULT (0),
         PRIMARY KEY CLUSTERED ([user_id] ASC)
     );
     
@@ -19,5 +20,14 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela dim_usuarios já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.dim_usuarios', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.dim_usuarios
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_dim_usuarios_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna dim_usuarios.excluido_na_origem adicionada em tabela existente.';
 END
 GO

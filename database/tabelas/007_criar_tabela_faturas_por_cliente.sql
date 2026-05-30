@@ -40,13 +40,23 @@ BEGIN
         notas_fiscais NVARCHAR(MAX),
         pedidos_cliente NVARCHAR(MAX),
         metadata NVARCHAR(MAX),
-        data_extracao DATETIME2 DEFAULT GETDATE()
+        data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_faturas_por_cliente_excluido_na_origem DEFAULT (0)
     );
     PRINT 'Tabela faturas_por_cliente criada com sucesso!';
 END
 ELSE
 BEGIN
     PRINT 'Tabela faturas_por_cliente já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.faturas_por_cliente', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.faturas_por_cliente
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_faturas_por_cliente_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna faturas_por_cliente.excluido_na_origem adicionada em tabela existente.';
 END
 GO
 

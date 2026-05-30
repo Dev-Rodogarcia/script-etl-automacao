@@ -60,17 +60,17 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
         );
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
                 AS source (
                     identificador_unico, sequence_code, numero_minuta, pagador_nome, remetente_nome, origem_cidade,
                     destinatario_nome, destino_cidade, regiao_entrega, filial_entregadora, branch_nickname, type,
                     started_at, finished_at, status, conferente_nome, invoices_mapping, invoices_value, real_weight,
                     total_cubic_volume, taxed_weight, invoices_volumes, read_volumes, predicted_delivery_at,
                     performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao,
-                    flag_comprovante_anexado, metadata, data_extracao
+                    flag_comprovante_anexado, metadata, data_extracao, excluido_na_origem
                 )
             ON target.identificador_unico = source.identificador_unico
-            WHEN MATCHED AND %s THEN
+            WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
                     sequence_code = source.sequence_code,
                     numero_minuta = source.numero_minuta,
@@ -100,7 +100,8 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
                     ultima_ocorrencia_descricao = source.ultima_ocorrencia_descricao,
                     flag_comprovante_anexado = source.flag_comprovante_anexado,
                     metadata = source.metadata,
-                    data_extracao = source.data_extracao
+                    data_extracao = source.data_extracao,
+                    excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     identificador_unico, sequence_code, numero_minuta, pagador_nome, remetente_nome, origem_cidade,
@@ -108,7 +109,7 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
                     started_at, finished_at, status, conferente_nome, invoices_mapping, invoices_value, real_weight,
                     total_cubic_volume, taxed_weight, invoices_volumes, read_volumes, predicted_delivery_at,
                     performance_finished_at, ultima_ocorrencia_at, ultima_ocorrencia_descricao,
-                    flag_comprovante_anexado, metadata, data_extracao
+                    flag_comprovante_anexado, metadata, data_extracao, excluido_na_origem
                 )
                 VALUES (
                     source.identificador_unico, source.sequence_code, source.numero_minuta, source.pagador_nome, source.remetente_nome, source.origem_cidade,
@@ -116,7 +117,7 @@ public class InventarioRepository extends AbstractRepository<InventarioEntity> {
                     source.started_at, source.finished_at, source.status, source.conferente_nome, source.invoices_mapping, source.invoices_value, source.real_weight,
                     source.total_cubic_volume, source.taxed_weight, source.invoices_volumes, source.read_volumes, source.predicted_delivery_at,
                     source.performance_finished_at, source.ultima_ocorrencia_at, source.ultima_ocorrencia_descricao,
-                    source.flag_comprovante_anexado, source.metadata, source.data_extracao
+                    source.flag_comprovante_anexado, source.metadata, source.data_extracao, source.excluido_na_origem
                 );
             """, NOME_TABELA, freshnessGuard);
 

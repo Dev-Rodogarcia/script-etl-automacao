@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -97,9 +98,10 @@ class LoopReconciliationServiceStressTest {
                 // Falha apenas na primeira tentativa de um subconjunto previsivel de datas.
                 if (tentativaAtual == 1 && data.getDayOfMonth() % 7 == 0) {
                     falhasControladas.incrementAndGet();
-                    throw new IllegalStateException("falha intermitente controlada");
+                    return CompletableFuture.failedFuture(new IllegalStateException("falha intermitente controlada"));
                 }
                 concluidas.add(data);
+                return CompletableFuture.completedFuture(null);
             }
         );
 
@@ -139,7 +141,10 @@ class LoopReconciliationServiceStressTest {
             true,
             20,
             0,
-            (data, api, entidade) -> conciliadas.add(data)
+            (data, api, entidade) -> {
+                conciliadas.add(data);
+                return CompletableFuture.completedFuture(null);
+            }
         );
 
         for (int dia = 0; dia < 90; dia++) {

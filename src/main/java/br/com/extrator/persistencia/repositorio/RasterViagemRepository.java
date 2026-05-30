@@ -23,7 +23,7 @@ public class RasterViagemRepository extends AbstractRepository<RasterViagemEntit
 
         final String sql = """
             MERGE dbo.raster_viagens WITH (HOLDLOCK) AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
                 AS source (
                     cod_solicitacao, sequencial, cod_filial, status_viagem, placa_veiculo,
                     placa_carreta1, placa_carreta2, placa_carreta3, cpf_motorista1, cpf_motorista2,
@@ -31,7 +31,7 @@ public class RasterViagemRepository extends AbstractRepository<RasterViagemEntit
                     data_hora_prev_ini, data_hora_prev_fim, data_hora_real_ini, data_hora_real_fim,
                     data_hora_identificou_fim_viagem, tempo_total_viagem_min, dentro_prazo_raster,
                     percentual_atraso_raster, rodou_fora_horario, velocidade_media, eventos_velocidade,
-                    desvios_de_rota, cod_rota, rota_descricao, link_timeline, metadata, data_extracao
+                    desvios_de_rota, cod_rota, rota_descricao, link_timeline, metadata, data_extracao, excluido_na_origem
                 )
             ON target.cod_solicitacao = source.cod_solicitacao
             WHEN MATCHED THEN
@@ -65,7 +65,8 @@ public class RasterViagemRepository extends AbstractRepository<RasterViagemEntit
                     rota_descricao = source.rota_descricao,
                     link_timeline = source.link_timeline,
                     metadata = source.metadata,
-                    data_extracao = source.data_extracao
+                    data_extracao = source.data_extracao,
+                    excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     cod_solicitacao, sequencial, cod_filial, status_viagem, placa_veiculo,
@@ -74,7 +75,7 @@ public class RasterViagemRepository extends AbstractRepository<RasterViagemEntit
                     data_hora_prev_ini, data_hora_prev_fim, data_hora_real_ini, data_hora_real_fim,
                     data_hora_identificou_fim_viagem, tempo_total_viagem_min, dentro_prazo_raster,
                     percentual_atraso_raster, rodou_fora_horario, velocidade_media, eventos_velocidade,
-                    desvios_de_rota, cod_rota, rota_descricao, link_timeline, metadata, data_extracao
+                    desvios_de_rota, cod_rota, rota_descricao, link_timeline, metadata, data_extracao, excluido_na_origem
                 )
                 VALUES (
                     source.cod_solicitacao, source.sequencial, source.cod_filial, source.status_viagem, source.placa_veiculo,
@@ -83,7 +84,7 @@ public class RasterViagemRepository extends AbstractRepository<RasterViagemEntit
                     source.data_hora_prev_ini, source.data_hora_prev_fim, source.data_hora_real_ini, source.data_hora_real_fim,
                     source.data_hora_identificou_fim_viagem, source.tempo_total_viagem_min, source.dentro_prazo_raster,
                     source.percentual_atraso_raster, source.rodou_fora_horario, source.velocidade_media, source.eventos_velocidade,
-                    source.desvios_de_rota, source.cod_rota, source.rota_descricao, source.link_timeline, source.metadata, source.data_extracao
+                    source.desvios_de_rota, source.cod_rota, source.rota_descricao, source.link_timeline, source.metadata, source.data_extracao, source.excluido_na_origem
                 );
             """;
 

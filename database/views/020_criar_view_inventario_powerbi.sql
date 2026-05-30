@@ -51,7 +51,9 @@ SELECT
     i.data_extracao AS [Data de extracao]
 FROM dbo.inventario AS i
 LEFT JOIN dbo.fretes AS f
-    ON f.corporation_sequence_number = i.numero_minuta;
+    ON f.corporation_sequence_number = i.numero_minuta
+   AND COALESCE(f.excluido_na_origem, 0) = 0
+WHERE COALESCE(i.excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_inventario_powerbi criada/atualizada com sucesso!';

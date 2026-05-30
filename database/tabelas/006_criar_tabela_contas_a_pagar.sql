@@ -34,7 +34,8 @@ BEGIN
         nome_usuario NVARCHAR(255),
         reconciliado BIT,
         metadata NVARCHAR(MAX),
-        data_extracao DATETIME2 DEFAULT GETDATE()
+        data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_contas_a_pagar_excluido_na_origem DEFAULT (0)
     );
     
     PRINT 'Tabela contas_a_pagar criada com sucesso!';
@@ -42,6 +43,15 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela contas_a_pagar já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.contas_a_pagar', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.contas_a_pagar
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_contas_a_pagar_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna contas_a_pagar.excluido_na_origem adicionada em tabela existente.';
 END
 GO
 

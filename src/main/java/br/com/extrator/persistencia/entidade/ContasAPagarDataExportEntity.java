@@ -116,6 +116,7 @@ public class ContasAPagarDataExportEntity {
     
     // METADATA (JSON completo)
     private String metadata;
+    private boolean excluidoNaOrigem;
     
     // DATA DE EXTRAÇÃO
     private LocalDateTime dataExtracao;
@@ -347,6 +348,14 @@ public class ContasAPagarDataExportEntity {
     
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
     
     public LocalDateTime getDataExtracao() {

@@ -39,6 +39,7 @@ public class SinistroEntity {
     private String dealingType;
     private String solutionType;
     private String metadata;
+    private boolean excluidoNaOrigem;
 
     public String getIdentificadorUnico() {
         return identificadorUnico;
@@ -302,5 +303,13 @@ public class SinistroEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

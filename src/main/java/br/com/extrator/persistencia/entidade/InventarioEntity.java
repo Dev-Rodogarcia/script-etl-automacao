@@ -34,6 +34,7 @@ public class InventarioEntity {
     private String ultimaOcorrenciaDescricao;
     private boolean flagComprovanteAnexado;
     private String metadata;
+    private boolean excluidoNaOrigem;
 
     public String getIdentificadorUnico() {
         return identificadorUnico;
@@ -265,5 +266,13 @@ public class InventarioEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

@@ -287,7 +287,7 @@ public abstract class AbstractRepository<T> extends RepositoryParameterBindingSu
             MERGE %s WITH (HOLDLOCK) AS target
             USING %s AS source
             ON %s
-            WHEN MATCHED AND %s THEN
+            WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
                 %s
             WHEN NOT MATCHED THEN

@@ -35,6 +35,8 @@ WITH base AS (
     FROM dbo.raster_viagens v
     LEFT JOIN dbo.raster_viagem_paradas p
         ON p.cod_solicitacao = v.cod_solicitacao
+       AND COALESCE(p.excluido_na_origem, 0) = 0
+    WHERE COALESCE(v.excluido_na_origem, 0) = 0
 ),
 rota AS (
     SELECT

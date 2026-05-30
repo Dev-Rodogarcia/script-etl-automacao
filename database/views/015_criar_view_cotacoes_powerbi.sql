@@ -128,7 +128,8 @@ SELECT
     delivery_subtotal                               AS [Trechos/Entrega],
     other_fees                                      AS [Trechos/Outros valores]
 
-FROM dbo.cotacoes;
+FROM dbo.cotacoes
+WHERE COALESCE(excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_cotacoes_powerbi atualizada com sucesso (Incluindo Hora Solicitacao).';

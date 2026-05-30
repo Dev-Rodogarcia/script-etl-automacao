@@ -51,7 +51,8 @@ BEGIN
         metadata NVARCHAR(MAX),
 
         -- Coluna de Auditoria
-        data_extracao DATETIME2 DEFAULT GETDATE()
+        data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_cotacoes_excluido_na_origem DEFAULT (0)
     );
     
     PRINT 'Tabela cotacoes criada com sucesso!';
@@ -59,5 +60,14 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela cotacoes já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.cotacoes', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.cotacoes
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_cotacoes_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna cotacoes.excluido_na_origem adicionada em tabela existente.';
 END
 GO

@@ -111,6 +111,7 @@ public class FaturaPorClienteEntity {
 
     // Sistema
     private String metadata;
+    private boolean excluidoNaOrigem;
     private List<String> legacyUniqueIds = List.of();
 
     // Getters e Setters
@@ -376,6 +377,14 @@ public class FaturaPorClienteEntity {
 
     public void setMetadata(final String metadata) {
         this.metadata = metadata;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 
     public List<String> getLegacyUniqueIds() {

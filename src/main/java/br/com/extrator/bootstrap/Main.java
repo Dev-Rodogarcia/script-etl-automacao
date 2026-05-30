@@ -272,6 +272,7 @@ public class Main {
             case "--fluxo-completo",
                 "--extracao-intervalo",
                 "--recovery",
+                "--expurgo-orfaos",
                 "--sincronizar-usuarios",
                 "--loop",
                 "--auditar-api",

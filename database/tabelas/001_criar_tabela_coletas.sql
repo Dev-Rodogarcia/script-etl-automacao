@@ -52,6 +52,7 @@ BEGIN
 
         -- Coluna de Auditoria
         data_extracao DATETIME2 DEFAULT GETDATE(),
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_coletas_excluido_na_origem DEFAULT (0),
         
         -- Constraint para chave de negócio
         CONSTRAINT UQ_coletas_sequence_code UNIQUE (sequence_code)
@@ -62,5 +63,14 @@ END
 ELSE
 BEGIN
     PRINT 'Tabela coletas já existe. Pulando criação.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.coletas', N'excluido_na_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.coletas
+    ADD excluido_na_origem BIT NOT NULL
+        CONSTRAINT DF_coletas_excluido_na_origem DEFAULT (0) WITH VALUES;
+    PRINT 'Coluna coletas.excluido_na_origem adicionada em tabela existente.';
 END
 GO

@@ -14,7 +14,8 @@ SELECT
     LTRIM(RTRIM([nome])) AS [Nome],
     [data_atualizacao] AS [Data Atualizacao]
 FROM dbo.dim_usuarios
-WHERE [user_id] IS NOT NULL;
+WHERE [user_id] IS NOT NULL
+  AND COALESCE(excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_dim_usuarios criada/atualizada com sucesso!';

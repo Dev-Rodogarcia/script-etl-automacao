@@ -41,6 +41,7 @@ import br.com.extrator.comandos.cli.base.Comando;
 import br.com.extrator.comandos.cli.console.ExibirAjudaComando;
 import br.com.extrator.comandos.cli.extracao.ExecutarExtracaoPorIntervaloComando;
 import br.com.extrator.comandos.cli.extracao.ExecutarFluxoCompletoComando;
+import br.com.extrator.comandos.cli.extracao.ExpurgoOrfaosComando;
 import br.com.extrator.comandos.cli.extracao.LoopDaemonComando;
 import br.com.extrator.comandos.cli.extracao.LoopExtracaoComando;
 import br.com.extrator.comandos.cli.extracao.recovery.RecoveryComando;
@@ -84,6 +85,7 @@ public final class CommandRegistry {
         comandos.put("--fluxo-completo", lazy(ExecutarFluxoCompletoComando::new));
         comandos.put("--extracao-intervalo", lazy(ExecutarExtracaoPorIntervaloComando::new));
         comandos.put("--recovery", lazy(RecoveryComando::new));
+        comandos.put("--expurgo-orfaos", lazy(ExpurgoOrfaosComando::new));
         comandos.put("--loop", lazy(LoopExtracaoComando::new));
         comandos.put("--validar", lazy(ValidarAcessoComando::new));
         comandos.put("--ajuda", lazy(ExibirAjudaComando::new));

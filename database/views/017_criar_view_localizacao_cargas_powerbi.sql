@@ -49,7 +49,8 @@ SELECT
 FROM dbo.localizacao_cargas lc
 LEFT JOIN dbo.localizacao_cargas_regiao_destino_alias regiao_alias
        ON regiao_alias.nome_responsavel = lc.destination_branch_nickname
-      AND regiao_alias.ativo = 1;
+      AND regiao_alias.ativo = 1
+WHERE COALESCE(lc.excluido_na_origem, 0) = 0;
 GO
 
 PRINT 'View vw_localizacao_cargas_powerbi criada/atualizada com sucesso!';

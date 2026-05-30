@@ -88,6 +88,7 @@ public class LocalizacaoCargaEntity {
     // --- Coluna de Metadados ---
     private String metadata;
     private String localizacaoHash;
+    private boolean excluidoNaOrigem;
 
     // --- Getters e Setters ---
 
@@ -275,5 +276,13 @@ public class LocalizacaoCargaEntity {
 
     public void setLocalizacaoHash(final String localizacaoHash) {
         this.localizacaoHash = localizacaoHash;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

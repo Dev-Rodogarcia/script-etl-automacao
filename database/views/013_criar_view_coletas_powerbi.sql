@@ -55,7 +55,14 @@ SELECT
     c.metadata AS [Metadata],
     c.data_extracao AS [Data de extracao]
 FROM dbo.coletas c
-LEFT JOIN dbo.manifestos m ON c.sequence_code = m.pick_sequence_code
-LEFT JOIN dbo.dim_usuarios u_cancel ON c.cancellation_user_id = u_cancel.user_id
-LEFT JOIN dbo.dim_usuarios u_destroy ON c.destroy_user_id = u_destroy.user_id;
+LEFT JOIN dbo.manifestos m
+    ON c.sequence_code = m.pick_sequence_code
+   AND COALESCE(m.excluido_na_origem, 0) = 0
+LEFT JOIN dbo.dim_usuarios u_cancel
+    ON c.cancellation_user_id = u_cancel.user_id
+   AND COALESCE(u_cancel.excluido_na_origem, 0) = 0
+LEFT JOIN dbo.dim_usuarios u_destroy
+    ON c.destroy_user_id = u_destroy.user_id
+   AND COALESCE(u_destroy.excluido_na_origem, 0) = 0
+WHERE COALESCE(c.excluido_na_origem, 0) = 0;
 GO

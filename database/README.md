@@ -13,6 +13,7 @@ Fontes usadas para montar este documento:
 
 - Quase todas as tabelas operacionais têm `metadata`, que guarda o **payload bruto completo** da origem.
 - Quase todas as tabelas de extração têm `data_extracao`, que representa **quando o ETL gravou ou atualizou** aquela linha.
+- Tabelas de domínio sincronizadas com APIs externas têm `excluido_na_origem`, flag de soft delete usada para preservar histórico e ocultar órfãos das views por padrão.
 - Nem todo campo lido da API é promovido a coluna física. Quando isso acontece, o dado continua disponível em `metadata`.
 - `faturas_por_cliente.serie_nfse` existe fisicamente e pode ser enriquecida a partir dos dados materializados de `fretes`.
 - A fonte canônica para recriação do schema fica em `database/*.sql`, mesmo quando o Java também mantém DDL defensivo de fallback.

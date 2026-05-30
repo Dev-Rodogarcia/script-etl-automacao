@@ -175,6 +175,7 @@ public class ManifestoEntity {
 
     // --- Coluna de Metadados ---
     private String metadata;
+    private boolean excluidoNaOrigem;
 
     // --- Coluna de Identificador Único (para chave composta) ---
     private String identificadorUnico;
@@ -933,6 +934,14 @@ public class ManifestoEntity {
 
     public void setObsFinanceira(final String obsFinanceira) {
         this.obsFinanceira = obsFinanceira;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 
     /**

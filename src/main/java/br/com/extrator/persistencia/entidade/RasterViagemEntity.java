@@ -36,6 +36,7 @@ public class RasterViagemEntity {
     private String linkTimeline;
     private String metadata;
     private Instant dataExtracao;
+    private boolean excluidoNaOrigem;
 
     public Long getCodSolicitacao() {
         return codSolicitacao;
@@ -283,5 +284,13 @@ public class RasterViagemEntity {
 
     public void setDataExtracao(final Instant dataExtracao) {
         this.dataExtracao = dataExtracao;
+    }
+
+    public boolean isExcluidoNaOrigem() {
+        return excluidoNaOrigem;
+    }
+
+    public void setExcluidoNaOrigem(final boolean excluidoNaOrigem) {
+        this.excluidoNaOrigem = excluidoNaOrigem;
     }
 }

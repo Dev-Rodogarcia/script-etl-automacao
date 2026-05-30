@@ -77,18 +77,19 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
                 + "OR COALESCE(S.origem_atualizado_em, S.data_atualizacao) >= COALESCE(T.origem_atualizado_em, T.data_atualizacao))";
         final String sql = String.format("""
             MERGE dbo.%s WITH (HOLDLOCK) AS T
-            USING (VALUES (?, ?, ?, ?, ?, ?)) AS S (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
+            USING (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit))) AS S (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
             ON T.user_id = S.id
-            WHEN MATCHED AND %s THEN
+            WHEN MATCHED AND (%s OR T.excluido_na_origem = 1) THEN
                 UPDATE SET
                     T.nome = S.nome,
                     T.ativo = S.ativo,
                     T.origem_atualizado_em = S.origem_atualizado_em,
                     T.data_atualizacao = S.data_atualizacao,
-                    T.ultima_extracao_em = S.ultima_extracao_em
+                    T.ultima_extracao_em = S.ultima_extracao_em,
+                    T.excluido_na_origem = S.excluido_na_origem
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em)
-                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em);
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem);
             """, NOME_TABELA, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
