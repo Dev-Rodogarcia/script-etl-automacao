@@ -341,6 +341,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             SELECT f.id
               FROM dbo.fretes f
              WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
+               AND COALESCE(f.excluido_na_origem, 0) = 0
                AND NOT EXISTS (
                      SELECT 1
                        FROM #fretes_periodo_api_ids ids
@@ -495,6 +496,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
               JOIN #fretes_periodo_delete d
                 ON d.id = f.id
              WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
+               AND COALESCE(f.excluido_na_origem, 0) = 0
             """;
         final int removidos;
         try (PreparedStatement ps = conexao.prepareStatement(sqlDelete)) {

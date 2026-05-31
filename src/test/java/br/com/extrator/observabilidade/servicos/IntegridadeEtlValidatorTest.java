@@ -28,8 +28,8 @@ class IntegridadeEtlValidatorTest {
     void deveFalharQuandoManifestoReferenciarColetaInexistente() throws Exception {
         try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:int_manifestos?mode=memory&cache=shared")) {
             conexao.createStatement().execute("ATTACH DATABASE ':memory:' AS dbo");
-            conexao.createStatement().execute("CREATE TABLE dbo.manifestos (pick_sequence_code INTEGER, data_extracao TIMESTAMP)");
-            conexao.createStatement().execute("CREATE TABLE dbo.coletas (sequence_code INTEGER)");
+            conexao.createStatement().execute("CREATE TABLE dbo.manifestos (pick_sequence_code INTEGER, data_extracao TIMESTAMP, excluido_na_origem INTEGER DEFAULT 0)");
+            conexao.createStatement().execute("CREATE TABLE dbo.coletas (sequence_code INTEGER, excluido_na_origem INTEGER DEFAULT 0)");
             inserirDataExtracao(conexao, "INSERT INTO dbo.manifestos (pick_sequence_code, data_extracao) VALUES (?, ?)", 999L);
 
             final IntegridadeEtlValidator validator = new IntegridadeEtlValidator(
@@ -68,7 +68,7 @@ class IntegridadeEtlValidatorTest {
     void deveAceitarDivergenciaDeUmRegistroAMenosEmMergeUpsert() throws Exception {
         try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:int_faturas?mode=memory&cache=shared")) {
             conexao.createStatement().execute("ATTACH DATABASE ':memory:' AS dbo");
-            conexao.createStatement().execute("CREATE TABLE dbo.faturas_por_cliente (data_extracao TIMESTAMP)");
+            conexao.createStatement().execute("CREATE TABLE dbo.faturas_por_cliente (data_extracao TIMESTAMP, excluido_na_origem INTEGER DEFAULT 0)");
             inserirDataExtracao(conexao, "INSERT INTO dbo.faturas_por_cliente (data_extracao) VALUES (?)", null);
             inserirDataExtracao(conexao, "INSERT INTO dbo.faturas_por_cliente (data_extracao) VALUES (?)", null);
 

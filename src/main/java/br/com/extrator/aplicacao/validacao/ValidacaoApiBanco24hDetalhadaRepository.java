@@ -139,6 +139,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
             SELECT DISTINCT TOP (?) CAST(f.accounting_credit_id AS BIGINT) AS accounting_credit_id
             FROM dbo.fretes f
             WHERE f.accounting_credit_id IS NOT NULL
+              AND COALESCE(f.excluido_na_origem, 0) = 0
               AND f.data_extracao >= ?
               AND f.data_extracao <= ?
             ORDER BY CAST(f.accounting_credit_id AS BIGINT)
@@ -1020,7 +1021,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
     }
 
     private String condicaoFiltroBanco(final String entidade, final boolean filtroEstritoDataExtracao) {
-        return switch (entidade) {
+        final String condicaoTemporal = switch (entidade) {
             case ConstantesEntidades.COLETAS ->
                 filtroEstritoDataExtracao
                     ? "(data_extracao >= ? AND data_extracao <= ?)"
@@ -1060,6 +1061,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
             default ->
                 "(data_extracao >= ? AND data_extracao <= ?)";
         };
+        return "COALESCE(excluido_na_origem, 0) = 0 AND " + condicaoTemporal;
     }
 
     private void preencherParametrosFiltroBanco(

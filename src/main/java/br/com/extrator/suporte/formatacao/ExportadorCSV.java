@@ -39,6 +39,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+import java.util.Set;
 
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 import br.com.extrator.suporte.console.LoggerConsole;
@@ -64,6 +66,20 @@ public class ExportadorCSV {
     private static final String ENTIDADE_SINISTROS = "sinistros";
     private static final String ENTIDADE_RASTER_VIAGENS = "raster_viagens";
     private static final String ENTIDADE_RASTER_VIAGEM_PARADAS = "raster_viagem_paradas";
+    private static final Set<String> TABELAS_COM_EXPURGO_LOGICO = Set.of(
+        ENTIDADE_COTACOES,
+        ENTIDADE_COLETAS,
+        ENTIDADE_CONTAS_A_PAGAR,
+        ENTIDADE_FATURAS_POR_CLIENTE,
+        ENTIDADE_FRETES,
+        ENTIDADE_MANIFESTOS,
+        ENTIDADE_LOCALIZACAO_CARGAS,
+        ENTIDADE_INVENTARIO,
+        ENTIDADE_SINISTROS,
+        ENTIDADE_RASTER_VIAGENS,
+        ENTIDADE_RASTER_VIAGEM_PARADAS,
+        "dim_usuarios"
+    );
 
     // PROBLEMA #9 CORRIGIDO: Usar LoggerConsole para log duplo (arquivo + console)
     private static final LoggerConsole log = LoggerConsole.getLogger(ExportadorCSV.class);
@@ -174,6 +190,8 @@ public class ExportadorCSV {
             // Para tabelas sem view, garantir esquema dbo.
             origem = entidade.contains(".") ? entidade : "dbo." + entidade;
         }
+        final boolean filtrarAtivos = deveFiltrarAtivosPorExpurgoLogico(origem);
+        final String filtroAtivos = filtrarAtivos ? " WHERE COALESCE(excluido_na_origem, 0) = 0" : "";
         
         log.info("    🔍 Contando registros em: {}", origem);
         
@@ -181,7 +199,7 @@ public class ExportadorCSV {
         int totalNoBanco = 0;
         try (Connection connCount = GerenciadorConexao.obterConexao();
              Statement stmtCount = connCount.createStatement();
-             ResultSet rsCount = stmtCount.executeQuery("SELECT COUNT(*) as total FROM " + origem)) {
+             ResultSet rsCount = stmtCount.executeQuery("SELECT COUNT(*) as total FROM " + origem + filtroAtivos)) {
             if (rsCount.next()) {
                 totalNoBanco = rsCount.getInt("total");
             }
@@ -209,7 +227,7 @@ public class ExportadorCSV {
             
             final boolean usarViewPowerBI = !origem.equals(entidade) && !("dbo." + entidade).equals(origem);
             final boolean usarViewDimUsuarios = "dbo.vw_dim_usuarios".equals(origem);
-            String query = "SELECT * FROM " + origem;
+            String query = "SELECT * FROM " + origem + filtroAtivos;
             // Ordenação consistente
             if (usarViewPowerBI || usarViewDimUsuarios) {
                 // Para views PowerBI ou views de dimensão, usar primeira coluna (ID)
@@ -302,5 +320,13 @@ public class ExportadorCSV {
                 return count;
             }
         }
+    }
+
+    private static boolean deveFiltrarAtivosPorExpurgoLogico(final String origem) {
+        String nomeTabela = origem == null ? "" : origem.trim().toLowerCase(Locale.ROOT);
+        if (nomeTabela.startsWith("dbo.")) {
+            nomeTabela = nomeTabela.substring("dbo.".length());
+        }
+        return TABELAS_COM_EXPURGO_LOGICO.contains(nomeTabela);
     }
 }

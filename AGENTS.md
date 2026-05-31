@@ -25,5 +25,18 @@ Você atua como Engenheiro de Software Principal neste repositório (Java 17 CLI
 
 * **Materialização Obrigatória:** Regras de BI complexas, filtros de elegibilidade pesados ou cruzamentos textuais não devem ser processados sob demanda dentro das views de apresentação. Realize o processamento textual pesado e as validações durante a carga (Load) no Java e salve o resultado em colunas físicas (ex: `BIT`, `TINYINT`) indexadas nas tabelas base.
 * **Exclusão Lógica (Soft Delete):** Dados extraídos das APIs e cadastros de suporte não podem sofrer `TRUNCATE` ou `DELETE` físico em rotinas comuns. Use controle de vigência ou inativação para preservar históricos e auditorias de BI.
+
+## Modelo Aditivo com Expurgo Logico (Sweep and Prune)
+
+O ETL opera em modelo aditivo por padrao: o loop recorrente de 30 minutos deve executar apenas insercoes e atualizacoes de registros novos ou alterados. Ele nao deve fazer `DELETE`, `TRUNCATE` ou varredura completa de ausencia na origem, para nao acoplar reconciliacao historica ao caminho critico de extracao quase em tempo real.
+
+Quando uma entidade da API deixar de retornar uma chave que ja existe no `ETL_SISTEMA`, a sincronizacao de estado deve ser feita por expurgo logico noturno. O job dedicado de reconciliacao deve obter o snapshot de chaves da origem, comparar com as chaves ativas do banco e marcar os ausentes com `excluido_na_origem = 1`, preservando os dados para auditoria. Quando uma chave reaparecer na origem, o upsert deve reativar o registro com `excluido_na_origem = 0`.
+
+Toda tabela de dominio sincronizada com APIs externas deve expor uma coluna padrao de controle, preferencialmente `excluido_na_origem BIT NOT NULL DEFAULT (0)`, acompanhada de metadados de auditoria quando aplicavel, como `data_exclusao_origem` e `ultima_reconciliacao_origem_em`. Alteracoes estruturais devem ser feitas por migrations e refletidas nos scripts base correspondentes.
+
+As views operacionais, views analiticas, APIs e dashboards devem filtrar registros com `excluido_na_origem = 1` por padrao. Consultas que incluam excluidos logicos so sao permitidas para auditoria, diagnostico ou reconciliacao tecnica e devem declarar essa intencao explicitamente.
+
+O job `Sweep and Prune` deve rodar fora do horario de pico, com paginacao por origem, staging ou comparacao por conjuntos de chaves, updates em lote, telemetria por entidade e protecao contra execucao concorrente. Se o snapshot de uma entidade falhar ou ficar incompleto, essa entidade nao deve ser marcada como expurgada naquela execucao.
+
 * **Testes e Sanidade:** Antes de dar a tarefa por concluída, execute a suíte de testes locais (`src/test`) e os scripts de validação de schema (`database/validacao`). Nenhuma alteração estrutural pode subir sem validação de quebra de contrato.
 * **Encoding e Mojibake:** Todo o ecossistema (código Java, drivers JDBC, scripts SQL e arquivos de log) opera estritamente em UTF-8. Não aceite aliases ou dados de tabelas com caracteres corrompidos.

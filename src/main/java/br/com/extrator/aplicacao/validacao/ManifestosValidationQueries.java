@@ -54,7 +54,8 @@ final class ManifestosValidationQueries {
                 conn,
                 "SELECT COUNT(*) as total FROM manifestos "
                     + "WHERE data_extracao >= CAST((SELECT TOP 1 timestamp_fim FROM log_extracoes "
-                    + "WHERE entidade = 'manifestos' ORDER BY timestamp_fim DESC) AS DATETIME2)"
+                    + "WHERE entidade = 'manifestos' ORDER BY timestamp_fim DESC) AS DATETIME2) "
+                    + "AND COALESCE(excluido_na_origem, 0) = 0"
             );
         } catch (final SQLException e) {
             log.warn("Erro ao contar registros desde ultima extracao: {}", e.getMessage());
@@ -80,6 +81,7 @@ final class ManifestosValidationQueries {
                  """
                     SELECT sequence_code, identificador_unico, COUNT(*) as quantidade
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY sequence_code, identificador_unico
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
@@ -96,7 +98,8 @@ final class ManifestosValidationQueries {
                     SELECT
                       SUM(CASE WHEN pick_sequence_code IS NULL THEN 1 ELSE 0 END) as com_null,
                       SUM(CASE WHEN pick_sequence_code IS NOT NULL THEN 1 ELSE 0 END) as com_valor
-                    FROM manifestos""")) {
+                    FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0""")) {
             if (rs.next()) {
                 return new int[] { rs.getInt("com_null"), rs.getInt("com_valor") };
             }
@@ -112,6 +115,7 @@ final class ManifestosValidationQueries {
                     SELECT sequence_code, identificador_unico
                     FROM manifestos
                     WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
+                      AND COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY sequence_code, identificador_unico
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {

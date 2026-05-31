@@ -155,10 +155,11 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     END
                ) = source.pick_sequence_code
              WHERE EXISTS (
-                       SELECT 1
-                         FROM dbo.coletas c
-                        WHERE c.sequence_code = source.pick_sequence_code
-                   )
+                        SELECT 1
+                          FROM dbo.coletas c
+                         WHERE c.sequence_code = source.pick_sequence_code
+                           AND COALESCE(c.excluido_na_origem, 0) = 0
+                    )
                AND NOT EXISTS (
                        SELECT 1
                          FROM dbo.manifestos resolved
@@ -187,10 +188,11 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
               FROM %s s
              WHERE s.pick_sequence_code IS NOT NULL
                AND NOT EXISTS (
-                       SELECT 1
-                         FROM dbo.coletas c
-                        WHERE c.sequence_code = s.pick_sequence_code
-                   )
+                        SELECT 1
+                          FROM dbo.coletas c
+                         WHERE c.sequence_code = s.pick_sequence_code
+                           AND COALESCE(c.excluido_na_origem, 0) = 0
+                    )
              ORDER BY pick_sequence_code
             """.formatted(staging);
         try (PreparedStatement statement = conexao.prepareStatement(sqlAmostra);
@@ -209,10 +211,11 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
               FROM %s s
              WHERE s.pick_sequence_code IS NOT NULL
                AND NOT EXISTS (
-                       SELECT 1
-                         FROM dbo.coletas c
-                        WHERE c.sequence_code = s.pick_sequence_code
-                   )
+                        SELECT 1
+                          FROM dbo.coletas c
+                         WHERE c.sequence_code = s.pick_sequence_code
+                           AND COALESCE(c.excluido_na_origem, 0) = 0
+                    )
             """.formatted(staging);
         try (PreparedStatement statement = conexao.prepareStatement(sqlUpdate)) {
             final int normalizados = statement.executeUpdate();

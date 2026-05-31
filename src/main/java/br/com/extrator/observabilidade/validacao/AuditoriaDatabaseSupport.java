@@ -93,6 +93,7 @@ final class AuditoriaDatabaseSupport {
                 FROM %s
                 WHERE issue_date >= CAST(DATEADD(day, -1, GETDATE()) AS DATE)
                   AND issue_date <= CAST(GETDATE() AS DATE)
+                  AND COALESCE(excluido_na_origem, 0) = 0
                 """, nomeTabela);
 
             logger.debug("Query executada (CONTAS_A_PAGAR usando issue_date): {}", sql);
@@ -113,6 +114,7 @@ final class AuditoriaDatabaseSupport {
             SELECT COUNT(*)
             FROM %s
             WHERE data_extracao >= CAST(? AS DATETIME2) AND data_extracao < CAST(? AS DATETIME2)
+              AND COALESCE(excluido_na_origem, 0) = 0
             """, nomeTabela);
 
         logger.debug("Query executada: {}", sql);
@@ -137,7 +139,10 @@ final class AuditoriaDatabaseSupport {
     void investigarCausaRaizZeroRegistros(final Connection conexao,
                                           final String nomeEntidade,
                                           final ResultadoValidacaoEntidade resultado) throws SQLException {
-        final String sqlTotal = String.format("SELECT COUNT(*) FROM %s", nomeEntidade);
+        final String sqlTotal = String.format(
+            "SELECT COUNT(*) FROM %s WHERE COALESCE(excluido_na_origem, 0) = 0",
+            nomeEntidade
+        );
         try (PreparedStatement stmt = conexao.prepareStatement(sqlTotal);
              ResultSet rs = stmt.executeQuery()) {
             if (rs.next()) {
@@ -167,7 +172,11 @@ final class AuditoriaDatabaseSupport {
         );
 
         final String condicaoNulos = camposCriticos.getOrDefault(nomeEntidade, "id IS NULL");
-        final String sql = String.format("SELECT COUNT(*) FROM %s WHERE %s", nomeEntidade, condicaoNulos);
+        final String sql = String.format(
+            "SELECT COUNT(*) FROM %s WHERE COALESCE(excluido_na_origem, 0) = 0 AND (%s)",
+            nomeEntidade,
+            condicaoNulos
+        );
         try (PreparedStatement stmt = conexao.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             return rs.next() ? rs.getLong(1) : 0;
@@ -175,7 +184,10 @@ final class AuditoriaDatabaseSupport {
     }
 
     Instant obterDataUltimaExtracao(final Connection conexao, final String nomeEntidade) throws SQLException {
-        final String sql = String.format("SELECT MAX(data_extracao) FROM %s", nomeEntidade);
+        final String sql = String.format(
+            "SELECT MAX(data_extracao) FROM %s WHERE COALESCE(excluido_na_origem, 0) = 0",
+            nomeEntidade
+        );
         logger.debug("Obtendo ultima extracao para {}: {}", nomeEntidade, sql);
         try (PreparedStatement stmt = conexao.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {

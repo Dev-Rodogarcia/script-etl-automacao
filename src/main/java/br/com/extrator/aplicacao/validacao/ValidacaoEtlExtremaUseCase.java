@@ -587,9 +587,13 @@ public class ValidacaoEtlExtremaUseCase {
                     SELECT COUNT(*)
                     FROM dbo.manifestos m
                     WHERE m.data_extracao >= ? AND m.data_extracao <= ?
+                      AND COALESCE(m.excluido_na_origem, 0) = 0
                       AND m.pick_sequence_code IS NOT NULL
                       AND NOT EXISTS (
-                          SELECT 1 FROM dbo.coletas c WHERE c.sequence_code = m.pick_sequence_code
+                          SELECT 1
+                          FROM dbo.coletas c
+                          WHERE c.sequence_code = m.pick_sequence_code
+                            AND COALESCE(c.excluido_na_origem, 0) = 0
                       )
                     """;
                 final int orfaos = executarCount(conexao, sql, janelaManifestos.inicio(), janelaManifestos.fim());
@@ -924,9 +928,13 @@ public class ValidacaoEtlExtremaUseCase {
             SELECT COUNT(*)
             FROM dbo.manifestos m
             WHERE m.data_extracao >= ? AND m.data_extracao <= ?
+              AND COALESCE(m.excluido_na_origem, 0) = 0
               AND m.pick_sequence_code IS NOT NULL
               AND NOT EXISTS (
-                  SELECT 1 FROM dbo.coletas c WHERE c.sequence_code = m.pick_sequence_code
+                  SELECT 1
+                  FROM dbo.coletas c
+                  WHERE c.sequence_code = m.pick_sequence_code
+                    AND COALESCE(c.excluido_na_origem, 0) = 0
               )
             """;
         return executarCount(conexao, sql, janela.inicio(), janela.fim());
@@ -972,6 +980,7 @@ public class ValidacaoEtlExtremaUseCase {
                 SELECT %s
                 FROM dbo.%s
                 WHERE %s >= ? AND %s <= ?
+                  AND COALESCE(excluido_na_origem, 0) = 0
                   AND %s
                 GROUP BY %s
                 HAVING COUNT(*) > 1
@@ -1095,7 +1104,8 @@ public class ValidacaoEtlExtremaUseCase {
                 default -> throw new IllegalArgumentException("Entidade nao suportada no fingerprint: " + entidade.entidade());
             };
             final String sql = "SELECT " + keyExpr + " AS chave, metadata FROM dbo." + entidade.table()
-                + " WHERE " + keyExpr + " IS NOT NULL ORDER BY chave";
+                + " WHERE COALESCE(excluido_na_origem, 0) = 0"
+                + " AND " + keyExpr + " IS NOT NULL ORDER BY chave";
             try (PreparedStatement stmt = conexao.prepareStatement(sql); ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     final String chave = rs.getString("chave");

@@ -302,7 +302,7 @@ public class IntegridadeEtlValidator {
                                            final LocalDateTime inicio,
                                            final LocalDateTime fim) throws SQLException {
         final String sql = String.format(
-            "SELECT COUNT(*) FROM dbo.%s WHERE %s >= ? AND %s <= ?",
+            "SELECT COUNT(*) FROM dbo.%s WHERE %s >= ? AND %s <= ? AND COALESCE(excluido_na_origem, 0) = 0",
             spec.tabela(), spec.colunaTimestamp(), spec.colunaTimestamp()
         );
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
@@ -323,7 +323,7 @@ public class IntegridadeEtlValidator {
             spec.chavesUnicas().stream().map(coluna -> coluna + " IS NULL").toList());
 
         final String sql = String.format(
-            "SELECT COUNT(*) FROM dbo.%s WHERE %s >= ? AND %s <= ? AND (%s)",
+            "SELECT COUNT(*) FROM dbo.%s WHERE %s >= ? AND %s <= ? AND COALESCE(excluido_na_origem, 0) = 0 AND (%s)",
             spec.tabela(), spec.colunaTimestamp(), spec.colunaTimestamp(), whereChavesNulas
         );
 
@@ -348,6 +348,7 @@ public class IntegridadeEtlValidator {
                 SELECT %s, COUNT(*) AS qtd
                 FROM dbo.%s
                 WHERE %s >= ? AND %s <= ?
+                  AND COALESCE(excluido_na_origem, 0) = 0
                 GROUP BY %s
                 HAVING COUNT(*) > 1
             ) d
@@ -407,11 +408,13 @@ public class IntegridadeEtlValidator {
             SELECT COUNT(*)
             FROM dbo.manifestos m
             WHERE m.data_extracao >= ? AND m.data_extracao <= ?
+              AND COALESCE(m.excluido_na_origem, 0) = 0
               AND m.pick_sequence_code IS NOT NULL
               AND NOT EXISTS (
                   SELECT 1
                   FROM dbo.coletas c
                   WHERE c.sequence_code = m.pick_sequence_code
+                    AND COALESCE(c.excluido_na_origem, 0) = 0
               )
             """;
         final int orfaosManifestos = sqlSupport.executarCount(conexao, sqlManifestosOrfaos, inicioExecucao, fimExecucao);
@@ -425,6 +428,7 @@ public class IntegridadeEtlValidator {
             SELECT COUNT(*)
             FROM dbo.manifestos m
             WHERE m.data_extracao >= ? AND m.data_extracao <= ?
+              AND COALESCE(m.excluido_na_origem, 0) = 0
               AND m.pick_sequence_code IS NOT NULL
             """;
         final int totalManifestosComPick = sqlSupport.executarCount(
@@ -438,11 +442,13 @@ public class IntegridadeEtlValidator {
             SELECT TOP 10 m.pick_sequence_code
             FROM dbo.manifestos m
             WHERE m.data_extracao >= ? AND m.data_extracao <= ?
+              AND COALESCE(m.excluido_na_origem, 0) = 0
               AND m.pick_sequence_code IS NOT NULL
               AND NOT EXISTS (
                   SELECT 1
                   FROM dbo.coletas c
                   WHERE c.sequence_code = m.pick_sequence_code
+                    AND COALESCE(c.excluido_na_origem, 0) = 0
               )
             ORDER BY m.pick_sequence_code
             """;

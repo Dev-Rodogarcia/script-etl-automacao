@@ -438,7 +438,9 @@ public class ValidacaoApiBanco24hUseCase {
                                       final String entidade,
                                       final JanelaExecucao janela) throws SQLException {
         final String tabela = mapearTabela(entidade);
-        final String sql = "SELECT COUNT(*) FROM dbo." + tabela + " WHERE data_extracao >= ? AND data_extracao <= ?";
+        final String sql = "SELECT COUNT(*) FROM dbo." + tabela
+            + " WHERE data_extracao >= ? AND data_extracao <= ?"
+            + " AND COALESCE(excluido_na_origem, 0) = 0";
 
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setTimestamp(1, Timestamp.valueOf(janela.inicio));

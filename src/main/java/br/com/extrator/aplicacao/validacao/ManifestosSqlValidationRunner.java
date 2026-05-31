@@ -61,6 +61,7 @@ final class ManifestosSqlValidationRunner {
                       MIN(data_extracao) as primeira_extracao,
                       MAX(data_extracao) as ultima_extracao
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY
                       sequence_code,
                       COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
@@ -87,6 +88,7 @@ final class ManifestosSqlValidationRunner {
                  COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL') as mdfe_number,
                  COUNT(*) as total
                FROM manifestos
+               WHERE COALESCE(excluido_na_origem, 0) = 0
                GROUP BY
                  sequence_code,
                  COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
@@ -96,7 +98,8 @@ final class ManifestosSqlValidationRunner {
         executarTeste(
             conn,
             "TESTE 2: Verificar identificadores NULL",
-            "SELECT COUNT(*) as total_com_identificador_null FROM manifestos WHERE identificador_unico IS NULL");
+            "SELECT COUNT(*) as total_com_identificador_null FROM manifestos "
+                + "WHERE identificador_unico IS NULL AND COALESCE(excluido_na_origem, 0) = 0");
 
         executarTeste(
             conn,
@@ -108,8 +111,9 @@ final class ManifestosSqlValidationRunner {
                    ELSE 'Sem pick_sequence_code (usa mdfe/hash)'
                  END as tipo,
                  COUNT(*) as total,
-                 CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos) AS DECIMAL(5,2)) as percentual
+                 CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos WHERE COALESCE(excluido_na_origem, 0) = 0) AS DECIMAL(5,2)) as percentual
                FROM manifestos
+               WHERE COALESCE(excluido_na_origem, 0) = 0
                GROUP BY
                  CASE
                    WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
@@ -125,6 +129,7 @@ final class ManifestosSqlValidationRunner {
                  identificador_unico,
                  COUNT(*) as total
                FROM manifestos
+               WHERE COALESCE(excluido_na_origem, 0) = 0
                GROUP BY sequence_code, identificador_unico
                HAVING COUNT(*) > 1""");
 
@@ -136,24 +141,28 @@ final class ManifestosSqlValidationRunner {
                  'Total de manifestos' as metrica,
                  COUNT(*) as valor
                FROM manifestos
+               WHERE COALESCE(excluido_na_origem, 0) = 0
                UNION ALL
                SELECT
                  'Com pick_sequence_code' as metrica,
                  COUNT(*) as valor
                FROM manifestos
                WHERE pick_sequence_code IS NOT NULL
+                 AND COALESCE(excluido_na_origem, 0) = 0
                UNION ALL
                SELECT
                  'Sem pick_sequence_code (usa mdfe/hash)' as metrica,
                  COUNT(*) as valor
                FROM manifestos
                WHERE pick_sequence_code IS NULL
+                 AND COALESCE(excluido_na_origem, 0) = 0
                UNION ALL
                SELECT
                  'Com identificador_unico NULL' as metrica,
                  COUNT(*) as valor
                FROM manifestos
                WHERE identificador_unico IS NULL
+                 AND COALESCE(excluido_na_origem, 0) = 0
                UNION ALL
                SELECT
                  'Duplicados falsos (mesma chave de negocio)' as metrica,
@@ -161,6 +170,7 @@ final class ManifestosSqlValidationRunner {
                FROM (
                  SELECT sequence_code
                  FROM manifestos
+                 WHERE COALESCE(excluido_na_origem, 0) = 0
                  GROUP BY
                    sequence_code,
                    COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),

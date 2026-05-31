@@ -96,10 +96,15 @@ public class ValidacaoManifestosUseCase {
         System.out.println("CONTAGEM NO BANCO:");
         log.console("");
 
-        final int totalBanco = queries.contar(conn, "SELECT COUNT(*) as total FROM manifestos");
+        final int totalBanco = queries.contar(
+            conn,
+            "SELECT COUNT(*) as total FROM manifestos WHERE COALESCE(excluido_na_origem, 0) = 0"
+        );
         final int totalUltimas24h = queries.contar(
             conn,
-            "SELECT COUNT(*) as total FROM manifestos WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())"
+            "SELECT COUNT(*) as total FROM manifestos "
+                + "WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE()) "
+                + "AND COALESCE(excluido_na_origem, 0) = 0"
         );
         int totalDesdeUltimaExtracao = timestampFim == null
             ? 0
@@ -141,10 +146,18 @@ public class ValidacaoManifestosUseCase {
 
         final boolean temIdentificadorUnico = queries.existeColunaIdentificadorUnico(conn);
         final int registrosSemIdentificador = temIdentificadorUnico
-            ? queries.contar(conn, "SELECT COUNT(*) as total FROM manifestos WHERE identificador_unico IS NULL")
+            ? queries.contar(
+                conn,
+                "SELECT COUNT(*) as total FROM manifestos "
+                    + "WHERE identificador_unico IS NULL AND COALESCE(excluido_na_origem, 0) = 0"
+            )
             : 0;
         final int identificadoresInvalidos = temIdentificadorUnico
-            ? queries.contar(conn, "SELECT COUNT(*) as total FROM manifestos WHERE LEN(identificador_unico) > 100")
+            ? queries.contar(
+                conn,
+                "SELECT COUNT(*) as total FROM manifestos "
+                    + "WHERE LEN(identificador_unico) > 100 AND COALESCE(excluido_na_origem, 0) = 0"
+            )
             : 0;
 
         exibirAnaliseEstrutura(conn, temIdentificadorUnico, registrosSemIdentificador, identificadoresInvalidos);
@@ -300,6 +313,7 @@ public class ValidacaoManifestosUseCase {
                  """
                     SELECT sequence_code, COUNT(*) as quantidade
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY sequence_code
                     HAVING COUNT(*) > 1
                     ORDER BY quantidade DESC""")) {
@@ -401,7 +415,8 @@ public class ValidacaoManifestosUseCase {
                       MAX(data_extracao) as data_maxima,
                       COUNT(*) as total
                     FROM manifestos
-                    WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())""")) {
+                    WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
+                      AND COALESCE(excluido_na_origem, 0) = 0""")) {
             if (rs.next()) {
                 System.out.println("Analise de data_extracao (janela operacional recente):");
                 System.out.println("   Data minima: " + valorOuPadrao(rs.getString("data_minima")));
@@ -430,7 +445,8 @@ public class ValidacaoManifestosUseCase {
                  """
                     SELECT COUNT(*) as total
                     FROM manifestos
-                    WHERE data_extracao IS NULL""")) {
+                    WHERE data_extracao IS NULL
+                      AND COALESCE(excluido_na_origem, 0) = 0""")) {
             if (rs.next() && rs.getInt("total") > 0) {
                 System.out.println("ATENCAO: " + rs.getInt("total") + " registros com data_extracao NULL!");
             }

@@ -129,6 +129,7 @@ final class ManifestosIdentificadorUnicoValidation {
                       COUNT(*) as total_registros,
                       COUNT(DISTINCT identificador_unico) as identificadores_unicos
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY
                       sequence_code,
                       COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
@@ -182,6 +183,7 @@ final class ManifestosIdentificadorUnicoValidation {
                  """
                     SELECT sequence_code
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY
                       sequence_code,
                       COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
@@ -215,6 +217,7 @@ final class ManifestosIdentificadorUnicoValidation {
                  """
                     SELECT sequence_code, identificador_unico
                     FROM manifestos
+                    WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY sequence_code, identificador_unico
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {

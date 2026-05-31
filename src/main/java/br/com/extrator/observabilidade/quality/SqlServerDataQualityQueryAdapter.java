@@ -126,8 +126,11 @@ public final class SqlServerDataQualityQueryAdapter implements DataQualityQueryP
         final String sql = """
             SELECT COUNT(*)
             FROM dbo.manifestos m
-            LEFT JOIN dbo.coletas c ON c.sequence_code = m.pick_sequence_code
+            LEFT JOIN dbo.coletas c
+              ON c.sequence_code = m.pick_sequence_code
+             AND COALESCE(c.excluido_na_origem, 0) = 0
             WHERE m.pick_sequence_code IS NOT NULL
+              AND COALESCE(m.excluido_na_origem, 0) = 0
               AND c.sequence_code IS NULL
             """;
         return queryLong(sql, ps -> { });

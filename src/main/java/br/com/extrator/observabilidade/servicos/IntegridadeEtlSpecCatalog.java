@@ -32,70 +32,70 @@ final class IntegridadeEtlSpecCatalog {
             "dim_usuarios",
             "data_atualizacao",
             List.of("user_id"),
-            List.of("user_id", "nome", "data_atualizacao")
+            List.of("user_id", "nome", "data_atualizacao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.COLETAS, new IntegridadeEtlSpec(
             ConstantesEntidades.COLETAS,
             ConstantesEntidades.COLETAS,
             "data_extracao",
             List.of("id"),
-            List.of("id", "sequence_code", "metadata", "data_extracao")
+            List.of("id", "sequence_code", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.FRETES, new IntegridadeEtlSpec(
             ConstantesEntidades.FRETES,
             ConstantesEntidades.FRETES,
             "data_extracao",
             List.of("id"),
-            List.of("id", "metadata", "data_extracao")
+            List.of("id", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.MANIFESTOS, new IntegridadeEtlSpec(
             ConstantesEntidades.MANIFESTOS,
             ConstantesEntidades.MANIFESTOS,
             "data_extracao",
             List.of("sequence_code", "identificador_unico"),
-            List.of("sequence_code", "identificador_unico", "metadata", "data_extracao")
+            List.of("sequence_code", "identificador_unico", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.COTACOES, new IntegridadeEtlSpec(
             ConstantesEntidades.COTACOES,
             ConstantesEntidades.COTACOES,
             "data_extracao",
             List.of("sequence_code"),
-            List.of("sequence_code", "metadata", "data_extracao")
+            List.of("sequence_code", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.LOCALIZACAO_CARGAS, new IntegridadeEtlSpec(
             ConstantesEntidades.LOCALIZACAO_CARGAS,
             ConstantesEntidades.LOCALIZACAO_CARGAS,
             "data_extracao",
             List.of("sequence_number"),
-            List.of("sequence_number", "metadata", "data_extracao")
+            List.of("sequence_number", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.CONTAS_A_PAGAR, new IntegridadeEtlSpec(
             ConstantesEntidades.CONTAS_A_PAGAR,
             ConstantesEntidades.CONTAS_A_PAGAR,
             "data_extracao",
             List.of("sequence_code"),
-            List.of("sequence_code", "metadata", "data_extracao")
+            List.of("sequence_code", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.FATURAS_POR_CLIENTE, new IntegridadeEtlSpec(
             ConstantesEntidades.FATURAS_POR_CLIENTE,
             ConstantesEntidades.FATURAS_POR_CLIENTE,
             "data_extracao",
             List.of("unique_id"),
-            List.of("unique_id", "metadata", "data_extracao")
+            List.of("unique_id", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.INVENTARIO, new IntegridadeEtlSpec(
             ConstantesEntidades.INVENTARIO,
             ConstantesEntidades.INVENTARIO,
             "data_extracao",
             List.of("identificador_unico"),
-            List.of("identificador_unico", "metadata", "data_extracao")
+            List.of("identificador_unico", "metadata", "data_extracao", "excluido_na_origem")
         ));
         specs.put(ConstantesEntidades.SINISTROS, new IntegridadeEtlSpec(
             ConstantesEntidades.SINISTROS,
             ConstantesEntidades.SINISTROS,
             "data_extracao",
             List.of("identificador_unico"),
-            List.of("identificador_unico", "metadata", "data_extracao")
+            List.of("identificador_unico", "metadata", "data_extracao", "excluido_na_origem")
         ));
         return Map.copyOf(specs);
     }

@@ -296,7 +296,7 @@ public class CompletudeValidator {
                             ? "data_atualizacao"
                             : "data_extracao";
                         final String sqlDb = String.format(
-                            "SELECT COUNT(*) FROM %s WHERE %s >= ? AND %s <= ?",
+                            "SELECT COUNT(*) FROM %s WHERE %s >= ? AND %s <= ? AND COALESCE(excluido_na_origem, 0) = 0",
                             nomeTabela,
                             colunaTemporal,
                             colunaTemporal
@@ -321,7 +321,7 @@ public class CompletudeValidator {
                             ? "data_atualizacao"
                             : "data_extracao";
                         final String sqlDb = String.format(
-                            "SELECT COUNT(*) FROM %s WHERE %s >= DATEADD(hour, -24, GETDATE())",
+                            "SELECT COUNT(*) FROM %s WHERE %s >= DATEADD(hour, -24, GETDATE()) AND COALESCE(excluido_na_origem, 0) = 0",
                             nomeTabela,
                             colunaTemporal
                         );
