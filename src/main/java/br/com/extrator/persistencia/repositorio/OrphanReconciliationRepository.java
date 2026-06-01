@@ -1,10 +1,12 @@
 package br.com.extrator.persistencia.repositorio;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -23,30 +25,44 @@ public class OrphanReconciliationRepository implements OrphanReconciliationStore
     private static final int LOCK_TIMEOUT_MS = 30_000;
 
     @Override
-    public Set<String> buscarChavesAtivas(final EntityReconciliationSpec spec) throws SQLException {
+    public Set<String> buscarChavesAtivas(final EntityReconciliationSpec spec,
+                                          final LocalDate dataInicio,
+                                          final LocalDate dataFim) throws SQLException {
         final String tableName = validarTabelaQualificada(spec.tableName());
         final String keyExpression = spec.dbKeyExpression();
+        final String temporalExpression = spec.dbTemporalExpression();
         final String sql = """
             SELECT DISTINCT %1$s AS chave
-              FROM %2$s
-             WHERE excluido_na_origem = 0
+              FROM %2$s AS base
+             WHERE COALESCE(base.excluido_na_origem, 0) = 0
                AND %1$s IS NOT NULL
+               AND %3$s >= ?
+               AND %3$s < DATEADD(day, 1, ?)
              ORDER BY chave
-            """.formatted(keyExpression, tableName);
+            """.formatted(keyExpression, tableName, temporalExpression);
 
         final Set<String> keys = new LinkedHashSet<>();
         try (Connection connection = GerenciadorConexao.obterConexao();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet rs = statement.executeQuery()) {
-            while (rs.next()) {
-                final String key = rs.getString("chave");
-                if (key != null && !key.isBlank()) {
-                    keys.add(key.trim());
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setDate(1, Date.valueOf(dataInicio));
+            statement.setDate(2, Date.valueOf(dataFim));
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    final String key = rs.getString("chave");
+                    if (key != null && !key.isBlank()) {
+                        keys.add(key.trim());
+                    }
                 }
             }
         }
 
-        logger.info("Chaves ativas carregadas do banco | entidade={} | total={}", spec.entityName(), keys.size());
+        logger.info(
+            "Chaves ativas carregadas do banco | entidade={} | periodo={}..{} | total={}",
+            spec.entityName(),
+            dataInicio,
+            dataFim,
+            keys.size()
+        );
         return keys;
     }
 

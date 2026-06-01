@@ -46,7 +46,7 @@ final class ManifestosSqlValidationRunner {
 
     void executar(final Connection conn) throws SQLException {
         System.out.println("📄 IDENTIFICAR DUPLICADOS FALSOS:");
-        System.out.println("(Manifestos com mesma chave de negocio mas identificador_unico diferente)");
+        System.out.println("(Manifestos com mesma chave logica estrita)");
         log.console("");
 
         try (Statement stmt = conn.createStatement();
@@ -126,11 +126,15 @@ final class ManifestosSqlValidationRunner {
             """
                SELECT
                  sequence_code,
-                 identificador_unico,
+                 COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), '-1') as pick_sequence_code,
+                 COALESCE(CAST(mdfe_number AS VARCHAR(50)), '-1') as mdfe_number,
                  COUNT(*) as total
                FROM manifestos
                WHERE COALESCE(excluido_na_origem, 0) = 0
-               GROUP BY sequence_code, identificador_unico
+               GROUP BY
+                 sequence_code,
+                 ISNULL(pick_sequence_code, -1),
+                 ISNULL(mdfe_number, -1)
                HAVING COUNT(*) > 1""");
 
         executarTeste(

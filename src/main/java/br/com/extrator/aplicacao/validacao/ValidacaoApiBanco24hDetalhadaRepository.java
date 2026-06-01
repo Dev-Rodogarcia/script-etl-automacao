@@ -48,16 +48,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 import br.com.extrator.suporte.mapeamento.MapperUtil;
 import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class ValidacaoApiBanco24hDetalhadaRepository {
-    private static final String METADATA_PICK_SEQUENCE_CODE = "mft_pfs_pck_sequence_code";
-    private static final String METADATA_MDFE_NUMBER = "mft_mfs_number";
     private final LoggerConsole log;
     private final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher;
     private final JanelaAbertaCeilingProvider janelaAbertaCeilingProvider;
@@ -891,17 +887,12 @@ class ValidacaoApiBanco24hDetalhadaRepository {
 
     static String montarChaveManifestoValidacao(final Long sequenceCode,
                                                 final Long pickSequenceCode,
-                                                final Integer mdfeNumber,
-                                                final String metadata) {
+                                                final Integer mdfeNumber) {
         if (sequenceCode == null) {
             return null;
         }
-        final Long pickEfetivo = pickSequenceCode != null
-            ? pickSequenceCode
-            : extrairLongMetadata(metadata, METADATA_PICK_SEQUENCE_CODE).orElse(-1L);
-        final Long mdfeEfetivo = mdfeNumber != null
-            ? mdfeNumber.longValue()
-            : extrairLongMetadata(metadata, METADATA_MDFE_NUMBER).orElse(-1L);
+        final Long pickEfetivo = pickSequenceCode != null ? pickSequenceCode : -1L;
+        final Long mdfeEfetivo = mdfeNumber != null ? mdfeNumber.longValue() : -1L;
         return sequenceCode + "|" + pickEfetivo + "|" + mdfeEfetivo;
     }
 
@@ -909,33 +900,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         final Long sequenceCode = obterLongNullable(rs, "sequence_code");
         final Long pickSequenceCode = obterLongNullable(rs, "pick_sequence_code");
         final Integer mdfeNumber = obterIntegerNullable(rs, "mdfe_number");
-        final String metadata = rs.getString("metadata");
-        return montarChaveManifestoValidacao(sequenceCode, pickSequenceCode, mdfeNumber, metadata);
-    }
-
-    private static Optional<Long> extrairLongMetadata(final String metadata, final String campo) {
-        if (metadata == null || metadata.isBlank() || campo == null || campo.isBlank()) {
-            return Optional.empty();
-        }
-        try {
-            final JsonNode root = MapperUtil.sharedJson().readTree(metadata);
-            final JsonNode valor = root.path(campo);
-            if (valor.isMissingNode() || valor.isNull()) {
-                return Optional.empty();
-            }
-            if (valor.isIntegralNumber()) {
-                return Optional.of(valor.longValue());
-            }
-            if (valor.isTextual()) {
-                final String texto = valor.asText().trim();
-                if (!texto.isEmpty()) {
-                    return Optional.of(Long.parseLong(texto));
-                }
-            }
-        } catch (Exception ignored) {
-            return Optional.empty();
-        }
-        return Optional.empty();
+        return montarChaveManifestoValidacao(sequenceCode, pickSequenceCode, mdfeNumber);
     }
 
     private Long obterLongNullable(final ResultSet rs, final String coluna) throws SQLException {

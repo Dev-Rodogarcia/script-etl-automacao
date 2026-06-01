@@ -21,7 +21,7 @@ Metodos principais:
 - contar(Connection, String): executa query COUNT generica.
 - contarDesdeUltimaExtracaoComFallback(): COUNT desde ultima extracao com fallback.
 - existeColunaIdentificadorUnico(): verifica schema (INFORMATION_SCHEMA).
-- contarDuplicadosChaveComposta(): consulta duplicados por sequence_code + identificador_unico.
+- contarDuplicadosChaveComposta(): consulta duplicados por sequence_code + pick_sequence_code + mdfe_number.
 - contarPickSequenceCode(): retorna int[] com contagem de NULL e nao-NULL.
 - contarDuplicadosUltimas24h(): duplicados nas ultimas 24h.
 [DOC-FILE-END]============================================================== */
@@ -79,10 +79,10 @@ final class ManifestosValidationQueries {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, identificador_unico, COUNT(*) as quantidade
+                    SELECT sequence_code, pick_sequence_code, mdfe_number, COUNT(*) as quantidade
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, identificador_unico
+                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 total++;
@@ -112,11 +112,11 @@ final class ManifestosValidationQueries {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, identificador_unico
+                    SELECT sequence_code, pick_sequence_code, mdfe_number
                     FROM manifestos
                     WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
                       AND COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, identificador_unico
+                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 total++;

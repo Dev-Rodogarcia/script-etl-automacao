@@ -182,6 +182,7 @@ for %%F in (
     "migrations\025_materializar_chave_responsavel_destino.sql"
     "migrations\026_materializar_chave_usuario_cotacoes.sql"
     "migrations\027_adicionar_excluido_na_origem.sql"
+    "migrations\028_corrigir_chave_unica_manifestos.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F

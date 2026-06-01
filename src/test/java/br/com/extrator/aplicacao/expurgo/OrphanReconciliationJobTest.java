@@ -66,6 +66,8 @@ class OrphanReconciliationJobTest {
 
         assertEquals(List.of("B", "D"), store.updatedKeys);
         assertEquals(2, store.lastBatchSize);
+        assertEquals(LocalDate.of(2026, 5, 29), store.lastDataInicio);
+        assertEquals(LocalDate.of(2026, 5, 30), store.lastDataFim);
         assertEquals(2, report.totalOrphans());
         assertEquals(2, report.totalUpdated());
     }
@@ -97,6 +99,7 @@ class OrphanReconciliationJobTest {
             entityName,
             "dbo." + entityName,
             "id",
+            "CAST(base.data_extracao AS date)",
             new ConfiguracaoEntidade(1, "service_at", "freights", "100", Duration.ofSeconds(1), "id asc", false),
             ignored -> "id"
         );
@@ -136,10 +139,16 @@ class OrphanReconciliationJobTest {
         private int updateCalls;
         private int buscarCalls;
         private int lastBatchSize;
+        private LocalDate lastDataInicio;
+        private LocalDate lastDataFim;
 
         @Override
-        public Set<String> buscarChavesAtivas(final EntityReconciliationSpec spec) throws SQLException {
+        public Set<String> buscarChavesAtivas(final EntityReconciliationSpec spec,
+                                              final LocalDate dataInicio,
+                                              final LocalDate dataFim) throws SQLException {
             buscarCalls++;
+            lastDataInicio = dataInicio;
+            lastDataFim = dataFim;
             return activeKeys.getOrDefault(spec.entityName(), Set.of());
         }
 

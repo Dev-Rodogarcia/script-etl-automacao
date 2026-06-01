@@ -311,7 +311,7 @@ ORDER BY data_extracao DESC;
 | `finished_at` | `DATETIMEOFFSET` | Finalização do manifesto. |
 | `mobile_read_at` | `DATETIMEOFFSET` | Momento de leitura/atualização mobile. |
 | `data_extracao` | `DATETIME2` | Momento da gravação/atualização no banco. |
-| `chave_merge_hash` | `Coluna computada persistida` | Concatenação `sequence_code|coalesce(pick_sequence_code, identificador_unico)|mdfe_number`, base da `UNIQUE`. |
+| `chave_merge_hash` | `Coluna computada persistida` | Concatenação `sequence_code|coalesce(pick_sequence_code, -1)|coalesce(mdfe_number, -1)`, base da `UNIQUE`. |
 
 #### MDF-e, contrato e programação
 

@@ -90,6 +90,23 @@ class RepositoryMergeGuardSourceTest {
     }
 
     @Test
+    void manifestoRepositoryNaoDeveUsarIdentificadorUnicoComoFallbackNoMatching() throws IOException {
+        final String source = Files.readString(Path.of(
+            "src/main/java/br/com/extrator/persistencia/repositorio/ManifestoRepository.java"
+        ));
+
+        assertTrue(source.contains(
+            "COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1)"
+        ));
+        assertTrue(!source.contains(
+            "COALESCE(CAST(target.pick_sequence_code AS VARCHAR(100)), target.identificador_unico)"
+        ));
+        assertTrue(!source.contains(
+            "COALESCE(CAST(source.pick_sequence_code AS VARCHAR(100)), source.identificador_unico)"
+        ));
+    }
+
+    @Test
     void guardaMonotonicaDeveAceitarAtualizacaoQuandoFreshnessForIgual() throws IOException {
         final String source = Files.readString(Path.of(
             "src/main/java/br/com/extrator/persistencia/repositorio/AbstractRepository.java"

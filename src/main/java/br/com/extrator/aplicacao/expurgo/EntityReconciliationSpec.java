@@ -11,6 +11,7 @@ public record EntityReconciliationSpec(
     String entityName,
     String tableName,
     String dbKeyExpression,
+    String dbTemporalExpression,
     ConfiguracaoEntidade dataExportConfig,
     Function<JsonNode, String> sourceKeyExtractor
 ) {
@@ -18,6 +19,7 @@ public record EntityReconciliationSpec(
         entityName = requireText(entityName, "entityName");
         tableName = requireText(tableName, "tableName");
         dbKeyExpression = requireText(dbKeyExpression, "dbKeyExpression");
+        dbTemporalExpression = requireText(dbTemporalExpression, "dbTemporalExpression");
         dataExportConfig = Objects.requireNonNull(dataExportConfig, "dataExportConfig");
         sourceKeyExtractor = Objects.requireNonNull(sourceKeyExtractor, "sourceKeyExtractor");
     }

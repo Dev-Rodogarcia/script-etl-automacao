@@ -319,26 +319,18 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
     }
 
     @Test
-    void devePreservarPickSequenceCodeOriginalDoMetadataNaChaveDeManifestos() {
-        final String metadata = """
-            {
-              "mft_pfs_pck_sequence_code": 71920,
-              "mft_mfs_number": 1503
-            }
-            """;
-
+    void deveUsarApenasColunasFisicasNaChaveDeManifestos() {
         final String chave = ValidacaoApiBanco24hDetalhadaRepository.montarChaveManifestoValidacao(
             48831L,
             null,
-            null,
-            metadata
+            null
         );
 
-        assertEquals("48831|71920|1503", chave);
+        assertEquals("48831|-1|-1", chave);
     }
 
     @Test
-    void deveCarregarChavesDeManifestosUsandoPickPreservadoNoMetadataQuandoColunaEstiverNormalizada() throws SQLException {
+    void deveCarregarChavesDeManifestosUsandoPickDaColunaFisica() throws SQLException {
         final Connection conexao = criarConexao(sql -> {
             assertTrue(sql.contains("FROM dbo.manifestos"));
             assertTrue(sql.contains("sequence_code"));
@@ -369,7 +361,7 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
             LocalDate.of(2026, 4, 23)
         );
 
-        assertEquals(Set.of("48831|71920|1503"), chaves);
+        assertEquals(Set.of("48831|-1|1503"), chaves);
     }
 
     @Test

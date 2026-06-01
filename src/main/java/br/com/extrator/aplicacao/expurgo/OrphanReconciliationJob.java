@@ -118,7 +118,11 @@ public class OrphanReconciliationJob {
         for (final Map.Entry<EntityReconciliationSpec, SourceKeySnapshot> entry : snapshots.entrySet()) {
             final EntityReconciliationSpec spec = entry.getKey();
             final SourceKeySnapshot snapshot = entry.getValue();
-            final Set<String> dbActiveKeys = store.buscarChavesAtivas(spec);
+            final Set<String> dbActiveKeys = store.buscarChavesAtivas(
+                spec,
+                request.dataInicio(),
+                request.dataFim()
+            );
             if (snapshot.keys().isEmpty() && !dbActiveKeys.isEmpty()) {
                 throw new IllegalStateException(
                     "Snapshot da API retornou zero chaves para "

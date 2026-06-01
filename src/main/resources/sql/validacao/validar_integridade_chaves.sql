@@ -27,10 +27,14 @@ ORDER BY quantidade DESC;
 SELECT 
     'manifestos_chave_composta' AS tabela,
     sequence_code,
-    identificador_unico,
+    ISNULL(CAST(pick_sequence_code AS VARCHAR(50)), '-1') AS pick_sequence_code,
+    ISNULL(CAST(mdfe_number AS VARCHAR(50)), '-1') AS mdfe_number,
     COUNT(*) AS quantidade
 FROM manifestos
-GROUP BY sequence_code, identificador_unico
+GROUP BY
+    sequence_code,
+    ISNULL(CAST(pick_sequence_code AS VARCHAR(50)), '-1'),
+    ISNULL(CAST(mdfe_number AS VARCHAR(50)), '-1')
 HAVING COUNT(*) > 1
 ORDER BY quantidade DESC;
 

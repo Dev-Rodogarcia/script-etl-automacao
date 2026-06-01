@@ -93,7 +93,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'024_drop_faturas_graphql'),
     (N'025_materializar_chave_responsavel_destino'),
     (N'026_materializar_chave_usuario_cotacoes'),
-    (N'027_adicionar_excluido_na_origem');
+    (N'027_adicionar_excluido_na_origem'),
+    (N'028_corrigir_chave_unica_manifestos');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -154,6 +155,20 @@ IF COL_LENGTH(N'dbo.localizacao_cargas', N'taxed_weight_decimal') IS NULL
 
 IF COL_LENGTH(N'dbo.localizacao_cargas', N'destination_branch_key') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.destination_branch_key', N'Chave materializada de responsavel destino ausente');
+
+DECLARE @manifestosChaveMergeDef NVARCHAR(MAX);
+SELECT @manifestosChaveMergeDef = cc.definition
+FROM sys.computed_columns cc
+WHERE cc.object_id = OBJECT_ID(N'dbo.manifestos')
+  AND cc.name = N'chave_merge_hash';
+
+IF @manifestosChaveMergeDef IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Coluna computada de chave estrita ausente');
+ELSE IF @manifestosChaveMergeDef LIKE N'%identificador_unico%'
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Chave computada nao deve usar fallback em identificador_unico');
+ELSE IF @manifestosChaveMergeDef NOT LIKE N'%pick_sequence_code%'
+     OR @manifestosChaveMergeDef NOT LIKE N'%mdfe_number%'
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Chave computada deve usar pick_sequence_code e mdfe_number');
 
 DECLARE @softDeleteTables TABLE (
     tabela NVARCHAR(128) NOT NULL,

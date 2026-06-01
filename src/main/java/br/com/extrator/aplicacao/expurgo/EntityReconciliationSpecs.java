@@ -14,6 +14,33 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class EntityReconciliationSpecs {
     private static final Map<String, EntityReconciliationSpec> DATAEXPORT_SPECS = criarSpecsDataExport();
+    private static final String TEMPORAL_FATURAS_POR_CLIENTE = """
+        COALESCE(
+            TRY_CONVERT(date, CASE WHEN ISJSON(base.metadata) = 1 THEN JSON_VALUE(base.metadata, '$.service_at') END),
+            TRY_CONVERT(date, CASE WHEN ISJSON(base.metadata) = 1 THEN JSON_VALUE(base.metadata, '$.service_date') END),
+            (
+                SELECT TOP (1) COALESCE(f.service_date, CONVERT(date, f.servico_em))
+                  FROM dbo.fretes f
+                 WHERE f.chave_cte = base.chave_cte
+                   AND COALESCE(f.excluido_na_origem, 0) = 0
+                 ORDER BY f.data_extracao DESC
+            ),
+            TRY_CONVERT(date, base.data_emissao_cte),
+            TRY_CONVERT(date, base.data_emissao_fatura),
+            TRY_CONVERT(date, base.fit_ant_issue_date),
+            CONVERT(date, base.data_extracao)
+        )
+        """;
+    private static final String TEMPORAL_MANIFESTOS = """
+        COALESCE(
+            TRY_CONVERT(date, CASE WHEN ISJSON(base.metadata) = 1 THEN JSON_VALUE(base.metadata, '$.service_date') END),
+            TRY_CONVERT(date, base.created_at),
+            TRY_CONVERT(date, base.departured_at),
+            TRY_CONVERT(date, base.closed_at),
+            TRY_CONVERT(date, base.finished_at),
+            CONVERT(date, base.data_extracao)
+        )
+        """;
 
     private EntityReconciliationSpecs() {
     }
@@ -50,6 +77,7 @@ public final class EntityReconciliationSpecs {
                 ConstantesEntidades.FATURAS_POR_CLIENTE,
                 "dbo.faturas_por_cliente",
                 "unique_id",
+                TEMPORAL_FATURAS_POR_CLIENTE,
                 ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.FATURAS_POR_CLIENTE),
                 DataExportReconciliationKeyExtractors::faturaPorCliente
             )
@@ -62,6 +90,7 @@ public final class EntityReconciliationSpecs {
                 "CONCAT(CAST(sequence_code AS varchar(50)), '|', "
                     + "COALESCE(CAST(pick_sequence_code AS varchar(50)), '-1'), '|', "
                     + "COALESCE(CAST(mdfe_number AS varchar(50)), '-1'))",
+                TEMPORAL_MANIFESTOS,
                 ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS),
                 DataExportReconciliationKeyExtractors::manifesto
             )

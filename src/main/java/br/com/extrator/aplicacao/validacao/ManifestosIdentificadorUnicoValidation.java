@@ -4,7 +4,7 @@ Classe  : ManifestosIdentificadorUnicoValidation (class)
 Pacote  : br.com.extrator.aplicacao.validacao
 Modulo  : Use Case - Validacao
 
-Papel   : Valida estrategia de identificador unico em manifestos (chave composta, duplicados).
+Papel   : Valida estrategia de chave logica em manifestos (chave composta, duplicados).
 
 Conecta com:
 - ManifestosSqlValidationRunner (delegacao)
@@ -58,8 +58,8 @@ final class ManifestosIdentificadorUnicoValidation {
 
         System.out.println("🔍 IDENTIFICAR DUPLICADOS FALSOS:");
         log.console("");
-        System.out.println("(Manifestos com mesma chave de negocio mas identificador_unico diferente)");
-        System.out.println("(Isso indica que campos voláteis estavam no hash ANTES da correção)");
+        System.out.println("(Manifestos com mesma chave logica estrita e identificador_unico diferente)");
+        System.out.println("(Isso indica cardinalidade vulneravel antes da correcao)");
         log.console("");
 
         final int duplicadosFalsosCount = exibirDuplicadosFalsos(conn);
@@ -215,10 +215,10 @@ final class ManifestosIdentificadorUnicoValidation {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, identificador_unico
+                    SELECT sequence_code, pick_sequence_code, mdfe_number
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, identificador_unico
+                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 duplicadosChaveComposta++;

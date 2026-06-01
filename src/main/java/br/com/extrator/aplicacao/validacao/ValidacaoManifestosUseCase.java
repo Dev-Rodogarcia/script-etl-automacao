@@ -434,7 +434,8 @@ public class ValidacaoManifestosUseCase {
             final int duplicadosExatos = queries.contarDuplicadosUltimas24h(conn);
             if (duplicadosExatos > 0) {
                 System.out.println(
-                    "ATENCAO: " + duplicadosExatos + " pares (sequence_code, identificador_unico) duplicados!"
+                    "ATENCAO: " + duplicadosExatos
+                        + " chaves (sequence_code, pick_sequence_code, mdfe_number) duplicadas!"
                 );
                 System.out.println("   Isso nao deveria acontecer com a constraint UNIQUE.");
             }

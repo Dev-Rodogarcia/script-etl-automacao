@@ -43,9 +43,9 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Implementa a arquitetura de persistência híbrida: colunas-chave para indexação
  * e uma coluna de metadados para resiliência e completude dos dados.
  * 
- * Utiliza chave composta (sequence_code, identificador_unico) para permitir
- * duplicados naturais (mesmo sequence_code mas dados diferentes) enquanto
- * mantém MERGE funcional para evitar duplicação não natural.
+ * Utiliza chave composta (sequence_code, pick_sequence_code, mdfe_number) para
+ * permitir duplicados naturais (mesmo sequence_code mas pick/MDF-e diferentes)
+ * enquanto mantém MERGE funcional para evitar duplicação não natural.
  * 
  * O identificador_unico é calculado como:
  * - pick_sequence_code + mdfe_number (quando ambos estão disponíveis)
@@ -122,8 +122,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             conexao,
             NOME_TABELA_STAGING,
             "target.sequence_code = source.sequence_code "
-                + "AND COALESCE(CAST(target.pick_sequence_code AS VARCHAR(100)), target.identificador_unico) "
-                + "= COALESCE(CAST(source.pick_sequence_code AS VARCHAR(100)), source.identificador_unico) "
+                + "AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1) "
                 + "AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)",
             freshnessGuard,
             COLUNAS_PROMOCAO,

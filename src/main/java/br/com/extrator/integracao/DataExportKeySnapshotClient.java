@@ -122,28 +122,27 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
         while (true) {
             verificarInterrupcao(spec.entityName(), paginaAtual);
             if (paginaAtual > limitePaginas) {
-                throw new IllegalStateException("Limite de paginas atingido no snapshot DataExport de "
+                throw new DataExportSnapshotException("Limite de paginas atingido no snapshot DataExport de "
                     + spec.entityName() + ": " + limitePaginas);
             }
             if (rows >= maxRegistros) {
-                throw new IllegalStateException("Limite de registros atingido no snapshot DataExport de "
+                throw new DataExportSnapshotException("Limite de registros atingido no snapshot DataExport de "
                     + spec.entityName() + ": " + maxRegistros);
             }
 
             final JsonNode dataNode = executarPaginaJson(spec, inicio, fim, paginaAtual);
             if (!dataNode.isArray()) {
-                throw new IllegalStateException(
+                throw new DataExportSnapshotException(
                     "Payload DataExport invalido para " + spec.entityName() + " pagina " + paginaAtual
                         + ": esperado array em data"
                 );
             }
 
             if (dataNode.isEmpty()) {
-                if (ehFimNatural(paginaAtual, tamanhoPaginaAnterior, per)
-                    || contagemCsvConfirmaFim(spec, dataInicio, dataFim, rows)) {
+                if (paginaVaziaComprovaFim(spec, dataInicio, dataFim, paginaAtual, tamanhoPaginaAnterior, per, rows)) {
                     break;
                 }
-                throw new IllegalStateException(
+                throw new DataExportSnapshotException(
                     "Pagina vazia inesperada no snapshot DataExport de "
                         + spec.entityName()
                         + " pagina "
@@ -203,12 +202,22 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
             : maxTentativasTimeoutPorPagina;
 
         while (tentativa <= maxTentativas) {
-            resposta = httpExecutor.executarRequisicaoDataExportJson(
-                url,
-                corpoJson,
-                config.timeout(),
-                "orphan-reconciliation-" + spec.entityName() + "-page-" + paginaAtual
-            );
+            try {
+                resposta = httpExecutor.executarRequisicaoDataExportJson(
+                    url,
+                    corpoJson,
+                    config.timeout(),
+                    "orphan-reconciliation-" + spec.entityName() + "-page-" + paginaAtual
+                );
+            } catch (final RuntimeException e) {
+                throw new DataExportSnapshotException(
+                    "Falha HTTP no snapshot DataExport de "
+                        + spec.entityName()
+                        + " pagina "
+                        + paginaAtual,
+                    e
+                );
+            }
             if (!httpExecutor.ehRespostaTimeout422(resposta) || tentativa == maxTentativas) {
                 break;
             }
@@ -217,13 +226,15 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
         }
 
         if (resposta == null) {
-            throw new IllegalStateException("Resposta nula no snapshot DataExport de "
+            throw new DataExportSnapshotException("Resposta nula no snapshot DataExport de "
                 + spec.entityName() + " pagina " + paginaAtual);
         }
         if (resposta.statusCode() != 200) {
-            throw new IllegalStateException(
-                "Erro HTTP "
-                    + resposta.statusCode()
+            final String tipoErro = resposta.statusCode() == 429
+                ? "Rate limit HTTP 429"
+                : "Erro HTTP " + resposta.statusCode();
+            throw new DataExportSnapshotException(
+                tipoErro
                     + " no snapshot DataExport de "
                     + spec.entityName()
                     + " pagina "
@@ -235,19 +246,29 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
             final JsonNode raizJson = MapperUtil.sharedJson().readTree(resposta.body());
             return raizJson.has("data") ? raizJson.get("data") : raizJson;
         } catch (final Exception e) {
-            throw new IllegalStateException(
+            throw new DataExportSnapshotException(
                 "Erro ao parsear pagina " + paginaAtual + " do snapshot DataExport de " + spec.entityName(),
                 e
             );
         }
     }
 
-    private boolean ehFimNatural(final int paginaAtual,
-                                 final Integer tamanhoPaginaAnterior,
-                                 final int per) {
+    private boolean paginaVaziaComprovaFim(final EntityReconciliationSpec spec,
+                                           final LocalDate dataInicio,
+                                           final LocalDate dataFim,
+                                           final int paginaAtual,
+                                           final Integer tamanhoPaginaAnterior,
+                                           final int per,
+                                           final int rowsRead) {
         if (paginaAtual <= 1) {
-            return true;
+            return contagemCsvConfirmaFim(spec, dataInicio, dataFim, rowsRead);
         }
+        return ehFimNatural(tamanhoPaginaAnterior, per)
+            || contagemCsvConfirmaFim(spec, dataInicio, dataFim, rowsRead);
+    }
+
+    private boolean ehFimNatural(final Integer tamanhoPaginaAnterior,
+                                 final int per) {
         return tamanhoPaginaAnterior != null && tamanhoPaginaAnterior < per;
     }
 
@@ -282,7 +303,7 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
             ThreadUtil.aguardar(delayMs);
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(
+            throw new DataExportSnapshotException(
                 "Thread interrompida durante retry do snapshot DataExport de "
                     + entityName
                     + " pagina "
@@ -304,7 +325,7 @@ public class DataExportKeySnapshotClient implements SourceKeySnapshotPort {
         if (!Thread.currentThread().isInterrupted()) {
             return;
         }
-        throw new IllegalStateException(
+        throw new DataExportSnapshotException(
             "Thread interrompida durante snapshot DataExport de " + entityName + " pagina " + paginaAtual
         );
     }
