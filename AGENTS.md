@@ -9,7 +9,7 @@ Você atua como Engenheiro de Software Principal neste repositório (Java 17 CLI
 * **Owner Estrutural:** Este repositório é o único dono do banco/schema `ETL_SISTEMA` (`esl_cloud`). Você tem permissão total para criar e alterar tabelas base, migrations, índices, views operacionais (`dbo.vw_*_powerbi`) e views dimensionais.
 * **Preservação de Documentação Operacional:** É proibido apagar arquivos `README.md` e `AGENTS.md`. Quando necessário, apenas atualize seu conteúdo mantendo esses arquivos presentes no repositório.
 * **Preparação para o Dashboard:** Garanta que todas as alterações de infraestrutura de dados necessárias para o Dashboard estejam aplicadas, testadas e documentadas aqui, deixando o caminho livre para o consumo limpa pelo monorepo de painéis.
-* **Sincronismo Canônico:** Ao criar ou alterar uma migration em `database/migrations`, atualize obrigatoriamente os scripts base correspondentes em `database/tabelas`, `database/views`, `database/indices` ou `database/validacao`. O banco deve ser capaz de ser recriado do zero de forma limpa.
+* **Paridade de Schema (Baseline Parity):** Toda alteração estrutural via Migration (ex: arquivos em `database/migrations/`) DEVE obrigatoriamente ser refletida nos scripts base de criação correspondentes (ex: `database/tabelas/`, `database/views/`, `database/indices/` e `database/validacao/`). A recriação do banco de dados do zero deve produzir um schema idêntico ao banco atualizado via migrations.
 
 ---
 

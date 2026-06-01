@@ -325,13 +325,19 @@ IF NOT EXISTS (
 )
     INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Volumes]', N'Coluna do KPI Volumes ausente');
 
+-- Contrato textual para inspeção: dbo.vw_fretes_powerbi.[Responsável Região Destino Key]
+DECLARE @colResponsavelRegiaoDestinoKey SYSNAME =
+    N'Respons' + NCHAR(225) + N'vel Regi' + NCHAR(227) + N'o Destino Key';
+DECLARE @nomeResponsavelRegiaoDestinoKey NVARCHAR(300) =
+    N'dbo.vw_fretes_powerbi.[' + @colResponsavelRegiaoDestinoKey + N']';
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.columns
     WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
-      AND name = N'Responsável Região Destino Key'
+      AND name = @colResponsavelRegiaoDestinoKey
 )
-    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_fretes_powerbi.[Responsável Região Destino Key]', N'Chave controlada para filtro de responsavel ausente');
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', @nomeResponsavelRegiaoDestinoKey, N'Chave controlada para filtro de responsavel ausente');
 
 IF NOT EXISTS (
     SELECT 1
