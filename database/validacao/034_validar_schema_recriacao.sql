@@ -34,7 +34,9 @@ INSERT INTO @tabelas (nome) VALUES
     (N'sys_replay_idempotency'),
     (N'sys_reconciliation_quarantine'),
     (N'raster_viagens'),
-    (N'raster_viagem_paradas');
+    (N'raster_viagem_paradas'),
+    (N'manifestos_frota_propria_cnpjs'),
+    (N'fato_gestao_vista_fretes');
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'TABELA', t.nome, N'Tabela dbo.' + t.nome + N' ausente'
@@ -94,7 +96,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'025_materializar_chave_responsavel_destino'),
     (N'026_materializar_chave_usuario_cotacoes'),
     (N'027_adicionar_excluido_na_origem'),
-    (N'028_corrigir_chave_unica_manifestos');
+    (N'028_corrigir_chave_unica_manifestos'),
+    (N'029_criar_fato_gestao_vista_fretes');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -308,6 +311,41 @@ IF NOT EXISTS (
       AND filter_definition LIKE N'%flag_comprovante_anexado%'
 )
     INSERT INTO @falhas VALUES (N'INDICE', N'IX_inventario_comprovante_minuta', N'Indice filtrado de comprovante anexado ausente ou desatualizado');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_functions
+    WHERE name = N'PF_fato_gv_data_referencia_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_FUNCTION', N'PF_fato_gv_data_referencia_mes', N'Partition Function da fato Gestao a Vista ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_schemes
+    WHERE name = N'PS_fato_gv_data_referencia_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_SCHEME', N'PS_fato_gv_data_referencia_mes', N'Partition Scheme da fato Gestao a Vista ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'CCI_fato_gv_fretes'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_fretes')
+      AND type_desc = N'CLUSTERED COLUMNSTORE'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'CCI_fato_gv_fretes', N'Clustered Columnstore Index da fato Gestao a Vista ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'UX_fato_gv_fretes_indicador_minuta'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_fretes')
+      AND is_unique = 1
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'UX_fato_gv_fretes_indicador_minuta', N'Indice unico de MERGE da fato Gestao a Vista ausente');
+
+IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_fretes', N'P') IS NULL
+    INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_fretes', N'Procedure de carga da fato Gestao a Vista ausente');
 
 IF NOT EXISTS (
     SELECT 1
