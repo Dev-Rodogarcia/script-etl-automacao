@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ class IndicadoresGestaoViewSqlTest {
         "\\x{00C3}[\\x{0080}-\\x{00BF}\\x{0192}\\x{201A}\\x{00A2}]|"
             + "\\x{00C2}[\\x{0080}-\\x{00BF}]|\\x{FFFD}"
     );
+    private static final Pattern SELECT_STAR_PATTERN = Pattern.compile("(?is)\\bSELECT\\s+\\*\\b");
 
     @Test
     void fretesPowerBiDeveExporColunasOficiaisDePerformanceECubagem() throws IOException {
@@ -208,6 +210,35 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(indicesSql, "IX_cotacoes_usuario_key_requested_at");
         assertSemMojibake(viewSql, "database/views/015_criar_view_cotacoes_powerbi.sql");
         assertSemMojibake(migrationSql, "database/migrations/026_materializar_chave_usuario_cotacoes.sql");
+    }
+
+    @Test
+    void viewsCriticasDeIntegracaoNaoPodemUsarSelectStar() throws IOException {
+        for (final String caminho : List.of(
+            "database/views/012_criar_view_fretes_powerbi.sql",
+            "database/views/015_criar_view_cotacoes_powerbi.sql",
+            "database/views/018_criar_view_manifestos_powerbi.sql",
+            "database/views/023_publicar_wrappers_dashboard_dev_explicitos.sql"
+        )) {
+            final String sql = lerSql(caminho);
+
+            assertFalse(
+                SELECT_STAR_PATTERN.matcher(sql).find(),
+                "View critica nao pode usar SELECT *: " + caminho
+            );
+        }
+    }
+
+    @Test
+    void wrappersDashboardDevDevemSerPublicadosComListaExplicita() throws IOException {
+        final String sql = lerSql("database/views/023_publicar_wrappers_dashboard_dev_explicitos.sql");
+
+        assertContem(sql, "vw_fretes_powerbi");
+        assertContem(sql, "vw_manifestos_powerbi");
+        assertContem(sql, "vw_cotacoes_powerbi");
+        assertContem(sql, "STRING_AGG(CONVERT(NVARCHAR(MAX), QUOTENAME(c.name))");
+        assertContem(sql, "CREATE OR ALTER VIEW dbo.");
+        assertContem(sql, "FROM [$(EtlDb)].dbo.");
     }
 
     @Test
