@@ -74,12 +74,36 @@ BEGIN
 
     IF NOT EXISTS (
         SELECT 1
-        FROM sys.indexes
-        WHERE name = N'IX_fato_gvf_aging'
-          AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
-          AND filter_definition LIKE N'%excluido_na_origem%'
+        FROM sys.indexes i
+        JOIN sys.index_columns k1
+          ON k1.object_id = i.object_id
+         AND k1.index_id = i.index_id
+         AND k1.key_ordinal = 1
+        JOIN sys.columns c1
+          ON c1.object_id = k1.object_id
+         AND c1.column_id = k1.column_id
+        JOIN sys.index_columns k2
+          ON k2.object_id = i.object_id
+         AND k2.index_id = i.index_id
+         AND k2.key_ordinal = 2
+        JOIN sys.columns c2
+          ON c2.object_id = k2.object_id
+         AND c2.column_id = k2.column_id
+        WHERE i.name = N'IX_fato_gvf_aging'
+          AND i.object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
+          AND c1.name = N'data_emissao_cte'
+          AND k1.is_descending_key = 1
+          AND c2.name = N'unique_id'
+          AND k2.is_descending_key = 1
+          AND (
+              SELECT COUNT(1)
+              FROM sys.index_columns kc
+              WHERE kc.object_id = i.object_id
+                AND kc.index_id = i.index_id
+                AND kc.key_ordinal > 0
+          ) = 2
     )
-        INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_aging', N'Indice de Aging ausente ou sem filtro esperado');
+        INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_aging', N'Indice de Aging ausente ou com chave fora do contrato');
 
     IF NOT EXISTS (
         SELECT 1

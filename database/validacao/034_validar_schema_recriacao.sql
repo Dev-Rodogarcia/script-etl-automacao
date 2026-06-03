@@ -103,7 +103,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'029_criar_fato_gestao_vista_fretes'),
     (N'030_criar_fato_gestao_vista_coletores'),
     (N'031_criar_fato_fretes_faturamento'),
-    (N'032_criar_fato_gestao_vista_faturas');
+    (N'032_criar_fato_gestao_vista_faturas'),
+    (N'033_tuning_indices_fatos');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -376,6 +377,34 @@ IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_coletores', N'P') IS NULL
 
 IF NOT EXISTS (
     SELECT 1
+    FROM sys.indexes i
+    JOIN sys.index_columns k1
+      ON k1.object_id = i.object_id
+     AND k1.index_id = i.index_id
+     AND k1.key_ordinal = 1
+    JOIN sys.columns c1
+      ON c1.object_id = k1.object_id
+     AND c1.column_id = k1.column_id
+    JOIN sys.index_columns k2
+      ON k2.object_id = i.object_id
+     AND k2.index_id = i.index_id
+     AND k2.key_ordinal = 2
+    JOIN sys.columns c2
+      ON c2.object_id = k2.object_id
+     AND c2.column_id = k2.column_id
+    WHERE i.name = N'IX_fato_gv_coletores_periodo_filial'
+      AND i.object_id = OBJECT_ID(N'dbo.fato_gestao_vista_coletores')
+      AND c1.name = N'data_referencia'
+      AND k1.is_descending_key = 1
+      AND c2.name = N'filial_key'
+      AND k2.is_descending_key = 0
+      AND i.filter_definition LIKE N'%is_linha_valida_indicador%'
+      AND i.filter_definition LIKE N'%excluido_na_origem%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gv_coletores_periodo_filial', N'Indice de Ranking da fato de coletores ausente ou fora do contrato');
+
+IF NOT EXISTS (
+    SELECT 1
     FROM sys.partition_functions
     WHERE name = N'PF_fato_ff_data_referencia_mes'
 )
@@ -433,12 +462,29 @@ IF NOT EXISTS (
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.indexes
-    WHERE name = N'IX_fato_gvf_aging'
-      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
-      AND filter_definition LIKE N'%excluido_na_origem%'
+    FROM sys.indexes i
+    JOIN sys.index_columns k1
+      ON k1.object_id = i.object_id
+     AND k1.index_id = i.index_id
+     AND k1.key_ordinal = 1
+    JOIN sys.columns c1
+      ON c1.object_id = k1.object_id
+     AND c1.column_id = k1.column_id
+    JOIN sys.index_columns k2
+      ON k2.object_id = i.object_id
+     AND k2.index_id = i.index_id
+     AND k2.key_ordinal = 2
+    JOIN sys.columns c2
+      ON c2.object_id = k2.object_id
+     AND c2.column_id = k2.column_id
+    WHERE i.name = N'IX_fato_gvf_aging'
+      AND i.object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
+      AND c1.name = N'data_emissao_cte'
+      AND k1.is_descending_key = 1
+      AND c2.name = N'unique_id'
+      AND k2.is_descending_key = 1
 )
-    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_aging', N'Indice de Aging da fato de faturas por cliente ausente');
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_aging', N'Indice de Aging da fato de faturas por cliente ausente ou fora do contrato');
 
 IF NOT EXISTS (
     SELECT 1

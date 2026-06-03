@@ -600,7 +600,7 @@ ORDER BY data_extracao DESC;
   - `valor_operacional` usa `fit_ant_value`, com fallback para `valor_fatura`, `valor_frete` e zero.
   - `status_pagamento` é materializado na carga para separar `sem_fatura`, `a_vencer`, `vencido`, `baixado` e `sem_vencimento`.
   - `hash_linha` permite carga incremental robusta, atualizando apenas linhas alteradas.
-  - `IX_fato_gvf_aging` e `IX_fato_gvf_paginacao_periodo` cobrem os padrões críticos do Dashboard de Faturas.
+  - `IX_fato_gvf_aging` usa `data_emissao_cte DESC, unique_id DESC` para Aging/Paginacao; `IX_fato_gvf_paginacao_periodo` cobre a tabela do Dashboard.
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |

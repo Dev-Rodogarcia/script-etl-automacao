@@ -205,16 +205,9 @@ IF OBJECT_ID(N'dbo.fato_gestao_vista_faturas', N'U') IS NOT NULL
 BEGIN
     CREATE NONCLUSTERED INDEX IX_fato_gvf_aging
         ON dbo.fato_gestao_vista_faturas(
-            data_emissao_cte_date,
-            documento_fatura,
-            data_baixa_fatura,
-            data_vencimento_fatura
+            data_emissao_cte DESC,
+            unique_id DESC
         )
-        INCLUDE (
-            valor_operacional, status_pagamento, cliente_chave,
-            cliente_nome, cliente_cnpj, filial, data_extracao_origem
-        )
-        WHERE excluido_na_origem = 0
         WITH (DATA_COMPRESSION = PAGE)
         ON PS_fato_gvf_data_emissao_mes(data_emissao_fatura);
 

@@ -193,6 +193,7 @@ for %%F in (
     "migrations\030_criar_fato_gestao_vista_coletores.sql"
     "migrations\031_criar_fato_fretes_faturamento.sql"
     "migrations\032_criar_fato_gestao_vista_faturas.sql"
+    "migrations\033_tuning_indices_fatos.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F

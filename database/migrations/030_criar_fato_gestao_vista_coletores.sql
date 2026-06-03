@@ -186,11 +186,14 @@ IF OBJECT_ID(N'dbo.fato_gestao_vista_coletores', N'U') IS NOT NULL
    )
 BEGIN
     CREATE NONCLUSTERED INDEX IX_fato_gv_coletores_periodo_filial
-        ON dbo.fato_gestao_vista_coletores(data_referencia, filial_key)
+        ON dbo.fato_gestao_vista_coletores(data_referencia DESC, filial_key)
         INCLUDE (
-            filial, classificacao, manifestos_bipados, manifestos_emitidos,
-            manifestos_descarregamento, total_manifestos, manifestos_incompletos,
-            pct_utilizacao, updated_at
+            manifestos_bipados,
+            manifestos_emitidos,
+            manifestos_descarregamento,
+            total_manifestos,
+            manifestos_incompletos,
+            is_filial_operacional
         )
         WHERE is_linha_valida_indicador = 1
           AND excluido_na_origem = 0
