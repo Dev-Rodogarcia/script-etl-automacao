@@ -36,8 +36,11 @@ REM
 REM OPCOES ADICIONAIS (config.bat):
 REM   DB_PORT           : porta do SQL Server (ex.: 1433)
 REM   SQLCMD_EXTRA_ARGS : flags extras do sqlcmd (ex.: -C para confiar no certificado)
-REM   ETL_EXECUTAR_CARGA_GESTAO_VISTA=1 : executa a carga materializada da fato
-REM                                      dbo.fato_gestao_vista_fretes apos publicar
+REM   ETL_EXECUTAR_CARGA_GESTAO_VISTA=1 : executa as cargas materializadas
+REM                                      dbo.fato_gestao_vista_fretes,
+REM                                      dbo.fato_gestao_vista_coletores,
+REM                                      dbo.fato_fretes_faturamento e
+REM                                      dbo.fato_gestao_vista_faturas apos publicar
 REM                                      tabelas, migrations, indices, views e procedures.
 REM
 REM BANCO SQLite DE AUTENTICACAO:
@@ -187,6 +190,9 @@ for %%F in (
     "migrations\027_adicionar_excluido_na_origem.sql"
     "migrations\028_corrigir_chave_unica_manifestos.sql"
     "migrations\029_criar_fato_gestao_vista_fretes.sql"
+    "migrations\030_criar_fato_gestao_vista_coletores.sql"
+    "migrations\031_criar_fato_fretes_faturamento.sql"
+    "migrations\032_criar_fato_gestao_vista_faturas.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -252,6 +258,9 @@ REM --- Stored Procedures (criticas - para em erro) ---
 echo [ETAPA] Stored Procedures...
 for %%F in (
     "procedures\001_criar_sp_carga_fato_gestao_vista_fretes.sql"
+    "procedures\002_criar_sp_carga_fato_gestao_vista_coletores.sql"
+    "procedures\003_criar_sp_carga_fato_fretes_faturamento.sql"
+    "procedures\004_criar_sp_carga_fato_gestao_vista_faturas.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
@@ -269,15 +278,40 @@ echo.
 
 REM --- Carga materializada opcional (uso recomendado em janela noturna) ---
 if /i "%ETL_EXECUTAR_CARGA_GESTAO_VISTA%"=="1" (
-    echo [ETAPA] Carga materializada Gestao a Vista...
+    echo [ETAPA] Cargas materializadas BI...
+    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
     sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
     if errorlevel 1 (
-        echo [ERRO] Falha na carga materializada Gestao a Vista.
+        echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
         set "SQLCMDPASSWORD="
         if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
         exit /b 1
     )
-    echo [OK] Carga materializada Gestao a Vista concluida.
+    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
+    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
+    if errorlevel 1 (
+        echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
+        set "SQLCMDPASSWORD="
+        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+        exit /b 1
+    )
+    echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
+    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
+    if errorlevel 1 (
+        echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
+        set "SQLCMDPASSWORD="
+        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+        exit /b 1
+    )
+    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
+    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
+    if errorlevel 1 (
+        echo [ERRO] Falha na carga materializada de Faturas por Cliente.
+        set "SQLCMDPASSWORD="
+        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+        exit /b 1
+    )
+    echo [OK] Cargas materializadas BI concluidas.
     echo.
 )
 
@@ -292,6 +326,9 @@ for %%F in (
     "validacao\034_validar_schema_recriacao.sql"
     "validacao\036_validar_volumes_fretes_faturamento.sql"
     "validacao\038_validar_fato_gestao_vista_fretes.sql"
+    "validacao\039_validar_fato_gestao_vista_coletores.sql"
+    "validacao\040_validar_fato_fretes_faturamento.sql"
+    "validacao\041_validar_fato_gestao_vista_faturas.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
@@ -369,6 +406,9 @@ for %%F in (
     "tabelas\026_criar_tabela_localizacao_cargas_regiao_destino_alias.sql"
     "tabelas\027_criar_tabela_manifestos_frota_propria_cnpjs.sql"
     "tabelas\028_criar_tabela_fato_gestao_vista_fretes.sql"
+    "tabelas\029_criar_tabela_fato_gestao_vista_coletores.sql"
+    "tabelas\030_criar_tabela_fato_fretes_faturamento.sql"
+    "tabelas\031_criar_tabela_fato_gestao_vista_faturas.sql"
 ) do (
     if not exist %%F (
         echo [ERRO] Script nao encontrado: %%~F

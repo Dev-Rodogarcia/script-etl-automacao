@@ -68,6 +68,8 @@ ORDER BY data_extracao DESC;
 | `dbo.localizacao_cargas` | Negócio | Data Export | 1 linha por minuta/carga | `sequence_number` |
 | `dbo.contas_a_pagar` | Negócio | Data Export | 1 linha por lançamento | `sequence_code` |
 | `dbo.faturas_por_cliente` | Negócio | Data Export + enriquecimento | 1 linha por vínculo de faturamento | `unique_id` |
+| `dbo.fato_gestao_vista_faturas` | Fato BI | Carga SQL de `faturas_por_cliente` | 1 linha por título/`unique_id` | `unique_id` |
+| `dbo.fato_fretes_faturamento` | Fato BI | Carga SQL de `fretes` + status CT-e de `faturas_por_cliente` | 1 linha por frete validado para faturamento | `frete_id` |
 | `dbo.inventario` | Negócio | Data Export | 1 linha por ordem/minuta consolidada por chave técnica | `identificador_unico` |
 | `dbo.sinistros` | Negócio | Data Export | 1 linha por sinistro + NF consolidada por chave técnica | `identificador_unico` |
 | `dbo.raster_viagens` | Negócio | Raster `getEventoFimViagem` | 1 linha por viagem/SM | `cod_solicitacao` |
@@ -97,6 +99,8 @@ ORDER BY data_extracao DESC;
 - `dbo.inventario.numero_minuta = dbo.fretes.corporation_sequence_number`
 - `dbo.sinistros.corporation_sequence_number = dbo.fretes.corporation_sequence_number`
 - `dbo.fretes.nfse_number` e `dbo.fretes.nfse_series` alimentam `dbo.faturas_por_cliente.numero_nfse` e `dbo.faturas_por_cliente.serie_nfse`
+- `dbo.fato_fretes_faturamento.frete_id = dbo.fretes.id`; quando houver `chave_cte`, a carga cruza `dbo.faturas_por_cliente.chave_cte` para validar CT-e cancelado.
+- `dbo.fato_gestao_vista_faturas.unique_id = dbo.faturas_por_cliente.unique_id`; a carga materializa datas, status, valor operacional e cliente para Aging/Tabela.
 - `dbo.coletas.cancellation_user_id` e `dbo.coletas.destroy_user_id` podem ser ligados a `dbo.dim_usuarios.user_id`
 - `dbo.raster_viagem_paradas.cod_solicitacao = dbo.raster_viagens.cod_solicitacao`
 - `dbo.dim_usuarios_historico.user_id = dbo.dim_usuarios.user_id`
@@ -586,6 +590,56 @@ ORDER BY data_extracao DESC;
 | `pedidos_cliente` | `NVARCHAR(MAX)` | Lista textual de pedidos do cliente. |
 | `metadata` | `NVARCHAR(MAX)` | JSON bruto do relatório de faturamento. |
 | `data_extracao` | `DATETIME2` | Momento da gravação/atualização no banco. |
+
+### `dbo.fato_gestao_vista_faturas`
+
+- Fonte: carga SQL `dbo.sp_carga_fato_gestao_vista_faturas`
+- Grão: 1 linha por título/linha operacional de `dbo.faturas_por_cliente`, identificada por `unique_id`.
+- Particionamento: mensal por `data_emissao_fatura`.
+- Observações importantes:
+  - `valor_operacional` usa `fit_ant_value`, com fallback para `valor_fatura`, `valor_frete` e zero.
+  - `status_pagamento` é materializado na carga para separar `sem_fatura`, `a_vencer`, `vencido`, `baixado` e `sem_vencimento`.
+  - `hash_linha` permite carga incremental robusta, atualizando apenas linhas alteradas.
+  - `IX_fato_gvf_aging` e `IX_fato_gvf_paginacao_periodo` cobrem os padrões críticos do Dashboard de Faturas.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `unique_id` | `NVARCHAR(100)` | Identidade operacional do título/linha de faturamento. |
+| `documento_fatura` | `NVARCHAR(100)` | Número/documento da fatura quando faturada. |
+| `data_emissao_fatura` | `DATE` | Data de emissão da fatura e chave de particionamento mensal. |
+| `data_vencimento_fatura` | `DATE` | Data de vencimento usada pelo Aging. |
+| `data_baixa_fatura` | `DATE` | Data de baixa/liquidação, quando existir. |
+| `valor_operacional` | `DECIMAL(19,4)` | Valor consolidado para métricas de faturamento. |
+| `status_pagamento` | `NVARCHAR(50)` | Status materializado para consultas de Aging. |
+| `cliente_chave` | `NVARCHAR(320)` | Chave estável por CNPJ ou nome do pagador. |
+| `cliente_cnpj_key` | `NVARCHAR(50)` | CNPJ normalizado para filtros dimensionais. |
+| `hash_linha` | `BINARY(32)` | Hash SHA-256 da linha de negócio para carga incremental. |
+
+### `dbo.fato_fretes_faturamento`
+
+- Fonte: carga SQL `dbo.sp_carga_fato_fretes_faturamento`
+- Grão: 1 linha por frete validado, usando `dbo.fretes.id` como identidade operacional.
+- Particionamento: mensal por `data_referencia_faturamento_date`, derivada de `data_referencia_faturamento`.
+- Observações importantes:
+  - `is_cte_cancelado` usa o status real de CT-e vindo de `dbo.faturas_por_cliente` por `chave_cte`, com fallback controlado para `fretes.status`.
+  - `is_elegivel_faturamento = 0` sempre zera `receita_bruta` e `valor_frete`; CT-e cancelado também força inelegibilidade.
+  - `hash_linha` permite carga incremental robusta, atualizando apenas linhas com mudança de regra ou atributo.
+  - `IX_fato_ff_paginacao_periodo` materializa a ordenação esperada pelo dashboard: `data_referencia_faturamento DESC`, `numero_minuta DESC`, `frete_id DESC`.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `frete_id` | `BIGINT` | ID do frete em `dbo.fretes`; identidade do grão 1:1. |
+| `numero_minuta` | `BIGINT` | Número operacional da minuta/frete. |
+| `data_referencia_faturamento` | `DATETIMEOFFSET` | Competência de faturamento materializada no frete. |
+| `data_referencia_faturamento_date` | `DATE` | Data usada para particionamento mensal e filtros sargable. |
+| `filial_key` | `NVARCHAR(255)` | Chave normalizada da filial emissora. |
+| `pagador_documento_key` | `NVARCHAR(50)` | Documento normalizado do pagador. |
+| `status_cte_real` | `NVARCHAR(255)` | Status de CT-e reconciliado a partir de `faturas_por_cliente`. |
+| `is_cte_cancelado` | `BIT` | Flag booleana da regra crítica de CT-e cancelado. |
+| `is_elegivel_faturamento` | `BIT` | Elegibilidade final após cortesia, bloqueio, origem e CT-e cancelado. |
+| `valor_frete` | `DECIMAL(18,2)` | Valor de frete elegível; zero quando inelegível. |
+| `receita_bruta` | `DECIMAL(18,2)` | Receita bruta elegível; zero quando inelegível ou CT-e cancelado. |
+| `hash_linha` | `BINARY(32)` | Hash SHA-256 da linha de negócio para carga incremental. |
 
 ### `dbo.raster_viagens`
 

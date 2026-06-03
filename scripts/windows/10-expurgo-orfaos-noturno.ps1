@@ -122,17 +122,17 @@ if ($exitCode -eq 0) {
     Write-LogLine "Expurgo logico noturno concluido com sucesso."
 
     if ($env:ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA -eq '1') {
-        Write-LogLine "Carga materializada de Gestao a Vista ignorada por ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA=1."
+        Write-LogLine "Cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente) ignoradas por ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA=1."
     } else {
         $databaseScript = Join-Path $RepoRoot 'database\executar_database.bat'
         if (-not (Test-Path -LiteralPath $databaseScript -PathType Leaf)) {
-            $message = "Script de banco nao encontrado em $databaseScript. Carga materializada de Gestao a Vista abortada."
+            $message = "Script de banco nao encontrado em $databaseScript. Cargas materializadas BI abortadas."
             Write-LogLine $message
             Publish-FailureEvent -ExitCode 3 -Message $message
             exit 3
         }
 
-        Write-LogLine "Iniciando carga materializada de Gestao a Vista."
+        Write-LogLine "Iniciando cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente)."
         $oldCargaGestaoVista = $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA
         $oldDbSilent = $env:EXTRATOR_DB_SILENT
         try {
@@ -146,13 +146,13 @@ if ($exitCode -eq 0) {
         }
 
         if ($dbExitCode -ne 0) {
-            $message = "Carga materializada de Gestao a Vista falhou com exit code $dbExitCode. Consulte $LogPath."
+            $message = "Cargas materializadas BI falharam com exit code $dbExitCode. Consulte $LogPath."
             Write-LogLine $message
             Publish-FailureEvent -ExitCode $dbExitCode -Message $message
             exit $dbExitCode
         }
 
-        Write-LogLine "Carga materializada de Gestao a Vista concluida com sucesso."
+        Write-LogLine "Cargas materializadas BI concluidas com sucesso."
     }
 
     if (Test-Path -LiteralPath $FailureMarker -PathType Leaf) {

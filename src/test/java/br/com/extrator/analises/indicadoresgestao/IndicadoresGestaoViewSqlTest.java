@@ -165,12 +165,18 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "migrations\\022_corrigir_volumes_fretes_faturamento.sql");
         assertContem(sql, "migrations\\025_materializar_chave_responsavel_destino.sql");
         assertContem(sql, "migrations\\026_materializar_chave_usuario_cotacoes.sql");
+        assertContem(sql, "migrations\\032_criar_fato_gestao_vista_faturas.sql");
+        assertContem(sql, "procedures\\004_criar_sp_carga_fato_gestao_vista_faturas.sql");
+        assertContem(sql, "validacao\\041_validar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
         assertContem(validacao, "019_adicionar_comprovante_fretes_performance");
         assertContem(validacao, "021_materializar_comprovante_inventario");
         assertContem(validacao, "022_corrigir_volumes_fretes_faturamento");
         assertContem(validacao, "025_materializar_chave_responsavel_destino");
         assertContem(validacao, "026_materializar_chave_usuario_cotacoes");
+        assertContem(validacao, "032_criar_fato_gestao_vista_faturas");
+        assertContem(validacao, "dbo.fato_gestao_vista_faturas");
+        assertContem(validacao, "dbo.sp_carga_fato_gestao_vista_faturas");
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Comprovante Anexado]");
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Responsável Região Destino Key]");
         assertContem(validacao, "dbo.vw_cotacoes_powerbi.[Usuario Key]");

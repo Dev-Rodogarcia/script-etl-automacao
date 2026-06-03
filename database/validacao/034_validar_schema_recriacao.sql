@@ -36,7 +36,10 @@ INSERT INTO @tabelas (nome) VALUES
     (N'raster_viagens'),
     (N'raster_viagem_paradas'),
     (N'manifestos_frota_propria_cnpjs'),
-    (N'fato_gestao_vista_fretes');
+    (N'fato_gestao_vista_fretes'),
+    (N'fato_gestao_vista_coletores'),
+    (N'fato_fretes_faturamento'),
+    (N'fato_gestao_vista_faturas');
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'TABELA', t.nome, N'Tabela dbo.' + t.nome + N' ausente'
@@ -97,7 +100,10 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'026_materializar_chave_usuario_cotacoes'),
     (N'027_adicionar_excluido_na_origem'),
     (N'028_corrigir_chave_unica_manifestos'),
-    (N'029_criar_fato_gestao_vista_fretes');
+    (N'029_criar_fato_gestao_vista_fretes'),
+    (N'030_criar_fato_gestao_vista_coletores'),
+    (N'031_criar_fato_fretes_faturamento'),
+    (N'032_criar_fato_gestao_vista_faturas');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -346,6 +352,105 @@ IF NOT EXISTS (
 
 IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_fretes', N'P') IS NULL
     INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_fretes', N'Procedure de carga da fato Gestao a Vista ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'CCI_fato_gv_coletores'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_coletores')
+      AND type_desc = N'CLUSTERED COLUMNSTORE'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'CCI_fato_gv_coletores', N'Clustered Columnstore Index da fato de coletores ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'UX_fato_gv_coletores_data_filial_classif'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_coletores')
+      AND is_unique = 1
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'UX_fato_gv_coletores_data_filial_classif', N'Indice unico de MERGE da fato de coletores ausente');
+
+IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_coletores', N'P') IS NULL
+    INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_coletores', N'Procedure de carga da fato de coletores ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_functions
+    WHERE name = N'PF_fato_ff_data_referencia_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_FUNCTION', N'PF_fato_ff_data_referencia_mes', N'Partition Function da fato de faturamento de fretes ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_schemes
+    WHERE name = N'PS_fato_ff_data_referencia_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_SCHEME', N'PS_fato_ff_data_referencia_mes', N'Partition Scheme da fato de faturamento de fretes ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'CCI_fato_ff'
+      AND object_id = OBJECT_ID(N'dbo.fato_fretes_faturamento')
+      AND type_desc = N'CLUSTERED COLUMNSTORE'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'CCI_fato_ff', N'Clustered Columnstore Index da fato de faturamento de fretes ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fato_ff_paginacao_periodo'
+      AND object_id = OBJECT_ID(N'dbo.fato_fretes_faturamento')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_ff_paginacao_periodo', N'Indice de paginacao da fato de faturamento de fretes ausente');
+
+IF OBJECT_ID(N'dbo.sp_carga_fato_fretes_faturamento', N'P') IS NULL
+    INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_fretes_faturamento', N'Procedure de carga da fato de faturamento de fretes ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_functions
+    WHERE name = N'PF_fato_gvf_data_emissao_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_FUNCTION', N'PF_fato_gvf_data_emissao_mes', N'Partition Function da fato de faturas por cliente ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.partition_schemes
+    WHERE name = N'PS_fato_gvf_data_emissao_mes'
+)
+    INSERT INTO @falhas VALUES (N'PARTITION_SCHEME', N'PS_fato_gvf_data_emissao_mes', N'Partition Scheme da fato de faturas por cliente ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'CCI_fato_gvf'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
+      AND type_desc = N'CLUSTERED COLUMNSTORE'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'CCI_fato_gvf', N'Clustered Columnstore Index da fato de faturas por cliente ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fato_gvf_aging'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
+      AND filter_definition LIKE N'%excluido_na_origem%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_aging', N'Indice de Aging da fato de faturas por cliente ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fato_gvf_paginacao_periodo'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_faturas')
+      AND filter_definition LIKE N'%excluido_na_origem%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_gvf_paginacao_periodo', N'Indice de paginacao da fato de faturas por cliente ausente');
+
+IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_faturas', N'P') IS NULL
+    INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_faturas', N'Procedure de carga da fato de faturas por cliente ausente');
 
 IF NOT EXISTS (
     SELECT 1

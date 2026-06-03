@@ -187,9 +187,9 @@ IF OBJECT_ID(N'dbo.fato_gestao_vista_fretes', N'U') IS NOT NULL
    )
 BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX UX_fato_gv_fretes_indicador_minuta
-        ON dbo.fato_gestao_vista_fretes(indicador_codigo, numero_minuta)
+        ON dbo.fato_gestao_vista_fretes(indicador_codigo, numero_minuta, data_referencia)
         WITH (DATA_COMPRESSION = PAGE)
-        ON [PRIMARY];
+        ON PS_fato_gv_data_referencia_mes(data_referencia);
 
     PRINT 'Indice UX_fato_gv_fretes_indicador_minuta criado.';
 END;
@@ -206,7 +206,7 @@ BEGIN
         ON dbo.fato_gestao_vista_fretes(indicador_codigo, numero_minuta)
         INCLUDE (data_referencia, hash_linha, excluido_na_origem, snapshot_em)
         WITH (DATA_COMPRESSION = PAGE)
-        ON [PRIMARY];
+        ON PS_fato_gv_data_referencia_mes(data_referencia);
 
     PRINT 'Indice IX_fato_gv_fretes_merge criado.';
 END;
