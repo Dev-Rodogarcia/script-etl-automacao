@@ -12,6 +12,7 @@ BEGIN
         nome NVARCHAR(255) NULL,
         ativo BIT NOT NULL,
         origem_atualizado_em DATETIME2 NULL,
+        hash_linha VARBINARY(32) NULL,
         observado_em DATETIME2 NOT NULL CONSTRAINT DF_dim_usuarios_historico_observado_em DEFAULT SYSDATETIME(),
         tipo_alteracao NVARCHAR(30) NOT NULL,
         CONSTRAINT PK_dim_usuarios_historico PRIMARY KEY CLUSTERED (id)
@@ -23,6 +24,26 @@ ELSE
 BEGIN
     PRINT 'Tabela dim_usuarios_historico ja existe. Pulando criacao.';
 END
+GO
+
+IF COL_LENGTH(N'dbo.dim_usuarios_historico', N'hash_linha') IS NULL
+BEGIN
+    ALTER TABLE dbo.dim_usuarios_historico
+    ADD hash_linha VARBINARY(32) NULL;
+    PRINT 'Coluna dim_usuarios_historico.hash_linha adicionada em tabela existente.';
+END
+GO
+
+EXEC('
+    UPDATE dbo.dim_usuarios_historico
+    SET hash_linha = HASHBYTES(''SHA2_256'', CONCAT_WS(N''|'',
+        CONVERT(NVARCHAR(20), user_id),
+        COALESCE(nome, N''<NULL>''),
+        CONVERT(NVARCHAR(1), CONVERT(TINYINT, ativo)),
+        COALESCE(CONVERT(NVARCHAR(33), origem_atualizado_em, 126), N''<NULL>'')
+    ))
+    WHERE hash_linha IS NULL;
+');
 GO
 
 IF NOT EXISTS (

@@ -17,6 +17,24 @@ import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
 import br.com.extrator.suporte.banco.GerenciadorConexao;
 
 public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPort {
+    private static final String HASH_USUARIO_ATUAL_SQL = """
+        HASHBYTES('SHA2_256', CONCAT_WS(N'|',
+            CONVERT(NVARCHAR(20), V.user_id),
+            COALESCE(V.nome, N'<NULL>'),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, V.ativo)),
+            COALESCE(CONVERT(NVARCHAR(33), V.origem_atualizado_em, 126), N'<NULL>'),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, V.excluido_na_origem))
+        ))
+        """;
+
+    private static final String HASH_USUARIO_HISTORICO_SQL = """
+        HASHBYTES('SHA2_256', CONCAT_WS(N'|',
+            CONVERT(NVARCHAR(20), V.user_id),
+            COALESCE(V.nome, N'<NULL>'),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, V.ativo)),
+            COALESCE(CONVERT(NVARCHAR(33), V.origem_atualizado_em, 126), N'<NULL>')
+        ))
+        """;
 
     @Override
     public SnapshotMetrics aplicarSnapshot(final List<UsuarioSistemaEntity> usuariosAtivos,
@@ -30,6 +48,8 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                 final Map<Long, EstadoAtualUsuario> existentes = carregarUsuarios(conexao);
                 final Set<Long> idsSnapshot = new LinkedHashSet<>();
                 int totalOperacoes = 0;
+                int registrosPersistidos = 0;
+                int noOpIdempotente = 0;
                 int registrosHistorico = 0;
 
                 for (final UsuarioSistemaEntity usuario : snapshot) {
@@ -38,11 +58,14 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                     }
                     idsSnapshot.add(usuario.getUserId());
                     final EstadoAtualUsuario anterior = existentes.get(usuario.getUserId());
-                    upsertUsuarioAtivo(conexao, usuario, observadoEm);
                     totalOperacoes++;
-                    if (houveMudancaSemantica(anterior, usuario, true)) {
+                    final boolean alterado = upsertUsuarioAtivo(conexao, usuario, observadoEm);
+                    if (alterado) {
+                        registrosPersistidos++;
                         inserirHistorico(conexao, executionUuid, usuario, true, observadoEm, tipoMudanca(anterior, true));
                         registrosHistorico++;
+                    } else {
+                        noOpIdempotente++;
                     }
                 }
 
@@ -51,22 +74,27 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                     .filter(usuario -> !idsSnapshot.contains(usuario.userId()))
                     .toList();
                 for (final EstadoAtualUsuario usuarioDesativado : desativados) {
-                    desativarUsuario(conexao, usuarioDesativado.userId(), observadoEm);
                     totalOperacoes++;
-                    inserirHistorico(
-                        conexao,
-                        executionUuid,
-                        usuarioDesativado.toEntity(observadoEm),
-                        false,
-                        observadoEm,
-                        "DEACTIVATED"
-                    );
-                    registrosHistorico++;
+                    final boolean alterado = desativarUsuario(conexao, usuarioDesativado.userId(), observadoEm);
+                    if (alterado) {
+                        registrosPersistidos++;
+                        inserirHistorico(
+                            conexao,
+                            executionUuid,
+                            usuarioDesativado.toEntity(observadoEm),
+                            false,
+                            observadoEm,
+                            "DEACTIVATED"
+                        );
+                        registrosHistorico++;
+                    } else {
+                        noOpIdempotente++;
+                    }
                 }
 
                 conexao.commit();
                 conexao.setAutoCommit(autoCommitOriginal);
-                return new SnapshotMetrics(totalOperacoes, totalOperacoes, 0, registrosHistorico);
+                return new SnapshotMetrics(totalOperacoes, registrosPersistidos, noOpIdempotente, registrosHistorico);
             } catch (final SQLException e) {
                 conexao.rollback();
                 throw e;
@@ -97,26 +125,48 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
         return usuarios;
     }
 
-    private void upsertUsuarioAtivo(final Connection conexao,
-                                    final UsuarioSistemaEntity usuario,
-                                    final LocalDateTime observadoEm) throws SQLException {
+    private boolean upsertUsuarioAtivo(final Connection conexao,
+                                       final UsuarioSistemaEntity usuario,
+                                       final LocalDateTime observadoEm) throws SQLException {
+        final String freshnessGuard =
+            "(COALESCE(T.origem_atualizado_em, T.data_atualizacao) IS NULL "
+                + "OR COALESCE(S.origem_atualizado_em, S.data_atualizacao) >= COALESCE(T.origem_atualizado_em, T.data_atualizacao))";
         final String sql = """
-            MERGE dbo.dim_usuarios AS T
-            USING (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
-                AS S (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+            MERGE dbo.dim_usuarios WITH (HOLDLOCK) AS T
+            USING (
+                SELECT
+                    V.user_id,
+                    V.nome,
+                    V.ativo,
+                    V.origem_atualizado_em,
+                    V.data_atualizacao,
+                    V.ultima_extracao_em,
+                    V.excluido_na_origem,
+                    %s AS hash_linha
+                FROM (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+                    AS V (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+            ) AS S
             ON T.user_id = S.user_id
-            WHEN MATCHED THEN
+            WHEN MATCHED AND (
+                (%s OR T.excluido_na_origem = 1)
+                AND (
+                    T.hash_linha IS NULL
+                 OR S.hash_linha IS NULL
+                 OR T.hash_linha <> S.hash_linha
+                )
+            ) THEN
                 UPDATE SET
                     T.nome = S.nome,
                     T.ativo = S.ativo,
                     T.origem_atualizado_em = S.origem_atualizado_em,
                     T.data_atualizacao = S.data_atualizacao,
                     T.ultima_extracao_em = S.ultima_extracao_em,
-                    T.excluido_na_origem = S.excluido_na_origem
+                    T.excluido_na_origem = S.excluido_na_origem,
+                    T.hash_linha = S.hash_linha
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
-                VALUES (S.user_id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem);
-            """;
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem, hash_linha)
+                VALUES (S.user_id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem, S.hash_linha);
+            """.formatted(HASH_USUARIO_ATUAL_SQL, freshnessGuard);
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setLong(1, usuario.getUserId());
             stmt.setString(2, usuario.getNome());
@@ -124,26 +174,34 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
             stmt.setTimestamp(4, timestamp(usuario.getOrigemAtualizadoEm()));
             stmt.setTimestamp(5, timestamp(observadoEm));
             stmt.setTimestamp(6, timestamp(observadoEm));
-            stmt.executeUpdate();
+            return stmt.executeUpdate() > 0;
         }
     }
 
-    private void desativarUsuario(final Connection conexao,
-                                  final Long userId,
-                                  final LocalDateTime observadoEm) throws SQLException {
+    private boolean desativarUsuario(final Connection conexao,
+                                     final Long userId,
+                                     final LocalDateTime observadoEm) throws SQLException {
         final String sql = """
-            UPDATE dbo.dim_usuarios
+            UPDATE T
             SET ativo = 0,
                 data_atualizacao = ?,
-                ultima_extracao_em = ?
-            WHERE user_id = ?
-              AND ativo = 1
+                ultima_extracao_em = ?,
+                hash_linha = HASHBYTES('SHA2_256', CONCAT_WS(N'|',
+                    CONVERT(NVARCHAR(20), T.user_id),
+                    COALESCE(T.nome, N'<NULL>'),
+                    CONVERT(NVARCHAR(1), CONVERT(TINYINT, CAST(0 AS bit))),
+                    COALESCE(CONVERT(NVARCHAR(33), T.origem_atualizado_em, 126), N'<NULL>'),
+                    CONVERT(NVARCHAR(1), CONVERT(TINYINT, T.excluido_na_origem))
+                ))
+            FROM dbo.dim_usuarios AS T
+            WHERE T.user_id = ?
+              AND T.ativo = 1
             """;
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setTimestamp(1, timestamp(observadoEm));
             stmt.setTimestamp(2, timestamp(observadoEm));
             stmt.setLong(3, userId);
-            stmt.executeUpdate();
+            return stmt.executeUpdate() > 0;
         }
     }
 
@@ -160,11 +218,22 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
                 nome,
                 ativo,
                 origem_atualizado_em,
+                hash_linha,
                 observado_em,
                 tipo_alteracao
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """;
+            SELECT
+                V.execution_uuid,
+                V.user_id,
+                V.nome,
+                V.ativo,
+                V.origem_atualizado_em,
+                %s AS hash_linha,
+                V.observado_em,
+                V.tipo_alteracao
+            FROM (VALUES (?, ?, ?, ?, ?, ?, ?))
+                AS V (execution_uuid, user_id, nome, ativo, origem_atualizado_em, observado_em, tipo_alteracao)
+            """.formatted(HASH_USUARIO_HISTORICO_SQL);
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setString(1, executionUuid);
             stmt.setLong(2, usuario.getUserId());
@@ -175,21 +244,6 @@ public final class SqlServerUsuariosEstadoRepository implements UsuariosEstadoPo
             stmt.setString(7, tipoAlteracao);
             stmt.executeUpdate();
         }
-    }
-
-    private boolean houveMudancaSemantica(final EstadoAtualUsuario anterior,
-                                          final UsuarioSistemaEntity atual,
-                                          final boolean ativoAtual) {
-        if (anterior == null) {
-            return true;
-        }
-        if (anterior.ativo() != ativoAtual) {
-            return true;
-        }
-        if (!java.util.Objects.equals(anterior.nome(), atual.getNome())) {
-            return true;
-        }
-        return !java.util.Objects.equals(anterior.origemAtualizadoEm(), atual.getOrigemAtualizadoEm());
     }
 
     private String tipoMudanca(final EstadoAtualUsuario anterior, final boolean ativoAtual) {

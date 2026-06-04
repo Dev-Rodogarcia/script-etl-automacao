@@ -248,6 +248,9 @@ public class Main {
         if (exitCode != 0) {
             System.exit(exitCode);
         }
+        if (deveEncerrarProcessoAoConcluir(nomeComando)) {
+            System.exit(0);
+        }
     }
 
     private static void organizarLogsTxtNaPastaLogs() {
@@ -262,6 +265,10 @@ public class Main {
 
     private static boolean isComandoLongaDuracao(final String nomeComando) {
         return "--loop".equals(nomeComando) || "--loop-daemon-run".equals(nomeComando);
+    }
+
+    static boolean deveEncerrarProcessoAoConcluir(final String nomeComando) {
+        return "--sincronizar-usuarios".equals(nomeComando);
     }
 
     static boolean requerInicializacaoContexto(final String nomeComando) {

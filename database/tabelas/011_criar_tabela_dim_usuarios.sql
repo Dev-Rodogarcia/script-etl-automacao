@@ -12,6 +12,7 @@ BEGIN
         [nome] [nvarchar](255) NULL,
         [data_atualizacao] [datetime] DEFAULT GETDATE(),
         [excluido_na_origem] [bit] NOT NULL CONSTRAINT DF_dim_usuarios_excluido_na_origem DEFAULT (0),
+        [hash_linha] [varbinary](32) NULL,
         PRIMARY KEY CLUSTERED ([user_id] ASC)
     );
     
@@ -29,5 +30,13 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_dim_usuarios_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna dim_usuarios.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.dim_usuarios', N'hash_linha') IS NULL
+BEGIN
+    ALTER TABLE dbo.dim_usuarios
+    ADD hash_linha VARBINARY(32) NULL;
+    PRINT 'Coluna dim_usuarios.hash_linha adicionada em tabela existente.';
 END
 GO

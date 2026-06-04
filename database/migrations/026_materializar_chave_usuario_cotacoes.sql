@@ -54,7 +54,8 @@ BEGIN
 END;
 GO
 
-:r views\015_criar_view_cotacoes_powerbi.sql
+-- [VETADO] Codigo morto: view do Power BI expurgada da arquitetura na migration 035.
+--          Include removido: views\015_criar_view_cotacoes_powerbi.sql
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'026_materializar_chave_usuario_cotacoes')
@@ -62,7 +63,7 @@ BEGIN
     INSERT INTO dbo.schema_migrations (migration_id, notes)
     VALUES (
         N'026_materializar_chave_usuario_cotacoes',
-        N'Materializa chave normalizada do usuario emissor de cotacoes e publica Usuario Key na view de cotacoes.'
+        N'Materializa chave normalizada do usuario emissor de cotacoes. Recriacao da view Power BI vetada pela migration 035.'
     );
 END;
 GO

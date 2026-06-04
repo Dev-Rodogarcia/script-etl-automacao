@@ -104,7 +104,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'030_criar_fato_gestao_vista_coletores'),
     (N'031_criar_fato_fretes_faturamento'),
     (N'032_criar_fato_gestao_vista_faturas'),
-    (N'033_tuning_indices_fatos');
+    (N'033_tuning_indices_fatos'),
+    (N'034_adicionar_hash_linha_usuarios');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -214,6 +215,30 @@ WHERE NOT EXISTS (
       AND i.object_id = OBJECT_ID(sdt.tabela)
       AND i.filter_definition LIKE N'%excluido_na_origem%'
 );
+
+DECLARE @hashDimTables TABLE (
+    tabela NVARCHAR(128) NOT NULL
+);
+
+INSERT INTO @hashDimTables (tabela) VALUES
+    (N'dbo.dim_usuarios'),
+    (N'dbo.dim_usuarios_historico');
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'COLUNA', tabela + N'.hash_linha', N'Hash SHA2_256 de idempotencia dimensional ausente'
+FROM @hashDimTables
+WHERE COL_LENGTH(tabela, N'hash_linha') IS NULL;
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'COLUNA', hdt.tabela + N'.hash_linha', N'hash_linha deve ser VARBINARY(32)'
+FROM @hashDimTables hdt
+INNER JOIN sys.columns c
+    ON c.object_id = OBJECT_ID(hdt.tabela)
+   AND c.name = N'hash_linha'
+INNER JOIN sys.types ty
+    ON ty.user_type_id = c.user_type_id
+WHERE ty.name <> N'varbinary'
+   OR c.max_length <> 32;
 
 IF NOT EXISTS (
     SELECT 1

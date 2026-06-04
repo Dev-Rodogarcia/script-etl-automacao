@@ -184,18 +184,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_raster_viagem_paradas
     CREATE INDEX IX_raster_viagem_paradas_ativos_origem ON dbo.raster_viagem_paradas(cod_solicitacao, ordem) WHERE excluido_na_origem = 0;
 GO
 
-:r views\011_criar_view_faturas_por_cliente_powerbi.sql
-:r views\012_criar_view_fretes_powerbi.sql
-:r views\013_criar_view_coletas_powerbi.sql
-:r views\015_criar_view_cotacoes_powerbi.sql
-:r views\016_criar_view_contas_a_pagar_powerbi.sql
-:r views\017_criar_view_localizacao_cargas_powerbi.sql
-:r views\018_criar_view_manifestos_powerbi.sql
-:r views\020_criar_view_inventario_powerbi.sql
-:r views\021_criar_view_sinistros_powerbi.sql
-:r views\022_criar_view_raster_sm_transit_time.sql
-:r views-dimensao\020_criar_view_dim_clientes.sql
-:r views-dimensao\024_criar_view_dim_usuarios.sql
+-- [VETADO] Codigo morto: views do Power BI expurgadas da arquitetura na migration 035.
+--          Includes removidos: views\011_criar_view_faturas_por_cliente_powerbi.sql; views\012_criar_view_fretes_powerbi.sql; views\013_criar_view_coletas_powerbi.sql.
+--          Includes removidos: views\015_criar_view_cotacoes_powerbi.sql; views\016_criar_view_contas_a_pagar_powerbi.sql; views\017_criar_view_localizacao_cargas_powerbi.sql.
+--          Includes removidos: views\018_criar_view_manifestos_powerbi.sql; views\020_criar_view_inventario_powerbi.sql; views\021_criar_view_sinistros_powerbi.sql.
+-- [VETADO] Reexecucao de scripts-base externos removida desta migration historica.
+--          Includes removidos: views\022_criar_view_raster_sm_transit_time.sql; views-dimensao\020_criar_view_dim_clientes.sql; views-dimensao\024_criar_view_dim_usuarios.sql.
+
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'027_adicionar_excluido_na_origem')
@@ -203,7 +198,7 @@ BEGIN
     INSERT INTO dbo.schema_migrations (migration_id, notes)
     VALUES (
         N'027_adicionar_excluido_na_origem',
-        N'Adiciona flag de soft delete por origem, indices filtrados de ativos e filtros nas views analiticas.'
+        N'Adiciona flag de soft delete por origem e indices filtrados de ativos. Recriacao de views via scripts-base vetada.'
     );
 END;
 GO

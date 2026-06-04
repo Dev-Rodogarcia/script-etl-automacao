@@ -92,7 +92,8 @@ BEGIN
 END;
 GO
 
-:r views\012_criar_view_fretes_powerbi.sql
+-- [VETADO] Codigo morto: view do Power BI expurgada da arquitetura na migration 035.
+--          Include removido: views\012_criar_view_fretes_powerbi.sql
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
    AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'025_materializar_chave_responsavel_destino')
@@ -100,7 +101,7 @@ BEGIN
     INSERT INTO dbo.schema_migrations (migration_id, notes)
     VALUES (
         N'025_materializar_chave_responsavel_destino',
-        N'Materializa chaves normalizadas de filial/responsavel de destino e publica Responsavel Regiao Destino Key na view de fretes.'
+        N'Materializa chaves normalizadas de filial/responsavel de destino. Recriacao da view Power BI vetada pela migration 035.'
     );
 END;
 GO

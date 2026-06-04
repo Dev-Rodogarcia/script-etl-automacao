@@ -24,4 +24,10 @@ class MainBootstrapRoutingTest {
         assertTrue(Main.requerInicializacaoContexto("--validar-api-banco-24h-detalhado"));
         assertTrue(Main.requerInicializacaoContexto("--validar-etl-extremo"));
     }
+
+    @Test
+    void sincronizacaoUsuariosDeveEncerrarProcessoAoConcluir() {
+        assertTrue(Main.deveEncerrarProcessoAoConcluir("--sincronizar-usuarios"));
+        assertFalse(Main.deveEncerrarProcessoAoConcluir("--fluxo-completo"));
+    }
 }

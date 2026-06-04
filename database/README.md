@@ -44,6 +44,21 @@ Checklist mínimo por mudança estrutural:
 3. incluir a migration nova em `database/executar_database.bat`;
 4. revisar este `README` se o catálogo ou a regra operacional mudou.
 
+## Cargas iniciais após recriação
+
+`database/executar_database.bat` publica o schema e, em seguida, executa obrigatoriamente as cargas SQL nativas das tabelas fato. As procedures são chamadas sem parâmetros, portanto fazem carga completa idempotente e deixam as fatos materializadas prontas antes das validações.
+
+| Tabela | Carga inicial | Observação |
+| --- | --- | --- |
+| `dbo.fato_gestao_vista_fretes` | `EXEC dbo.sp_carga_fato_gestao_vista_fretes;` | SQL nativo, publicado em `database/procedures/001_criar_sp_carga_fato_gestao_vista_fretes.sql`. |
+| `dbo.fato_gestao_vista_coletores` | `EXEC dbo.sp_carga_fato_gestao_vista_coletores;` | SQL nativo, publicado em `database/procedures/002_criar_sp_carga_fato_gestao_vista_coletores.sql`. |
+| `dbo.fato_fretes_faturamento` | `EXEC dbo.sp_carga_fato_fretes_faturamento;` | SQL nativo, publicado em `database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql`. |
+| `dbo.fato_gestao_vista_faturas` | `EXEC dbo.sp_carga_fato_gestao_vista_faturas;` | SQL nativo, publicado em `database/procedures/004_criar_sp_carga_fato_gestao_vista_faturas.sql`. |
+| `dbo.dim_usuarios` | `java -jar target\extrator.jar --sincronizar-usuarios` | Carga por Java/API GraphQL; não possui procedure SQL nativa por desenho. |
+| `dbo.dim_usuarios_historico` | `java -jar target\extrator.jar --sincronizar-usuarios` | Alimentada pelo snapshot Java quando há inserção, alteração, reativação ou desativação de usuário. |
+
+Depois de recriar o banco, execute o comando Java dedicado de usuários, ou inicie o fluxo/daemon que inclua essa sincronização, para popular `dim_usuarios` e `dim_usuarios_historico`.
+
 Exemplo de pesquisa em `metadata`:
 
 ```sql
@@ -68,8 +83,10 @@ ORDER BY data_extracao DESC;
 | `dbo.localizacao_cargas` | Negócio | Data Export | 1 linha por minuta/carga | `sequence_number` |
 | `dbo.contas_a_pagar` | Negócio | Data Export | 1 linha por lançamento | `sequence_code` |
 | `dbo.faturas_por_cliente` | Negócio | Data Export + enriquecimento | 1 linha por vínculo de faturamento | `unique_id` |
-| `dbo.fato_gestao_vista_faturas` | Fato BI | Carga SQL de `faturas_por_cliente` | 1 linha por título/`unique_id` | `unique_id` |
+| `dbo.fato_gestao_vista_fretes` | Fato BI | Carga SQL de `fretes` + `localizacao_cargas` | 1 linha por indicador/minuta/data | `indicador_codigo`, `numero_minuta`, `data_referencia` |
+| `dbo.fato_gestao_vista_coletores` | Fato BI | Carga SQL de `fretes`, `manifestos` e `inventario` | 1 linha por data/filial/classificação | `data_referencia`, `filial_key`, `classificacao` |
 | `dbo.fato_fretes_faturamento` | Fato BI | Carga SQL de `fretes` + status CT-e de `faturas_por_cliente` | 1 linha por frete validado para faturamento | `frete_id` |
+| `dbo.fato_gestao_vista_faturas` | Fato BI | Carga SQL de `faturas_por_cliente` | 1 linha por título/`unique_id` | `unique_id` |
 | `dbo.inventario` | Negócio | Data Export | 1 linha por ordem/minuta consolidada por chave técnica | `identificador_unico` |
 | `dbo.sinistros` | Negócio | Data Export | 1 linha por sinistro + NF consolidada por chave técnica | `identificador_unico` |
 | `dbo.raster_viagens` | Negócio | Raster `getEventoFimViagem` | 1 linha por viagem/SM | `cod_solicitacao` |
@@ -99,6 +116,8 @@ ORDER BY data_extracao DESC;
 - `dbo.inventario.numero_minuta = dbo.fretes.corporation_sequence_number`
 - `dbo.sinistros.corporation_sequence_number = dbo.fretes.corporation_sequence_number`
 - `dbo.fretes.nfse_number` e `dbo.fretes.nfse_series` alimentam `dbo.faturas_por_cliente.numero_nfse` e `dbo.faturas_por_cliente.serie_nfse`
+- `dbo.fato_gestao_vista_fretes.numero_minuta` deriva de `dbo.fretes.corporation_sequence_number` e usa `dbo.localizacao_cargas` para enriquecer previsão/responsável de destino quando disponível.
+- `dbo.fato_gestao_vista_coletores` consolida `dbo.fretes`, `dbo.manifestos` e `dbo.inventario` por competência, filial e classificação operacional.
 - `dbo.fato_fretes_faturamento.frete_id = dbo.fretes.id`; quando houver `chave_cte`, a carga cruza `dbo.faturas_por_cliente.chave_cte` para validar CT-e cancelado.
 - `dbo.fato_gestao_vista_faturas.unique_id = dbo.faturas_por_cliente.unique_id`; a carga materializa datas, status, valor operacional e cliente para Aging/Tabela.
 - `dbo.coletas.cancellation_user_id` e `dbo.coletas.destroy_user_id` podem ser ligados a `dbo.dim_usuarios.user_id`
@@ -722,6 +741,7 @@ ORDER BY data_extracao DESC;
 - Chaves: PK `user_id`
 - Observação importante: a estrutura final da tabela é a soma de `011_criar_tabela_dim_usuarios.sql` com `016_alter_tabela_dim_usuarios_estado.sql`.
 - Observação importante: hoje existem dois caminhos de escrita. `UsuarioSistemaRepository` mantém o subconjunto legado (`user_id`, `nome`, `data_atualizacao`), enquanto `SqlServerUsuariosEstadoRepository` preenche também `ativo`, `origem_atualizado_em`, `ultima_extracao_em` e alimenta `dim_usuarios_historico`. Para pesquisa, considerar a estrutura completa abaixo.
+- Carga inicial: execute `java -jar target\extrator.jar --sincronizar-usuarios` após recriar o banco, ou inicie um fluxo/daemon que contemple a sincronização de usuários.
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
@@ -731,6 +751,7 @@ ORDER BY data_extracao DESC;
 | `ativo` | `BIT` | Indica se o usuário está ativo no snapshot atual. |
 | `origem_atualizado_em` | `DATETIME2` | Data/hora de atualização vinda da origem, quando disponível. |
 | `ultima_extracao_em` | `DATETIME2` | Último momento em que o usuário apareceu na sincronização. |
+| `hash_linha` | `VARBINARY(32)` | Hash SHA-256 do estado de negócio usado para idempotência e detecção de delta. |
 
 ## Tabelas técnicas, auditoria e controle
 
@@ -856,6 +877,7 @@ ORDER BY data_extracao DESC;
 | `nome` | `NVARCHAR(255)` | Nome observado naquele momento. |
 | `ativo` | `BIT` | Estado ativo/inativo no momento da observação. |
 | `origem_atualizado_em` | `DATETIME2` | Carimbo de atualização vindo da origem, quando houver. |
+| `hash_linha` | `VARBINARY(32)` | Hash SHA-256 do estado histórico observado. |
 | `observado_em` | `DATETIME2` | Momento em que a mudança foi observada. |
 | `tipo_alteracao` | `NVARCHAR(30)` | Tipo da mudança (`INSERTED`, `UPDATED`, `REACTIVATED`, `DEACTIVATED`). |
 

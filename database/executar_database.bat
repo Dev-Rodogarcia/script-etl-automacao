@@ -15,14 +15,14 @@ REM   executar_database.bat
 REM     Modo PADRAO (seguro):
 REM     - Banco ja deve existir
 REM     - Garante tabelas base sem usar DROP/CREATE DATABASE
-REM     - Executa: migrations, indices, views, validacoes
+REM     - Executa: migrations, indices, views, procedures, cargas iniciais, validacoes
 REM     - NAO executa DROP/CREATE DATABASE
 REM     - Idempotente - pode rodar multiplas vezes
 REM
 REM   executar_database.bat --recriar
 REM     Modo DEV (destrutivo - requer confirmacao):
 REM     - Apaga e recria o banco do zero
-REM     - Executa: tabelas, migrations, indices, views, validacoes
+REM     - Executa: tabelas, migrations, indices, views, procedures, cargas iniciais, validacoes
 REM     - ATENCAO: todos os dados serao perdidos
 REM
 REM   executar_database.bat --help
@@ -36,12 +36,11 @@ REM
 REM OPCOES ADICIONAIS (config.bat):
 REM   DB_PORT           : porta do SQL Server (ex.: 1433)
 REM   SQLCMD_EXTRA_ARGS : flags extras do sqlcmd (ex.: -C para confiar no certificado)
-REM   ETL_EXECUTAR_CARGA_GESTAO_VISTA=1 : executa as cargas materializadas
-REM                                      dbo.fato_gestao_vista_fretes,
-REM                                      dbo.fato_gestao_vista_coletores,
-REM                                      dbo.fato_fretes_faturamento e
-REM                                      dbo.fato_gestao_vista_faturas apos publicar
-REM                                      tabelas, migrations, indices, views e procedures.
+REM
+REM CARGAS INICIAIS:
+REM   As fatos materializadas SQL sao carregadas obrigatoriamente apos publicar
+REM   tabelas, migrations, indices, views e procedures. As dimensoes de usuarios
+REM   sao populadas pelo runtime Java, via --sincronizar-usuarios ou fluxo/daemon.
 REM
 REM BANCO SQLite DE AUTENTICACAO:
 REM   Gerenciado exclusivamente pela aplicacao Java (extrator.jar).
@@ -194,6 +193,8 @@ for %%F in (
     "migrations\031_criar_fato_fretes_faturamento.sql"
     "migrations\032_criar_fato_gestao_vista_faturas.sql"
     "migrations\033_tuning_indices_fatos.sql"
+    "migrations\034_adicionar_hash_linha_usuarios.sql"
+    "migrations\035_drop_views_legadas_powerbi.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -225,18 +226,9 @@ for %%F in (
 echo [OK] Indices concluidos.
 echo.
 
-REM --- Views PowerBI e Dimensao (nao-criticas - avisa e continua) ---
-echo [ETAPA] Views ^(PowerBI + Dimensao^)...
+REM --- Views analiticas e Dimensao (nao-criticas - avisa e continua) ---
+echo [ETAPA] Views ^(Analiticas + Dimensao^)...
 for %%F in (
-    "views\011_criar_view_faturas_por_cliente_powerbi.sql"
-    "views\012_criar_view_fretes_powerbi.sql"
-    "views\013_criar_view_coletas_powerbi.sql"
-    "views\015_criar_view_cotacoes_powerbi.sql"
-    "views\016_criar_view_contas_a_pagar_powerbi.sql"
-    "views\017_criar_view_localizacao_cargas_powerbi.sql"
-    "views\018_criar_view_manifestos_powerbi.sql"
-    "views\020_criar_view_inventario_powerbi.sql"
-    "views\021_criar_view_sinistros_powerbi.sql"
     "views\022_criar_view_raster_sm_transit_time.sql"
     "views\019_criar_view_bi_monitoramento.sql"
     "views-dimensao\019_criar_view_dim_filiais.sql"
@@ -277,44 +269,43 @@ for %%F in (
 echo [OK] Stored Procedures concluidas.
 echo.
 
-REM --- Carga materializada opcional (uso recomendado em janela noturna) ---
-if /i "%ETL_EXECUTAR_CARGA_GESTAO_VISTA%"=="1" (
-    echo [ETAPA] Cargas materializadas BI...
-    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
-    if errorlevel 1 (
-        echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
-    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
-    if errorlevel 1 (
-        echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
-    echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
-    if errorlevel 1 (
-        echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
-    echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
-    if errorlevel 1 (
-        echo [ERRO] Falha na carga materializada de Faturas por Cliente.
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
-    echo [OK] Cargas materializadas BI concluidas.
-    echo.
+REM --- Cargas iniciais obrigatorias das fatos SQL (criticas - para em erro) ---
+echo [ETAPA] Cargas iniciais das fatos BI...
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
 )
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
+echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na carga materializada de Faturas por Cliente.
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
+echo [OK] Cargas iniciais das fatos BI concluidas.
+echo [INFO] Dimensoes dbo.dim_usuarios e dbo.dim_usuarios_historico sao populadas pelo Java: java -jar target\extrator.jar --sincronizar-usuarios
+echo.
 
 REM --- Validacoes de leitura (seguras, sem scripts destrutivos) ---
 REM Excluidos: 027 diagnosticar_null, 030 api_vs_banco, 031 limpar_dados
@@ -359,11 +350,12 @@ echo.
 echo Uso:
 echo   executar_database.bat
 echo      Atualiza um banco existente. Cria tabelas faltantes, aplica migrations,
-echo      indices, views e validacoes seguras.
+echo      indices, views, procedures, cargas iniciais SQL e validacoes seguras.
 echo.
 echo   executar_database.bat --recriar
 echo      Apaga e recria o banco definido em config.bat ^(ex.: ETL_SISTEMA^).
-echo      Depois cria tabelas base, aplica migrations, indices, views e validacoes.
+echo      Depois cria tabelas base, aplica migrations, indices, views, procedures,
+echo      cargas iniciais SQL e validacoes.
 echo      Requer digitacao de RECRIAR para confirmar.
 echo.
 echo Configuracao:
@@ -373,6 +365,7 @@ echo.
 echo Observacoes:
 echo   - Pare o daemon antes de recriar ou apagar o banco.
 echo   - Scripts destrutivos de validacao/limpeza nao rodam automaticamente.
+echo   - Dimensoes de usuarios dependem do Java: execute --sincronizar-usuarios.
 echo   - O banco SQLite de autenticacao nao e recriado por este script.
 echo.
 exit /b 0

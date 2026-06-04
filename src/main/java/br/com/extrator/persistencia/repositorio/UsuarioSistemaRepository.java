@@ -40,6 +40,15 @@ import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
 public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaEntity> {
     private static final Logger logger = LoggerFactory.getLogger(UsuarioSistemaRepository.class);
     private static final String NOME_TABELA = "dim_usuarios";
+    private static final String HASH_USUARIO_SQL = """
+        HASHBYTES('SHA2_256', CONCAT_WS(N'|',
+            CONVERT(NVARCHAR(20), V.id),
+            COALESCE(V.nome, N'<NULL>'),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, V.ativo)),
+            COALESCE(CONVERT(NVARCHAR(33), V.origem_atualizado_em, 126), N'<NULL>'),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, V.excluido_na_origem))
+        ))
+        """;
 
     @Override
     protected String getNomeTabela() {
@@ -77,20 +86,40 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
                 + "OR COALESCE(S.origem_atualizado_em, S.data_atualizacao) >= COALESCE(T.origem_atualizado_em, T.data_atualizacao))";
         final String sql = String.format("""
             MERGE dbo.%s WITH (HOLDLOCK) AS T
-            USING (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit))) AS S (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+            USING (
+                SELECT
+                    V.id,
+                    V.nome,
+                    V.ativo,
+                    V.origem_atualizado_em,
+                    V.data_atualizacao,
+                    V.ultima_extracao_em,
+                    V.excluido_na_origem,
+                    %s AS hash_linha
+                FROM (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+                    AS V (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+            ) AS S
             ON T.user_id = S.id
-            WHEN MATCHED AND (%s OR T.excluido_na_origem = 1) THEN
+            WHEN MATCHED AND (
+                (%s OR T.excluido_na_origem = 1)
+                AND (
+                    T.hash_linha IS NULL
+                 OR S.hash_linha IS NULL
+                 OR T.hash_linha <> S.hash_linha
+                )
+            ) THEN
                 UPDATE SET
                     T.nome = S.nome,
                     T.ativo = S.ativo,
                     T.origem_atualizado_em = S.origem_atualizado_em,
                     T.data_atualizacao = S.data_atualizacao,
                     T.ultima_extracao_em = S.ultima_extracao_em,
-                    T.excluido_na_origem = S.excluido_na_origem
+                    T.excluido_na_origem = S.excluido_na_origem,
+                    T.hash_linha = S.hash_linha
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
-                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem);
-            """, NOME_TABELA, freshnessGuard);
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem, hash_linha)
+                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem, S.hash_linha);
+            """, NOME_TABELA, HASH_USUARIO_SQL, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             int paramIndex = 1;

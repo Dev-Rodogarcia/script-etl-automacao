@@ -38,12 +38,35 @@ BEGIN
         PRINT 'Coluna dim_usuarios.ultima_extracao_em ja existe. Pulando alteracao.';
     END
 
+    IF COL_LENGTH('dbo.dim_usuarios', 'hash_linha') IS NULL
+    BEGIN
+        ALTER TABLE dbo.dim_usuarios
+            ADD hash_linha VARBINARY(32) NULL;
+        PRINT 'Coluna dim_usuarios.hash_linha adicionada com sucesso!';
+    END
+    ELSE
+    BEGIN
+        PRINT 'Coluna dim_usuarios.hash_linha ja existe. Pulando alteracao.';
+    END
+
     EXEC('
         UPDATE dbo.dim_usuarios
         SET ativo = ISNULL(ativo, 1),
             ultima_extracao_em = COALESCE(ultima_extracao_em, data_atualizacao)
         WHERE ativo IS NULL
            OR ultima_extracao_em IS NULL;
+    ');
+
+    EXEC('
+        UPDATE dbo.dim_usuarios
+        SET hash_linha = HASHBYTES(''SHA2_256'', CONCAT_WS(N''|'',
+            CONVERT(NVARCHAR(20), user_id),
+            COALESCE(nome, N''<NULL>''),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, ativo)),
+            COALESCE(CONVERT(NVARCHAR(33), origem_atualizado_em, 126), N''<NULL>''),
+            CONVERT(NVARCHAR(1), CONVERT(TINYINT, excluido_na_origem))
+        ))
+        WHERE hash_linha IS NULL;
     ');
 
     IF NOT EXISTS (
