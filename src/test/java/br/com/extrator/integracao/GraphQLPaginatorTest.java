@@ -370,7 +370,7 @@ class GraphQLPaginatorTest {
     }
 
     @Test
-    void devePermitirMaisDeDuasMilPaginasParaUsuariosSistema() {
+    void deveAplicarHardLimitDeDezPaginasParaUsuariosSistemaLegado() {
         final AtomicInteger callCount = new AtomicInteger();
         final GraphQLPaginator paginator = new GraphQLPaginator(
             LoggerFactory.getLogger(GraphQLPaginatorTest.class),
@@ -389,7 +389,7 @@ class GraphQLPaginatorTest {
                     final Class<T> tipoClasse
                 ) {
                     final int pagina = callCount.incrementAndGet();
-                    return cast(List.of(pagina), pagina < 2001, "cursor-" + pagina);
+                    return cast(List.of(pagina), true, "cursor-" + pagina);
                 }
             }
         );
@@ -402,13 +402,15 @@ class GraphQLPaginatorTest {
             Integer.class
         );
 
-        assertTrue(resultado.isCompleto());
-        assertEquals(2001, resultado.getPaginasProcessadas());
-        assertEquals(2001, resultado.getDados().size());
+        assertFalse(resultado.isCompleto());
+        assertEquals(ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo(), resultado.getMotivoInterrupcao());
+        assertEquals(10, resultado.getPaginasProcessadas());
+        assertEquals(10, resultado.getDados().size());
+        assertEquals(10, callCount.get());
     }
 
     @Test
-    void devePermitirMaisDeCinquentaMilRegistrosParaUsuariosSistema() {
+    void deveConcluirUsuariosSistemaQuandoApiTerminaAntesDoHardLimit() {
         final AtomicInteger callCount = new AtomicInteger();
         final GraphQLPaginator paginator = new GraphQLPaginator(
             LoggerFactory.getLogger(GraphQLPaginatorTest.class),
@@ -428,7 +430,7 @@ class GraphQLPaginatorTest {
                 ) {
                     final int pagina = callCount.incrementAndGet();
                     return cast(java.util.stream.IntStream.rangeClosed((pagina - 1) * 100 + 1, pagina * 100).boxed().toList(),
-                        pagina < 501,
+                        pagina < 3,
                         "cursor-reg-" + pagina);
                 }
             }
@@ -443,8 +445,8 @@ class GraphQLPaginatorTest {
         );
 
         assertTrue(resultado.isCompleto());
-        assertEquals(501, resultado.getPaginasProcessadas());
-        assertEquals(50100, resultado.getDados().size());
+        assertEquals(3, resultado.getPaginasProcessadas());
+        assertEquals(300, resultado.getDados().size());
     }
 
     @Test

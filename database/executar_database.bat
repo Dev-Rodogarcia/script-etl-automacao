@@ -226,9 +226,18 @@ for %%F in (
 echo [OK] Indices concluidos.
 echo.
 
-REM --- Views analiticas e Dimensao (nao-criticas - avisa e continua) ---
-echo [ETAPA] Views ^(Analiticas + Dimensao^)...
+REM --- Views Power BI, analiticas e Dimensao (nao-criticas - avisa e continua) ---
+echo [ETAPA] Views ^(Power BI + Analiticas + Dimensao^)...
 for %%F in (
+    "views\011_criar_view_faturas_por_cliente_powerbi.sql"
+    "views\012_criar_view_fretes_powerbi.sql"
+    "views\013_criar_view_coletas_powerbi.sql"
+    "views\015_criar_view_cotacoes_powerbi.sql"
+    "views\016_criar_view_contas_a_pagar_powerbi.sql"
+    "views\017_criar_view_localizacao_cargas_powerbi.sql"
+    "views\018_criar_view_manifestos_powerbi.sql"
+    "views\020_criar_view_inventario_powerbi.sql"
+    "views\021_criar_view_sinistros_powerbi.sql"
     "views\022_criar_view_raster_sm_transit_time.sql"
     "views\019_criar_view_bi_monitoramento.sql"
     "views-dimensao\019_criar_view_dim_filiais.sql"

@@ -268,7 +268,12 @@ public class ExtractionLogger {
             final boolean salvamentoConsistente = registrosSalvos == totalUnicos;
             final boolean invalidosDentroTolerancia =
                 isInvalidosDentroTolerancia(extractor, registrosInvalidos, totalRecebido);
-            final String statusFinal = determinarStatusFinal(resultado, salvamentoConsistente, invalidosDentroTolerancia);
+            final String statusFinal = determinarStatusFinal(
+                entityName,
+                resultado,
+                salvamentoConsistente,
+                invalidosDentroTolerancia
+            );
             final String motivoStatus = determinarMotivoStatus(
                 resultado,
                 salvamentoConsistente,
@@ -367,6 +372,7 @@ public class ExtractionLogger {
                     .registrosPersistidos(registrosPersistidos)
                     .registrosNoOpIdempotente(registrosNoOpIdempotente)
                     .registrosInvalidos(registrosInvalidos)
+                    .apiCompleta(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             } else {
@@ -379,6 +385,7 @@ public class ExtractionLogger {
                     .registrosPersistidos(registrosPersistidos)
                     .registrosNoOpIdempotente(registrosNoOpIdempotente)
                     .registrosInvalidos(registrosInvalidos)
+                    .apiCompleta(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .sucesso(ConstantesEntidades.STATUS_COMPLETO.equals(statusFinal))
                     .build();
             }
@@ -528,11 +535,18 @@ public class ExtractionLogger {
         return registrosSalvos;
     }
 
-    private String determinarStatusFinal(final ResultadoExtracao<?> resultado,
+    private String determinarStatusFinal(final String entityName,
+                                         final ResultadoExtracao<?> resultado,
                                          final boolean salvamentoConsistente,
                                          final boolean invalidosDentroTolerancia) {
         if (!resultado.isCompleto()) {
             final String motivo = resultado.getMotivoInterrupcao();
+            if (ConstantesEntidades.USUARIOS_SISTEMA.equals(entityName)
+                && ResultadoExtracao.MotivoInterrupcao.LIMITE_PAGINAS.getCodigo().equals(motivo)
+                && salvamentoConsistente
+                && invalidosDentroTolerancia) {
+                return ConstantesEntidades.STATUS_COMPLETO;
+            }
             if (ResultadoExtracao.MotivoInterrupcao.ERRO_API.getCodigo().equals(motivo)
                 || ResultadoExtracao.MotivoInterrupcao.CIRCUIT_BREAKER.getCodigo().equals(motivo)) {
                 return ConstantesEntidades.STATUS_ERRO_API;

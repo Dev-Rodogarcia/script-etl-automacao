@@ -164,12 +164,9 @@ public class ClienteApiGraphQL {
     }
 
     /**
-     * Busca usuários do sistema com extração incremental via filtro updatedAt.
-     * Retorna apenas usuários modificados no intervalo especificado.
-     *
-     * @param dataInicio Data de início do intervalo
-     * @param dataFim Data de fim do intervalo
-     * @return Resultado da extração com usuários atualizados no período
+     * Busca usuários do sistema na API legada sem filtro temporal em Individual.
+     * A janela recebida e mantida apenas para telemetria/auditoria; o hard-limit
+     * de paginacao de usuarios evita full load historico prolongado.
      */
     public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema(
             final LocalDate dataInicio, final LocalDate dataFim) {
@@ -200,10 +197,13 @@ public class ClienteApiGraphQL {
                 ? atualizadoApos
                 : RelogioSistema.agora().minusDays(90);
             final LocalDateTime fim = atualizadoAte != null ? atualizadoAte : RelogioSistema.agora();
-            final String intervaloUpdatedAt = FormatadorData.formatarIntervaloEslCloud(inicio, fim);
             final Map<String, Object> variaveis = new HashMap<>();
-            variaveis.put("params", Map.of("enabled", true, "updatedAt", intervaloUpdatedAt));
-            logger.info("Buscando Usuários do Sistema via GraphQL (enabled: true, updatedAt: {})", intervaloUpdatedAt);
+            variaveis.put("params", Map.of("enabled", true));
+            logger.info(
+                "Buscando Usuarios do Sistema via GraphQL legado (enabled: true, sem filtro temporal; janela informativa: {} a {})",
+                inicio,
+                fim
+            );
             return paginator.executarQueryPaginada(
                 this.executionUuid,
                 GraphQLQueries.QUERY_USUARIOS_SISTEMA,
@@ -219,10 +219,10 @@ public class ClienteApiGraphQL {
     }
 
     /**
-     * Compatibilidade para chamadas legadas: nunca executa full load.
-     * Sem janela explícita, usa fallback incremental de 90 dias.
+     * Compatibilidade para chamadas legadas: usa a query legada sem filtro temporal,
+     * protegida pelo hard-limit de paginacao de usuarios no cliente Java.
      *
-     * @return Resultado da extração com usuários habilitados atualizados nos últimos 90 dias
+     * @return Resultado da extracao com usuarios habilitados dentro do limite de paginas
      */
     public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema() {
         final LocalDateTime fim = RelogioSistema.agora();

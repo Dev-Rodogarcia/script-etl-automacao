@@ -135,11 +135,11 @@ public final class ConfigApi {
     public static int obterLimitePaginasUsuariosGraphQL() {
         return ConfigValueParser.parseInt(
             ConfigSource.obterConfiguracao("API_GRAPHQL_USUARIOS_MAX_PAGINAS", "api.graphql.usuarios.max_paginas"),
-            5000,
+            10,
             value -> value > 0,
             logger,
             "api.graphql.usuarios.max_paginas",
-            "5000"
+            "10"
         );
     }
 

@@ -1,49 +1,7 @@
-PRINT 'Migration 021: materializar comprovante anexado no inventario';
-GO
-
-IF COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NULL
-BEGIN
-    ALTER TABLE dbo.inventario
-        ADD flag_comprovante_anexado BIT NOT NULL
-            CONSTRAINT DF_inventario_flag_comprovante_anexado DEFAULT (0) WITH VALUES;
-END;
-GO
-
-UPDATE dbo.inventario
-   SET flag_comprovante_anexado = CASE
-        WHEN ultima_ocorrencia_descricao COLLATE Latin1_General_CI_AI LIKE N'%Comprovante%Entrega%Anexado%' THEN 1
-        ELSE 0
-   END
- WHERE flag_comprovante_anexado <> CASE
-        WHEN ultima_ocorrencia_descricao COLLATE Latin1_General_CI_AI LIKE N'%Comprovante%Entrega%Anexado%' THEN 1
-        ELSE 0
-   END;
-GO
-
-IF EXISTS (
-    SELECT 1
-    FROM sys.indexes
-    WHERE name = N'IX_inventario_comprovante_minuta'
-      AND object_id = OBJECT_ID(N'dbo.inventario')
-      AND (filter_definition IS NULL OR filter_definition NOT LIKE N'%flag_comprovante_anexado%')
-)
-BEGIN
-    DROP INDEX IX_inventario_comprovante_minuta ON dbo.inventario;
-END;
-GO
-
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.indexes
-    WHERE name = N'IX_inventario_comprovante_minuta'
-      AND object_id = OBJECT_ID(N'dbo.inventario')
-)
-BEGIN
-    CREATE NONCLUSTERED INDEX IX_inventario_comprovante_minuta
-        ON dbo.inventario(numero_minuta)
-        WHERE flag_comprovante_anexado = 1;
-END;
-GO
+-- ============================================
+-- Script de criação da view 'vw_fretes_powerbi'
+-- Execute este script UMA VEZ antes de colocar o sistema em produção
+-- ============================================
 
 CREATE OR ALTER VIEW dbo.vw_fretes_powerbi AS
 SELECT
@@ -115,7 +73,7 @@ SELECT
     f.valor_notas AS [Valor NF],
     f.peso_notas AS [Kg NF],
     f.subtotal AS [Valor Frete],
-    f.invoices_total_volumes AS [Volumes],
+    COALESCE(lc.invoices_volumes, f.invoices_total_volumes, 0) AS [Volumes],
     f.taxed_weight AS [Kg Taxado],
     f.taxed_weight AS [Peso Taxado],
     f.real_weight AS [Kg Real],
@@ -142,6 +100,7 @@ SELECT
     f.filial_nome AS [Filial],
     f.filial_nome AS [Filial Emissora],
     indicador_base.filial_responsavel_destino AS [Responsável pela Região de Destino],
+    indicador_base.filial_responsavel_destino_key AS [Responsável Região Destino Key],
     f.filial_apelido AS [Filial Apelido],
     f.filial_cnpj AS [Filial CNPJ],
     f.tabela_preco_nome AS [Tabela de Preço],
@@ -191,6 +150,7 @@ SELECT
             FROM dbo.inventario AS inv
             WHERE inv.numero_minuta = f.corporation_sequence_number
               AND inv.flag_comprovante_anexado = 1
+              AND COALESCE(inv.excluido_na_origem, 0) = 0
         )
             THEN N'Sim'
         ELSE N'Não'
@@ -283,11 +243,13 @@ SELECT
 FROM dbo.fretes AS f
 LEFT JOIN dbo.localizacao_cargas AS lc
     ON lc.sequence_number = f.corporation_sequence_number
+   AND COALESCE(lc.excluido_na_origem, 0) = 0
 OUTER APPLY (
     SELECT
         COALESCE(CAST(f.data_previsao_entrega AS DATE), CAST(lc.predicted_delivery_at AS DATE)) AS previsao_entrega_oficial,
         COALESCE(f.fit_dpn_performance_finished_at, f.finished_at) AS finalizacao_performance_oficial,
-        COALESCE(NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), ''), f.filial_nome) AS filial_responsavel_destino
+        COALESCE(NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), ''), f.filial_nome) AS filial_responsavel_destino,
+        COALESCE(lc.destination_branch_key, f.filial_nome_key, N'sem_responsavel') AS filial_responsavel_destino_key
 ) AS indicador_base
 OUTER APPLY (
     SELECT
@@ -300,20 +262,9 @@ OUTER APPLY (
                 CAST(indicador_base.finalizacao_performance_oficial AS DATE)
             )
         END AS performance_diferenca_dias
-) AS indicador_perf;
+) AS indicador_perf
+WHERE COALESCE(f.excluido_na_origem, 0) = 0;
 GO
 
-IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'021_materializar_comprovante_inventario')
-BEGIN
-    INSERT INTO dbo.schema_migrations (migration_id, notes)
-    VALUES (
-        N'021_materializar_comprovante_inventario',
-        N'Materializa flag de comprovante no inventario e publica Comprovante Anexado na view vw_fretes_powerbi.'
-    );
-END;
+PRINT 'View vw_fretes_powerbi criada/atualizada com sucesso!';
 GO
-
-PRINT 'Flag de comprovante materializada e view vw_fretes_powerbi atualizada com sucesso!';
-GO
-

@@ -22,37 +22,10 @@ END;
 BEGIN TRY
 BEGIN TRANSACTION;
 
-DROP VIEW IF EXISTS dbo.vw_faturas_por_cliente_powerbi;
-PRINT 'View dbo.vw_faturas_por_cliente_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_fretes_powerbi;
-PRINT 'View dbo.vw_fretes_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_coletas_powerbi;
-PRINT 'View dbo.vw_coletas_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_cotacoes_powerbi;
-PRINT 'View dbo.vw_cotacoes_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_contas_a_pagar_powerbi;
-PRINT 'View dbo.vw_contas_a_pagar_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_localizacao_cargas_powerbi;
-PRINT 'View dbo.vw_localizacao_cargas_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_manifestos_powerbi;
-PRINT 'View dbo.vw_manifestos_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_inventario_powerbi;
-PRINT 'View dbo.vw_inventario_powerbi removida quando existente.';
-
-DROP VIEW IF EXISTS dbo.vw_sinistros_powerbi;
-PRINT 'View dbo.vw_sinistros_powerbi removida quando existente.';
-
 INSERT INTO dbo.schema_migrations (migration_id, notes)
 VALUES (
     @MigrationId,
-    N'Remove views legadas de Power BI substituidas pelo dashboard React.'
+    N'Migration historica convertida em no-op: Shadow Deployment preserva views legadas Power BI em paralelo com a nova API.'
 );
 
 COMMIT TRANSACTION;
@@ -63,5 +36,5 @@ BEGIN CATCH
     THROW;
 END CATCH;
 
-PRINT 'Migracao 035_drop_views_legadas_powerbi concluida com sucesso.';
+PRINT 'Migracao 035_drop_views_legadas_powerbi registrada como no-op; views legadas Power BI preservadas.';
 GO

@@ -108,10 +108,10 @@ public final class ConstantesApiGraphQL {
         // USUARIOS_SISTEMA - Individual
         ConstantesEntidades.USUARIOS_SISTEMA,
         new ConfiguracaoGraphQL(
-            "updatedAt",                    // campoFiltro (usa enabled: true + intervalo updatedAt)
+            "enabled",                      // campoFiltro legado disponivel em IndividualInput
             GraphQLQueries.QUERY_USUARIOS_SISTEMA, // query
             "individual",                    // nomeEntidadeApi
-            true                            // suportaIntervalo
+            false                           // nao suporta filtro temporal
         )
     );
 

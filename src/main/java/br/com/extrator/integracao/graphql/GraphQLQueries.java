@@ -252,7 +252,9 @@ public final class GraphQLQueries {
     /**
      * Query para buscar Usuários do Sistema (Individual)
      * Tipo GraphQL: Individual
-     * Filtro operacional: enabled: true + updatedAt no intervalo planejado pelo watermark incremental.
+     * Filtro operacional: enabled: true.
+     * A API ESL legada nao expoe campo temporal em Individual; o controle de seguranca
+     * fica no hard-limit de paginacao do cliente Java.
      * Paginação: cursor-based (first: 1000, after: $cursor)
      *
      * ATENÇÃO: Esta query busca usuários do tipo Individual.
@@ -271,7 +273,6 @@ public final class GraphQLQueries {
                   node {
                     id
                     name
-                    updatedAt
                   }
                 }
               }
