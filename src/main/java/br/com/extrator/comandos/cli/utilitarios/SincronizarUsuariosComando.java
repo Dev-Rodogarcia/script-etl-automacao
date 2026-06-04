@@ -24,10 +24,10 @@ public class SincronizarUsuariosComando implements Comando {
 
     @Override
     public void executar(final String[] args) throws Exception {
-        logger.info("Iniciando sincronizacao completa explicita de dim_usuarios...");
+        logger.info("Iniciando sincronizacao incremental de dim_usuarios...");
         final EntityExtractor.SaveMetrics metrics = service.sincronizar();
         logger.info(
-            "Sincronizacao completa de dim_usuarios concluida | user_id_unicos={} | operacoes={} | persistidos={} | noop={}",
+            "Sincronizacao incremental de dim_usuarios concluida | user_id_unicos={} | operacoes={} | persistidos={} | noop={}",
             metrics.getTotalUnicos(),
             metrics.getRegistrosSalvos(),
             metrics.getRegistrosPersistidos(),

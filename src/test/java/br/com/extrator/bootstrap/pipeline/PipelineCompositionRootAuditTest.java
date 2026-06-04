@@ -20,6 +20,7 @@ import br.com.extrator.aplicacao.portas.ClockPort;
 import br.com.extrator.aplicacao.portas.ConfigPort;
 import br.com.extrator.aplicacao.portas.ExtractionLoggerPort;
 import br.com.extrator.observabilidade.pipeline.InMemoryPipelineMetrics;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class PipelineCompositionRootAuditTest {
 
@@ -45,6 +46,25 @@ class PipelineCompositionRootAuditTest {
         assertEquals(1, report.getResultados().size());
         assertEquals(StepStatus.FAILED, report.getResultados().get(0).getStatus());
         assertFalse(report.getResultados().isEmpty());
+    }
+
+    @Test
+    void fluxoCompletoDeveIniciarPelaDimensaoUsuarios() {
+        final PipelineCompositionRoot root = new PipelineCompositionRoot(
+            new ConfigPortPadrao(),
+            new FixedClock(LocalDateTime.of(2026, 4, 14, 10, 0)),
+            new NoOpExtractionLogger(),
+            new InMemoryPipelineMetrics()
+        );
+
+        final List<String> entidades = root.criarStepsFluxoCompleto(false)
+            .stream()
+            .map(PipelineStep::obterNomeEntidade)
+            .toList();
+
+        assertEquals(ConstantesEntidades.USUARIOS_SISTEMA, entidades.get(0));
+        assertEquals(ConstantesEntidades.COLETAS, entidades.get(1));
+        assertEquals(ConstantesEntidades.FRETES, entidades.get(2));
     }
 
     private PipelineStep falha(final String nomeEtapa, final String entidade) {

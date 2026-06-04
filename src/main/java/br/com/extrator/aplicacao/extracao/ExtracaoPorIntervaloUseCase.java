@@ -51,6 +51,9 @@ import br.com.extrator.aplicacao.pipeline.PipelineReport;
 import br.com.extrator.aplicacao.pipeline.PipelineStep;
 import br.com.extrator.aplicacao.pipeline.runtime.StepExecutionResult;
 import br.com.extrator.aplicacao.pipeline.runtime.StepStatus;
+import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionWindowPlanner;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.banco.SqlServerExecutionLockManager;
 import br.com.extrator.suporte.console.BannerUtil;
@@ -135,6 +138,10 @@ public class ExtracaoPorIntervaloUseCase {
         final String apiEspecifica = request.apiEspecifica();
         final String entidadeEspecifica = request.entidadeEspecifica();
         final boolean modoLoopDaemon = request.modoLoopDaemon();
+        final ExecutionWindowPlan planoUsuariosSistema =
+            planejarJanelaUsuariosSistema(dataFim, request.modoExecucao());
+        ExecutionPlanContext.setPlanos(Map.of(ConstantesEntidades.USUARIOS_SISTEMA, planoUsuariosSistema));
+        try {
 
         BannerUtil.exibirBannerExtracaoPorIntervalo();
 
@@ -368,6 +375,7 @@ public class ExtracaoPorIntervaloUseCase {
 
         if (blocosFalhados == 0) {
             BannerUtil.exibirBannerSucesso();
+            atualizarWatermarkUsuariosSistema(planoUsuariosSistema);
             return;
         }
 
@@ -378,6 +386,9 @@ public class ExtracaoPorIntervaloUseCase {
                 + " - "
                 + String.join(", ", blocosFalhadosLista)
         );
+        } finally {
+            ExecutionPlanContext.clear();
+        }
         }
         }
     }
@@ -415,6 +426,31 @@ public class ExtracaoPorIntervaloUseCase {
             }
         }
         return Integer.toString(valorMinimo);
+    }
+
+    private ExecutionWindowPlan planejarJanelaUsuariosSistema(
+        final LocalDate dataFim,
+        final ExtracaoPorIntervaloRequest.ModoExecucao modoExecucao
+    ) {
+        return new ExecutionWindowPlanner(AplicacaoContexto.executionAuditPort()).planejarEntidade(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            dataFim,
+            modoExecucao
+        );
+    }
+
+    private void atualizarWatermarkUsuariosSistema(final ExecutionWindowPlan planoUsuariosSistema) {
+        if (planoUsuariosSistema == null) {
+            return;
+        }
+        final var executionAuditPort = AplicacaoContexto.executionAuditPort();
+        if (executionAuditPort == null || !executionAuditPort.isDisponivel()) {
+            return;
+        }
+        executionAuditPort.atualizarWatermarkConfirmado(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            planoUsuariosSistema.confirmacaoFim()
+        );
     }
 
     private List<BlocoPeriodo> dividirEmBlocos(final LocalDate dataInicio, final LocalDate dataFim) {

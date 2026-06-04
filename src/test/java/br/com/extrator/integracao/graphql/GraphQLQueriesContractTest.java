@@ -10,5 +10,6 @@ class GraphQLQueriesContractTest {
     void queryUsuariosSistemaDeveUsarVariavelAfterCompativelComPaginador() {
         assertTrue(GraphQLQueries.QUERY_USUARIOS_SISTEMA.contains("$after: String"));
         assertTrue(GraphQLQueries.QUERY_USUARIOS_SISTEMA.contains("after: $after"));
+        assertTrue(GraphQLQueries.QUERY_USUARIOS_SISTEMA.contains("updatedAt"));
     }
 }

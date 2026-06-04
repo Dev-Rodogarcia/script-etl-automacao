@@ -156,7 +156,12 @@ public final class PipelineCompositionRoot {
 
     public List<PipelineStep> criarStepsFluxoCompleto(final boolean incluirDataQuality) {
         final ExtractorRegistry registry = criarRegistryFluxoCompleto(incluirDataQuality);
-        final List<String> ordem = new ArrayList<>(List.of("graphql", "dataexport"));
+        final List<String> ordem = new ArrayList<>(List.of(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            ConstantesEntidades.COLETAS,
+            ConstantesEntidades.FRETES,
+            "dataexport"
+        ));
         if (ConfigRaster.isHabilitadoParaExecucao()) {
             ordem.add(ConstantesEntidades.RASTER_VIAGENS);
         }
@@ -169,6 +174,18 @@ public final class PipelineCompositionRoot {
     public ExtractorRegistry criarRegistryFluxoCompleto(final boolean incluirDataQuality) {
         final ExtractorRegistry registry = new ExtractorRegistry();
         registry.registrar("graphql", () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), "graphql"));
+        registry.registrar(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), ConstantesEntidades.USUARIOS_SISTEMA)
+        );
+        registry.registrar(
+            ConstantesEntidades.COLETAS,
+            () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), ConstantesEntidades.COLETAS)
+        );
+        registry.registrar(
+            ConstantesEntidades.FRETES,
+            () -> new GraphQLPipelineStep(new GraphQLGatewayAdapter(), ConstantesEntidades.FRETES)
+        );
         registry.registrar("dataexport", () -> new DataExportPipelineStep(new DataExportGatewayAdapter(), "dataexport"));
         registry.registrar(
             ConstantesEntidades.RASTER_VIAGENS,

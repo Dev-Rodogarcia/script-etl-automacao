@@ -150,7 +150,7 @@ class PlanejadorEscopoExtracaoIntervaloTest {
             .map(PipelineStep::obterNomeEtapa)
             .toList();
 
-        assertEquals(List.of("graphql:coletas"), steps);
+        assertEquals(List.of("graphql:usuarios_sistema", "graphql:coletas"), steps);
     }
 
     @Test

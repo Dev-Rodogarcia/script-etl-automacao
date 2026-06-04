@@ -11,6 +11,7 @@ import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest.ModoExecuc
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.features.fretes.aplicacao.FretesExecutionWindowStrategy;
 import br.com.extrator.features.localizacao.aplicacao.LocalizacaoCargasExecutionWindowStrategy;
+import br.com.extrator.features.usuarios.aplicacao.UsuariosExecutionWindowStrategy;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
@@ -64,7 +65,7 @@ public final class ExecutionWindowPlanner {
         registradas.put(ConstantesEntidades.LOCALIZACAO_CARGAS, new LocalizacaoCargasExecutionWindowStrategy());
         registrarReplay(registradas, ConstantesEntidades.FATURAS_POR_CLIENTE);
 
-        registrarJanelaDiaria(registradas, ConstantesEntidades.USUARIOS_SISTEMA);
+        registradas.put(ConstantesEntidades.USUARIOS_SISTEMA, new UsuariosExecutionWindowStrategy());
         registrarJanelaDiaria(registradas, ConstantesEntidades.CONTAS_A_PAGAR);
         registrarJanelaDiaria(registradas, ConstantesEntidades.INVENTARIO);
         registrarJanelaDiaria(registradas, ConstantesEntidades.SINISTROS);

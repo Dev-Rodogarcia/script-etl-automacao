@@ -19,6 +19,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,6 +39,7 @@ import br.com.extrator.dominio.graphql.fretes.FreteNodeDTO;
 import br.com.extrator.suporte.configuracao.ConfigApi;
 import br.com.extrator.suporte.formatacao.FormatadorData;
 import br.com.extrator.suporte.http.GerenciadorRequisicaoHttp;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public class ClienteApiGraphQL {
@@ -178,8 +180,27 @@ public class ClienteApiGraphQL {
             final LocalDate dataInicio,
             final LocalDate dataFim,
             final PageChunkConsumer<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> chunkConsumer) {
+        final LocalDate inicio = dataInicio != null ? dataInicio : RelogioSistema.hoje().minusDays(90);
+        final LocalDate fim = dataFim != null ? dataFim : inicio;
+        return buscarUsuariosSistema(inicio.atStartOfDay(), fim.atTime(23, 59), chunkConsumer);
+    }
+
+    public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema(
+            final LocalDateTime atualizadoApos,
+            final LocalDateTime atualizadoAte) {
+        return buscarUsuariosSistema(atualizadoApos, atualizadoAte, null);
+    }
+
+    public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema(
+            final LocalDateTime atualizadoApos,
+            final LocalDateTime atualizadoAte,
+            final PageChunkConsumer<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> chunkConsumer) {
         try {
-            final String intervaloUpdatedAt = FormatadorData.formatarIntervaloEslCloud(dataInicio, dataFim);
+            final LocalDateTime inicio = atualizadoApos != null
+                ? atualizadoApos
+                : RelogioSistema.agora().minusDays(90);
+            final LocalDateTime fim = atualizadoAte != null ? atualizadoAte : RelogioSistema.agora();
+            final String intervaloUpdatedAt = FormatadorData.formatarIntervaloEslCloud(inicio, fim);
             final Map<String, Object> variaveis = new HashMap<>();
             variaveis.put("params", Map.of("enabled", true, "updatedAt", intervaloUpdatedAt));
             logger.info("Buscando Usuários do Sistema via GraphQL (enabled: true, updatedAt: {})", intervaloUpdatedAt);
@@ -198,27 +219,14 @@ public class ClienteApiGraphQL {
     }
 
     /**
-     * Busca TODOS os usuários do sistema (full load).
-     * Usado apenas na sincronização completa explícita de dim_usuarios.
+     * Compatibilidade para chamadas legadas: nunca executa full load.
+     * Sem janela explícita, usa fallback incremental de 90 dias.
      *
-     * @return Resultado da extração com todos os usuários habilitados
+     * @return Resultado da extração com usuários habilitados atualizados nos últimos 90 dias
      */
     public ResultadoExtracao<br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO> buscarUsuariosSistema() {
-        try {
-            final Map<String, Object> variaveis = new HashMap<>();
-            variaveis.put("params", Map.of("enabled", true));
-            logger.info("Buscando Usuários do Sistema via GraphQL - FULL LOAD (enabled: true)");
-            return paginator.executarQueryPaginada(
-                this.executionUuid,
-                GraphQLQueries.QUERY_USUARIOS_SISTEMA,
-                ConstantesApiGraphQL.obterNomeEntidadeApi(ConstantesEntidades.USUARIOS_SISTEMA),
-                variaveis,
-                br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO.class
-            );
-        } catch (final RuntimeException e) {
-            logger.warn("Falha ao buscar Usuários do Sistema: {}", e.getMessage());
-            return ResultadoExtracao.incompleto(new ArrayList<>(), ResultadoExtracao.MotivoInterrupcao.ERRO_API, 0, 0);
-        }
+        final LocalDateTime fim = RelogioSistema.agora();
+        return buscarUsuariosSistema(fim.minusDays(90), fim);
     }
 
     public ResultadoExtracao<br.com.extrator.dominio.graphql.fretes.nfse.NfseNodeDTO> buscarNfseDireta(final LocalDate dataReferencia) {

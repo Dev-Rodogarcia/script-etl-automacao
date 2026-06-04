@@ -54,10 +54,10 @@ Checklist mínimo por mudança estrutural:
 | `dbo.fato_gestao_vista_coletores` | `EXEC dbo.sp_carga_fato_gestao_vista_coletores;` | SQL nativo, publicado em `database/procedures/002_criar_sp_carga_fato_gestao_vista_coletores.sql`. |
 | `dbo.fato_fretes_faturamento` | `EXEC dbo.sp_carga_fato_fretes_faturamento;` | SQL nativo, publicado em `database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql`. |
 | `dbo.fato_gestao_vista_faturas` | `EXEC dbo.sp_carga_fato_gestao_vista_faturas;` | SQL nativo, publicado em `database/procedures/004_criar_sp_carga_fato_gestao_vista_faturas.sql`. |
-| `dbo.dim_usuarios` | `java -jar target\extrator.jar --sincronizar-usuarios` | Carga por Java/API GraphQL; não possui procedure SQL nativa por desenho. |
-| `dbo.dim_usuarios_historico` | `java -jar target\extrator.jar --sincronizar-usuarios` | Alimentada pelo snapshot Java quando há inserção, alteração, reativação ou desativação de usuário. |
+| `dbo.dim_usuarios` | `java -jar target\extrator.jar --extracao-intervalo YYYY-MM-DD YYYY-MM-DD` | Sincronizada automaticamente como primeiro passo do ciclo Java/API GraphQL. |
+| `dbo.dim_usuarios_historico` | Ciclo Java de extração | Alimentada pelos mecanismos Java de estado/histórico quando aplicável. |
 
-Depois de recriar o banco, execute o comando Java dedicado de usuários, ou inicie o fluxo/daemon que inclua essa sincronização, para popular `dim_usuarios` e `dim_usuarios_historico`.
+Depois de recriar o banco, inicie o ciclo Java de extração. A dimensão `dim_usuarios` deixa de exigir acionamento manual dedicado e é processada antes das tabelas fato.
 
 Exemplo de pesquisa em `metadata`:
 
@@ -740,8 +740,8 @@ ORDER BY data_extracao DESC;
 - Grão: 1 linha por usuário
 - Chaves: PK `user_id`
 - Observação importante: a estrutura final da tabela é a soma de `011_criar_tabela_dim_usuarios.sql` com `016_alter_tabela_dim_usuarios_estado.sql`.
-- Observação importante: hoje existem dois caminhos de escrita. `UsuarioSistemaRepository` mantém o subconjunto legado (`user_id`, `nome`, `data_atualizacao`), enquanto `SqlServerUsuariosEstadoRepository` preenche também `ativo`, `origem_atualizado_em`, `ultima_extracao_em` e alimenta `dim_usuarios_historico`. Para pesquisa, considerar a estrutura completa abaixo.
-- Carga inicial: execute `java -jar target\extrator.jar --sincronizar-usuarios` após recriar o banco, ou inicie um fluxo/daemon que contemple a sincronização de usuários.
+- Observação importante: a sincronização operacional da dimensão roda pelo ciclo Java de extração e usa filtro incremental por `updatedAt`; sem watermark local, a primeira janela é limitada aos últimos 90 dias.
+- Carga inicial: inicie `java -jar target\extrator.jar --extracao-intervalo YYYY-MM-DD YYYY-MM-DD`; a sincronização de usuários ocorre automaticamente antes das fatos.
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |

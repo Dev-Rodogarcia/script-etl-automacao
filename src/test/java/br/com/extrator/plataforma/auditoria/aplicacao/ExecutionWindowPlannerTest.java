@@ -137,6 +137,36 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
+    void deveLimitarUsuariosANoventaDiasQuandoNaoHaWatermark() {
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            LocalDate.of(2026, 6, 3)
+        );
+
+        assertEquals(LocalDate.of(2026, 3, 5), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 6, 3), plano.consultaDataFim());
+        assertEquals(LocalDateTime.of(2026, 3, 5, 0, 0), plano.confirmacaoInicio());
+        assertEquals(LocalDateTime.of(2026, 6, 3, LocalTime.MAX.getHour(), LocalTime.MAX.getMinute(), LocalTime.MAX.getSecond(), LocalTime.MAX.getNano()), plano.confirmacaoFim());
+    }
+
+    @Test
+    void devePlanejarUsuariosAPartirDoWatermarkConfirmado() {
+        final LocalDateTime watermark = LocalDateTime.of(2026, 6, 2, 10, 45);
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            LocalDate.of(2026, 6, 3)
+        );
+
+        assertEquals(LocalDate.of(2026, 6, 2), plano.consultaDataInicio());
+        assertEquals(watermark, plano.confirmacaoInicio());
+        assertEquals(LocalDate.of(2026, 6, 3), plano.consultaDataFim());
+    }
+
+    @Test
     void deveUsarWatermarkMaisAntigoQueReplayComoInicioDaConsulta() {
         final LocalDateTime watermark = LocalDateTime.of(2026, 3, 10, 5, 30);
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));

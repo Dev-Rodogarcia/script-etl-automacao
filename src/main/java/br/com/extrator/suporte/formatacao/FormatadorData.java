@@ -319,6 +319,22 @@ public final class FormatadorData {
         return formatarIntervaloEslCloud(dataInicio, dataFim, 10);
     }
 
+    /**
+     * Formata um intervalo exato de data/hora no padrão ESL Cloud.
+     * Usado por cargas incrementais orientadas por watermark confirmado.
+     *
+     * @param inicio Data/hora inicial do intervalo
+     * @param fim Data/hora final do intervalo
+     * @return String no formato "yyyy-MM-dd HH:mm - yyyy-MM-dd HH:mm"
+     */
+    public static String formatarIntervaloEslCloud(final LocalDateTime inicio, final LocalDateTime fim) {
+        if (inicio == null) {
+            throw new IllegalArgumentException("inicio nao pode ser nulo");
+        }
+        final LocalDateTime fimEfetivo = fim != null ? fim : inicio;
+        return inicio.format(ESL_CLOUD_INTERVAL) + " - " + fimEfetivo.format(ESL_CLOUD_INTERVAL);
+    }
+
     private FormatadorData() {
         // Impede instanciação
     }

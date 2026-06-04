@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
@@ -18,8 +20,16 @@ import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapp
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
 import br.com.extrator.persistencia.repositorio.AbstractRepository;
 import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class UsuarioSistemaExtractorTest {
+
+    @AfterEach
+    void limparPlano() {
+        ExecutionPlanContext.clear();
+    }
 
     @Test
     void deveUsarCargaIncrementalQuandoDimUsuariosJaPossuiDados() {
@@ -35,6 +45,8 @@ class UsuarioSistemaExtractorTest {
 
         assertTrue(apiClient.incrementalChamado);
         assertFalse(apiClient.fullLoadChamado);
+        assertEquals(LocalDateTime.of(2026, 3, 24, 0, 0), apiClient.inicioRecebido);
+        assertEquals(LocalDateTime.of(2026, 3, 25, 23, 59), apiClient.fimRecebido);
     }
 
     @Test
@@ -51,6 +63,33 @@ class UsuarioSistemaExtractorTest {
 
         assertTrue(apiClient.incrementalChamado);
         assertFalse(apiClient.fullLoadChamado);
+        assertEquals(apiClient.fimRecebido.minusDays(90), apiClient.inicioRecebido);
+    }
+
+    @Test
+    void deveUsarPlanoDeWatermarkQuandoDisponivel() {
+        final RecordingClienteApiGraphQL apiClient = new RecordingClienteApiGraphQL();
+        final FakeUsuarioSistemaRepository repository = new FakeUsuarioSistemaRepository(true);
+        ExecutionPlanContext.setPlanos(java.util.Map.of(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            new ExecutionWindowPlan(
+                LocalDate.of(2026, 6, 3),
+                LocalDate.of(2026, 6, 4),
+                LocalDateTime.of(2026, 6, 3, 10, 45),
+                LocalDateTime.of(2026, 6, 4, 23, 59)
+            )
+        ));
+        final UsuarioSistemaExtractor extractor = new UsuarioSistemaExtractor(
+            apiClient,
+            repository,
+            new UsuarioSistemaMapper()
+        );
+
+        extractor.extract(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 2));
+
+        assertTrue(apiClient.incrementalChamado);
+        assertEquals(LocalDateTime.of(2026, 6, 3, 10, 45), apiClient.inicioRecebido);
+        assertEquals(LocalDateTime.of(2026, 6, 4, 23, 59), apiClient.fimRecebido);
     }
 
     @Test
@@ -95,11 +134,33 @@ class UsuarioSistemaExtractorTest {
     private static final class RecordingClienteApiGraphQL extends ClienteApiGraphQL {
         private boolean incrementalChamado;
         private boolean fullLoadChamado;
+        private LocalDateTime inicioRecebido;
+        private LocalDateTime fimRecebido;
+        private String origemChamada;
 
         @Override
         public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(final LocalDate dataInicio, final LocalDate dataFim) {
             incrementalChamado = true;
+            origemChamada = "local_date";
             return ResultadoExtracao.completo(List.of(), 0, 0);
+        }
+
+        @Override
+        public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(final LocalDateTime atualizadoApos,
+                                                                          final LocalDateTime atualizadoAte) {
+            incrementalChamado = true;
+            inicioRecebido = atualizadoApos;
+            fimRecebido = atualizadoAte;
+            origemChamada = "local_date_time";
+            return ResultadoExtracao.completo(List.of(), 0, 0);
+        }
+
+        @Override
+        public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(
+                final LocalDateTime atualizadoApos,
+                final LocalDateTime atualizadoAte,
+                final br.com.extrator.integracao.PageChunkConsumer<IndividualNodeDTO> chunkConsumer) {
+            return buscarUsuariosSistema(atualizadoApos, atualizadoAte);
         }
 
         @Override

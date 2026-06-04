@@ -252,7 +252,7 @@ public final class GraphQLQueries {
     /**
      * Query para buscar Usuários do Sistema (Individual)
      * Tipo GraphQL: Individual
-     * Filtro: enabled: true (obrigatório), updatedAt: intervalo de datas (opcional, para extração incremental)
+     * Filtro operacional: enabled: true + updatedAt no intervalo planejado pelo watermark incremental.
      * Paginação: cursor-based (first: 1000, after: $cursor)
      *
      * ATENÇÃO: Esta query busca usuários do tipo Individual.
@@ -271,6 +271,7 @@ public final class GraphQLQueries {
                   node {
                     id
                     name
+                    updatedAt
                   }
                 }
               }

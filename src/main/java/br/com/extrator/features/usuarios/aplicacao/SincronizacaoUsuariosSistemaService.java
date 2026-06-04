@@ -9,42 +9,59 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import br.com.extrator.aplicacao.contexto.AplicacaoContexto;
+import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest;
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
-import br.com.extrator.features.usuarios.persistencia.sqlserver.SqlServerUsuariosEstadoRepository;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
+import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
+import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionWindowPlanner;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
+import br.com.extrator.suporte.tempo.RelogioSistema;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class SincronizacaoUsuariosSistemaService {
     private static final Logger logger = LoggerFactory.getLogger(SincronizacaoUsuariosSistemaService.class);
 
     private final ClienteApiGraphQL apiClient;
     private final UsuarioSistemaMapper mapper;
-    private final UsuariosSistemaSnapshotService snapshotService;
+    private final UsuarioSistemaRepository repository;
+    private final ExecutionAuditPort executionAuditPort;
 
     public SincronizacaoUsuariosSistemaService() {
         this(
             new ClienteApiGraphQL(),
             new UsuarioSistemaMapper(),
-            new UsuariosSistemaSnapshotService(new SqlServerUsuariosEstadoRepository())
+            new UsuarioSistemaRepository(),
+            AplicacaoContexto.executionAuditPort()
         );
     }
 
     SincronizacaoUsuariosSistemaService(final ClienteApiGraphQL apiClient,
                                         final UsuarioSistemaMapper mapper,
-                                        final UsuariosSistemaSnapshotService snapshotService) {
+                                        final UsuarioSistemaRepository repository,
+                                        final ExecutionAuditPort executionAuditPort) {
         this.apiClient = Objects.requireNonNull(apiClient, "apiClient");
         this.mapper = Objects.requireNonNull(mapper, "mapper");
-        this.snapshotService = Objects.requireNonNull(snapshotService, "snapshotService");
+        this.repository = Objects.requireNonNull(repository, "repository");
+        this.executionAuditPort = Objects.requireNonNull(executionAuditPort, "executionAuditPort");
     }
 
     public EntityExtractor.SaveMetrics sincronizar() throws SQLException {
         apiClient.setExecutionUuid(ExecutionContext.currentExecutionId());
 
-        final ResultadoExtracao<IndividualNodeDTO> resultado = apiClient.buscarUsuariosSistema();
+        final ExecutionWindowPlan plano = new ExecutionWindowPlanner(executionAuditPort).planejarEntidade(
+            ConstantesEntidades.USUARIOS_SISTEMA,
+            RelogioSistema.hoje(),
+            ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH
+        );
+        final ResultadoExtracao<IndividualNodeDTO> resultado =
+            apiClient.buscarUsuariosSistema(plano.confirmacaoInicio(), plano.confirmacaoFim());
         validarResultadoCompleto(resultado);
 
         final List<UsuarioSistemaEntity> entities = resultado.getDados().stream()
@@ -61,12 +78,27 @@ public final class SincronizacaoUsuariosSistemaService {
         }
 
         logger.info(
-            "sincronizar_usuarios: snapshot completo autorizado | api_bruto={} | user_id_unicos={} | paginas_processadas={}",
+            "sincronizar_usuarios: upsert incremental autorizado | janela={}..{} | api_bruto={} | user_id_unicos={} | paginas_processadas={}",
+            plano.confirmacaoInicio(),
+            plano.confirmacaoFim(),
             entities.size(),
             unicos.size(),
             resultado.getPaginasProcessadas()
         );
-        return snapshotService.persistirSnapshot(unicos);
+        final int registrosSalvos = repository.salvar(unicos);
+        if (executionAuditPort.isDisponivel()) {
+            executionAuditPort.atualizarWatermarkConfirmado(
+                ConstantesEntidades.USUARIOS_SISTEMA,
+                plano.confirmacaoFim()
+            );
+        }
+        return new EntityExtractor.SaveMetrics(
+            registrosSalvos,
+            unicos.size(),
+            0,
+            repository.getUltimoResumoSalvamento().getRegistrosPersistidos(),
+            repository.getUltimoResumoSalvamento().getRegistrosNoOpIdempotente()
+        );
     }
 
     private void validarResultadoCompleto(final ResultadoExtracao<IndividualNodeDTO> resultado) {
@@ -79,13 +111,13 @@ public final class SincronizacaoUsuariosSistemaService {
         final int registrosExtraidos = resultado == null ? 0 : resultado.getRegistrosExtraidos();
 
         logger.error(
-            "sincronizar_usuarios: snapshot cancelado por resultado incompleto | motivo={} | paginas_processadas={} | registros_extraidos={}",
+            "sincronizar_usuarios: upsert incremental cancelado por resultado incompleto | motivo={} | paginas_processadas={} | registros_extraidos={}",
             motivo,
             paginasProcessadas,
             registrosExtraidos
         );
         throw new IllegalStateException(
-            "Sincronizacao completa de usuarios cancelada: resultado incompleto (" + motivo + ")."
+            "Sincronizacao incremental de usuarios cancelada: resultado incompleto (" + motivo + ")."
         );
     }
 

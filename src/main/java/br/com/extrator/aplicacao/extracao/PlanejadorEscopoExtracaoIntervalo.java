@@ -114,6 +114,7 @@ final class PlanejadorEscopoExtracaoIntervalo {
                 adicionarStepsGraphQLGranulares(steps, graphQLGateway);
                 return steps;
             }
+            adicionarStepUsuariosAntesDeFatoGraphQL(steps, graphQLGateway, entidadeNormalizada);
             steps.add(new GraphQLPipelineStep(graphQLGateway, entidadeNormalizada));
             return steps;
         }
@@ -186,6 +187,9 @@ final class PlanejadorEscopoExtracaoIntervalo {
         if (entidadeEspecifica != null && !entidadeEspecifica.isBlank()) {
             final String entidadeNormalizada = normalizarEntidade(entidadeEspecifica);
             if (entidadeNormalizada != null) {
+                if (deveSincronizarUsuariosAntesDaFatoGraphQL(apiEspecifica, entidadeNormalizada)) {
+                    entidades.add(ConstantesEntidades.USUARIOS_SISTEMA);
+                }
                 adicionarEntidadeResumo(entidades, entidadeNormalizada);
             }
             return entidades;
@@ -340,6 +344,21 @@ final class PlanejadorEscopoExtracaoIntervalo {
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.USUARIOS_SISTEMA));
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.COLETAS));
         steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.FRETES));
+    }
+
+    private void adicionarStepUsuariosAntesDeFatoGraphQL(final List<PipelineStep> steps,
+                                                         final GraphQLGateway graphQLGateway,
+                                                         final String entidadeNormalizada) {
+        if (deveSincronizarUsuariosAntesDaFatoGraphQL("graphql", entidadeNormalizada)) {
+            steps.add(new GraphQLPipelineStep(graphQLGateway, ConstantesEntidades.USUARIOS_SISTEMA));
+        }
+    }
+
+    private boolean deveSincronizarUsuariosAntesDaFatoGraphQL(final String apiEspecifica,
+                                                             final String entidadeNormalizada) {
+        return "graphql".equalsIgnoreCase(apiEspecifica)
+            && (ConstantesEntidades.COLETAS.equals(entidadeNormalizada)
+                || ConstantesEntidades.FRETES.equals(entidadeNormalizada));
     }
 
     private void adicionarStepsDataExportGranulares(final List<PipelineStep> steps,

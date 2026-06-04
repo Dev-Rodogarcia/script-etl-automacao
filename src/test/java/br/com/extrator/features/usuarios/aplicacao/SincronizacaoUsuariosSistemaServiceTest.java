@@ -6,20 +6,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.SQLException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
 import br.com.extrator.dominio.graphql.usuarios.IndividualNodeDTO;
 import br.com.extrator.integracao.ClienteApiGraphQL;
 import br.com.extrator.integracao.ResultadoExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
 import br.com.extrator.persistencia.entidade.UsuarioSistemaEntity;
+import br.com.extrator.persistencia.repositorio.AbstractRepository;
+import br.com.extrator.persistencia.repositorio.UsuarioSistemaRepository;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionAuditRecord;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
+import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class SincronizacaoUsuariosSistemaServiceTest {
 
@@ -29,7 +34,7 @@ class SincronizacaoUsuariosSistemaServiceTest {
     }
 
     @Test
-    void deveAplicarSnapshotSomenteQuandoResultadoCompleto() throws SQLException {
+    void deveAplicarUpsertIncrementalSomenteQuandoResultadoCompleto() throws SQLException {
         final RecordingClienteApiGraphQL apiClient = new RecordingClienteApiGraphQL(
             ResultadoExtracao.completo(
                 List.of(
@@ -41,23 +46,28 @@ class SincronizacaoUsuariosSistemaServiceTest {
                 3
             )
         );
-        final RecordingUsuariosEstadoPort snapshotPort = new RecordingUsuariosEstadoPort();
+        final RecordingUsuarioSistemaRepository repository = new RecordingUsuarioSistemaRepository();
+        final LocalDateTime watermark = LocalDateTime.of(2026, 6, 3, 10, 45);
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort(watermark);
         final SincronizacaoUsuariosSistemaService service = new SincronizacaoUsuariosSistemaService(
             apiClient,
             new UsuarioSistemaMapper(),
-            new UsuariosSistemaSnapshotService(snapshotPort)
+            repository,
+            auditPort
         );
 
         final String executionId = ExecutionContext.initialize("--sincronizar-usuarios");
         final EntityExtractor.SaveMetrics metrics = service.sincronizar();
 
-        assertTrue(apiClient.fullLoadChamado);
-        assertFalse(apiClient.incrementalChamado);
+        assertFalse(apiClient.fullLoadChamado);
+        assertTrue(apiClient.incrementalChamado);
         assertEquals(executionId, apiClient.executionUuidRecebido);
-        assertEquals(1, snapshotPort.snapshotChamadas);
-        assertEquals(List.of(10L, 11L), snapshotPort.userIdsRecebidos);
-        assertEquals(List.of("Ana Silva", "Bruno"), snapshotPort.nomesRecebidos);
-        assertEquals(executionId, snapshotPort.executionUuidRecebido);
+        assertEquals(watermark, apiClient.inicioRecebido);
+        assertEquals(1, repository.salvarChamadas);
+        assertEquals(List.of(10L, 11L), repository.userIdsRecebidos);
+        assertEquals(List.of("Ana Silva", "Bruno"), repository.nomesRecebidos);
+        assertEquals(ConstantesEntidades.USUARIOS_SISTEMA, auditPort.entidadeAtualizada);
+        assertTrue(auditPort.watermarkAtualizado.isAfter(watermark));
         assertEquals(2, metrics.getTotalUnicos());
         assertEquals(2, metrics.getRegistrosSalvos());
         assertEquals(2, metrics.getRegistrosPersistidos());
@@ -73,17 +83,21 @@ class SincronizacaoUsuariosSistemaServiceTest {
                 1
             )
         );
-        final RecordingUsuariosEstadoPort snapshotPort = new RecordingUsuariosEstadoPort();
+        final RecordingUsuarioSistemaRepository repository = new RecordingUsuarioSistemaRepository();
+        final RecordingExecutionAuditPort auditPort = new RecordingExecutionAuditPort();
         final SincronizacaoUsuariosSistemaService service = new SincronizacaoUsuariosSistemaService(
             apiClient,
             new UsuarioSistemaMapper(),
-            new UsuariosSistemaSnapshotService(snapshotPort)
+            repository,
+            auditPort
         );
 
         final IllegalStateException error = assertThrows(IllegalStateException.class, service::sincronizar);
 
-        assertTrue(apiClient.fullLoadChamado);
-        assertEquals(0, snapshotPort.snapshotChamadas);
+        assertTrue(apiClient.incrementalChamado);
+        assertFalse(apiClient.fullLoadChamado);
+        assertEquals(0, repository.salvarChamadas);
+        assertEquals(null, auditPort.watermarkAtualizado);
         assertTrue(error.getMessage().contains("resultado incompleto"));
         assertTrue(error.getMessage().contains("LIMITE_PAGINAS"));
     }
@@ -100,6 +114,8 @@ class SincronizacaoUsuariosSistemaServiceTest {
         private boolean incrementalChamado;
         private boolean fullLoadChamado;
         private String executionUuidRecebido;
+        private LocalDateTime inicioRecebido;
+        private LocalDateTime fimRecebido;
 
         private RecordingClienteApiGraphQL(final ResultadoExtracao<IndividualNodeDTO> resultado) {
             this.resultado = resultado;
@@ -111,8 +127,11 @@ class SincronizacaoUsuariosSistemaServiceTest {
         }
 
         @Override
-        public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(final LocalDate dataInicio, final LocalDate dataFim) {
+        public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(final LocalDateTime atualizadoApos,
+                                                                          final LocalDateTime atualizadoAte) {
             incrementalChamado = true;
+            inicioRecebido = atualizadoApos;
+            fimRecebido = atualizadoAte;
             return resultado;
         }
 
@@ -123,26 +142,72 @@ class SincronizacaoUsuariosSistemaServiceTest {
         }
     }
 
-    private static final class RecordingUsuariosEstadoPort implements UsuariosEstadoPort {
-        private int snapshotChamadas;
+    private static final class RecordingUsuarioSistemaRepository extends UsuarioSistemaRepository {
+        private int salvarChamadas;
         private List<Long> userIdsRecebidos = List.of();
         private List<String> nomesRecebidos = List.of();
-        private String executionUuidRecebido;
 
         @Override
-        public SnapshotMetrics aplicarSnapshot(final List<UsuarioSistemaEntity> usuariosAtivos,
-                                               final String executionUuid,
-                                               final LocalDateTime observadoEm) {
-            snapshotChamadas++;
-            this.executionUuidRecebido = executionUuid;
-            this.userIdsRecebidos = usuariosAtivos.stream()
+        public int salvar(final List<UsuarioSistemaEntity> entidades) {
+            salvarChamadas++;
+            this.userIdsRecebidos = entidades.stream()
                 .map(UsuarioSistemaEntity::getUserId)
                 .toList();
-            this.nomesRecebidos = usuariosAtivos.stream()
+            this.nomesRecebidos = entidades.stream()
                 .map(UsuarioSistemaEntity::getNome)
                 .toList();
-            final int total = usuariosAtivos.size();
-            return new SnapshotMetrics(total, total, 0, total);
+            return entidades.size();
+        }
+
+        @Override
+        public AbstractRepository.SaveSummary getUltimoResumoSalvamento() {
+            return new AbstractRepository.SaveSummary(
+                userIdsRecebidos.size(),
+                userIdsRecebidos.size(),
+                0,
+                0,
+                0
+            );
+        }
+    }
+
+    private static final class RecordingExecutionAuditPort implements ExecutionAuditPort {
+        private final LocalDateTime watermarkInicial;
+        private String entidadeAtualizada;
+        private LocalDateTime watermarkAtualizado;
+
+        private RecordingExecutionAuditPort() {
+            this(null);
+        }
+
+        private RecordingExecutionAuditPort(final LocalDateTime watermarkInicial) {
+            this.watermarkInicial = watermarkInicial;
+        }
+
+        @Override
+        public void registrarResultado(final ExecutionAuditRecord record) {
+            // no-op
+        }
+
+        @Override
+        public Optional<ExecutionAuditRecord> buscarResultado(final String executionUuid, final String entidade) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<ExecutionAuditRecord> listarResultados(final String executionUuid) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<LocalDateTime> buscarWatermarkConfirmado(final String entidade) {
+            return Optional.ofNullable(watermarkInicial);
+        }
+
+        @Override
+        public void atualizarWatermarkConfirmado(final String entidade, final LocalDateTime watermarkConfirmado) {
+            this.entidadeAtualizada = entidade;
+            this.watermarkAtualizado = watermarkConfirmado;
         }
     }
 }

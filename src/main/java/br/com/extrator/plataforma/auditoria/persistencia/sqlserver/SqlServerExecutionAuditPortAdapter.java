@@ -212,7 +212,7 @@ public final class SqlServerExecutionAuditPortAdapter implements ExecutionAuditP
             MERGE dbo.sys_execution_watermark AS T
             USING (VALUES (?, ?)) AS S (entidade, watermark_confirmado)
             ON T.entidade = S.entidade
-            WHEN MATCHED THEN
+            WHEN MATCHED AND S.watermark_confirmado > T.watermark_confirmado THEN
                 UPDATE SET
                     watermark_confirmado = S.watermark_confirmado,
                     updated_at = SYSDATETIME()

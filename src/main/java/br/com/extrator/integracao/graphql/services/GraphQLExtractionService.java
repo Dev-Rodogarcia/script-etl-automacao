@@ -187,8 +187,9 @@ public class GraphQLExtractionService {
             final boolean executarUsuariosSistema = shouldExecute(entidade, ConstantesEntidades.USUARIOS_SISTEMA);
             boolean coletasConcluidasComSucesso = !executarColetas;
 
-            // Extrair usuários ANTES de coletas (dependência)
-            if (executarColetas) {
+            // Em execucoes agrupadas (entidade nula), usuarios continua sendo a primeira entidade GraphQL.
+            // Em steps granulares, o planner agenda usuarios_sistema antes de coletas para evitar duplicidade.
+            if (executarUsuariosSistema) {
                 try {
                     final ExtractionResult resultUsuarios = executarComTimeout(
                         ConstantesEntidades.USUARIOS_SISTEMA,
@@ -198,34 +199,7 @@ public class GraphQLExtractionService {
                                 dataInicio,
                                 dataFim
                             );
-                            return extractUsuarios(datas.inicio(), datas.fim(), false);
-                        }
-                    );
-                    if (resultUsuarios != null) {
-                        resultados.add(resultUsuarios);
-                    }
-                } catch (final Exception e) {
-                    registrarFalhaEntidade(
-                        resultados,
-                        ConstantesEntidades.USUARIOS_SISTEMA,
-                        "Usuarios do Sistema",
-                        e,
-                        dataInicio,
-                        dataFim
-                    );
-                }
-                aplicarDelayEntreEntidades();
-            } else if (executarUsuariosSistema) {
-                try {
-                    final ExtractionResult resultUsuarios = executarComTimeout(
-                        ConstantesEntidades.USUARIOS_SISTEMA,
-                        () -> {
-                            final ExecutionDates datas = resolverDatasExecucao(
-                                ConstantesEntidades.USUARIOS_SISTEMA,
-                                dataInicio,
-                                dataFim
-                            );
-                            return extractUsuarios(datas.inicio(), datas.fim(), true);
+                            return extractUsuarios(datas.inicio(), datas.fim(), !executarColetas);
                         }
                     );
                     if (resultUsuarios != null) {

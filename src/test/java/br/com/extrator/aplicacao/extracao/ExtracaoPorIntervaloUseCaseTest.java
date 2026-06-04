@@ -85,9 +85,10 @@ class ExtracaoPorIntervaloUseCaseTest {
         System.setProperty(PROP_BACKFILL_MAX_EXPANSAO, expansaoAnterior);
 
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok")
         );
-        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(321));
+        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(12), logCompleto(321));
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(integridadeValida());
         final Queue<String> timeoutsObservados = new ArrayDeque<>();
         final Queue<String> expansoesObservadas = new ArrayDeque<>();
@@ -105,8 +106,8 @@ class ExtracaoPorIntervaloUseCaseTest {
         );
 
         assertDoesNotThrow(() -> useCase.executar(requestComBlocos(1)));
-        assertEquals(List.of("1800000"), List.copyOf(timeoutsObservados));
-        assertEquals(List.of("400"), List.copyOf(expansoesObservadas));
+        assertEquals(List.of("1800000", "1800000"), List.copyOf(timeoutsObservados));
+        assertEquals(List.of("400", "400"), List.copyOf(expansoesObservadas));
         assertEquals(timeoutAnterior, System.getProperty(PROP_TIMEOUT_COLETAS));
         assertEquals(expansaoAnterior, System.getProperty(PROP_BACKFILL_MAX_EXPANSAO));
     }
@@ -114,9 +115,10 @@ class ExtracaoPorIntervaloUseCaseTest {
     @Test
     void modoLoopDaemonDeveSinalizarMicroBatchSemAtivarReconciliacaoDeFretes() {
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios"),
             resultadoGraphql("fretes", StepStatus.SUCCESS, "ok")
         );
-        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(42));
+        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(12), logCompleto(42));
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(integridadeValida());
         final Queue<String> modosObservados = new ArrayDeque<>();
 
@@ -142,7 +144,7 @@ class ExtracaoPorIntervaloUseCaseTest {
         assertDoesNotThrow(() -> useCase.executar(request));
 
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH, request.modoExecucao());
-        assertEquals(List.of("micro_batch"), List.copyOf(modosObservados));
+        assertEquals(List.of("micro_batch", "micro_batch"), List.copyOf(modosObservados));
     }
 
     @Test
@@ -159,10 +161,17 @@ class ExtracaoPorIntervaloUseCaseTest {
     @Test
     void deveAbortarAposDuasFalhasDiretasConsecutivasDeColetas() {
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 1"),
             resultadoGraphql("coletas", StepStatus.FAILED, "falha bloco 1"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 2"),
             resultadoGraphql("coletas", StepStatus.FAILED, "falha bloco 2")
         );
-        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(Optional.empty(), Optional.empty());
+        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(
+            logCompleto(12),
+            Optional.empty(),
+            logCompleto(13),
+            Optional.empty()
+        );
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(
             integridadeValida(),
             integridadeValida()
@@ -185,7 +194,7 @@ class ExtracaoPorIntervaloUseCaseTest {
             () -> useCase.executar(requestComBlocos(3))
         );
 
-        assertEquals(2, chamadas.get());
+        assertEquals(4, chamadas.get());
         assertTrue(erro.getMessage().contains("falhas criticas consecutivas de coletas"));
         assertTrue(erro.getMessage().contains("2/3"));
     }
@@ -193,15 +202,23 @@ class ExtracaoPorIntervaloUseCaseTest {
     @Test
     void deveResetarContadorQuandoBlocoIntermediarioDeColetasForSaudavel() {
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 1"),
             resultadoGraphql("coletas", StepStatus.FAILED, "falha bloco 1"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 2"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok bloco 2"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 3"),
             resultadoGraphql("coletas", StepStatus.FAILED, "falha bloco 3"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 4"),
             resultadoGraphql("coletas", StepStatus.FAILED, "falha bloco 4")
         );
         final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(
+            logCompleto(12),
             Optional.empty(),
+            logCompleto(13),
             logCompleto(100),
+            logCompleto(14),
             Optional.empty(),
+            logCompleto(15),
             Optional.empty()
         );
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(
@@ -228,18 +245,22 @@ class ExtracaoPorIntervaloUseCaseTest {
             () -> useCase.executar(requestComBlocos(5))
         );
 
-        assertEquals(4, chamadas.get(), "Bloco saudavel intermediario deve resetar o contador antes do abort.");
+        assertEquals(8, chamadas.get(), "Bloco saudavel intermediario deve resetar o contador antes do abort.");
         assertTrue(erro.getMessage().contains("4/5"));
     }
 
     @Test
     void deveAbortarAposDuasFalhasAuditAusenteDeColetas() {
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 1"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok bloco 1"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 2"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok bloco 2")
         );
         final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(
+            logCompleto(12),
             logCompleto(210),
+            logCompleto(13),
             logCompleto(215)
         );
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(
@@ -264,18 +285,22 @@ class ExtracaoPorIntervaloUseCaseTest {
             () -> useCase.executar(requestComBlocos(3))
         );
 
-        assertEquals(2, chamadas.get());
+        assertEquals(4, chamadas.get());
         assertTrue(erro.getMessage().contains("falhas criticas consecutivas de coletas"));
     }
 
     @Test
     void deveAbortarAposDuasFalhasReferenciaisAtribuidasAColetas() {
         final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 1"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok bloco 1"),
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios bloco 2"),
             resultadoGraphql("coletas", StepStatus.SUCCESS, "ok bloco 2")
         );
         final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(
+            logCompleto(12),
             logCompleto(180),
+            logCompleto(13),
             logCompleto(181)
         );
         final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(
@@ -304,7 +329,7 @@ class ExtracaoPorIntervaloUseCaseTest {
             () -> useCase.executar(requestComBlocos(4))
         );
 
-        assertEquals(2, chamadas.get());
+        assertEquals(4, chamadas.get());
         assertTrue(erro.getMessage().contains("falhas criticas consecutivas de coletas"));
     }
 

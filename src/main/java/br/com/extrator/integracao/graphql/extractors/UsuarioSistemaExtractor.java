@@ -37,6 +37,7 @@ Atributos-chave:
 package br.com.extrator.integracao.graphql.extractors;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -53,13 +54,16 @@ import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapp
 import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.comum.EntityExtractor;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 /**
  * Extractor para entidade Usuários do Sistema (Individual - GraphQL).
  * Utiliza filtro incremental via updatedAt para extrair apenas usuários modificados no período.
  * Deduplica por user_id (Keep Last) antes de salvar para que o log e o banco batam na validação API vs banco.
- * A carga completa de dim_usuarios é deliberadamente explícita e deve ser feita via comando dedicado.
+ * Nunca executa full load; primeira execução sem watermark fica limitada aos últimos 90 dias.
  */
 public class UsuarioSistemaExtractor implements ChunkedEntityExtractor<IndividualNodeDTO> {
 
@@ -79,40 +83,28 @@ public class UsuarioSistemaExtractor implements ChunkedEntityExtractor<Individua
 
     @Override
     public ResultadoExtracao<IndividualNodeDTO> extract(final LocalDate dataInicio, final LocalDate dataFim) {
-        if (dimUsuariosVazia()) {
-            logger.warn(
-                "usuarios_sistema: dim_usuarios vazia. A extracao operacional permanecera restrita ao periodo {} a {} via updatedAt. Execute --sincronizar-usuarios para uma carga completa explicita.",
-                dataInicio,
-                dataFim
-            );
-        }
-
+        final JanelaUsuarios janela = resolverJanelaIncremental(dataInicio, dataFim);
         logger.info(
-            "usuarios_sistema: executando modo incremental via updatedAt para o periodo {} a {}.",
-            dataInicio,
-            dataFim
+            "usuarios_sistema: executando modo incremental via updatedAt | origem_janela={} | inicio={} | fim={}",
+            janela.origem(),
+            janela.inicio(),
+            janela.fim()
         );
-        return apiClient.buscarUsuariosSistema(dataInicio, dataFim);
+        return apiClient.buscarUsuariosSistema(janela.inicio(), janela.fim());
     }
 
     @Override
     public ResultadoExtracao<IndividualNodeDTO> extractInChunks(final LocalDate dataInicio,
                                                                 final LocalDate dataFim,
                                                                 final PageChunkConsumer<IndividualNodeDTO> chunkConsumer) {
-        if (dimUsuariosVazia()) {
-            logger.warn(
-                "usuarios_sistema: dim_usuarios vazia. A extracao operacional permanecera restrita ao periodo {} a {} via updatedAt. Execute --sincronizar-usuarios para uma carga completa explicita.",
-                dataInicio,
-                dataFim
-            );
-        }
-
+        final JanelaUsuarios janela = resolverJanelaIncremental(dataInicio, dataFim);
         logger.info(
-            "usuarios_sistema: executando modo incremental via updatedAt para o periodo {} a {} em chunks.",
-            dataInicio,
-            dataFim
+            "usuarios_sistema: executando modo incremental via updatedAt em chunks | origem_janela={} | inicio={} | fim={}",
+            janela.origem(),
+            janela.inicio(),
+            janela.fim()
         );
-        return apiClient.buscarUsuariosSistema(dataInicio, dataFim, chunkConsumer);
+        return apiClient.buscarUsuariosSistema(janela.inicio(), janela.fim(), chunkConsumer);
     }
 
     @Override
@@ -177,5 +169,25 @@ public class UsuarioSistemaExtractor implements ChunkedEntityExtractor<Individua
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException("Falha ao verificar se dim_usuarios ja possui dados.", e);
         }
+    }
+
+    private JanelaUsuarios resolverJanelaIncremental(final LocalDate dataInicio, final LocalDate dataFim) {
+        final java.util.Optional<ExecutionWindowPlan> planoOpt = ExecutionPlanContext.getPlano(getEntityName());
+        if (planoOpt.isPresent()) {
+            final ExecutionWindowPlan plano = planoOpt.get();
+            return new JanelaUsuarios(plano.confirmacaoInicio(), plano.confirmacaoFim(), "watermark_confirmado");
+        }
+
+        if (dimUsuariosVazia()) {
+            final LocalDateTime fim = RelogioSistema.agora();
+            return new JanelaUsuarios(fim.minusDays(90), fim, "fallback_90_dias_dim_vazia");
+        }
+
+        final LocalDate inicio = dataInicio != null ? dataInicio : RelogioSistema.hoje().minusDays(1);
+        final LocalDate fimData = dataFim != null ? dataFim : inicio;
+        return new JanelaUsuarios(inicio.atStartOfDay(), fimData.atTime(23, 59), "janela_solicitada");
+    }
+
+    private record JanelaUsuarios(LocalDateTime inicio, LocalDateTime fim, String origem) {
     }
 }

@@ -40,7 +40,7 @@ REM
 REM CARGAS INICIAIS:
 REM   As fatos materializadas SQL sao carregadas obrigatoriamente apos publicar
 REM   tabelas, migrations, indices, views e procedures. As dimensoes de usuarios
-REM   sao populadas pelo runtime Java, via --sincronizar-usuarios ou fluxo/daemon.
+REM   sao sincronizadas automaticamente no inicio do ciclo Java de extracao.
 REM
 REM BANCO SQLite DE AUTENTICACAO:
 REM   Gerenciado exclusivamente pela aplicacao Java (extrator.jar).
@@ -304,7 +304,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo [OK] Cargas iniciais das fatos BI concluidas.
-echo [INFO] Dimensoes dbo.dim_usuarios e dbo.dim_usuarios_historico sao populadas pelo Java: java -jar target\extrator.jar --sincronizar-usuarios
+echo [INFO] Dimensoes de usuarios sao sincronizadas automaticamente pelo ciclo Java de extracao.
 echo.
 
 REM --- Validacoes de leitura (seguras, sem scripts destrutivos) ---
@@ -365,7 +365,7 @@ echo.
 echo Observacoes:
 echo   - Pare o daemon antes de recriar ou apagar o banco.
 echo   - Scripts destrutivos de validacao/limpeza nao rodam automaticamente.
-echo   - Dimensoes de usuarios dependem do Java: execute --sincronizar-usuarios.
+echo   - Dimensoes de usuarios entram no primeiro passo do ciclo Java de extracao.
 echo   - O banco SQLite de autenticacao nao e recriado por este script.
 echo.
 exit /b 0
