@@ -105,7 +105,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'031_criar_fato_fretes_faturamento'),
     (N'032_criar_fato_gestao_vista_faturas'),
     (N'033_tuning_indices_fatos'),
-    (N'034_adicionar_hash_linha_usuarios');
+    (N'034_adicionar_hash_linha_usuarios'),
+    (N'035_drop_views_legadas_powerbi'),
+    (N'037_adicionar_status_fatura');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -154,6 +156,9 @@ IF COL_LENGTH(N'dbo.inventario', N'flag_comprovante_anexado') IS NULL
 
 IF COL_LENGTH(N'dbo.faturas_por_cliente', N'cliente_cnpj') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.cliente_cnpj', N'Coluna da migration 015 ausente');
+
+IF COL_LENGTH(N'dbo.faturas_por_cliente', N'status') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.status', N'Coluna da migration 037 ausente');
 
 IF COL_LENGTH(N'dbo.localizacao_cargas', N'localizacao_hash') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.localizacao_hash', N'Coluna da migration 017 ausente');

@@ -120,6 +120,9 @@ public class FaturaPorClienteDTO {
     @JsonProperty("type")
     private String tipoFrete;
 
+    @JsonProperty("status")
+    private String status;
+
     // Classificação Operacional
     @JsonProperty("fit_crn_psn_nickname")
     private String filial;
@@ -308,6 +311,14 @@ public class FaturaPorClienteDTO {
 
     public void setTipoFrete(final String tipoFrete) {
         this.tipoFrete = tipoFrete;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(final String status) {
+        this.status = status;
     }
 
     public String getFilial() {

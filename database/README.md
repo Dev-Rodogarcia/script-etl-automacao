@@ -595,6 +595,7 @@ ORDER BY data_extracao DESC;
 | `fit_ant_value` | `DECIMAL(18,2)` | Valor legado da fatura. |
 | `filial` | `NVARCHAR(255)` | Filial do faturamento. |
 | `tipo_frete` | `NVARCHAR(100)` | Tipo de frete consolidado. |
+| `status` | `NVARCHAR(50)` | Status bruto da fatura recebido no DataExport ESL Cloud. |
 | `classificacao` | `NVARCHAR(100)` | Classificação do registro. |
 | `estado` | `NVARCHAR(50)` | Estado/UF ou estado operacional recebido no relatório. |
 | `pagador_nome` | `NVARCHAR(255)` | Nome do pagador. |

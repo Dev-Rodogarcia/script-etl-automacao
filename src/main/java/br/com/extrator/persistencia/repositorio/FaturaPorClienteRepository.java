@@ -150,6 +150,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             setBigDecimalParameter(pstmt, idx++, entity.getFitAntValue());
             pstmt.setString(idx++, entity.getFilial());
             pstmt.setString(idx++, entity.getTipoFrete());
+            pstmt.setString(idx++, entity.getStatus());
             pstmt.setString(idx++, entity.getClassificacao());
             pstmt.setString(idx++, entity.getEstado());
             pstmt.setString(idx++, entity.getPagadorNome());
@@ -201,6 +202,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                     fit_ant_value = source.fit_ant_value,
                     filial = source.filial,
                     tipo_frete = source.tipo_frete,
+                    status = source.status,
                     classificacao = source.classificacao,
                     estado = source.estado,
                     pagador_nome = source.pagador_nome,
@@ -217,8 +219,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                     data_extracao = source.data_extracao,
                     excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
-                INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, classificacao, estado, pagador_nome, pagador_documento, cliente_cnpj, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao, excluido_na_origem)
-                VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.cliente_cnpj, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao, source.excluido_na_origem);
+                INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, status, classificacao, estado, pagador_nome, pagador_documento, cliente_cnpj, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao, excluido_na_origem)
+                VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.status, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.cliente_cnpj, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao, source.excluido_na_origem);
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
 
@@ -257,6 +259,7 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                     ? AS fit_ant_value,
                     ? AS filial,
                     ? AS tipo_frete,
+                    ? AS status,
                     ? AS classificacao,
                     ? AS estado,
                     ? AS pagador_nome,

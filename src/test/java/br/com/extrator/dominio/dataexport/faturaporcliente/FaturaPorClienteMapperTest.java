@@ -159,6 +159,19 @@ class FaturaPorClienteMapperTest {
     }
 
     @Test
+    void devePromoverStatusDaFaturaSemRemoverDoMetadata() {
+        final FaturaPorClienteDTO dto = criarDtoSemChaveNatural();
+        dto.setStatus("finished");
+
+        final var entity = mapper.toEntity(dto);
+        final JsonNode projecao = mapper.projetarCamposPersistidosEstaveis(entity);
+
+        assertEquals("finished", entity.getStatus());
+        assertEquals("finished", projecao.get("status").asText());
+        assertTrue(entity.getMetadata().contains("\"status\":\"finished\""));
+    }
+
+    @Test
     void deveManterMesmoUniqueIdQuandoCamposComplementaresMudamMasCtePermanece() {
         final FaturaPorClienteDTO original = criarDtoSemChaveNatural();
         original.setCteNumber(12345L);

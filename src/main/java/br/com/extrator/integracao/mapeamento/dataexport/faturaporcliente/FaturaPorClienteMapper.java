@@ -143,6 +143,7 @@ public class FaturaPorClienteMapper {
             // 5. Classificacao operacional
             entity.setFilial(dto.getFilial());
             entity.setTipoFrete(traduzirTipoFrete(dto.getTipoFrete()));
+            entity.setStatus(dto.getStatus());
             entity.setClassificacao(dto.getClassificacao());
             entity.setEstado(dto.getEstado());
 
@@ -241,6 +242,7 @@ public class FaturaPorClienteMapper {
         putBigDecimal(node, "third_party_ctes_value", entity.getThirdPartyCtesValue());
         putString(node, "filial", entity.getFilial());
         putString(node, "tipo_frete", entity.getTipoFrete());
+        putString(node, "status", entity.getStatus());
         putString(node, "classificacao", entity.getClassificacao());
         putString(node, "estado", entity.getEstado());
         putString(node, "pagador_documento", entity.getPagadorDocumento());

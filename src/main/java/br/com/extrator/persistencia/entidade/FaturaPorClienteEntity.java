@@ -92,6 +92,7 @@ public class FaturaPorClienteEntity {
     // Classificação Operacional
     private String filial;
     private String tipoFrete;
+    private String status;
     private String classificacao;
     private String estado;
 
@@ -273,6 +274,14 @@ public class FaturaPorClienteEntity {
 
     public void setTipoFrete(final String tipoFrete) {
         this.tipoFrete = tipoFrete;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(final String status) {
+        this.status = status;
     }
 
     public String getClassificacao() {

@@ -27,6 +27,7 @@ BEGIN
         fit_ant_value DECIMAL(18,2),
         filial NVARCHAR(255),
         tipo_frete NVARCHAR(100),
+        status NVARCHAR(50),
         classificacao NVARCHAR(100),
         estado NVARCHAR(50),
         pagador_nome NVARCHAR(255),
@@ -57,6 +58,14 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_faturas_por_cliente_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna faturas_por_cliente.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.faturas_por_cliente', N'status') IS NULL
+BEGIN
+    ALTER TABLE dbo.faturas_por_cliente
+    ADD status NVARCHAR(50) NULL;
+    PRINT 'Coluna faturas_por_cliente.status adicionada em tabela existente.';
 END
 GO
 
