@@ -8,8 +8,8 @@ REM BACKFILL CUSTOMIZADO
 REM Edite manualmente o periodo abaixo antes de executar.
 REM Formato esperado: YYYY-MM-DD
 REM ================================================================
-set "DATA_INICIO=2026-05-05"
-set "DATA_FIM=2026-06-04"
+set "DATA_INICIO=2026-05-07"
+set "DATA_FIM=2026-06-05"
 
 set "SCRIPT_ROOT=%~dp0"
 for %%I in ("%SCRIPT_ROOT%.") do set "REPO_ROOT=%%~fI"

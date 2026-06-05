@@ -38,6 +38,7 @@ Atributos-chave:
 
 package br.com.extrator.integracao.dataexport.extractors;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,8 +52,10 @@ import br.com.extrator.persistencia.entidade.FaturaPorClienteEntity;
 import br.com.extrator.persistencia.repositorio.FaturaPorClienteRepository;
 import br.com.extrator.persistencia.repositorio.InvalidRecordAuditRepository;
 import br.com.extrator.dominio.dataexport.faturaporcliente.FaturaPorClienteDTO;
+import br.com.extrator.integracao.comum.ChunkedExtractionOutcome;
 import br.com.extrator.integracao.mapeamento.dataexport.faturaporcliente.FaturaPorClienteMapper;
 import br.com.extrator.integracao.comum.ChunkedDataExportEntityExtractor;
+import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
 import br.com.extrator.integracao.dataexport.support.Deduplicator;
 import br.com.extrator.suporte.console.LoggerConsole;
@@ -102,6 +105,29 @@ public class FaturaPorClienteExtractor implements ChunkedDataExportEntityExtract
             return apiClient.buscarFaturasPorCliente(dataInicio, fim, chunkConsumer);
         }
         return extract(dataInicio, dataFim);
+    }
+
+    @Override
+    public ChunkedExtractionOutcome<FaturaPorClienteDTO> extractAndSaveWithMetrics(
+            final LocalDate dataInicio,
+            final LocalDate dataFim) throws Exception {
+        final List<FaturaPorClienteDTO> registrosDaExecucao = new ArrayList<>();
+        final ResultadoExtracao<FaturaPorClienteDTO> resultado = extractInChunks(
+            dataInicio,
+            dataFim,
+            registrosDaExecucao::addAll
+        );
+        if (registrosDaExecucao.isEmpty() && resultado.getDados() != null && !resultado.getDados().isEmpty()) {
+            registrosDaExecucao.addAll(resultado.getDados());
+        }
+
+        final long inicioSalvamento = System.nanoTime();
+        final EntityExtractor.SaveMetrics metrics = registrosDaExecucao.isEmpty()
+            ? new EntityExtractor.SaveMetrics(0, 0, 0, 0, 0)
+            : saveWithMetrics(registrosDaExecucao);
+        final Duration duracaoSalvamento = Duration.ofNanos(System.nanoTime() - inicioSalvamento);
+
+        return new ChunkedExtractionOutcome<>(resultado, metrics, duracaoSalvamento);
     }
 
     @Override

@@ -46,7 +46,14 @@ if /i "%~1"=="--auto-extracao-completa" (
         goto :END_WITH_CODE
     )
     call :RUN_SCRIPT_AUTHORIZED "01-executar_extracao_completa.bat" "%~2"
-    set "AUTO_EXIT=!ERRORLEVEL!"
+    if errorlevel 1 (
+        set "AUTO_EXIT=!ERRORLEVEL!"
+        echo.
+        echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !AUTO_EXIT!.
+    ) else (
+        call :MATERIALIZAR_FATOS_BI_POST_RUN
+        set "AUTO_EXIT=!ERRORLEVEL!"
+    )
     goto :END_WITH_CODE
 )
 
@@ -172,7 +179,14 @@ set "PREV_NONINTERACTIVE=%EXTRATOR_NONINTERACTIVE%"
 set "EXTRATOR_SKIP_AUTH_CHECK=1"
 set "EXTRATOR_NONINTERACTIVE=1"
 call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "%~2" "%~3" "%~4" "%~5" "%~6" "%~7"
-set "AUTO_EXIT=!ERRORLEVEL!"
+if errorlevel 1 (
+    set "AUTO_EXIT=!ERRORLEVEL!"
+    echo.
+    echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !AUTO_EXIT!.
+) else (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "AUTO_EXIT=!ERRORLEVEL!"
+)
 if defined PREV_SKIP_AUTH_CHECK (
     set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"
 ) else (
@@ -201,7 +215,14 @@ if errorlevel 1 (
 call :PREPARE_DATABASE
 if errorlevel 1 goto :MENU
 call :RUN_SCRIPT_AUTHORIZED "01-executar_extracao_completa.bat"
-set "RUN_01_EXIT=!ERRORLEVEL!"
+if errorlevel 1 (
+    set "RUN_01_EXIT=!ERRORLEVEL!"
+    echo.
+    echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !RUN_01_EXIT!.
+) else (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "RUN_01_EXIT=!ERRORLEVEL!"
+)
 call :WAIT_AFTER_MENU_ACTION "Extracao completa" "!RUN_01_EXIT!"
 goto :MENU
 
@@ -248,6 +269,15 @@ if errorlevel 1 (
 call :PREPARE_DATABASE
 if errorlevel 1 goto :MENU
 call :RUN_SCRIPT_AUTHORIZED "04-extracao_por_intervalo.bat"
+if errorlevel 1 (
+    set "RUN_04_EXIT=!ERRORLEVEL!"
+    echo.
+    echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !RUN_04_EXIT!.
+) else (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "RUN_04_EXIT=!ERRORLEVEL!"
+)
+call :WAIT_AFTER_MENU_ACTION "Extracao por intervalo" "!RUN_04_EXIT!"
 goto :MENU
 
 :RUN_11
@@ -291,7 +321,14 @@ set "EXTRATOR_SKIP_AUTH_CHECK=1"
 set "EXTRATOR_NONINTERACTIVE=1"
 set "EXTRATOR_MENU_CHILD=1"
 call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "!RAPIDA_DATA_INICIO!" "!RAPIDA_DATA_FIM!" "--modo-rapido-24h"
-set "RUN_11_EXIT=!ERRORLEVEL!"
+if errorlevel 1 (
+    set "RUN_11_EXIT=!ERRORLEVEL!"
+    echo.
+    echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !RUN_11_EXIT!.
+) else (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "RUN_11_EXIT=!ERRORLEVEL!"
+)
 if defined PREV_SKIP_AUTH_CHECK (
     set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"
 ) else (
@@ -537,6 +574,96 @@ if exist "%REPO_ROOT%\database\executar_database.bat" (
 )
 set "STARTUP_READY=1"
 exit /b 0
+
+:MATERIALIZAR_FATOS_BI_POST_RUN
+setlocal EnableExtensions DisableDelayedExpansion
+echo.
+echo ================================================================
+echo MATERIALIZAR FATOS BI ^(POST-RUN^)
+echo ================================================================
+
+if not exist "%REPO_ROOT%\database\config.bat" (
+    echo [ERRO] Configuracao de banco nao encontrada: %REPO_ROOT%\database\config.bat
+    endlocal & exit /b 1
+)
+
+call "%REPO_ROOT%\database\config.bat"
+
+if "%DB_SERVER%"=="" (
+    echo [ERRO] DB_SERVER nao definido no config.bat.
+    endlocal & exit /b 1
+)
+if "%DB_NAME%"=="" (
+    echo [ERRO] DB_NAME nao definido no config.bat.
+    endlocal & exit /b 1
+)
+
+set "DB_SERVER_TARGET=%DB_SERVER%"
+if not "%DB_PORT%"=="" set "DB_SERVER_TARGET=%DB_SERVER%,%DB_PORT%"
+set "SQLCMD_FLAGS=-I -f 65001"
+if not "%SQLCMD_EXTRA_ARGS%"=="" set "SQLCMD_FLAGS=%SQLCMD_FLAGS% %SQLCMD_EXTRA_ARGS%"
+
+where sqlcmd >nul 2>nul
+if errorlevel 1 (
+    echo [ERRO] sqlcmd nao encontrado no PATH.
+    endlocal & exit /b 1
+)
+
+if "%DB_USER%"=="" (
+    set "AUTH_CMD=-E"
+    set "SQLCMDPASSWORD="
+    echo Autenticacao: Windows ^(integrada^)
+) else (
+    if "%DB_PASSWORD%"=="" (
+        echo [ERRO] DB_USER definido mas DB_PASSWORD esta vazio no config.bat.
+        endlocal & exit /b 1
+    )
+    set "AUTH_CMD=-U %DB_USER%"
+    set "SQLCMDPASSWORD=%DB_PASSWORD%"
+    echo Autenticacao: SQL ^(%DB_USER%^)
+)
+
+echo Servidor: %DB_SERVER_TARGET%  ^|  Banco: %DB_NAME%
+echo.
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
+if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FRETES
+
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
+if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_COLETORES
+
+echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
+if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FATURAMENTO
+
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
+if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FATURAS
+
+set "SQLCMDPASSWORD="
+echo [OK] Fatos BI materializadas no pos-run.
+endlocal & exit /b 0
+
+:MATERIALIZAR_FATOS_BI_ERRO_FRETES
+echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
+goto :MATERIALIZAR_FATOS_BI_ERRO
+
+:MATERIALIZAR_FATOS_BI_ERRO_COLETORES
+echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
+goto :MATERIALIZAR_FATOS_BI_ERRO
+
+:MATERIALIZAR_FATOS_BI_ERRO_FATURAMENTO
+echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
+goto :MATERIALIZAR_FATOS_BI_ERRO
+
+:MATERIALIZAR_FATOS_BI_ERRO_FATURAS
+echo [ERRO] Falha na carga materializada de Faturas por Cliente.
+goto :MATERIALIZAR_FATOS_BI_ERRO
+
+:MATERIALIZAR_FATOS_BI_ERRO
+set "SQLCMDPASSWORD="
+endlocal & exit /b 1
 
 :DATABASE_MARKER_FRESH
 if /i "%EXTRATOR_FORCE_DB_PREPARE%"=="1" exit /b 1
