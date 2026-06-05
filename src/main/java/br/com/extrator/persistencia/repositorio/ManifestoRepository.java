@@ -43,8 +43,8 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
  * Implementa a arquitetura de persistência híbrida: colunas-chave para indexação
  * e uma coluna de metadados para resiliência e completude dos dados.
  * 
- * Utiliza chave composta (sequence_code, pick_sequence_code, mdfe_number) para
- * permitir duplicados naturais (mesmo sequence_code mas pick/MDF-e diferentes)
+ * Utiliza chave composta (sequence_code, pick_sequence_code ou identificador_unico, mdfe_number) para
+ * permitir duplicados naturais (mesmo sequence_code mas itens/MDF-e diferentes)
  * enquanto mantém MERGE funcional para evitar duplicação não natural.
  * 
  * O identificador_unico é calculado como:
@@ -58,6 +58,12 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
     private static final String NOME_TABELA = ConstantesEntidades.MANIFESTOS;
     private static final String NOME_TABELA_STAGING = "#stg_manifestos";
     private static final String JSON_PATH_PICK_SEQUENCE_CODE = "$.mft_pfs_pck_sequence_code";
+    private static final String CONDICAO_CHAVE_MERGE = """
+        target.sequence_code = source.sequence_code
+        AND COALESCE(CAST(target.pick_sequence_code AS VARCHAR(100)), target.identificador_unico, '-1')
+            = COALESCE(CAST(source.pick_sequence_code AS VARCHAR(100)), source.identificador_unico, '-1')
+        AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)
+        """;
     private static final java.util.List<String> COLUNAS_PROMOCAO = java.util.List.of(
         "sequence_code", "identificador_unico", "status", "created_at", "departured_at", "closed_at", "finished_at",
         "mdfe_number", "mdfe_key", "mdfe_status", "distribution_pole", "classification", "vehicle_plate",
@@ -121,9 +127,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         return promoverStagingComMerge(
             conexao,
             NOME_TABELA_STAGING,
-            "target.sequence_code = source.sequence_code "
-                + "AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1) "
-                + "AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)",
+            CONDICAO_CHAVE_MERGE,
             freshnessGuard,
             COLUNAS_PROMOCAO,
             COLUNAS_PROMOCAO_ATUALIZAVEIS
@@ -234,13 +238,12 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
      * ⚠️ IMPORTANTE: A tabela deve ter a estrutura nova (com identificador_unico e chave composta).
      * A estrutura deve ser criada via scripts SQL (pasta database/).
      * 
-     * O MERGE usa (sequence_code, pick_sequence_code, mdfe_number) para matching,
-     * NÃO (sequence_code, identificador_unico).
+     * O MERGE usa (sequence_code, pick_sequence_code/identificador_unico, mdfe_number) para matching.
      * 
      * Lógica do MERGE (usando COALESCE para simplificar):
-     * - Compara (sequence_code, pick_sequence_code, mdfe_number):
+     * - Compara (sequence_code, pick_sequence_code ou fallback identificador_unico, mdfe_number):
      *   - Se ambos têm pick_sequence_code: compara os valores (ex: 71920 = 71920)
-     *   - Se ambos são NULL: ambos viram -1 → match! (mesmo manifesto sem coleta)
+     *   - Se pick_sequence_code é NULL: usa identificador_unico para evitar colisão artificial
      *   - Se um é NULL e outro não: não match (registros diferentes)
      *   - Se ambos têm mdfe_number: compara os valores (ex: 1503 = 1503)
      *   - Se ambos são NULL: ambos viram -1 → match! (mesmo manifesto sem MDF-e)
@@ -248,8 +251,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
      * Isso garante que:
      * - Duplicados naturais (mesmo sequence_code, diferentes pick_sequence_code) são preservados
      * - Múltiplos MDF-es (mesmo sequence_code, diferentes mdfe_number) são preservados
-     * - Duplicados falsos (mesmo sequence_code, pick NULL, mdfe NULL, hash diferente) são eliminados
-     * - O identificador_unico é atualizado no UPDATE, mas não é usado para matching
+     * - Duplicados falsos (mesmo identificador_unico) são eliminados
+     * - O identificador_unico diferencia itens legítimos quando pick_sequence_code está ausente
      * 
      * CORREÇÃO CRÍTICA #2: Validação do nome da tabela para prevenir SQL injection
      */
@@ -307,9 +310,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             MERGE %s WITH (HOLDLOCK) AS target
             USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
                 AS source (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem)
-            ON target.sequence_code = source.sequence_code
-               AND COALESCE(target.pick_sequence_code, -1) = COALESCE(source.pick_sequence_code, -1)
-               AND COALESCE(target.mdfe_number, -1) = COALESCE(source.mdfe_number, -1)
+            ON %s
             WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
                     status = source.status,
@@ -366,7 +367,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             WHEN NOT MATCHED THEN
                 INSERT (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem)
                 VALUES (source.sequence_code, source.identificador_unico, source.status, source.created_at, source.departured_at, source.closed_at, source.finished_at, source.mdfe_number, source.mdfe_key, source.mdfe_status, source.distribution_pole, source.classification, source.vehicle_plate, source.vehicle_type, source.vehicle_owner, source.driver_name, source.branch_nickname, source.vehicle_departure_km, source.closing_km, source.traveled_km, source.invoices_count, source.invoices_volumes, source.invoices_weight, source.total_taxed_weight, source.total_cubic_volume, source.invoices_value, source.manifest_freights_total, source.pick_sequence_code, source.contract_number, source.contract_type, source.calculation_type, source.cargo_type, source.daily_subtotal, source.total_cost, source.freight_subtotal, source.fuel_subtotal, source.toll_subtotal, source.driver_services_total, source.operational_expenses_total, source.inss_value, source.sest_senat_value, source.ir_value, source.paying_total, source.manual_km, source.generate_mdfe, source.monitoring_request, source.uniq_destinations_count, source.creation_user_name, source.adjustment_user_name, source.metadata, source.data_extracao, source.excluido_na_origem);
-            """, tabelaAlvo, freshnessGuard);
+            """, tabelaAlvo, CONDICAO_CHAVE_MERGE, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
             // Define os parâmetros de forma segura e na ordem correta conforme MERGE SQL
@@ -475,7 +476,10 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                         trailer1_license_plate = ?, trailer1_weight_capacity = ?, trailer2_license_plate = ?, trailer2_weight_capacity = ?, vehicle_weight_capacity = ?, vehicle_cubic_weight = ?, \
                         capacidade_kg = ?, obs_operacional = ?, obs_financeira = ?, \
                         unloading_recipient_names = ?, delivery_region_names = ?, programacao_cliente = ?, programacao_tipo_servico = ? \
-                        WHERE sequence_code = ? AND COALESCE(pick_sequence_code, -1) = COALESCE(?, -1) AND COALESCE(mdfe_number, -1) = COALESCE(?, -1)""",
+                        WHERE sequence_code = ? \
+                          AND COALESCE(CAST(pick_sequence_code AS VARCHAR(100)), identificador_unico, '-1') \
+                              = COALESCE(CAST(? AS VARCHAR(100)), ?, '-1') \
+                          AND COALESCE(mdfe_number, -1) = COALESCE(?, -1)""",
                     tabelaAlvo);
                 try (PreparedStatement upd = conexao.prepareStatement(sqlUpdateExtras)) {
                     int i = 1;
@@ -525,6 +529,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     upd.setString(i++, truncate(manifesto.getProgramacaoTipoServico(), 255, "programacao_tipo_servico"));
                     upd.setObject(i++, manifesto.getSequenceCode(), Types.BIGINT);
                     upd.setObject(i++, manifesto.getPickSequenceCode(), Types.BIGINT);
+                    upd.setString(i++, identificadorUnico);
                     upd.setObject(i++, manifesto.getMdfeNumber(), Types.INTEGER);
                     upd.executeUpdate();
                 }

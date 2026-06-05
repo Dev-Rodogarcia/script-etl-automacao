@@ -21,7 +21,7 @@ Metodos principais:
 - contar(Connection, String): executa query COUNT generica.
 - contarDesdeUltimaExtracaoComFallback(): COUNT desde ultima extracao com fallback.
 - existeColunaIdentificadorUnico(): verifica schema (INFORMATION_SCHEMA).
-- contarDuplicadosChaveComposta(): consulta duplicados por sequence_code + pick_sequence_code + mdfe_number.
+- contarDuplicadosChaveComposta(): consulta duplicados por chave_merge_hash.
 - contarPickSequenceCode(): retorna int[] com contagem de NULL e nao-NULL.
 - contarDuplicadosUltimas24h(): duplicados nas ultimas 24h.
 [DOC-FILE-END]============================================================== */
@@ -79,10 +79,10 @@ final class ManifestosValidationQueries {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, pick_sequence_code, mdfe_number, COUNT(*) as quantidade
+                    SELECT chave_merge_hash, COUNT(*) as quantidade
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
+                    GROUP BY chave_merge_hash
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 total++;
@@ -112,11 +112,11 @@ final class ManifestosValidationQueries {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, pick_sequence_code, mdfe_number
+                    SELECT chave_merge_hash
                     FROM manifestos
                     WHERE data_extracao >= DATEADD(HOUR, -24, GETDATE())
                       AND COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
+                    GROUP BY chave_merge_hash
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 total++;

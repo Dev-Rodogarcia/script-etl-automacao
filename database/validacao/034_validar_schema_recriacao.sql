@@ -174,12 +174,11 @@ WHERE cc.object_id = OBJECT_ID(N'dbo.manifestos')
   AND cc.name = N'chave_merge_hash';
 
 IF @manifestosChaveMergeDef IS NULL
-    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Coluna computada de chave estrita ausente');
-ELSE IF @manifestosChaveMergeDef LIKE N'%identificador_unico%'
-    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Chave computada nao deve usar fallback em identificador_unico');
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Coluna computada de chave de merge ausente');
 ELSE IF @manifestosChaveMergeDef NOT LIKE N'%pick_sequence_code%'
      OR @manifestosChaveMergeDef NOT LIKE N'%mdfe_number%'
-    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Chave computada deve usar pick_sequence_code e mdfe_number');
+     OR @manifestosChaveMergeDef NOT LIKE N'%identificador_unico%'
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.chave_merge_hash', N'Chave computada deve usar pick_sequence_code, identificador_unico e mdfe_number');
 
 DECLARE @softDeleteTables TABLE (
     tabela NVARCHAR(128) NOT NULL,

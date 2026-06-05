@@ -319,14 +319,15 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
     }
 
     @Test
-    void deveUsarApenasColunasFisicasNaChaveDeManifestos() {
+    void deveUsarIdentificadorUnicoComoFallbackNaChaveDeManifestos() {
         final String chave = ValidacaoApiBanco24hDetalhadaRepository.montarChaveManifestoValidacao(
             48831L,
             null,
-            null
+            null,
+            "hash-estavel"
         );
 
-        assertEquals("48831|-1|-1", chave);
+        assertEquals("48831|hash-estavel|-1", chave);
     }
 
     @Test
@@ -336,11 +337,13 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
             assertTrue(sql.contains("sequence_code"));
             assertTrue(sql.contains("pick_sequence_code"));
             assertTrue(sql.contains("mdfe_number"));
+            assertTrue(sql.contains("identificador_unico"));
             assertTrue(sql.contains("metadata"));
             final Map<String, Object> row = new LinkedHashMap<>();
             row.put("sequence_code", 48831L);
             row.put("pick_sequence_code", null);
             row.put("mdfe_number", 1503);
+            row.put("identificador_unico", "48831_MDFE_1503");
             row.put("metadata", "{\"mft_pfs_pck_sequence_code\":71920,\"mft_mfs_number\":1503}");
             return criarPreparedStatement(
                 new LinkedHashMap<>(),
@@ -361,7 +364,7 @@ class ValidacaoApiBanco24hDetalhadaRepositoryTest {
             LocalDate.of(2026, 4, 23)
         );
 
-        assertEquals(Set.of("48831|-1|1503"), chaves);
+        assertEquals(Set.of("48831|48831_MDFE_1503|1503"), chaves);
     }
 
     @Test

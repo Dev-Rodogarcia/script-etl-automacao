@@ -435,7 +435,7 @@ public class ValidacaoManifestosUseCase {
             if (duplicadosExatos > 0) {
                 System.out.println(
                     "ATENCAO: " + duplicadosExatos
-                        + " chaves (sequence_code, pick_sequence_code, mdfe_number) duplicadas!"
+                        + " chaves_merge_hash duplicadas!"
                 );
                 System.out.println("   Isso nao deveria acontecer com a constraint UNIQUE.");
             }

@@ -1000,7 +1000,7 @@ public class ValidacaoEtlExtremaUseCase {
         final List<EntitySpec> candidatos = new ArrayList<>(List.of(
             new EntitySpec(ConstantesEntidades.COLETAS, "coletas", "data_extracao", List.of("id"), "sequence_code"),
             new EntitySpec(ConstantesEntidades.FRETES, "fretes", "data_extracao", List.of("id"), null),
-            new EntitySpec(ConstantesEntidades.MANIFESTOS, "manifestos", "data_extracao", List.of("sequence_code", "pick_sequence_code", "mdfe_number"), null),
+            new EntitySpec(ConstantesEntidades.MANIFESTOS, "manifestos", "data_extracao", List.of("chave_merge_hash"), null),
             new EntitySpec(ConstantesEntidades.COTACOES, "cotacoes", "data_extracao", List.of("sequence_code"), "sequence_code"),
             new EntitySpec(ConstantesEntidades.LOCALIZACAO_CARGAS, "localizacao_cargas", "data_extracao", List.of("sequence_number"), "sequence_number"),
             new EntitySpec(ConstantesEntidades.CONTAS_A_PAGAR, "contas_a_pagar", "data_extracao", List.of("sequence_code"), "sequence_code"),
@@ -1094,7 +1094,7 @@ public class ValidacaoEtlExtremaUseCase {
 
             final String keyExpr = switch (entidade.entidade()) {
                 case ConstantesEntidades.MANIFESTOS ->
-                    "CONCAT(CAST(sequence_code AS VARCHAR(50)),'|',COALESCE(CAST(pick_sequence_code AS VARCHAR(50)),'-1'),'|',COALESCE(CAST(mdfe_number AS VARCHAR(50)),'-1'))";
+                    "chave_merge_hash";
                 case ConstantesEntidades.COTACOES -> "CAST(sequence_code AS VARCHAR(50))";
                 case ConstantesEntidades.LOCALIZACAO_CARGAS -> "CAST(sequence_number AS VARCHAR(50))";
                 case ConstantesEntidades.CONTAS_A_PAGAR -> "CAST(sequence_code AS VARCHAR(50))";

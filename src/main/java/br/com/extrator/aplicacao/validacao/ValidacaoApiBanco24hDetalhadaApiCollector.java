@@ -616,9 +616,18 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
     }
 
     private String chaveManifesto(final ManifestoEntity entity) {
-        final long pick = entity.getPickSequenceCode() != null ? entity.getPickSequenceCode() : -1L;
+        final String pick = entity.getPickSequenceCode() != null
+            ? String.valueOf(entity.getPickSequenceCode())
+            : identificadorOuSentinela(entity.getIdentificadorUnico());
         final int mdfe = entity.getMdfeNumber() != null ? entity.getMdfeNumber() : -1;
         return entity.getSequenceCode() + "|" + pick + "|" + mdfe;
+    }
+
+    private String identificadorOuSentinela(final String identificadorUnico) {
+        if (identificadorUnico == null || identificadorUnico.isBlank()) {
+            return "-1";
+        }
+        return identificadorUnico;
     }
 
     private Set<String> extrairCaminhosMetadata(final String metadata) {

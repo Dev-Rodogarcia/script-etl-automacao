@@ -518,7 +518,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         final String sql = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS ->
                 """
-                SELECT sequence_code, pick_sequence_code, mdfe_number, metadata
+                SELECT sequence_code, pick_sequence_code, mdfe_number, identificador_unico, metadata
                 FROM dbo.manifestos
                 WHERE %s
                   AND sequence_code IS NOT NULL
@@ -655,7 +655,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         final String sql = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS ->
                 """
-                SELECT sequence_code, pick_sequence_code, mdfe_number, metadata
+                SELECT sequence_code, pick_sequence_code, mdfe_number, identificador_unico, metadata
                 FROM dbo.manifestos
                 WHERE %s
                   AND sequence_code IS NOT NULL
@@ -787,7 +787,7 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         final String sql = switch (entidade) {
             case ConstantesEntidades.MANIFESTOS ->
                 """
-                SELECT sequence_code, pick_sequence_code, mdfe_number, metadata
+                SELECT sequence_code, pick_sequence_code, mdfe_number, identificador_unico, metadata
                 FROM dbo.manifestos
                 WHERE %s
                   AND sequence_code IS NOT NULL
@@ -886,12 +886,15 @@ class ValidacaoApiBanco24hDetalhadaRepository {
     }
 
     static String montarChaveManifestoValidacao(final Long sequenceCode,
-                                                final Long pickSequenceCode,
-                                                final Integer mdfeNumber) {
+                                                 final Long pickSequenceCode,
+                                                 final Integer mdfeNumber,
+                                                 final String identificadorUnico) {
         if (sequenceCode == null) {
             return null;
         }
-        final Long pickEfetivo = pickSequenceCode != null ? pickSequenceCode : -1L;
+        final String pickEfetivo = pickSequenceCode != null
+            ? String.valueOf(pickSequenceCode)
+            : identificadorOuSentinela(identificadorUnico);
         final Long mdfeEfetivo = mdfeNumber != null ? mdfeNumber.longValue() : -1L;
         return sequenceCode + "|" + pickEfetivo + "|" + mdfeEfetivo;
     }
@@ -900,7 +903,15 @@ class ValidacaoApiBanco24hDetalhadaRepository {
         final Long sequenceCode = obterLongNullable(rs, "sequence_code");
         final Long pickSequenceCode = obterLongNullable(rs, "pick_sequence_code");
         final Integer mdfeNumber = obterIntegerNullable(rs, "mdfe_number");
-        return montarChaveManifestoValidacao(sequenceCode, pickSequenceCode, mdfeNumber);
+        final String identificadorUnico = rs.getString("identificador_unico");
+        return montarChaveManifestoValidacao(sequenceCode, pickSequenceCode, mdfeNumber, identificadorUnico);
+    }
+
+    private static String identificadorOuSentinela(final String identificadorUnico) {
+        if (identificadorUnico == null || identificadorUnico.isBlank()) {
+            return "-1";
+        }
+        return identificadorUnico;
     }
 
     private Long obterLongNullable(final ResultSet rs, final String coluna) throws SQLException {

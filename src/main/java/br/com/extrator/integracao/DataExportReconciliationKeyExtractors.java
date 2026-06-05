@@ -10,6 +10,9 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import br.com.extrator.suporte.json.CanonicalJsonHasher;
 
 public final class DataExportReconciliationKeyExtractors {
     private static final Pattern DECIMAL_ZERO = Pattern.compile("-?\\d+\\.0");
@@ -23,9 +26,47 @@ public final class DataExportReconciliationKeyExtractors {
         if (sequence == null) {
             return null;
         }
-        final String pick = defaultIfNull(cleanId(get(row, "mft_pfs_pck_sequence_code")), "-1");
-        final String mdfe = defaultIfNull(cleanId(get(row, "mft_mfs_number")), "-1");
-        return sequence + "|" + pick + "|" + mdfe;
+        final String pick = cleanId(get(row, "mft_pfs_pck_sequence_code"));
+        final String mdfe = cleanId(get(row, "mft_mfs_number"));
+        final String pickOuIdentificador = pick != null ? pick : identificadorManifesto(row, sequence, mdfe);
+        return sequence + "|" + pickOuIdentificador + "|" + defaultIfNull(mdfe, "-1");
+    }
+
+    private static String identificadorManifesto(final JsonNode row, final String sequence, final String mdfe) {
+        if (mdfe != null) {
+            return sequence + "_MDFE_" + mdfe;
+        }
+        if (row == null || row.isNull() || row.isMissingNode()) {
+            return "NULL_METADATA_" + sequence;
+        }
+        try {
+            if (!row.isObject()) {
+                return CanonicalJsonHasher.sha256CanonicalJson(row);
+            }
+            final ObjectNode metadataParaHash = ((ObjectNode) row).deepCopy();
+            removerCamposVolateisManifesto(metadataParaHash);
+            return CanonicalJsonHasher.sha256CanonicalJson(metadataParaHash);
+        } catch (final com.fasterxml.jackson.core.JsonProcessingException e) {
+            return sha256Hex(row.toString().trim());
+        }
+    }
+
+    private static void removerCamposVolateisManifesto(final ObjectNode metadata) {
+        List.of(
+            "mobile_read_at",
+            "departured_at",
+            "closed_at",
+            "finished_at",
+            "vehicle_departure_km",
+            "closing_km",
+            "traveled_km",
+            "finalized_manifest_items_count",
+            "mft_mfs_number",
+            "mft_mfs_key",
+            "mdfe_status",
+            "mft_aoe_comments",
+            "mft_aoe_rer_name"
+        ).forEach(metadata::remove);
     }
 
     public static String faturaPorCliente(final JsonNode row) {

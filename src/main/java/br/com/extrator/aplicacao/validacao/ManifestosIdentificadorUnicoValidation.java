@@ -58,8 +58,8 @@ final class ManifestosIdentificadorUnicoValidation {
 
         System.out.println("🔍 IDENTIFICAR DUPLICADOS FALSOS:");
         log.console("");
-        System.out.println("(Manifestos com mesma chave logica estrita e identificador_unico diferente)");
-        System.out.println("(Isso indica cardinalidade vulneravel antes da correcao)");
+        System.out.println("(Manifestos com mesma chave_merge_hash e identificador_unico diferente)");
+        System.out.println("(Isso indica colisao real na chave operacional)");
         log.console("");
 
         final int duplicadosFalsosCount = exibirDuplicadosFalsos(conn);
@@ -88,7 +88,7 @@ final class ManifestosIdentificadorUnicoValidation {
                 + " (" + String.format("%.2f", calcularPercentual(registrosComPickNotNull, totalBanco)) + "%)"
         );
         System.out.println(
-            "  Registros sem pick_sequence_code (usa mdfe/hash): " + registrosComPickNull
+            "  Registros sem pick_sequence_code (usa identificador_unico/mdfe): " + registrosComPickNull
                 + " (" + String.format("%.2f", calcularPercentual(registrosComPickNull, totalBanco)) + "%)"
         );
         log.console("");
@@ -100,7 +100,7 @@ final class ManifestosIdentificadorUnicoValidation {
         System.out.println("TESTE 5: Resumo final");
         System.out.println("  Total de manifestos: " + totalBanco);
         System.out.println("  Com pick_sequence_code: " + registrosComPickNotNull);
-        System.out.println("  Sem pick_sequence_code (usa mdfe/hash): " + registrosComPickNull);
+        System.out.println("  Sem pick_sequence_code (usa identificador_unico/mdfe): " + registrosComPickNull);
         System.out.println("  Com identificador_unico NULL: " + registrosSemIdentificador);
         System.out.println("  Duplicados falsos: " + duplicadosFalsosCount);
         log.console("");
@@ -124,16 +124,14 @@ final class ManifestosIdentificadorUnicoValidation {
                  """
                     SELECT
                       sequence_code,
-                      COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL') as pick_sequence_code,
-                      COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL') as mdfe_number,
+                      MIN(COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL')) as pick_sequence_code,
+                      MIN(COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')) as mdfe_number,
+                      chave_merge_hash,
                       COUNT(*) as total_registros,
                       COUNT(DISTINCT identificador_unico) as identificadores_unicos
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY
-                      sequence_code,
-                      COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
-                      COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')
+                    GROUP BY sequence_code, chave_merge_hash
                     HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1
                     ORDER BY COUNT(*) DESC""")) {
             boolean encontrou = false;
@@ -154,7 +152,7 @@ final class ManifestosIdentificadorUnicoValidation {
             }
             if (!encontrou) {
                 System.out.println("✅ Nenhum duplicado falso encontrado!");
-                System.out.println("   Todos os manifestos com a mesma chave de negocio têm o mesmo identificador_unico.");
+                System.out.println("   Todos os manifestos com a mesma chave operacional têm o mesmo identificador_unico.");
                 System.out.println("   Isso indica que a correção está funcionando corretamente.");
             } else {
                 log.console("");
@@ -162,7 +160,7 @@ final class ManifestosIdentificadorUnicoValidation {
                 log.console("");
                 System.out.println("💡 Interpretação:");
                 System.out.println("   - Esses são duplicados criados ANTES da correção do identificador único");
-                System.out.println("   - Eles têm a mesma chave de negocio mas identificador_unico diferente");
+                System.out.println("   - Eles têm a mesma chave operacional mas identificador_unico diferente");
                 System.out.println("   - Isso acontecia porque campos voláteis (mobile_read_at, etc.) estavam no hash");
                 System.out.println("   - Após a correção, novas extrações não criarão mais esses duplicados");
                 log.console("");
@@ -186,8 +184,7 @@ final class ManifestosIdentificadorUnicoValidation {
                     WHERE COALESCE(excluido_na_origem, 0) = 0
                     GROUP BY
                       sequence_code,
-                      COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
-                      COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')
+                      chave_merge_hash
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 duplicadosFalsosAposCorrecao++;
@@ -215,10 +212,10 @@ final class ManifestosIdentificadorUnicoValidation {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
                  """
-                    SELECT sequence_code, pick_sequence_code, mdfe_number
+                    SELECT chave_merge_hash
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY sequence_code, ISNULL(pick_sequence_code, -1), ISNULL(mdfe_number, -1)
+                    GROUP BY chave_merge_hash
                     HAVING COUNT(*) > 1""")) {
             while (rs.next()) {
                 duplicadosChaveComposta++;

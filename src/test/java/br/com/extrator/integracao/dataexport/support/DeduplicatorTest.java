@@ -82,6 +82,30 @@ class DeduplicatorTest {
     }
 
     @Test
+    void devePreservarManifestosSemPickNemMdfeQuandoIdentificadorForDiferente() {
+        final ManifestoEntity primeiro = manifestoSemPickNemMdfe(60962L, "hash-nota-a");
+        final ManifestoEntity segundo = manifestoSemPickNemMdfe(60962L, "hash-nota-b");
+
+        final var resultado = Deduplicator.deduplicarManifestos(List.of(primeiro, segundo));
+
+        assertEquals(2, resultado.size());
+    }
+
+    @Test
+    void deveDeduplicarManifestosSemPickNemMdfeQuandoIdentificadorForIgual() {
+        final ManifestoEntity primeiro = manifestoSemPickNemMdfe(60962L, "hash-nota-a");
+        primeiro.setCreatedAt(OffsetDateTime.parse("2026-05-01T08:00:00-03:00"));
+        final ManifestoEntity segundo = manifestoSemPickNemMdfe(60962L, "hash-nota-a");
+        segundo.setCreatedAt(OffsetDateTime.parse("2026-05-01T09:00:00-03:00"));
+        segundo.setStatus("encerrado");
+
+        final var resultado = Deduplicator.deduplicarManifestos(List.of(primeiro, segundo));
+
+        assertEquals(1, resultado.size());
+        assertEquals("encerrado", resultado.get(0).getStatus());
+    }
+
+    @Test
     void deveManterContaMaisFrescaPorDataCriacao() {
         final ContasAPagarDataExportEntity antiga = conta(100L);
         antiga.setDataCriacao(OffsetDateTime.parse("2026-04-10T08:00:00-03:00"));
@@ -121,6 +145,14 @@ class DeduplicatorTest {
         entity.setSequenceCode(sequenceCode);
         entity.setPickSequenceCode(1000L);
         entity.setMdfeNumber(3896);
+        entity.setCreatedAt(OffsetDateTime.parse("2026-05-01T08:00:00-03:00"));
+        return entity;
+    }
+
+    private ManifestoEntity manifestoSemPickNemMdfe(final Long sequenceCode, final String identificadorUnico) {
+        final ManifestoEntity entity = new ManifestoEntity();
+        entity.setSequenceCode(sequenceCode);
+        entity.setIdentificadorUnico(identificadorUnico);
         entity.setCreatedAt(OffsetDateTime.parse("2026-05-01T08:00:00-03:00"));
         return entity;
     }

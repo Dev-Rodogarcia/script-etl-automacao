@@ -87,9 +87,7 @@ public final class EntityReconciliationSpecs {
             new EntityReconciliationSpec(
                 ConstantesEntidades.MANIFESTOS,
                 "dbo.manifestos",
-                "CONCAT(CAST(sequence_code AS varchar(50)), '|', "
-                    + "COALESCE(CAST(pick_sequence_code AS varchar(50)), '-1'), '|', "
-                    + "COALESCE(CAST(mdfe_number AS varchar(50)), '-1'))",
+                "chave_merge_hash",
                 TEMPORAL_MANIFESTOS,
                 ConstantesApiDataExport.obterConfiguracao(ConstantesEntidades.MANIFESTOS),
                 DataExportReconciliationKeyExtractors::manifesto

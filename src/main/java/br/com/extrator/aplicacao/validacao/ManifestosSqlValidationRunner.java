@@ -46,7 +46,7 @@ final class ManifestosSqlValidationRunner {
 
     void executar(final Connection conn) throws SQLException {
         System.out.println("📄 IDENTIFICAR DUPLICADOS FALSOS:");
-        System.out.println("(Manifestos com mesma chave logica estrita)");
+        System.out.println("(Manifestos com mesma chave_merge_hash)");
         log.console("");
 
         try (Statement stmt = conn.createStatement();
@@ -54,18 +54,16 @@ final class ManifestosSqlValidationRunner {
                  """
                     SELECT
                       sequence_code,
-                      COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL') as pick_sequence_code,
-                      COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL') as mdfe_number,
+                      MIN(COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL')) as pick_sequence_code,
+                      MIN(COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')) as mdfe_number,
+                      chave_merge_hash,
                       COUNT(*) as total_registros,
                       COUNT(DISTINCT identificador_unico) as identificadores_unicos,
                       MIN(data_extracao) as primeira_extracao,
                       MAX(data_extracao) as ultima_extracao
                     FROM manifestos
                     WHERE COALESCE(excluido_na_origem, 0) = 0
-                    GROUP BY
-                      sequence_code,
-                      COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
-                      COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')
+                    GROUP BY sequence_code, chave_merge_hash
                     HAVING COUNT(*) > 1 AND COUNT(DISTINCT identificador_unico) > 1
                     ORDER BY COUNT(*) DESC""")) {
             resultPrinter.exibirResultado(rs);
@@ -84,15 +82,13 @@ final class ManifestosSqlValidationRunner {
             """
                SELECT
                  sequence_code,
-                 COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL') as pick_sequence_code,
-                 COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL') as mdfe_number,
+                 MIN(COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL')) as pick_sequence_code,
+                 MIN(COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')) as mdfe_number,
+                 chave_merge_hash,
                  COUNT(*) as total
                FROM manifestos
                WHERE COALESCE(excluido_na_origem, 0) = 0
-               GROUP BY
-                 sequence_code,
-                 COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
-                 COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')
+               GROUP BY sequence_code, chave_merge_hash
                HAVING COUNT(*) > 1""");
 
         executarTeste(
@@ -108,7 +104,7 @@ final class ManifestosSqlValidationRunner {
                SELECT
                  CASE
                    WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
-                   ELSE 'Sem pick_sequence_code (usa mdfe/hash)'
+                   ELSE 'Sem pick_sequence_code (usa identificador_unico/mdfe)'
                  END as tipo,
                  COUNT(*) as total,
                  CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM manifestos WHERE COALESCE(excluido_na_origem, 0) = 0) AS DECIMAL(5,2)) as percentual
@@ -117,7 +113,7 @@ final class ManifestosSqlValidationRunner {
                GROUP BY
                  CASE
                    WHEN pick_sequence_code IS NOT NULL THEN 'Com pick_sequence_code'
-                   ELSE 'Sem pick_sequence_code (usa mdfe/hash)'
+                   ELSE 'Sem pick_sequence_code (usa identificador_unico/mdfe)'
                  END""");
 
         executarTeste(
@@ -125,16 +121,14 @@ final class ManifestosSqlValidationRunner {
             "TESTE 4: Integridade de chave composta",
             """
                SELECT
-                 sequence_code,
-                 COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), '-1') as pick_sequence_code,
-                 COALESCE(CAST(mdfe_number AS VARCHAR(50)), '-1') as mdfe_number,
+                 MIN(CAST(sequence_code AS VARCHAR(50))) as sequence_code,
+                 MIN(COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), '-1')) as pick_sequence_code,
+                 MIN(COALESCE(CAST(mdfe_number AS VARCHAR(50)), '-1')) as mdfe_number,
+                 chave_merge_hash,
                  COUNT(*) as total
                FROM manifestos
                WHERE COALESCE(excluido_na_origem, 0) = 0
-               GROUP BY
-                 sequence_code,
-                 ISNULL(pick_sequence_code, -1),
-                 ISNULL(mdfe_number, -1)
+               GROUP BY chave_merge_hash
                HAVING COUNT(*) > 1""");
 
         executarTeste(
@@ -155,7 +149,7 @@ final class ManifestosSqlValidationRunner {
                  AND COALESCE(excluido_na_origem, 0) = 0
                UNION ALL
                SELECT
-                 'Sem pick_sequence_code (usa mdfe/hash)' as metrica,
+                 'Sem pick_sequence_code (usa identificador_unico/mdfe)' as metrica,
                  COUNT(*) as valor
                FROM manifestos
                WHERE pick_sequence_code IS NULL
@@ -176,9 +170,7 @@ final class ManifestosSqlValidationRunner {
                  FROM manifestos
                  WHERE COALESCE(excluido_na_origem, 0) = 0
                  GROUP BY
-                   sequence_code,
-                   COALESCE(CAST(pick_sequence_code AS VARCHAR(50)), 'NULL'),
-                   COALESCE(CAST(mdfe_number AS VARCHAR(50)), 'NULL')
+                   chave_merge_hash
                  HAVING COUNT(*) > 1
                ) as duplicados""");
     }

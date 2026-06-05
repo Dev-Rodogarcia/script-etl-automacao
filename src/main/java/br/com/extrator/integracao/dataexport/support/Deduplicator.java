@@ -66,7 +66,7 @@ public final class Deduplicator {
      * Deduplica lista de manifestos removendo registros duplicados da API.
      * 
      * ⚠️ CRÍTICO: Usa a MESMA chave composta do MERGE SQL:
-     * (sequence_code, pick_sequence_code, mdfe_number)
+     * (sequence_code, pick_sequence_code ou identificador_unico, mdfe_number)
      * 
      * Estratégia: mantém o registro mais recente baseado em finishedAt/createdAt
      * e completa métricas ausentes com valores reais vindos do duplicado.
@@ -82,14 +82,13 @@ public final class Deduplicator {
         return manifestos.stream()
             .collect(Collectors.toMap(
                 m -> {
-                    // ✅ CHAVE ALINHADA COM MERGE SQL: (sequence_code, pick_sequence_code, mdfe_number)
+                    // Chave alinhada com MERGE SQL: fallback em identificador_unico quando pick e nulo.
                     if (m.getSequenceCode() == null) {
                         throw new IllegalStateException("Manifesto com sequence_code NULL não pode ser deduplicado");
                     }
-                    // Usar -1 como sentinela para NULL (igual ao MERGE SQL com COALESCE)
-                    final Long pickSeq = m.getPickSequenceCode() != null ? m.getPickSequenceCode() : -1L;
+                    final String pickOuIdentificador = chavePickOuIdentificador(m);
                     final Integer mdfe = m.getMdfeNumber() != null ? m.getMdfeNumber() : -1;
-                    return m.getSequenceCode() + "_" + pickSeq + "_" + mdfe;
+                    return m.getSequenceCode() + "_" + pickOuIdentificador + "_" + mdfe;
                 },
                 m -> m,
                 (primeiro, segundo) -> {
@@ -104,6 +103,16 @@ public final class Deduplicator {
             .values()
             .stream()
             .collect(Collectors.toList());
+    }
+
+    private static String chavePickOuIdentificador(final ManifestoEntity manifesto) {
+        if (manifesto.getPickSequenceCode() != null) {
+            return String.valueOf(manifesto.getPickSequenceCode());
+        }
+        if (manifesto.getIdentificadorUnico() != null && !manifesto.getIdentificadorUnico().isBlank()) {
+            return manifesto.getIdentificadorUnico();
+        }
+        return "-1";
     }
     
     /**
