@@ -3,6 +3,14 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 65001 >nul
 
+REM ================================================================
+REM BACKFILL CUSTOMIZADO
+REM Edite manualmente o periodo abaixo antes de executar.
+REM Formato esperado: YYYY-MM-DD
+REM ================================================================
+set "DATA_INICIO=2026-05-05"
+set "DATA_FIM=2026-06-04"
+
 set "SCRIPT_ROOT=%~dp0"
 for %%I in ("%SCRIPT_ROOT%.") do set "REPO_ROOT=%%~fI"
 
@@ -12,30 +20,25 @@ if errorlevel 1 (
     endlocal & exit /b 1
 )
 
-for /f "tokens=1,2" %%A in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "$hoje=(Get-Date).Date; $inicio=$hoje.AddDays(-90); Write-Output ($inicio.ToString('yyyy-MM-dd') + ' ' + $hoje.ToString('yyyy-MM-dd'))"') do (
-    set "DATA_INICIO=%%A"
-    set "DATA_FIM=%%B"
-)
-
 if not defined DATA_INICIO (
-    echo ERRO: Nao foi possivel calcular a data inicial do backfill.
+    echo ERRO: DATA_INICIO nao foi definida no bloco inicial do arquivo.
     set "BACKFILL_EXIT=1"
     goto :END
 )
 
 if not defined DATA_FIM (
-    echo ERRO: Nao foi possivel calcular a data final do backfill.
+    echo ERRO: DATA_FIM nao foi definida no bloco inicial do arquivo.
     set "BACKFILL_EXIT=1"
     goto :END
 )
 
 echo ================================================================
-echo BACKFILL AUTOMATICO - ULTIMOS 90 DIAS
+echo BACKFILL CUSTOMIZADO
 echo ================================================================
 echo Data de Inicio: !DATA_INICIO!
 echo Data de Fim:    !DATA_FIM!
 echo.
-echo A rotina de producao executara:
+echo A rotina de producao executara o mesmo fluxo da extracao por intervalo:
 echo   java -jar target\extrator.jar --extracao-intervalo !DATA_INICIO! !DATA_FIM! %*
 echo.
 
