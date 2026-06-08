@@ -18,4 +18,20 @@ public record FatoMaterializacaoResumo(
             .mapToLong(FatoMaterializacaoProcedureResultado::linhasAtualizadas)
             .sum();
     }
+
+    public long totalProceduresFalhas() {
+        return procedures.stream()
+            .filter(procedure -> !procedure.sucesso())
+            .count();
+    }
+
+    public boolean houveFalha() {
+        return totalProceduresFalhas() > 0;
+    }
+
+    public List<FatoMaterializacaoProcedureResultado> proceduresComFalha() {
+        return procedures.stream()
+            .filter(procedure -> !procedure.sucesso())
+            .toList();
+    }
 }

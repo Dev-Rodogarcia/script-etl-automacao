@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
+import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoProcedureResultado;
 import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoResumo;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
@@ -90,6 +91,54 @@ class LoopDaemonRunHandlerTest {
         assertEquals(1, fluxosExecutados.get());
         assertEquals(1, materializacoes.get());
         assertTrue(conteudo.contains("materializacao_bi"), "Resumo do ciclo deve registrar materializacao BI");
+    }
+
+    @Test
+    void falhaParcialDeMaterializacaoDeveSerRegistradaComoAlertaDoCiclo() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final AtomicInteger fluxosExecutados = new AtomicInteger();
+
+        final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+            stateStore,
+            historyWriter,
+            () -> fluxosExecutados.incrementAndGet(),
+            () -> new FatoMaterializacaoResumo(
+                List.of(
+                    new FatoMaterializacaoProcedureResultado(
+                        "dbo.sp_ok",
+                        1,
+                        2,
+                        LocalDateTime.now(),
+                        Duration.ofMillis(10)
+                    ),
+                    FatoMaterializacaoProcedureResultado.falha(
+                        "dbo.sp_bloqueada",
+                        new IllegalStateException("lock ocupado"),
+                        Duration.ofMillis(5)
+                    )
+                ),
+                Duration.ofMillis(15)
+            ),
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+            (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
+            cicloLog -> () -> { },
+            () -> 24681L,
+            30L,
+            false,
+            () -> java.time.Duration.ofSeconds(30)
+        );
+
+        handler.executar();
+
+        final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));
+        final String conteudo = Files.readString(logCiclo, StandardCharsets.UTF_8);
+
+        assertEquals(1, fluxosExecutados.get());
+        assertTrue(conteudo.contains("alerta de materializacao BI"));
+        assertTrue(conteudo.contains("falhas=1"));
+        assertTrue(conteudo.contains("procedures_falhas="));
+        assertTrue(conteudo.contains("sp_bloqueada"));
     }
 
     @Test

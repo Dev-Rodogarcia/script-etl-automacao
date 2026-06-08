@@ -40,6 +40,7 @@ import java.util.function.LongSupplier;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
 import br.com.extrator.aplicacao.extracao.FluxoCompletoUseCase;
+import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoProcedureResultado;
 import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoResumo;
 import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoService;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
@@ -205,6 +206,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
 
             boolean sucesso = true;
             boolean cicloComAlertaIntegridade = false;
+            boolean cicloComAlertaMaterializacao = false;
             boolean cicloPuladoPorLock = false;
             FatoMaterializacaoResumo resumoMaterializacao = null;
             String detalhe = "Ciclo concluido com sucesso.";
@@ -238,6 +240,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                     detalhe = "Falha no ciclo [cycle_id=" + cycleId + "]: " + historyWriter.summarizeMessage(e.getMessage());
                 }
             }
+            if (sucesso && resumoMaterializacao != null && resumoMaterializacao.houveFalha()) {
+                cicloComAlertaMaterializacao = true;
+                detalhe = "Ciclo concluido com alerta de materializacao BI [cycle_id=" + cycleId + "].";
+                System.err.println("ALERTA LOOP: materializacao BI teve falha parcial. O loop continuara no proximo ciclo.");
+            }
 
             final LocalDateTime fimExtracao = LocalDateTime.now();
             final ReconciliationSummary resumoReconciliacao = cicloPuladoPorLock
@@ -268,10 +275,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
 
             final LocalDateTime proximo = fim.plusMinutes(intervaloMinutos);
             final boolean falhaReconciliacao = houveFalhaReconciliacao(resumoReconciliacao);
-            final boolean cicloSaudavel = sucesso && !cicloComAlertaIntegridade && !falhaReconciliacao;
+            final boolean cicloComAlerta = cicloComAlertaIntegridade || cicloComAlertaMaterializacao;
+            final boolean cicloSaudavel = sucesso && !cicloComAlerta && !falhaReconciliacao;
             final int consecutiveAlertCycles = cicloPuladoPorLock
                 ? stateStore.readConsecutiveAlertCycles()
-                : cicloComAlertaIntegridade
+                : cicloComAlerta
                     ? stateStore.readConsecutiveAlertCycles() + 1
                     : 0;
             final int consecutiveNonSuccessCycles = cicloPuladoPorLock
@@ -286,7 +294,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                 ? "WAITING_NEXT_CYCLE"
                 : waitingManualIntervention
                     ? "WAITING_MANUAL_INTERVENTION"
-                    : determinarStatusDaemon(sucesso, cicloComAlertaIntegridade, resumoReconciliacao);
+                    : determinarStatusDaemon(sucesso, cicloComAlerta, resumoReconciliacao);
             final String detalheOperacional = adicionarContadoresOperacionais(
                 resumoCiclo.getDetalhe(),
                 consecutiveAlertCycles,
@@ -485,10 +493,25 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         }
         return (detalheBase == null ? "Sem detalhes." : detalheBase)
             + " | materializacao_bi[procedures=" + resumoMaterializacao.procedures().size()
+            + ", falhas=" + resumoMaterializacao.totalProceduresFalhas()
+            + formatarProceduresFalhas(resumoMaterializacao)
             + ", inseridas=" + resumoMaterializacao.totalLinhasInseridas()
             + ", atualizadas=" + resumoMaterializacao.totalLinhasAtualizadas()
             + ", duracao_ms=" + resumoMaterializacao.duracao().toMillis()
             + "]";
+    }
+
+    private String formatarProceduresFalhas(final FatoMaterializacaoResumo resumoMaterializacao) {
+        if (!resumoMaterializacao.houveFalha()) {
+            return "";
+        }
+        final String proceduresFalhas = String.join(
+            "|",
+            resumoMaterializacao.proceduresComFalha().stream()
+                .map(FatoMaterializacaoProcedureResultado::procedureName)
+                .toList()
+        );
+        return ", procedures_falhas=" + historyWriter.summarizeMessage(proceduresFalhas);
     }
 
     private Duration resolverTimeoutCiclo() {

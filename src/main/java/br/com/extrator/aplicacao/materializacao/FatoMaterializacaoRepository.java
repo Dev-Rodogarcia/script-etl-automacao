@@ -18,7 +18,16 @@ public class FatoMaterializacaoRepository {
                                                                         final int timeoutSegundos) throws SQLException {
         final List<FatoMaterializacaoProcedureResultado> resultados = new ArrayList<>();
         for (final String procedure : procedures) {
-            resultados.add(executarProcedure(procedure, timeoutSegundos));
+            final Instant inicio = Instant.now();
+            try {
+                resultados.add(executarProcedure(procedure, timeoutSegundos));
+            } catch (final SQLException e) {
+                resultados.add(FatoMaterializacaoProcedureResultado.falha(
+                    procedure,
+                    e,
+                    Duration.between(inicio, Instant.now())
+                ));
+            }
         }
         return resultados;
     }
@@ -32,12 +41,23 @@ public class FatoMaterializacaoRepository {
             final boolean possuiResultado = statement.execute();
             if (possuiResultado) {
                 try (ResultSet rs = statement.getResultSet()) {
-                    if (rs != null && rs.next()) {
+                    if (rs != null) {
+                        long linhasInseridas = 0L;
+                        long linhasAtualizadas = 0L;
+                        LocalDateTime snapshotEm = null;
+                        while (rs.next()) {
+                            linhasInseridas += rs.getLong("linhas_inseridas");
+                            linhasAtualizadas += rs.getLong("linhas_atualizadas");
+                            final LocalDateTime snapshotAtual = obterSnapshot(rs);
+                            if (snapshotAtual != null && (snapshotEm == null || snapshotAtual.isAfter(snapshotEm))) {
+                                snapshotEm = snapshotAtual;
+                            }
+                        }
                         return new FatoMaterializacaoProcedureResultado(
                             procedure,
-                            rs.getLong("linhas_inseridas"),
-                            rs.getLong("linhas_atualizadas"),
-                            obterSnapshot(rs),
+                            linhasInseridas,
+                            linhasAtualizadas,
+                            snapshotEm,
                             Duration.between(inicio, Instant.now())
                         );
                     }

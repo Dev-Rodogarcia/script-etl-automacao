@@ -33,17 +33,27 @@ public class MaterializarFatosBiComando implements Comando {
     private void imprimirResumo(final FatoMaterializacaoResumo resumo) {
         log.console("Materializacao de fatos BI concluida");
         for (final FatoMaterializacaoProcedureResultado resultado : resumo.procedures()) {
-            log.console(
-                "  {} | inseridas={} | atualizadas={} | snapshot={} | duracao_ms={}",
-                resultado.procedureName(),
-                resultado.linhasInseridas(),
-                resultado.linhasAtualizadas(),
-                resultado.snapshotEm(),
-                resultado.duracao().toMillis()
-            );
+            if (resultado.sucesso()) {
+                log.console(
+                    "  {} | status=OK | inseridas={} | atualizadas={} | snapshot={} | duracao_ms={}",
+                    resultado.procedureName(),
+                    resultado.linhasInseridas(),
+                    resultado.linhasAtualizadas(),
+                    resultado.snapshotEm(),
+                    resultado.duracao().toMillis()
+                );
+            } else {
+                log.console(
+                    "  {} | status=FALHA | erro={} | duracao_ms={}",
+                    resultado.procedureName(),
+                    resultado.erro(),
+                    resultado.duracao().toMillis()
+                );
+            }
         }
         log.console(
-            "Totais | inseridas={} | atualizadas={} | duracao_ms={}",
+            "Totais | falhas={} | inseridas={} | atualizadas={} | duracao_ms={}",
+            resumo.totalProceduresFalhas(),
             resumo.totalLinhasInseridas(),
             resumo.totalLinhasAtualizadas(),
             resumo.duracao().toMillis()

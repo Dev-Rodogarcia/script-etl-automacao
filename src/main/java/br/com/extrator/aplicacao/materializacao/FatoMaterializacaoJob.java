@@ -30,12 +30,21 @@ public class FatoMaterializacaoJob {
             new FatoMaterializacaoResumo(resultados, Duration.between(inicio, Instant.now()));
 
         logger.info(
-            "Materializacao de fatos BI concluida | procedures={} | inseridas={} | atualizadas={} | duracao_ms={}",
+            "Materializacao de fatos BI concluida | procedures={} | falhas={} | inseridas={} | atualizadas={} | duracao_ms={}",
             resultados.size(),
+            resumo.totalProceduresFalhas(),
             resumo.totalLinhasInseridas(),
             resumo.totalLinhasAtualizadas(),
             resumo.duracao().toMillis()
         );
+        if (resumo.houveFalha()) {
+            logger.warn(
+                "Materializacao de fatos BI concluiu com falhas parciais | procedures_falhas={}",
+                resumo.proceduresComFalha().stream()
+                    .map(FatoMaterializacaoProcedureResultado::procedureName)
+                    .toList()
+            );
+        }
         return resumo;
     }
 }
