@@ -13,6 +13,8 @@ class MainBootstrapRoutingTest {
         assertFalse(Main.requerInicializacaoContexto("--loop-daemon-start"));
         assertFalse(Main.requerInicializacaoContexto("--validar"));
         assertFalse(Main.requerInicializacaoContexto("--exportar-csv"));
+        assertFalse(Main.requerInicializacaoContexto("--materializar-fatos-bi"));
+        assertFalse(Main.requerInicializacaoContexto("--materializar-fatos-bi-scheduler"));
     }
 
     @Test

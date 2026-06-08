@@ -46,6 +46,8 @@ import br.com.extrator.comandos.cli.extracao.LoopDaemonComando;
 import br.com.extrator.comandos.cli.extracao.LoopExtracaoComando;
 import br.com.extrator.comandos.cli.extracao.recovery.RecoveryComando;
 import br.com.extrator.comandos.cli.interno.ExecutarStepIsoladoComando;
+import br.com.extrator.comandos.cli.materializacao.MaterializarFatosBiComando;
+import br.com.extrator.comandos.cli.materializacao.MaterializarFatosBiSchedulerComando;
 import br.com.extrator.comandos.cli.seguranca.AuthBootstrapComando;
 import br.com.extrator.comandos.cli.seguranca.AuthCheckComando;
 import br.com.extrator.comandos.cli.seguranca.AuthCreateUserComando;
@@ -106,6 +108,8 @@ public final class CommandRegistry {
         comandos.put("--validar-etl-resiliencia", lazy(ValidarEtlResilienciaComando::new));
         comandos.put("--executar-step-isolado", lazy(ExecutarStepIsoladoComando::new));
         comandos.put("--exportar-csv", lazy(ExportarCsvComando::new));
+        comandos.put("--materializar-fatos-bi", lazy(MaterializarFatosBiComando::new));
+        comandos.put("--materializar-fatos-bi-scheduler", lazy(MaterializarFatosBiSchedulerComando::new));
 
         comandos.put("--auth-check", lazy(AuthCheckComando::new));
         comandos.put("--auth-bootstrap", lazy(AuthBootstrapComando::new));

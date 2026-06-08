@@ -47,6 +47,8 @@ class CommandRegistryTest {
         assertTrue(comandos.containsKey("--sincronizar-usuarios"));
         assertTrue(comandos.containsKey("--validar-etl-extremo"));
         assertTrue(comandos.containsKey("--validar-etl-resiliencia"));
+        assertTrue(comandos.containsKey("--materializar-fatos-bi"));
+        assertTrue(comandos.containsKey("--materializar-fatos-bi-scheduler"));
     }
 
     @Test

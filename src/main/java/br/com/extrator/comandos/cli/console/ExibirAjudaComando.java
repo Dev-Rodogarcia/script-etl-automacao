@@ -72,6 +72,10 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  --loop-daemon-start   Inicia loop em segundo plano");
         System.out.println("  --loop-daemon-stop    Para loop em segundo plano");
         System.out.println("  --loop-daemon-status  Consulta status do loop em segundo plano");
+        System.out.println("  --materializar-fatos-bi");
+        System.out.println("                        Executa uma carga das fatos BI financeiras");
+        System.out.println("  --materializar-fatos-bi-scheduler");
+        System.out.println("                        Mantem materializacao intradia em processo independente");
         System.out.println("  --auth-bootstrap      Cria o primeiro usuario ADMIN");
         System.out.println("  --auth-check ACAO     Solicita autenticacao para acao sensivel");
         System.out.println("  --auth-create-user    Cria usuario (requer ADMIN)");
@@ -91,6 +95,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  java -jar extrator.jar --validar-etl-extremo --periodo-fechado --stress-repeticoes 3");
         System.out.println("  java -jar extrator.jar --validar-etl-resiliencia --auto-chaos --ciclos 12 --duracao-segundos 120");
         System.out.println("  java -jar extrator.jar --loop-daemon-start");
+        System.out.println("  java -jar extrator.jar --materializar-fatos-bi-scheduler");
         System.out.println();
         System.out.println("=".repeat(80));
     }

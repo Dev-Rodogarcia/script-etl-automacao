@@ -264,7 +264,9 @@ public class Main {
     }
 
     private static boolean isComandoLongaDuracao(final String nomeComando) {
-        return "--loop".equals(nomeComando) || "--loop-daemon-run".equals(nomeComando);
+        return "--loop".equals(nomeComando)
+            || "--loop-daemon-run".equals(nomeComando)
+            || "--materializar-fatos-bi-scheduler".equals(nomeComando);
     }
 
     static boolean deveEncerrarProcessoAoConcluir(final String nomeComando) {

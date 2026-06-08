@@ -16,7 +16,10 @@ Atributos: [PENDENTE]
 
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +34,107 @@ public final class ConfigEtl {
     private static final String FRETES_LOOKBACK_MODO_RECONCILIACAO = "reconciliacao";
     private static final String FRETES_LOOKBACK_MODO_BACKFILL = "backfill";
     private static final String FRETES_LOOKBACK_MODO_INTERVALO = "intervalo";
+    private static final List<String> MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO = List.of(
+        "dbo.sp_carga_fato_fretes_faturamento",
+        "dbo.sp_carga_fato_gestao_vista_faturas"
+    );
+    private static final Set<String> MATERIALIZACAO_FATOS_BI_PROCEDURES_PERMITIDAS = Set.of(
+        "dbo.sp_carga_fato_fretes_faturamento",
+        "dbo.sp_carga_fato_gestao_vista_faturas",
+        "dbo.sp_carga_fato_gestao_vista_fretes",
+        "dbo.sp_carga_fato_gestao_vista_coletores"
+    );
 
     private ConfigEtl() {
+    }
+
+    public static List<String> obterMaterializacaoFatosBiProcedures() {
+        final String valor = ConfigSource.obterConfiguracao(
+            "ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES",
+            "etl.materializacao.fatos_bi.procedures"
+        );
+        if (valor == null || valor.isBlank()) {
+            return MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO;
+        }
+
+        final List<String> procedures = new ArrayList<>();
+        for (final String item : valor.split(",")) {
+            final String procedure = normalizarProcedureMaterializacao(item);
+            if (procedure == null) {
+                continue;
+            }
+            if (!MATERIALIZACAO_FATOS_BI_PROCEDURES_PERMITIDAS.contains(procedure)) {
+                logger.warn(
+                    "Procedure de materializacao '{}' nao permitida. Valor ignorado.",
+                    item == null ? "" : item.trim()
+                );
+                continue;
+            }
+            procedures.add(procedure);
+        }
+
+        if (procedures.isEmpty()) {
+            logger.warn(
+                "Nenhuma procedure valida configurada em ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES. Usando padrao: {}",
+                MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO
+            );
+            return MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO;
+        }
+        return List.copyOf(procedures);
+    }
+
+    public static Duration obterMaterializacaoFatosBiIntervalo() {
+        final long minutos = ConfigValueParser.parseLong(
+            ConfigSource.obterConfiguracao(
+                "ETL_MATERIALIZACAO_FATOS_BI_INTERVALO_MINUTOS",
+                "etl.materializacao.fatos_bi.intervalo_minutos"
+            ),
+            60L,
+            value -> value > 0L,
+            null,
+            null,
+            null
+        );
+        return Duration.ofMinutes(minutos);
+    }
+
+    public static Duration obterMaterializacaoFatosBiAtrasoInicial() {
+        final long segundos = ConfigValueParser.parseLong(
+            ConfigSource.obterConfiguracao(
+                "ETL_MATERIALIZACAO_FATOS_BI_ATRASO_INICIAL_SEGUNDOS",
+                "etl.materializacao.fatos_bi.atraso_inicial_segundos"
+            ),
+            0L,
+            value -> value >= 0L,
+            null,
+            null,
+            null
+        );
+        return Duration.ofSeconds(segundos);
+    }
+
+    public static int obterMaterializacaoFatosBiTimeoutSegundos() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_MATERIALIZACAO_FATOS_BI_TIMEOUT_SEGUNDOS",
+                "etl.materializacao.fatos_bi.timeout_segundos"
+            ),
+            1800,
+            value -> value > 0,
+            null,
+            null,
+            null
+        );
+    }
+
+    private static String normalizarProcedureMaterializacao(final String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        return valor.trim()
+            .replace("[", "")
+            .replace("]", "")
+            .toLowerCase(Locale.ROOT);
     }
 
     public static long obterDelayEntreExtracoes() {

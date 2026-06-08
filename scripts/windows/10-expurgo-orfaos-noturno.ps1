@@ -84,6 +84,47 @@ function Publish-FailureEvent {
     }
 }
 
+function Invoke-MaterializacaoFatosBi {
+    $script:MaterializacaoExitCode = 0
+
+    if ($env:ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA -eq '1') {
+        Write-LogLine "Cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente) ignoradas por ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA=1."
+        return
+    }
+
+    $databaseScript = Join-Path $RepoRoot 'database\executar_database.bat'
+    if (-not (Test-Path -LiteralPath $databaseScript -PathType Leaf)) {
+        $message = "Script de banco nao encontrado em $databaseScript. Cargas materializadas BI abortadas."
+        Write-LogLine $message
+        Publish-FailureEvent -ExitCode 3 -Message $message
+        $script:MaterializacaoExitCode = 3
+        return
+    }
+
+    Write-LogLine "Iniciando cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente)."
+    $oldCargaGestaoVista = $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA
+    $oldDbSilent = $env:EXTRATOR_DB_SILENT
+    try {
+        $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = '1'
+        $env:EXTRATOR_DB_SILENT = '1'
+        & $databaseScript *>> $LogPath
+        $dbExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
+    } finally {
+        $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = $oldCargaGestaoVista
+        $env:EXTRATOR_DB_SILENT = $oldDbSilent
+    }
+
+    if ($dbExitCode -ne 0) {
+        $message = "Cargas materializadas BI falharam com exit code $dbExitCode. Consulte $LogPath."
+        Write-LogLine $message
+        Publish-FailureEvent -ExitCode $dbExitCode -Message $message
+        $script:MaterializacaoExitCode = $dbExitCode
+        return
+    }
+
+    Write-LogLine "Cargas materializadas BI concluidas com sucesso."
+}
+
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 Set-Location -LiteralPath $RepoRoot
 Import-OperationalEnvironment
@@ -96,72 +137,47 @@ if (-not (Test-Path -LiteralPath $JarPath -PathType Leaf)) {
     $message = "JAR nao encontrado em $JarPath. Execute mvn package -DskipTests antes da janela noturna."
     Write-LogLine $message
     Publish-FailureEvent -ExitCode 2 -Message $message
-    exit 2
+    $exitCode = 2
+} else {
+    $javaExe = Resolve-JavaCommand
+    $javaArgs = @(
+        '--enable-native-access=ALL-UNNAMED',
+        "-DETL_BASE_DIR=$RepoRoot",
+        "-Detl.base.dir=$RepoRoot",
+        '-jar',
+        $JarPath,
+        '--expurgo-orfaos',
+        '--batch-size',
+        '500'
+    )
+
+    Write-LogLine ("Executando: {0} {1}" -f $javaExe, (($javaArgs | ForEach-Object {
+        if ($_ -like '* *') { '"' + $_ + '"' } else { $_ }
+    }) -join ' '))
+
+    & $javaExe @javaArgs *>> $LogPath
+    $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
 }
-
-$javaExe = Resolve-JavaCommand
-$javaArgs = @(
-    '--enable-native-access=ALL-UNNAMED',
-    "-DETL_BASE_DIR=$RepoRoot",
-    "-Detl.base.dir=$RepoRoot",
-    '-jar',
-    $JarPath,
-    '--expurgo-orfaos',
-    '--batch-size',
-    '500'
-)
-
-Write-LogLine ("Executando: {0} {1}" -f $javaExe, (($javaArgs | ForEach-Object {
-    if ($_ -like '* *') { '"' + $_ + '"' } else { $_ }
-}) -join ' '))
-
-& $javaExe @javaArgs *>> $LogPath
-$exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
 
 if ($exitCode -eq 0) {
     Write-LogLine "Expurgo logico noturno concluido com sucesso."
+} else {
+    $failureMessage = "Expurgo logico noturno falhou com exit code $exitCode. Cargas materializadas BI serao executadas mesmo assim. Consulte $LogPath."
+    Write-LogLine $failureMessage
+    Publish-FailureEvent -ExitCode $exitCode -Message $failureMessage
+}
 
-    if ($env:ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA -eq '1') {
-        Write-LogLine "Cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente) ignoradas por ETL_SKIP_CARGA_GESTAO_VISTA_NOTURNA=1."
-    } else {
-        $databaseScript = Join-Path $RepoRoot 'database\executar_database.bat'
-        if (-not (Test-Path -LiteralPath $databaseScript -PathType Leaf)) {
-            $message = "Script de banco nao encontrado em $databaseScript. Cargas materializadas BI abortadas."
-            Write-LogLine $message
-            Publish-FailureEvent -ExitCode 3 -Message $message
-            exit 3
-        }
+Invoke-MaterializacaoFatosBi
 
-        Write-LogLine "Iniciando cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente)."
-        $oldCargaGestaoVista = $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA
-        $oldDbSilent = $env:EXTRATOR_DB_SILENT
-        try {
-            $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = '1'
-            $env:EXTRATOR_DB_SILENT = '1'
-            & $databaseScript *>> $LogPath
-            $dbExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
-        } finally {
-            $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = $oldCargaGestaoVista
-            $env:EXTRATOR_DB_SILENT = $oldDbSilent
-        }
-
-        if ($dbExitCode -ne 0) {
-            $message = "Cargas materializadas BI falharam com exit code $dbExitCode. Consulte $LogPath."
-            Write-LogLine $message
-            Publish-FailureEvent -ExitCode $dbExitCode -Message $message
-            exit $dbExitCode
-        }
-
-        Write-LogLine "Cargas materializadas BI concluidas com sucesso."
-    }
-
+if ($exitCode -eq 0 -and $script:MaterializacaoExitCode -eq 0) {
     if (Test-Path -LiteralPath $FailureMarker -PathType Leaf) {
         Remove-Item -LiteralPath $FailureMarker -Force
     }
     exit 0
 }
 
-$failureMessage = "Expurgo logico noturno falhou com exit code $exitCode. Consulte $LogPath."
-Write-LogLine $failureMessage
-Publish-FailureEvent -ExitCode $exitCode -Message $failureMessage
+if ($script:MaterializacaoExitCode -ne 0) {
+    exit $script:MaterializacaoExitCode
+}
+
 exit $exitCode
