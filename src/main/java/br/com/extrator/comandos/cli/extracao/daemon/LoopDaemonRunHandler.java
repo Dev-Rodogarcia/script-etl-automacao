@@ -40,6 +40,8 @@ import java.util.function.LongSupplier;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
 import br.com.extrator.aplicacao.extracao.FluxoCompletoUseCase;
+import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoResumo;
+import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoService;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
 import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
@@ -51,6 +53,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     @FunctionalInterface
     public interface FluxoExecutor {
         void executar() throws Exception;
+    }
+
+    @FunctionalInterface
+    public interface MaterializacaoProcessor {
+        FatoMaterializacaoResumo processar() throws Exception;
     }
 
     @FunctionalInterface
@@ -80,6 +87,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     private final DaemonStateStore stateStore;
     private final DaemonHistoryWriter historyWriter;
     private final FluxoExecutor fluxoExecutor;
+    private final MaterializacaoProcessor materializacaoProcessor;
     private final ReconciliationProcessor reconciliationProcessor;
     private final CycleWaitStrategy waitStrategy;
     private final TeeFactory teeFactory;
@@ -93,6 +101,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             stateStore,
             historyWriter,
             LoopDaemonRunHandler::executarFluxoCompletoPadrao,
+            criarProcessadorMaterializacaoPadrao(),
             criarProcessadorReconciliacaoPadrao(),
             LoopDaemonRunHandler::aguardarProximoCicloPadrao,
             LoopDaemonRunHandler::iniciarTeeCicloPadrao,
@@ -113,9 +122,36 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                          final long intervaloMinutos,
                          final boolean registrarShutdownHook,
                          final java.util.function.Supplier<Duration> cycleTimeoutProvider) {
+        this(
+            stateStore,
+            historyWriter,
+            fluxoExecutor,
+            () -> null,
+            reconciliationProcessor,
+            waitStrategy,
+            teeFactory,
+            pidSupplier,
+            intervaloMinutos,
+            registrarShutdownHook,
+            cycleTimeoutProvider
+        );
+    }
+
+    LoopDaemonRunHandler(final DaemonStateStore stateStore,
+                         final DaemonHistoryWriter historyWriter,
+                         final FluxoExecutor fluxoExecutor,
+                         final MaterializacaoProcessor materializacaoProcessor,
+                         final ReconciliationProcessor reconciliationProcessor,
+                         final CycleWaitStrategy waitStrategy,
+                         final TeeFactory teeFactory,
+                         final LongSupplier pidSupplier,
+                         final long intervaloMinutos,
+                         final boolean registrarShutdownHook,
+                         final java.util.function.Supplier<Duration> cycleTimeoutProvider) {
         this.stateStore = stateStore;
         this.historyWriter = historyWriter;
         this.fluxoExecutor = fluxoExecutor;
+        this.materializacaoProcessor = materializacaoProcessor;
         this.reconciliationProcessor = reconciliationProcessor;
         this.waitStrategy = waitStrategy;
         this.teeFactory = teeFactory;
@@ -170,10 +206,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             boolean sucesso = true;
             boolean cicloComAlertaIntegridade = false;
             boolean cicloPuladoPorLock = false;
+            FatoMaterializacaoResumo resumoMaterializacao = null;
             String detalhe = "Ciclo concluido com sucesso.";
             try {
                 try (AutoCloseable ignored = teeFactory.abrir(cicloLog)) {
-                    executarFluxoComWatchdog();
+                    resumoMaterializacao = executarPipelineComWatchdog();
                 }
             } catch (final Error e) {
                 throw e;
@@ -214,9 +251,10 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             historyWriter.registerReconciliationHistory(inicio, fimExtracao, sucesso, resumoReconciliacao, cicloLog);
 
             final LocalDateTime fim = LocalDateTime.now();
-            final String detalheCiclo = cicloPuladoPorLock
+            final String detalheCicloBase = cicloPuladoPorLock
                 ? adicionarDetalheReconciliacaoIgnorada(detalhe)
                 : adicionarDetalheReconciliacao(detalhe, resumoReconciliacao);
+            final String detalheCiclo = adicionarDetalheMaterializacao(detalheCicloBase, resumoMaterializacao);
             final CycleSummary resumoCiclo = historyWriter.buildCycleSummary(
                 inicio,
                 fim,
@@ -395,6 +433,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         new FluxoCompletoUseCase().executar(true);
     }
 
+    private static MaterializacaoProcessor criarProcessadorMaterializacaoPadrao() {
+        final FatoMaterializacaoService service = new FatoMaterializacaoService();
+        return service::processarTodasFatos;
+    }
+
     private static ReconciliationProcessor criarProcessadorReconciliacaoPadrao() {
         final LoopReconciliationService service = LoopReconciliationService.criarPadrao(DaemonPaths.RECONCILIACAO_STATE_FILE);
         return service::processarPosCiclo;
@@ -423,16 +466,29 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         return DaemonCycleTee.abrir(cicloLog);
     }
 
-    private void executarFluxoComWatchdog() throws Exception {
+    private FatoMaterializacaoResumo executarPipelineComWatchdog() throws Exception {
         final Duration timeout = resolverTimeoutCiclo();
-        OperationTimeoutGuard.executar(
+        return OperationTimeoutGuard.executar(
             "ciclo_loop_daemon",
             timeout,
             () -> {
                 fluxoExecutor.executar();
-                return null;
+                return materializacaoProcessor == null ? null : materializacaoProcessor.processar();
             }
         );
+    }
+
+    private String adicionarDetalheMaterializacao(final String detalheBase,
+                                                  final FatoMaterializacaoResumo resumoMaterializacao) {
+        if (resumoMaterializacao == null) {
+            return detalheBase;
+        }
+        return (detalheBase == null ? "Sem detalhes." : detalheBase)
+            + " | materializacao_bi[procedures=" + resumoMaterializacao.procedures().size()
+            + ", inseridas=" + resumoMaterializacao.totalLinhasInseridas()
+            + ", atualizadas=" + resumoMaterializacao.totalLinhasAtualizadas()
+            + ", duracao_ms=" + resumoMaterializacao.duracao().toMillis()
+            + "]";
     }
 
     private Duration resolverTimeoutCiclo() {

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
+import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoResumo;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService;
 import br.com.extrator.comandos.cli.extracao.reconciliacao.LoopReconciliationService.ReconciliationSummary;
 
@@ -54,6 +56,40 @@ class LoopDaemonRunHandlerTest {
         assertFalse(Files.exists(stateStore.getStopFile()), "Stop file deve ser limpo ao finalizar");
         assertFalse(Files.exists(stateStore.getForceRunFile()), "Force run file deve ser limpo ao finalizar");
         assertEquals("STOPPED", stateStore.loadState().getProperty("status"), "Estado final deve ser STOPPED");
+    }
+
+    @Test
+    void deveMaterializarFatosBiDepoisDeFluxoBemSucedido() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final AtomicInteger fluxosExecutados = new AtomicInteger();
+        final AtomicInteger materializacoes = new AtomicInteger();
+
+        final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+            stateStore,
+            historyWriter,
+            () -> fluxosExecutados.incrementAndGet(),
+            () -> {
+                materializacoes.incrementAndGet();
+                return new FatoMaterializacaoResumo(List.of(), Duration.ofMillis(15));
+            },
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+            (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
+            cicloLog -> () -> { },
+            () -> 24680L,
+            30L,
+            false,
+            () -> java.time.Duration.ofSeconds(30)
+        );
+
+        handler.executar();
+
+        final Path logCiclo = localizarPrimeiroLogCiclo(tempDir.resolve("daemon").resolve("ciclos"));
+        final String conteudo = Files.readString(logCiclo, StandardCharsets.UTF_8);
+
+        assertEquals(1, fluxosExecutados.get());
+        assertEquals(1, materializacoes.get());
+        assertTrue(conteudo.contains("materializacao_bi"), "Resumo do ciclo deve registrar materializacao BI");
     }
 
     @Test

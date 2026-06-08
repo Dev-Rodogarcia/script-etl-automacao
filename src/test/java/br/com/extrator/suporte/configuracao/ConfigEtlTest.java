@@ -5,10 +5,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.Duration;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 class ConfigEtlTest {
+
+    @Test
+    void deveMapearTargetsDeMaterializacaoBiParaQuatroProcedures() {
+        final String chaveTargets = "etl.bi.procedures.target";
+        final String chaveProceduresLegada = "etl.materializacao.fatos_bi.procedures";
+        final String targetsAnterior = System.getProperty(chaveTargets);
+        final String proceduresAnterior = System.getProperty(chaveProceduresLegada);
+        try {
+            System.setProperty(
+                chaveTargets,
+                "fato_fretes_faturamento,fato_gestao_vista_faturas,fato_gestao_vista_fretes,fato_gestao_vista_coletores"
+            );
+            System.clearProperty(chaveProceduresLegada);
+
+            assertEquals(
+                List.of(
+                    "dbo.sp_carga_fato_fretes_faturamento",
+                    "dbo.sp_carga_fato_gestao_vista_faturas",
+                    "dbo.sp_carga_fato_gestao_vista_fretes",
+                    "dbo.sp_carga_fato_gestao_vista_coletores"
+                ),
+                ConfigEtl.obterMaterializacaoFatosBiProcedures()
+            );
+        } finally {
+            restaurarPropriedade(chaveTargets, targetsAnterior);
+            restaurarPropriedade(chaveProceduresLegada, proceduresAnterior);
+        }
+    }
+
+    @Test
+    void devePermitirOverrideLegadoDeProceduresQuandoTargetNaoFoiSobrescritoExternamente() {
+        final String chaveTargets = "etl.bi.procedures.target";
+        final String chaveProceduresLegada = "etl.materializacao.fatos_bi.procedures";
+        final String targetsAnterior = System.getProperty(chaveTargets);
+        final String proceduresAnterior = System.getProperty(chaveProceduresLegada);
+        try {
+            System.clearProperty(chaveTargets);
+            System.setProperty(
+                chaveProceduresLegada,
+                "dbo.sp_carga_fato_fretes_faturamento,dbo.sp_carga_fato_gestao_vista_faturas"
+            );
+
+            assertEquals(
+                List.of(
+                    "dbo.sp_carga_fato_fretes_faturamento",
+                    "dbo.sp_carga_fato_gestao_vista_faturas"
+                ),
+                ConfigEtl.obterMaterializacaoFatosBiProcedures()
+            );
+        } finally {
+            restaurarPropriedade(chaveTargets, targetsAnterior);
+            restaurarPropriedade(chaveProceduresLegada, proceduresAnterior);
+        }
+    }
 
     @Test
     void deveUsarPadraoMaiorParaTimeoutReferencialDeColetas() {

@@ -14,7 +14,7 @@ Materializar uma fato granular de fretes elegiveis ou inelegiveis para faturamen
 ## Carga e orquestracao
 
 - Procedure de carga: `dbo.sp_carga_fato_fretes_faturamento`.
-- Orquestracao intradia: incluida no conjunto padrao do `FatoMaterializacaoScheduler`, iniciado em processo paralelo pelo `00-PRODUCAO_START.bat` no loop de producao e executado a cada 60 minutos por padrao.
+- Orquestracao intradia: incluida em `etl.bi.procedures.target` e executada pelo proprio `--loop-daemon-run` apos cada ciclo de extracao bem-sucedido.
 - Orquestracao complementar: tambem pode ser chamada pelo `MATERIALIZAR_FATOS_BI_POST_RUN`, por `database/executar_database.bat` e pela janela noturna resiliente de `10-expurgo-orfaos-noturno.ps1`.
 
 ## De/Para JSON API -> SQL

@@ -75,7 +75,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  --materializar-fatos-bi");
         System.out.println("                        Executa uma carga das fatos BI financeiras");
         System.out.println("  --materializar-fatos-bi-scheduler");
-        System.out.println("                        Mantem materializacao intradia em processo independente");
+        System.out.println("                        Legado: scheduler isolado; loop daemon ja materializa intradia");
         System.out.println("  --auth-bootstrap      Cria o primeiro usuario ADMIN");
         System.out.println("  --auth-check ACAO     Solicita autenticacao para acao sensivel");
         System.out.println("  --auth-create-user    Cria usuario (requer ADMIN)");

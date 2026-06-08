@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -36,7 +37,21 @@ public final class ConfigEtl {
     private static final String FRETES_LOOKBACK_MODO_INTERVALO = "intervalo";
     private static final List<String> MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO = List.of(
         "dbo.sp_carga_fato_fretes_faturamento",
-        "dbo.sp_carga_fato_gestao_vista_faturas"
+        "dbo.sp_carga_fato_gestao_vista_faturas",
+        "dbo.sp_carga_fato_gestao_vista_fretes",
+        "dbo.sp_carga_fato_gestao_vista_coletores"
+    );
+    private static final List<String> MATERIALIZACAO_FATOS_BI_TARGETS_PADRAO = List.of(
+        "fato_fretes_faturamento",
+        "fato_gestao_vista_faturas",
+        "fato_gestao_vista_fretes",
+        "fato_gestao_vista_coletores"
+    );
+    private static final Map<String, String> MATERIALIZACAO_FATOS_BI_TARGET_TO_PROCEDURE = Map.of(
+        "fato_fretes_faturamento", "dbo.sp_carga_fato_fretes_faturamento",
+        "fato_gestao_vista_faturas", "dbo.sp_carga_fato_gestao_vista_faturas",
+        "fato_gestao_vista_fretes", "dbo.sp_carga_fato_gestao_vista_fretes",
+        "fato_gestao_vista_coletores", "dbo.sp_carga_fato_gestao_vista_coletores"
     );
     private static final Set<String> MATERIALIZACAO_FATOS_BI_PROCEDURES_PERMITIDAS = Set.of(
         "dbo.sp_carga_fato_fretes_faturamento",
@@ -49,10 +64,33 @@ public final class ConfigEtl {
     }
 
     public static List<String> obterMaterializacaoFatosBiProcedures() {
-        final String valor = ConfigSource.obterConfiguracao(
+        final String targetsOverride = ConfigSource.obterConfiguracaoExterna(
+            "ETL_BI_PROCEDURES_TARGET",
+            "etl.bi.procedures.target"
+        );
+        if (targetsOverride != null && !targetsOverride.isBlank()) {
+            return resolverProceduresPorTargetsMaterializacao(targetsOverride);
+        }
+
+        final String proceduresOverride = ConfigSource.obterConfiguracaoExterna(
             "ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES",
             "etl.materializacao.fatos_bi.procedures"
         );
+        if (proceduresOverride != null && !proceduresOverride.isBlank()) {
+            return resolverProceduresMaterializacao(proceduresOverride);
+        }
+
+        final String targets = ConfigSource.obterPropriedade("etl.bi.procedures.target");
+        if (targets != null && !targets.isBlank()) {
+            return resolverProceduresPorTargetsMaterializacao(targets);
+        }
+
+        return resolverProceduresMaterializacao(
+            ConfigSource.obterPropriedade("etl.materializacao.fatos_bi.procedures")
+        );
+    }
+
+    private static List<String> resolverProceduresMaterializacao(final String valor) {
         if (valor == null || valor.isBlank()) {
             return MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO;
         }
@@ -75,8 +113,36 @@ public final class ConfigEtl {
 
         if (procedures.isEmpty()) {
             logger.warn(
-                "Nenhuma procedure valida configurada em ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES. Usando padrao: {}",
+                "Nenhuma procedure valida configurada para materializacao BI. Usando padrao: {}",
                 MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO
+            );
+            return MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO;
+        }
+        return List.copyOf(procedures);
+    }
+
+    private static List<String> resolverProceduresPorTargetsMaterializacao(final String valor) {
+        final List<String> procedures = new ArrayList<>();
+        for (final String item : valor.split(",")) {
+            final String target = normalizarTargetMaterializacao(item);
+            if (target == null) {
+                continue;
+            }
+            final String procedure = MATERIALIZACAO_FATOS_BI_TARGET_TO_PROCEDURE.get(target);
+            if (procedure == null) {
+                logger.warn(
+                    "Target de materializacao '{}' nao permitido. Valor ignorado.",
+                    item == null ? "" : item.trim()
+                );
+                continue;
+            }
+            procedures.add(procedure);
+        }
+
+        if (procedures.isEmpty()) {
+            logger.warn(
+                "Nenhum target valido configurado em ETL_BI_PROCEDURES_TARGET. Usando padrao: {}",
+                MATERIALIZACAO_FATOS_BI_TARGETS_PADRAO
             );
             return MATERIALIZACAO_FATOS_BI_PROCEDURES_PADRAO;
         }
@@ -135,6 +201,20 @@ public final class ConfigEtl {
             .replace("[", "")
             .replace("]", "")
             .toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizarTargetMaterializacao(final String valor) {
+        if (valor == null || valor.isBlank()) {
+            return null;
+        }
+        final String normalizado = valor.trim()
+            .replace("[", "")
+            .replace("]", "")
+            .toLowerCase(Locale.ROOT);
+        final int ultimoSeparadorSchema = normalizado.lastIndexOf('.');
+        return ultimoSeparadorSchema >= 0
+            ? normalizado.substring(ultimoSeparadorSchema + 1)
+            : normalizado;
     }
 
     public static long obterDelayEntreExtracoes() {

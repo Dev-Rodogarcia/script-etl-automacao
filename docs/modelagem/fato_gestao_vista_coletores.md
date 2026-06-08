@@ -13,7 +13,7 @@ Materializar utilizacao de coletores por data, filial e classificacao com base e
 ## Carga e orquestracao
 
 - Procedure de carga: `dbo.sp_carga_fato_gestao_vista_coletores`.
-- Orquestracao intradia: procedure permitida no `FatoMaterializacaoScheduler` via `ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES`; quando configurada, roda em processo paralelo a cada 60 minutos por padrao.
+- Orquestracao intradia: incluida em `etl.bi.procedures.target` e executada pelo proprio `--loop-daemon-run` apos cada ciclo de extracao bem-sucedido.
 - Orquestracao complementar: chamada pelo `MATERIALIZAR_FATOS_BI_POST_RUN`, por `database/executar_database.bat` e pela janela noturna resiliente de `10-expurgo-orfaos-noturno.ps1`.
 
 ## De/Para JSON API -> SQL

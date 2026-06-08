@@ -146,6 +146,30 @@ final class ConfigSource {
         return obterConfiguracao(new String[] { nomeVariavelAmbiente }, nomeChaveProperties);
     }
 
+    static String obterConfiguracaoExterna(final String nomeVariavelAmbiente, final String nomeChaveProperties) {
+        return obterConfiguracaoExterna(new String[] { nomeVariavelAmbiente }, nomeChaveProperties);
+    }
+
+    static String obterConfiguracaoExterna(final String[] nomesVariaveisAmbiente, final String nomeChaveProperties) {
+        final String valorSystemPropertyAmbiente = obterConfiguracaoSystemProperty(nomesVariaveisAmbiente, false);
+        if (valorSystemPropertyAmbiente != null) {
+            return valorSystemPropertyAmbiente;
+        }
+
+        final String valorPropertyKey = System.getProperty(nomeChaveProperties);
+        if (valorPropertyKey != null && !valorPropertyKey.trim().isEmpty()) {
+            logger.debug("Configuracao '{}' obtida da system property com chave de propriedade", nomeChaveProperties);
+            return valorPropertyKey;
+        }
+
+        final String valorDotEnv = obterConfiguracaoDotEnv(nomesVariaveisAmbiente, false);
+        if (valorDotEnv != null) {
+            return valorDotEnv;
+        }
+
+        return obterConfiguracaoVariavelAmbiente(nomesVariaveisAmbiente, false);
+    }
+
     static String obterConfiguracao(final String[] nomesVariaveisAmbiente, final String nomeChaveProperties) {
         final String valorSystemPropertyAmbiente = obterConfiguracaoSystemProperty(nomesVariaveisAmbiente, false);
         if (valorSystemPropertyAmbiente != null) {
