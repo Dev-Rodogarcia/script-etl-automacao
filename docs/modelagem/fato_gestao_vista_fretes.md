@@ -10,6 +10,12 @@ Materializar indicadores de Gestao a Vista de fretes para entrega no prazo (`PE`
 - Chave unica: `UX_fato_gv_fretes_indicador_minuta (indicador_codigo, numero_minuta, data_referencia)`.
 - Deduplicacao: a procedure `dbo.sp_carga_fato_gestao_vista_fretes` usa `MERGE` idempotente com `hash_linha`; registros ausentes podem ser marcados com `excluido_na_origem`.
 
+## Carga e orquestracao
+
+- Procedure de carga: `dbo.sp_carga_fato_gestao_vista_fretes`.
+- Orquestracao intradia: procedure permitida no `FatoMaterializacaoScheduler` via `ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES`; quando configurada, roda em processo paralelo a cada 60 minutos por padrao.
+- Orquestracao complementar: chamada pelo `MATERIALIZAR_FATOS_BI_POST_RUN`, por `database/executar_database.bat` e pela janela noturna resiliente de `10-expurgo-orfaos-noturno.ps1`.
+
 ## De/Para JSON API -> SQL
 
 Esta fato e derivada de `dbo.fretes` e `dbo.localizacao_cargas`.

@@ -11,6 +11,12 @@ Materializar uma fato granular de fretes elegiveis ou inelegiveis para faturamen
 - Chave auxiliar: indices por `frete_id`, data, filial e status.
 - Deduplicacao: `dbo.sp_carga_fato_fretes_faturamento` rankeia faturas por `chave_cte`, pega a melhor evidencia fiscal e faz `MERGE` por frete/data com `hash_linha`.
 
+## Carga e orquestracao
+
+- Procedure de carga: `dbo.sp_carga_fato_fretes_faturamento`.
+- Orquestracao intradia: incluida no conjunto padrao do `FatoMaterializacaoScheduler`, iniciado em processo paralelo pelo `00-PRODUCAO_START.bat` no loop de producao e executado a cada 60 minutos por padrao.
+- Orquestracao complementar: tambem pode ser chamada pelo `MATERIALIZAR_FATOS_BI_POST_RUN`, por `database/executar_database.bat` e pela janela noturna resiliente de `10-expurgo-orfaos-noturno.ps1`.
+
 ## De/Para JSON API -> SQL
 
 Esta fato e derivada de `dbo.fretes`, `dbo.localizacao_cargas` e `dbo.faturas_por_cliente`.

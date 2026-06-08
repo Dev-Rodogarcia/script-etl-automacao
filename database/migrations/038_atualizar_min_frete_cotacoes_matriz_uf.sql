@@ -1,7 +1,4 @@
--- ============================================
--- Script FINAL da view 'vw_cotacoes_powerbi'
--- Status: CORRIGIDO (Inclui colunas novas + Hora Solicitacao)
--- ============================================
+PRINT 'Migration 038: atualizar Min. Frete/KG de cotacoes por matriz UF x UF';
 GO
 
 CREATE OR ALTER VIEW dbo.vw_cotacoes_powerbi AS
@@ -11,10 +8,10 @@ SELECT
     -- =============================================
     sequence_code                                   AS [N° Cotação],
     requested_at                                    AS [Data Cotação],
-    
+
     -- !!! CORREÇÃO DO ERRO DO POWER BI !!!
     -- Adicionada a coluna de Hora para evitar quebra no ETL
-    CAST(requested_at AS TIME(0))                   AS [Hora (Solicitacao)], 
+    CAST(requested_at AS TIME(0))                   AS [Hora (Solicitacao)],
 
     data_extracao                                   AS [Data de extracao],
 
@@ -62,7 +59,7 @@ SELECT
     taxed_weight                                    AS [Peso taxado],
     invoices_value                                  AS [Valor NF],
     total_value                                     AS [Valor frete],
-    
+
     -- KPI: Min. Frete/KG (Matriz fixa por UF Origem x UF Destino)
     CASE
         WHEN origin_state = 'SP' AND destination_state = 'SP' THEN 0.66
@@ -114,19 +111,19 @@ SELECT
         ELSE 'Pendente'
     END                                             AS [Status_Sistema],    -- Nova
 
-    CASE 
-        WHEN cte_issued_at IS NOT NULL THEN 'Emitido' 
-        ELSE 'Pendente' 
+    CASE
+        WHEN cte_issued_at IS NOT NULL THEN 'Emitido'
+        ELSE 'Pendente'
     END                                             AS [Status_Sistema_CTe], -- Nova
 
-    CASE 
-        WHEN nfse_issued_at IS NOT NULL THEN 'Emitida' 
-        ELSE 'Pendente' 
+    CASE
+        WHEN nfse_issued_at IS NOT NULL THEN 'Emitida'
+        ELSE 'Pendente'
     END                                             AS [Status_Sistema_NFSe], -- Nova
 
-    CASE 
-        WHEN cte_issued_at IS NOT NULL THEN 'Sim' 
-        ELSE 'Não' 
+    CASE
+        WHEN cte_issued_at IS NOT NULL THEN 'Sim'
+        ELSE 'Não'
     END                                             AS [Refino_CTe],        -- Nova
 
     -- =============================================
@@ -155,5 +152,16 @@ FROM dbo.cotacoes
 WHERE COALESCE(excluido_na_origem, 0) = 0;
 GO
 
-PRINT 'View vw_cotacoes_powerbi atualizada com sucesso (Incluindo Hora Solicitacao).';
+IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE migration_id = N'038_atualizar_min_frete_cotacoes_matriz_uf')
+BEGIN
+    INSERT INTO dbo.schema_migrations (migration_id, notes)
+    VALUES (
+        N'038_atualizar_min_frete_cotacoes_matriz_uf',
+        N'Atualiza dbo.vw_cotacoes_powerbi para calcular Min. Frete/KG por matriz fixa de UF origem x UF destino.'
+    );
+END;
+GO
+
+PRINT 'View vw_cotacoes_powerbi atualizada com matriz UF x UF para Min. Frete/KG.';
 GO

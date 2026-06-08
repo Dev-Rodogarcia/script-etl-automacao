@@ -21,3 +21,19 @@ Arquivos:
 - `fato_gestao_vista_faturas.md`
 
 As colunas `metadata`, `data_extracao` e `excluido_na_origem` sao padroes tecnicos: `metadata` guarda o payload completo ou propriedades nao promovidas, `data_extracao` registra a materializacao local, e `excluido_na_origem` preserva historico para expurgo logico.
+
+## Topologia operacional dos fatos BI
+
+A materializacao das tabelas fato analiticas deixou de depender exclusivamente da janela noturna. O modo de loop de producao (`scripts/windows/00-PRODUCAO_START.bat`, opcao 02) inicia um processo Java paralelo com o comando `--materializar-fatos-bi-scheduler`, implementado por `FatoMaterializacaoScheduler`.
+
+Esse scheduler executa as procedures configuradas a cada 60 minutos por padrao (`etl.materializacao.fatos_bi.intervalo_minutos=60`), com lista controlada por `ETL_MATERIALIZACAO_FATOS_BI_PROCEDURES` / `etl.materializacao.fatos_bi.procedures`. A lista padrao atual cobre `dbo.sp_carga_fato_fretes_faturamento` e `dbo.sp_carga_fato_gestao_vista_faturas`; a lista permitida tambem inclui `dbo.sp_carga_fato_gestao_vista_fretes` e `dbo.sp_carga_fato_gestao_vista_coletores`.
+
+O script `scripts/windows/10-expurgo-orfaos-noturno.ps1` continua executando a reconciliacao noturna e dispara as cargas materializadas do BI ao final. A falha do expurgo logico, entretanto, nao bloqueia mais essa chamada: o script registra evento/marcador de falha do expurgo e segue para `Invoke-MaterializacaoFatosBi`. Sustentacao deve tratar falhas de expurgo e falhas de materializacao como incidentes separados.
+
+Execucoes pontuais pelo menu de producao ainda podem chamar `MATERIALIZAR_FATOS_BI_POST_RUN` apos extracoes bem-sucedidas. Portanto, a topologia vigente tem tres pontos de carga: scheduler intradia independente, pos-run operacional e janela noturna resiliente.
+
+## Contrato temporal
+
+- Fatos BI usam `snapshot_em` gerado nas stored procedures com `SYSUTCDATETIME()`. Ao expor snapshots analiticos no Dashboard, `TemporalJsonUtils` sela o timestamp em UTC e garante sufixo `Z`.
+- Logs de auditoria operacional do ETL (`log_extracoes.timestamp_inicio`, `log_extracoes.timestamp_fim`, `data_extracao` das tabelas base e mensagens de scripts) permanecem em Local Time da JVM/SQL Server local, normalmente como `DATETIME2` sem offset.
+- Nao compare diretamente timestamps analiticos UTC com auditoria local sem converter explicitamente a zona. Para filtros de periodo no Dashboard, a janela de negocio usa `America/Sao_Paulo` antes de consultar campos `DATETIMEOFFSET`.

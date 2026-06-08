@@ -10,6 +10,12 @@ Materializar visao de Gestao a Vista de faturas por cliente, com status de proce
 - Chave unica: `UX_fato_gvf_unique_id_data (unique_id, data_emissao_fatura)`.
 - Deduplicacao: a origem `faturas_por_cliente` ja chega deduplicada por `unique_id`; a procedure aplica normalizacao, status e `MERGE` idempotente com `hash_linha`.
 
+## Carga e orquestracao
+
+- Procedure de carga: `dbo.sp_carga_fato_gestao_vista_faturas`.
+- Orquestracao intradia: incluida no conjunto padrao do `FatoMaterializacaoScheduler`, iniciado em processo paralelo pelo `00-PRODUCAO_START.bat` no loop de producao e executado a cada 60 minutos por padrao.
+- Orquestracao complementar: tambem pode ser chamada pelo `MATERIALIZAR_FATOS_BI_POST_RUN`, por `database/executar_database.bat` e pela janela noturna resiliente de `10-expurgo-orfaos-noturno.ps1`.
+
 ## De/Para JSON API -> SQL
 
 Esta fato e derivada de `dbo.faturas_por_cliente`.

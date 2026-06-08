@@ -10,6 +10,20 @@ Registrar cotacoes Data Export para analise comercial, conversao em fretes e aco
 - Chave primaria: `sequence_code`.
 - Deduplicacao: `sequence_code` e a chave de negocio; quando a API retorna duplicatas, o deduplicador mantem a versao mais recente por `requested_at`.
 
+## AVISO OPERACIONAL - `vw_cotacoes_powerbi`
+
+> A coluna `[Min. Frete/KG]` da view `dbo.vw_cotacoes_powerbi` NAO e calculada por divisao de `Valor frete / Peso taxado`. Desde a migration `database/migrations/038_atualizar_min_frete_cotacoes_matriz_uf.sql`, ela usa uma matriz tarifaria hardcoded por UF origem x UF destino.
+
+O contrato esta materializado no arquivo base `database/views/015_criar_view_cotacoes_powerbi.sql`. Qualquer alteracao de tarifa, UF coberta ou regra de fallback deve ser feita na migration apropriada e refletida nesse arquivo base para manter paridade de recriacao do schema.
+
+Matriz atual: combinacoes explicitas entre `SP`, `RJ`, `PR`, `RS` e `PE`, incluindo rotas como `SP-SP`, `SP-RJ`, `PR-RJ`, `RS-PE` e `PE-RS`; rotas nao mapeadas retornam `0.00`.
+
+## Contrato de filtros do Dashboard
+
+A view publica `[Origem]` e `[Destino]` no formato `Cidade - UF`, alem de `[UF Origem]` e `[UF Destino]`. O `DashboardExportSqlBuilder` usa filtro inteligente para cotacoes: termos de duas letras sao tratados como UF e aplicados sobre `[Origem]`/`[Destino]` com padrao `LIKE '% - UF'`; termos com tres ou mais caracteres usam busca textual sobre cidade/UF/trecho.
+
+Preserve o sufixo ` - UF` em `[Origem]` e `[Destino]`. A remocao ou mudanca desse formato quebra filtros por UF nas tabelas/exportacoes de cotacoes.
+
 ## De/Para JSON API -> SQL
 
 | JSON API | Coluna SQL |

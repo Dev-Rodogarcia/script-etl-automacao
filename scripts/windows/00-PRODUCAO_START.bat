@@ -350,6 +350,8 @@ goto :MENU
 :RUN_05
 call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
+call :START_MATERIALIZACAO_BI_SCHEDULER
+if errorlevel 1 goto :MENU
 call :RUN_SCRIPT "05-loop_extracao_30min.bat"
 goto :MENU
 
@@ -675,6 +677,20 @@ exit /b %ERRORLEVEL%
 if not exist "%REPO_ROOT%\runtime" mkdir "%REPO_ROOT%\runtime" >nul 2>&1
 > "%DB_STARTUP_MARKER%" echo prepared_at=%DATE% %TIME%
 exit /b 0
+
+:START_MATERIALIZACAO_BI_SCHEDULER
+set "MATERIALIZACAO_BI_FLAG=--materializar-fatos-bi-scheduler"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$flag=$env:MATERIALIZACAO_BI_FLAG; $jar=($env:JAR_PATH).ToLowerInvariant(); $processo=Get-CimInstance Win32_Process -Filter \"Name='java.exe' OR Name='javaw.exe'\" | Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($flag) -and $_.CommandLine.ToLowerInvariant().Contains($jar) } | Select-Object -First 1; if ($processo) { exit 0 }; exit 1" >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo [OK] Scheduler de materializacao BI ja esta ativo.
+    exit /b 0
+)
+echo.
+echo Iniciando scheduler de materializacao BI em processo paralelo...
+echo Executando: start "Materializacao BI" java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" %MATERIALIZACAO_BI_FLAG%
+start "Materializacao BI" java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" %MATERIALIZACAO_BI_FLAG%
+exit /b %ERRORLEVEL%
 
 :check_sqlite_auth_db
 if defined EXTRATOR_SECURITY_DB_PATH (

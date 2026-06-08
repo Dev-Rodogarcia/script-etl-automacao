@@ -196,6 +196,7 @@ for %%F in (
     "migrations\034_adicionar_hash_linha_usuarios.sql"
     "migrations\035_drop_views_legadas_powerbi.sql"
     "migrations\037_adicionar_status_fatura.sql"
+    "migrations\038_atualizar_min_frete_cotacoes_matriz_uf.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
