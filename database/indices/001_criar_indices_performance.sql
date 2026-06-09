@@ -262,6 +262,52 @@ END
 ELSE
     PRINT '    Indice IX_fretes_performance_previsao_key ja existe ou coluna filial_nome_key ausente';
 
+-- Indice de cobertura para deduplicacao por minuta no Dashboard de Performance
+IF COL_LENGTH('dbo.fretes', 'corporation_sequence_number') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'filial_nome_key') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'data_previsao_entrega') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'finished_at') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'fit_dpn_performance_finished_at') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'pagador_nome') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'filial_nome') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'destino_cidade') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'destino_uf') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'status') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'taxed_weight') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'valor_notas') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'data_extracao') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'IX_fretes_performance_minuta_cobertura'
+         AND object_id = OBJECT_ID('dbo.fretes')
+   )
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_performance_minuta_cobertura
+    ON dbo.fretes(corporation_sequence_number)
+    INCLUDE (
+        data_previsao_entrega,
+        finished_at,
+        fit_dpn_performance_finished_at,
+        pagador_nome,
+        filial_nome,
+        filial_nome_key,
+        destino_cidade,
+        destino_uf,
+        status,
+        taxed_weight,
+        valor_notas,
+        data_extracao,
+        excluido_na_origem
+    )
+    WITH (DATA_COMPRESSION = PAGE);
+
+    PRINT '  Indice IX_fretes_performance_minuta_cobertura criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_performance_minuta_cobertura ja existe ou colunas obrigatorias ausentes';
+
 -- ============================================================================
 -- LOCALIZACAO DE CARGAS - Indices para otimizar queries
 -- ============================================================================

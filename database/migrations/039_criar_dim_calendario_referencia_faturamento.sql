@@ -312,13 +312,20 @@ BEGIN
         PRINT 'Coluna dbo.fato_fretes_faturamento.is_data_faturamento_retroagida adicionada.';
     END;
 
-    UPDATE dbo.fato_fretes_faturamento
-       SET data_referencia_faturamento_real = COALESCE(data_referencia_faturamento_real, data_referencia_faturamento),
-           data_referencia_faturamento_real_date = COALESCE(data_referencia_faturamento_real_date, data_referencia_faturamento_date),
-           data_referencia_faturamento_real_yyyymm = COALESCE(data_referencia_faturamento_real_yyyymm, data_referencia_faturamento_yyyymm)
-    WHERE data_referencia_faturamento_real IS NULL
-       OR data_referencia_faturamento_real_date IS NULL
-       OR data_referencia_faturamento_real_yyyymm IS NULL;
+    -- As colunas podem ter sido adicionadas neste mesmo batch. SQL dinamico
+    -- adia a compilacao do UPDATE ate o catalogo refletir os ALTER TABLE.
+    EXEC sys.sp_executesql N'
+        UPDATE dbo.fato_fretes_faturamento
+           SET data_referencia_faturamento_real =
+                   COALESCE(data_referencia_faturamento_real, data_referencia_faturamento),
+               data_referencia_faturamento_real_date =
+                   COALESCE(data_referencia_faturamento_real_date, data_referencia_faturamento_date),
+               data_referencia_faturamento_real_yyyymm =
+                   COALESCE(data_referencia_faturamento_real_yyyymm, data_referencia_faturamento_yyyymm)
+         WHERE data_referencia_faturamento_real IS NULL
+            OR data_referencia_faturamento_real_date IS NULL
+            OR data_referencia_faturamento_real_yyyymm IS NULL;
+    ';
 
     IF EXISTS (
         SELECT 1

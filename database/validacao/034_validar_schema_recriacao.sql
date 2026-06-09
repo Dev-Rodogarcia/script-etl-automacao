@@ -110,7 +110,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'035_drop_views_legadas_powerbi'),
     (N'037_adicionar_status_fatura'),
     (N'038_atualizar_min_frete_cotacoes_matriz_uf'),
-    (N'039_criar_dim_calendario_referencia_faturamento');
+    (N'039_criar_dim_calendario_referencia_faturamento'),
+    (N'040_criar_indice_performance_fretes');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -135,6 +136,28 @@ IF COL_LENGTH(N'dbo.fretes', N'fit_dpn_performance_finished_at') IS NULL
 
 IF COL_LENGTH(N'dbo.fretes', N'corporation_sequence_number') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.corporation_sequence_number', N'Coluna da migration 006 ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes i
+    INNER JOIN sys.index_columns ic
+        ON ic.object_id = i.object_id
+       AND ic.index_id = i.index_id
+       AND ic.key_ordinal = 1
+    INNER JOIN sys.columns c
+        ON c.object_id = ic.object_id
+       AND c.column_id = ic.column_id
+    WHERE i.name = N'IX_fretes_performance_minuta_cobertura'
+      AND i.object_id = OBJECT_ID(N'dbo.fretes')
+      AND i.type_desc = N'NONCLUSTERED'
+      AND i.is_disabled = 0
+      AND c.name = N'corporation_sequence_number'
+)
+    INSERT INTO @falhas VALUES (
+        N'INDICE',
+        N'IX_fretes_performance_minuta_cobertura',
+        N'Indice de cobertura por minuta do Dashboard de Performance ausente ou fora do contrato'
+    );
 
 IF COL_LENGTH(N'dbo.log_extracoes', N'noop_count') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.log_extracoes.noop_count', N'Coluna da migration 023 ausente');

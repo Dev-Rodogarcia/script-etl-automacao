@@ -104,13 +104,15 @@ class IndicadoresGestaoViewSqlTest {
     @Test
     void migrationComprovanteDeveMaterializarFlagNoInventario() throws IOException {
         final String sql = lerSql("database/migrations/021_materializar_comprovante_inventario.sql");
+        final String viewSql = lerSql("database/views/012_criar_view_fretes_powerbi.sql");
 
         assertContem(sql, "ADD flag_comprovante_anexado BIT NOT NULL");
         assertContem(sql, "UPDATE dbo.inventario");
         assertContem(sql, "COLLATE Latin1_General_CI_AI LIKE N'%Comprovante%Entrega%Anexado%'");
         assertContem(sql, "WHERE flag_comprovante_anexado = 1");
-        assertContem(sql, "inv.flag_comprovante_anexado = 1");
-        assertFalse(sql.contains("inv.ultima_ocorrencia_descricao COLLATE Latin1_General_CI_AI LIKE"));
+        assertFalse(sql.contains("CREATE OR ALTER VIEW dbo.vw_fretes_powerbi"));
+        assertContem(viewSql, "inv.flag_comprovante_anexado = 1");
+        assertFalse(viewSql.contains("inv.ultima_ocorrencia_descricao COLLATE Latin1_General_CI_AI LIKE"));
         assertSemMojibake(sql, "database/migrations/021_materializar_comprovante_inventario.sql");
     }
 
@@ -155,6 +157,8 @@ class IndicadoresGestaoViewSqlTest {
     void executorDatabaseDeveAplicarMigrationsRecentesDoContratoDeFretes() throws IOException {
         final String sql = lerSql("database/executar_database.bat");
         final String validacao = lerSql("database/validacao/034_validar_schema_recriacao.sql");
+        final String validacaoPerformance =
+                lerSql("database/validacao/042_validar_contrato_dashboard_performance.sql");
 
         assertContem(sql, "migrations\\016_materializar_faturamento_fretes.sql");
         assertContem(sql, "migrations\\017_localizacao_cargas_dashboard_operacional.sql");
@@ -172,6 +176,10 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "procedures\\004_criar_sp_carga_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\041_validar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
+        assertContem(sql, "validacao\\042_validar_contrato_dashboard_performance.sql");
+        assertContem(sql, "Contrato critico da view de fretes nao foi publicado");
+        assertContem(validacaoPerformance, "Responsável Região Destino Key");
+        assertContem(validacaoPerformance, "THROW 53002");
         assertContem(validacao, "019_adicionar_comprovante_fretes_performance");
         assertContem(validacao, "021_materializar_comprovante_inventario");
         assertContem(validacao, "022_corrigir_volumes_fretes_faturamento");
@@ -205,6 +213,7 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(tabelaCalendarioSql, "N'Confraternizacao Universal'");
         assertContem(tabelaCalendarioSql, "N'Sexta-feira Santa'");
         assertContem(migrationSql, "039_criar_dim_calendario_referencia_faturamento");
+        assertContem(migrationSql, "EXEC sys.sp_executesql");
         assertContem(tabelaFatoSql, "data_referencia_faturamento_real DATETIMEOFFSET NULL");
         assertContem(tabelaFatoSql, "is_data_faturamento_retroagida BIT NOT NULL");
         assertContem(procedureSql, "INNER JOIN dbo.dim_calendario AS cal");
@@ -215,6 +224,18 @@ class IndicadoresGestaoViewSqlTest {
         assertSemMojibake(tabelaCalendarioSql, "database/tabelas/008_criar_tabela_dim_calendario.sql");
         assertSemMojibake(migrationSql, "database/migrations/039_criar_dim_calendario_referencia_faturamento.sql");
         assertSemMojibake(procedureSql, "database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql");
+    }
+
+    @Test
+    void expurgoNoturnoDeveMaterializarFatosSemReexecutarInstaladorDoBanco() throws IOException {
+        final String script = lerSql("scripts/windows/10-expurgo-orfaos-noturno.ps1");
+
+        assertFalse(script.contains("database\\executar_database.bat"));
+        assertContem(script, "Responsável Região Destino Key");
+        assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_fretes;");
+        assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_coletores;");
+        assertContem(script, "EXEC dbo.sp_carga_fato_fretes_faturamento;");
+        assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_faturas;");
     }
 
     @Test

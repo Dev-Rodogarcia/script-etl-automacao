@@ -198,6 +198,7 @@ for %%F in (
     "migrations\037_adicionar_status_fatura.sql"
     "migrations\038_atualizar_min_frete_cotacoes_matriz_uf.sql"
     "migrations\039_criar_dim_calendario_referencia_faturamento.sql"
+    "migrations\040_criar_indice_performance_fretes.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -257,6 +258,18 @@ for %%F in (
     )
 )
 echo [OK] Views concluidas.
+echo.
+
+REM --- Contrato critico consumido pelo Dashboard (para em erro) ---
+echo [ETAPA] Validando contrato critico da view de fretes...
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "validacao\042_validar_contrato_dashboard_performance.sql" -b
+if errorlevel 1 (
+    echo [ERRO] Contrato critico da view de fretes nao foi publicado.
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
+echo [OK] Contrato critico da view de fretes validado.
 echo.
 
 REM --- Stored Procedures (criticas - para em erro) ---
@@ -333,6 +346,7 @@ for %%F in (
     "validacao\039_validar_fato_gestao_vista_coletores.sql"
     "validacao\040_validar_fato_fretes_faturamento.sql"
     "validacao\041_validar_fato_gestao_vista_faturas.sql"
+    "validacao\043_validar_indice_performance_fretes.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F

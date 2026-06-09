@@ -54,6 +54,77 @@ function Resolve-JavaCommand {
     return 'java.exe'
 }
 
+function Resolve-SqlConnection {
+    if ([string]::IsNullOrWhiteSpace($env:DB_URL)) {
+        throw 'DB_URL nao configurada para a materializacao noturna.'
+    }
+
+    $match = [regex]::Match(
+        $env:DB_URL,
+        '^jdbc:sqlserver://(?<server>[^;]+);(?<properties>.*)$',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if (-not $match.Success) {
+        throw 'DB_URL nao segue o formato jdbc:sqlserver://servidor:porta;databaseName=banco;.'
+    }
+
+    $databaseMatch = [regex]::Match(
+        $match.Groups['properties'].Value,
+        '(?:^|;)databaseName=(?<database>[^;]+)',
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+    )
+    if (-not $databaseMatch.Success) {
+        throw 'DB_URL nao informa databaseName.'
+    }
+
+    [PSCustomObject]@{
+        Server = $match.Groups['server'].Value.Replace(':', ',')
+        Database = $databaseMatch.Groups['database'].Value
+        TrustServerCertificate = $match.Groups['properties'].Value -match '(?:^|;)trustServerCertificate=true(?:;|$)'
+    }
+}
+
+function Invoke-SqlCommand {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject] $Connection,
+        [Parameter(Mandatory)]
+        [string] $Query
+    )
+
+    $arguments = @(
+        '-I',
+        '-f', '65001',
+        '-S', $Connection.Server,
+        '-d', $Connection.Database,
+        '-b',
+        '-Q', $Query
+    )
+    if ($Connection.TrustServerCertificate) {
+        $arguments += '-C'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($env:DB_USER)) {
+        $arguments += '-E'
+    } else {
+        if ([string]::IsNullOrWhiteSpace($env:DB_PASSWORD)) {
+            throw 'DB_USER definido, mas DB_PASSWORD esta vazio.'
+        }
+        $env:SQLCMDPASSWORD = $env:DB_PASSWORD
+        $arguments += @('-U', $env:DB_USER)
+    }
+
+    try {
+        & sqlcmd.exe @arguments *>> $LogPath
+        if ($null -eq $LASTEXITCODE) {
+            return 0
+        }
+        return [int] $LASTEXITCODE
+    } finally {
+        Remove-Item Env:SQLCMDPASSWORD -ErrorAction SilentlyContinue
+    }
+}
+
 function Publish-FailureEvent {
     param(
         [int] $ExitCode,
@@ -92,26 +163,39 @@ function Invoke-MaterializacaoFatosBi {
         return
     }
 
-    $databaseScript = Join-Path $RepoRoot 'database\executar_database.bat'
-    if (-not (Test-Path -LiteralPath $databaseScript -PathType Leaf)) {
-        $message = "Script de banco nao encontrado em $databaseScript. Cargas materializadas BI abortadas."
-        Write-LogLine $message
-        Publish-FailureEvent -ExitCode 3 -Message $message
-        $script:MaterializacaoExitCode = 3
-        return
-    }
-
     Write-LogLine "Iniciando cargas materializadas BI (Gestao a Vista, Faturamento de Fretes e Faturas por Cliente)."
-    $oldCargaGestaoVista = $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA
-    $oldDbSilent = $env:EXTRATOR_DB_SILENT
     try {
-        $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = '1'
-        $env:EXTRATOR_DB_SILENT = '1'
-        & $databaseScript *>> $LogPath
-        $dbExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int] $LASTEXITCODE }
-    } finally {
-        $env:ETL_EXECUTAR_CARGA_GESTAO_VISTA = $oldCargaGestaoVista
-        $env:EXTRATOR_DB_SILENT = $oldDbSilent
+        if (-not (Get-Command sqlcmd.exe -ErrorAction SilentlyContinue)) {
+            throw 'sqlcmd.exe nao encontrado no PATH.'
+        }
+
+        $connection = Resolve-SqlConnection
+        $queries = @(
+            @"
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_fretes_powerbi')
+      AND name = N'Responsável Região Destino Key'
+)
+    THROW 53001, 'Contrato invalido: dbo.vw_fretes_powerbi sem Responsável Região Destino Key.', 1;
+"@,
+            'EXEC dbo.sp_carga_fato_gestao_vista_fretes;',
+            'EXEC dbo.sp_carga_fato_gestao_vista_coletores;',
+            'EXEC dbo.sp_carga_fato_fretes_faturamento;',
+            'EXEC dbo.sp_carga_fato_gestao_vista_faturas;'
+        )
+
+        $dbExitCode = 0
+        foreach ($query in $queries) {
+            $dbExitCode = Invoke-SqlCommand -Connection $connection -Query $query
+            if ($dbExitCode -ne 0) {
+                break
+            }
+        }
+    } catch {
+        Write-LogLine ("Falha ao preparar materializacao BI: {0}" -f $_.Exception.Message)
+        $dbExitCode = 3
     }
 
     if ($dbExitCode -ne 0) {
