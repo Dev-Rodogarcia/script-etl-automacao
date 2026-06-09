@@ -197,6 +197,7 @@ for %%F in (
     "migrations\035_drop_views_legadas_powerbi.sql"
     "migrations\037_adicionar_status_fatura.sql"
     "migrations\038_atualizar_min_frete_cotacoes_matriz_uf.sql"
+    "migrations\039_criar_dim_calendario_referencia_faturamento.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -391,6 +392,7 @@ for %%F in (
     "tabelas\005_criar_tabela_localizacao_cargas.sql"
     "tabelas\006_criar_tabela_contas_a_pagar.sql"
     "tabelas\007_criar_tabela_faturas_por_cliente.sql"
+    "tabelas\008_criar_tabela_dim_calendario.sql"
     "tabelas\009_criar_tabela_log_extracoes.sql"
     "tabelas\010_criar_tabela_page_audit.sql"
     "tabelas\011_criar_tabela_dim_usuarios.sql"

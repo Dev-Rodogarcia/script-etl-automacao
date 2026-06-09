@@ -11,6 +11,7 @@ Arquivos:
 - `localizacao_cargas.md`
 - `contas_a_pagar.md`
 - `faturas_por_cliente.md`
+- `dim_calendario.md`
 - `inventario.md`
 - `sinistros.md`
 - `raster_viagens.md`

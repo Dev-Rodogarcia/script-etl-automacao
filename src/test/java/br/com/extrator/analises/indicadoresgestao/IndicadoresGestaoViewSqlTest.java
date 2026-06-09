@@ -167,6 +167,8 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "migrations\\026_materializar_chave_usuario_cotacoes.sql");
         assertContem(sql, "migrations\\032_criar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "migrations\\033_tuning_indices_fatos.sql");
+        assertContem(sql, "migrations\\039_criar_dim_calendario_referencia_faturamento.sql");
+        assertContem(sql, "tabelas\\008_criar_tabela_dim_calendario.sql");
         assertContem(sql, "procedures\\004_criar_sp_carga_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\041_validar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
@@ -177,6 +179,8 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(validacao, "026_materializar_chave_usuario_cotacoes");
         assertContem(validacao, "032_criar_fato_gestao_vista_faturas");
         assertContem(validacao, "033_tuning_indices_fatos");
+        assertContem(validacao, "039_criar_dim_calendario_referencia_faturamento");
+        assertContem(validacao, "dbo.dim_calendario");
         assertContem(validacao, "dbo.fato_gestao_vista_faturas");
         assertContem(validacao, "IX_fato_gv_coletores_periodo_filial");
         assertContem(validacao, "data_emissao_cte");
@@ -185,6 +189,32 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Responsável Região Destino Key]");
         assertContem(validacao, "dbo.vw_cotacoes_powerbi.[Usuario Key]");
         assertContem(validacao, "lc.invoices_volumes");
+    }
+
+    @Test
+    void fatoFretesFaturamentoDeveUsarDimCalendarioParaRetroagirDataDeFaturamento() throws IOException {
+        final String migrationSql = lerSql("database/migrations/039_criar_dim_calendario_referencia_faturamento.sql");
+        final String tabelaCalendarioSql = lerSql("database/tabelas/008_criar_tabela_dim_calendario.sql");
+        final String tabelaFatoSql = lerSql("database/tabelas/030_criar_tabela_fato_fretes_faturamento.sql");
+        final String procedureSql = lerSql("database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql");
+        final String validacaoSql = lerSql("database/validacao/040_validar_fato_fretes_faturamento.sql");
+
+        assertContem(tabelaCalendarioSql, "CREATE TABLE dbo.dim_calendario");
+        assertContem(tabelaCalendarioSql, "is_dia_util BIT NOT NULL");
+        assertContem(tabelaCalendarioSql, "data_referencia_faturamento DATE NOT NULL");
+        assertContem(tabelaCalendarioSql, "N'Confraternizacao Universal'");
+        assertContem(tabelaCalendarioSql, "N'Sexta-feira Santa'");
+        assertContem(migrationSql, "039_criar_dim_calendario_referencia_faturamento");
+        assertContem(tabelaFatoSql, "data_referencia_faturamento_real DATETIMEOFFSET NULL");
+        assertContem(tabelaFatoSql, "is_data_faturamento_retroagida BIT NOT NULL");
+        assertContem(procedureSql, "INNER JOIN dbo.dim_calendario AS cal");
+        assertContem(procedureSql, "cal.data_referencia_faturamento AS data_referencia_faturamento_date");
+        assertContem(procedureSql, "f.data_referencia_faturamento AS data_referencia_faturamento_real");
+        assertContem(procedureSql, "source.is_data_faturamento_retroagida");
+        assertContem(validacaoSql, "RETROACAO_FATURAMENTO");
+        assertSemMojibake(tabelaCalendarioSql, "database/tabelas/008_criar_tabela_dim_calendario.sql");
+        assertSemMojibake(migrationSql, "database/migrations/039_criar_dim_calendario_referencia_faturamento.sql");
+        assertSemMojibake(procedureSql, "database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql");
     }
 
     @Test

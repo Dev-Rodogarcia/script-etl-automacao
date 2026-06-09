@@ -16,6 +16,35 @@ IF NOT EXISTS (SELECT 1 FROM sys.partition_functions WHERE name = N'PF_fato_ff_d
 IF NOT EXISTS (SELECT 1 FROM sys.partition_schemes WHERE name = N'PS_fato_ff_data_referencia_mes')
     INSERT INTO @falhas VALUES (N'PARTITION_SCHEME', N'PS_fato_ff_data_referencia_mes', N'Partition Scheme mensal da fato ausente');
 
+IF OBJECT_ID(N'dbo.dim_calendario', N'U') IS NULL
+BEGIN
+    INSERT INTO @falhas VALUES (N'TABELA', N'dbo.dim_calendario', N'Dimensao calendario ausente');
+END
+ELSE
+BEGIN
+    DECLARE @colunasCalendario TABLE (nome SYSNAME NOT NULL);
+    INSERT INTO @colunasCalendario (nome) VALUES
+        (N'data'),
+        (N'is_dia_util'),
+        (N'is_feriado_nacional'),
+        (N'is_ponto_facultativo'),
+        (N'data_referencia_faturamento'),
+        (N'data_referencia_faturamento_key');
+
+    INSERT INTO @falhas (tipo, nome, detalhe)
+    SELECT N'COLUNA', N'dbo.dim_calendario.' + c.nome, N'Coluna essencial da dimensao calendario ausente'
+    FROM @colunasCalendario c
+    WHERE COL_LENGTH(N'dbo.dim_calendario', c.nome) IS NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_dim_calendario_referencia_faturamento'
+          AND object_id = OBJECT_ID(N'dbo.dim_calendario')
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'IX_dim_calendario_referencia_faturamento', N'Indice de referencia de faturamento do calendario ausente');
+END;
+
 IF OBJECT_ID(N'dbo.fato_fretes_faturamento', N'U') IS NULL
 BEGIN
     INSERT INTO @falhas VALUES (N'TABELA', N'dbo.fato_fretes_faturamento', N'Tabela fato ausente');
@@ -29,6 +58,10 @@ BEGIN
         (N'data_referencia_faturamento'),
         (N'data_referencia_faturamento_date'),
         (N'data_referencia_faturamento_yyyymm'),
+        (N'data_referencia_faturamento_real'),
+        (N'data_referencia_faturamento_real_date'),
+        (N'data_referencia_faturamento_real_yyyymm'),
+        (N'is_data_faturamento_retroagida'),
         (N'filial_key'),
         (N'pagador_documento_key'),
         (N'chave_cte'),
@@ -111,6 +144,20 @@ BEGIN
         HAVING COUNT_BIG(1) > 1
     )
         INSERT INTO @falhas VALUES (N'GRAO', N'dbo.fato_fretes_faturamento.frete_id', N'Ha mais de uma linha por frete_id');
+
+    IF OBJECT_ID(N'dbo.dim_calendario', N'U') IS NOT NULL
+       AND COL_LENGTH(N'dbo.fato_fretes_faturamento', N'data_referencia_faturamento_real_date') IS NOT NULL
+    BEGIN
+        IF EXISTS (
+            SELECT 1
+            FROM dbo.fato_fretes_faturamento ff
+            INNER JOIN dbo.dim_calendario cal
+                ON cal.data = ff.data_referencia_faturamento_real_date
+            WHERE ff.excluido_na_origem = 0
+              AND cal.data_referencia_faturamento <> ff.data_referencia_faturamento_date
+        )
+            INSERT INTO @falhas VALUES (N'REGRA', N'RETROACAO_FATURAMENTO', N'Data de referencia da fato diverge da dimensao calendario');
+    END;
 END;
 
 IF OBJECT_ID(N'dbo.sp_carga_fato_fretes_faturamento', N'P') IS NULL

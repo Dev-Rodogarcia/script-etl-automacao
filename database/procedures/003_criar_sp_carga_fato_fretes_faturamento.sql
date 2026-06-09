@@ -30,6 +30,9 @@ BEGIN
     IF OBJECT_ID(N'dbo.faturas_por_cliente', N'U') IS NULL
         THROW 51043, 'Tabela dbo.faturas_por_cliente nao encontrada. A carga precisa dela para validar status real de CT-e.', 1;
 
+    IF OBJECT_ID(N'dbo.dim_calendario', N'U') IS NULL
+        THROW 51048, 'Tabela dbo.dim_calendario nao encontrada. Execute a migration 039 antes da carga.', 1;
+
     IF (@DataInicio IS NULL AND @DataFimExclusivo IS NOT NULL)
        OR (@DataInicio IS NOT NULL AND @DataFimExclusivo IS NULL)
         THROW 51044, 'Informe @DataInicio e @DataFimExclusivo juntos ou deixe ambos nulos para carga completa.', 1;
@@ -97,10 +100,19 @@ BEGIN
             SELECT
                 f.id AS frete_id,
                 f.corporation_sequence_number AS numero_minuta,
-                f.data_referencia_faturamento,
-                CAST(f.data_referencia_faturamento AS DATE) AS data_referencia_faturamento_date,
+                TODATETIMEOFFSET(
+                    CAST(cal.data_referencia_faturamento AS DATETIME2(0)),
+                    DATEPART(TZOFFSET, f.data_referencia_faturamento)
+                ) AS data_referencia_faturamento,
+                cal.data_referencia_faturamento AS data_referencia_faturamento_date,
+                YEAR(cal.data_referencia_faturamento) * 100
+                    + MONTH(cal.data_referencia_faturamento) AS data_referencia_faturamento_yyyymm,
+                f.data_referencia_faturamento AS data_referencia_faturamento_real,
+                CAST(f.data_referencia_faturamento AS DATE) AS data_referencia_faturamento_real_date,
                 YEAR(CAST(f.data_referencia_faturamento AS DATE)) * 100
-                    + MONTH(CAST(f.data_referencia_faturamento AS DATE)) AS data_referencia_faturamento_yyyymm,
+                    + MONTH(CAST(f.data_referencia_faturamento AS DATE)) AS data_referencia_faturamento_real_yyyymm,
+                CAST(CASE WHEN cal.data_referencia_faturamento <> CAST(f.data_referencia_faturamento AS DATE) THEN 1 ELSE 0 END AS BIT)
+                    AS is_data_faturamento_retroagida,
                 f.servico_em AS data_frete,
                 CAST(f.servico_em AS DATE) AS data_frete_date,
                 f.cte_issued_at AS data_emissao_cte,
@@ -178,6 +190,8 @@ BEGIN
             LEFT JOIN dbo.localizacao_cargas AS lc
                 ON lc.sequence_number = f.corporation_sequence_number
                AND COALESCE(lc.excluido_na_origem, 0) = 0
+            INNER JOIN dbo.dim_calendario AS cal
+                ON cal.data = CAST(f.data_referencia_faturamento AS DATE)
             CROSS APPLY (
                 SELECT UPPER(NULLIF(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                     LTRIM(RTRIM(COALESCE(f.pagador_documento, N''))),
@@ -268,6 +282,10 @@ BEGIN
                     COALESCE(CONVERT(NVARCHAR(48), o.data_referencia_faturamento, 127), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(30), o.data_referencia_faturamento_date, 126), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(10), o.data_referencia_faturamento_yyyymm), N'__NULL__'),
+                    COALESCE(CONVERT(NVARCHAR(48), o.data_referencia_faturamento_real, 127), N'__NULL__'),
+                    COALESCE(CONVERT(NVARCHAR(30), o.data_referencia_faturamento_real_date, 126), N'__NULL__'),
+                    COALESCE(CONVERT(NVARCHAR(10), o.data_referencia_faturamento_real_yyyymm), N'__NULL__'),
+                    CONVERT(NVARCHAR(1), o.is_data_faturamento_retroagida),
                     COALESCE(CONVERT(NVARCHAR(48), o.data_frete, 127), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(30), o.data_frete_date, 126), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(48), o.data_emissao_cte, 127), N'__NULL__'),
@@ -355,6 +373,10 @@ BEGIN
                 data_referencia_faturamento = source.data_referencia_faturamento,
                 data_referencia_faturamento_date = source.data_referencia_faturamento_date,
                 data_referencia_faturamento_yyyymm = source.data_referencia_faturamento_yyyymm,
+                data_referencia_faturamento_real = source.data_referencia_faturamento_real,
+                data_referencia_faturamento_real_date = source.data_referencia_faturamento_real_date,
+                data_referencia_faturamento_real_yyyymm = source.data_referencia_faturamento_real_yyyymm,
+                is_data_faturamento_retroagida = source.is_data_faturamento_retroagida,
                 data_frete = source.data_frete,
                 data_frete_date = source.data_frete_date,
                 data_emissao_cte = source.data_emissao_cte,
@@ -433,6 +455,8 @@ BEGIN
             THEN INSERT (
                 frete_id, numero_minuta, data_referencia_faturamento,
                 data_referencia_faturamento_date, data_referencia_faturamento_yyyymm,
+                data_referencia_faturamento_real, data_referencia_faturamento_real_date,
+                data_referencia_faturamento_real_yyyymm, is_data_faturamento_retroagida,
                 data_frete, data_frete_date, data_emissao_cte, criado_em,
                 filial_id, filial_nome, filial_key, filial_apelido, filial_cnpj,
                 responsavel_regiao_destino, responsavel_regiao_destino_key, regiao_destino,
@@ -454,6 +478,8 @@ BEGIN
             VALUES (
                 source.frete_id, source.numero_minuta, source.data_referencia_faturamento,
                 source.data_referencia_faturamento_date, source.data_referencia_faturamento_yyyymm,
+                source.data_referencia_faturamento_real, source.data_referencia_faturamento_real_date,
+                source.data_referencia_faturamento_real_yyyymm, source.is_data_faturamento_retroagida,
                 source.data_frete, source.data_frete_date, source.data_emissao_cte, source.criado_em,
                 source.filial_id, source.filial_nome, source.filial_key, source.filial_apelido, source.filial_cnpj,
                 source.responsavel_regiao_destino, source.responsavel_regiao_destino_key, source.regiao_destino,
@@ -478,7 +504,13 @@ BEGIN
          AND (
                 @cargaCompleta = 1
              OR (
-                    target.data_referencia_faturamento_date >= @DataInicio
+                    target.data_referencia_faturamento_real_date IS NOT NULL
+                AND target.data_referencia_faturamento_real_date >= @DataInicio
+                AND target.data_referencia_faturamento_real_date < @DataFimExclusivo
+             )
+             OR (
+                    target.data_referencia_faturamento_real_date IS NULL
+                AND target.data_referencia_faturamento_date >= @DataInicio
                 AND target.data_referencia_faturamento_date < @DataFimExclusivo
              )
          )

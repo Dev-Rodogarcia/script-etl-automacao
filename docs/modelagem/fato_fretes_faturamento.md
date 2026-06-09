@@ -6,7 +6,7 @@ Materializar uma fato granular de fretes elegiveis ou inelegiveis para faturamen
 
 ## Chaves e deduplicacao
 
-- Grao: 1 linha por frete e data de referencia de faturamento.
+- Grao: 1 linha por frete e data de referencia de faturamento ajustada para dia util.
 - Chave unica principal: `UX_fato_ff_frete_data (frete_id, data_referencia_faturamento_date)`.
 - Chave auxiliar: indices por `frete_id`, data, filial e status.
 - Deduplicacao: `dbo.sp_carga_fato_fretes_faturamento` rankeia faturas por `chave_cte`, pega a melhor evidencia fiscal e faz `MERGE` por frete/data com `hash_linha`.
@@ -26,7 +26,8 @@ Esta fato e derivada de `dbo.fretes`, `dbo.localizacao_cargas` e `dbo.faturas_po
 | GraphQL `fretes.id` | `frete_id` |
 | GraphQL `fretes.corporationSequenceNumber` | `numero_minuta` |
 | GraphQL `fretes.serviceAt` | `data_frete`, `data_frete_date` |
-| GraphQL `fretes.data_referencia_faturamento` materializada | `data_referencia_faturamento`, `data_referencia_faturamento_date`, `data_referencia_faturamento_yyyymm` |
+| GraphQL `fretes.data_referencia_faturamento` materializada | `data_referencia_faturamento_real`, `data_referencia_faturamento_real_date`, `data_referencia_faturamento_real_yyyymm` |
+| `dbo.dim_calendario.data_referencia_faturamento` | `data_referencia_faturamento`, `data_referencia_faturamento_date`, `data_referencia_faturamento_yyyymm`, `is_data_faturamento_retroagida` |
 | GraphQL `fretes.cte.*` | `chave_cte`, `numero_cte`, `serie_cte`, `data_emissao_cte` |
 | DataExport `faturas_por_cliente.fit_fhe_cte_status*` por `chave_cte` | `status_cte_real`, `status_cte_result`, `is_cte_cancelado` |
 | GraphQL `fretes.corporation.*` | `filial_id`, `filial_nome`, `filial_key`, `filial_cnpj` |

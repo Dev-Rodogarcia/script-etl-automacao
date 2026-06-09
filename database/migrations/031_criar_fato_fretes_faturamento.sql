@@ -84,6 +84,10 @@ BEGIN
         data_referencia_faturamento DATETIMEOFFSET NOT NULL,
         data_referencia_faturamento_date DATE NOT NULL,
         data_referencia_faturamento_yyyymm INT NOT NULL,
+        data_referencia_faturamento_real DATETIMEOFFSET NULL,
+        data_referencia_faturamento_real_date DATE NULL,
+        data_referencia_faturamento_real_yyyymm INT NULL,
+        is_data_faturamento_retroagida BIT NOT NULL CONSTRAINT DF_fato_ff_is_data_retroagida DEFAULT (0),
         data_frete DATETIMEOFFSET NULL,
         data_frete_date DATE NULL,
         data_emissao_cte DATETIMEOFFSET NULL,
@@ -169,7 +173,7 @@ BEGIN
         hash_linha BINARY(32) NULL,
 
         CONSTRAINT CK_fato_ff_yyyymm
-            CHECK (data_referencia_faturamento_yyyymm BETWEEN 202001 AND 203212),
+            CHECK (data_referencia_faturamento_yyyymm BETWEEN 201912 AND 203212),
         CONSTRAINT CK_fato_ff_cte_cancelado_sem_receita
             CHECK (is_cte_cancelado = 0 OR (is_elegivel_faturamento = 0 AND receita_bruta = 0 AND valor_frete = 0)),
         CONSTRAINT CK_fato_ff_inelegivel_sem_receita

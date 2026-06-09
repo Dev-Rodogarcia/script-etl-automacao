@@ -19,6 +19,7 @@ INSERT INTO @tabelas (nome) VALUES
     (N'localizacao_cargas_regiao_destino_alias'),
     (N'contas_a_pagar'),
     (N'faturas_por_cliente'),
+    (N'dim_calendario'),
     (N'log_extracoes'),
     (N'page_audit'),
     (N'dim_usuarios'),
@@ -107,7 +108,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'033_tuning_indices_fatos'),
     (N'034_adicionar_hash_linha_usuarios'),
     (N'035_drop_views_legadas_powerbi'),
-    (N'037_adicionar_status_fatura');
+    (N'037_adicionar_status_fatura'),
+    (N'038_atualizar_min_frete_cotacoes_matriz_uf'),
+    (N'039_criar_dim_calendario_referencia_faturamento');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -159,6 +162,20 @@ IF COL_LENGTH(N'dbo.faturas_por_cliente', N'cliente_cnpj') IS NULL
 
 IF COL_LENGTH(N'dbo.faturas_por_cliente', N'status') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.faturas_por_cliente.status', N'Coluna da migration 037 ausente');
+
+IF COL_LENGTH(N'dbo.dim_calendario', N'is_dia_util') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.dim_calendario.is_dia_util', N'Flag de dia util da dimensao calendario ausente');
+
+IF COL_LENGTH(N'dbo.dim_calendario', N'data_referencia_faturamento') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.dim_calendario.data_referencia_faturamento', N'Data retroativa de faturamento da dimensao calendario ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_dim_calendario_referencia_faturamento'
+      AND object_id = OBJECT_ID(N'dbo.dim_calendario')
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_dim_calendario_referencia_faturamento', N'Indice de referencia de faturamento da dimensao calendario ausente');
 
 IF COL_LENGTH(N'dbo.localizacao_cargas', N'localizacao_hash') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.localizacao_cargas.localizacao_hash', N'Coluna da migration 017 ausente');
@@ -465,6 +482,12 @@ IF NOT EXISTS (
 
 IF OBJECT_ID(N'dbo.sp_carga_fato_fretes_faturamento', N'P') IS NULL
     INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_fretes_faturamento', N'Procedure de carga da fato de faturamento de fretes ausente');
+
+IF COL_LENGTH(N'dbo.fato_fretes_faturamento', N'data_referencia_faturamento_real') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_fretes_faturamento.data_referencia_faturamento_real', N'Data real de faturamento ausente na fato');
+
+IF COL_LENGTH(N'dbo.fato_fretes_faturamento', N'is_data_faturamento_retroagida') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_fretes_faturamento.is_data_faturamento_retroagida', N'Flag de retroacao de faturamento ausente na fato');
 
 IF NOT EXISTS (
     SELECT 1

@@ -639,8 +639,10 @@ ORDER BY data_extracao DESC;
 
 - Fonte: carga SQL `dbo.sp_carga_fato_fretes_faturamento`
 - Grão: 1 linha por frete validado, usando `dbo.fretes.id` como identidade operacional.
-- Particionamento: mensal por `data_referencia_faturamento_date`, derivada de `data_referencia_faturamento`.
+- Particionamento: mensal por `data_referencia_faturamento_date`, derivada da data de referencia ajustada pela `dbo.dim_calendario`.
 - Observações importantes:
+  - Faturamento emitido em fim de semana, feriado nacional ou ponto facultativo operacional e retroagido para o ultimo dia util anterior.
+  - `data_referencia_faturamento_real*` preserva a data original de emissao/materializacao do frete para auditoria.
   - `is_cte_cancelado` usa o status real de CT-e vindo de `dbo.faturas_por_cliente` por `chave_cte`, com fallback controlado para `fretes.status`.
   - `is_elegivel_faturamento = 0` sempre zera `receita_bruta` e `valor_frete`; CT-e cancelado também força inelegibilidade.
   - `hash_linha` permite carga incremental robusta, atualizando apenas linhas com mudança de regra ou atributo.
@@ -650,8 +652,10 @@ ORDER BY data_extracao DESC;
 | --- | --- | --- |
 | `frete_id` | `BIGINT` | ID do frete em `dbo.fretes`; identidade do grão 1:1. |
 | `numero_minuta` | `BIGINT` | Número operacional da minuta/frete. |
-| `data_referencia_faturamento` | `DATETIMEOFFSET` | Competência de faturamento materializada no frete. |
+| `data_referencia_faturamento` | `DATETIMEOFFSET` | Competência de faturamento ajustada para o último dia útil anterior quando necessário. |
 | `data_referencia_faturamento_date` | `DATE` | Data usada para particionamento mensal e filtros sargable. |
+| `data_referencia_faturamento_real` | `DATETIMEOFFSET` | Data real de emissão/materialização antes da retroação por calendário. |
+| `is_data_faturamento_retroagida` | `BIT` | Indica que a data real caiu em dia não útil e foi agrupada em data anterior. |
 | `filial_key` | `NVARCHAR(255)` | Chave normalizada da filial emissora. |
 | `pagador_documento_key` | `NVARCHAR(50)` | Documento normalizado do pagador. |
 | `status_cte_real` | `NVARCHAR(255)` | Status de CT-e reconciliado a partir de `faturas_por_cliente`. |
