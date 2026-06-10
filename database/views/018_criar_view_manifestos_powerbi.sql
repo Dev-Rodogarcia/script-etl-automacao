@@ -54,6 +54,8 @@ SELECT
     total_cubic_volume                                  AS [Total M3],
     invoices_value                                      AS [Valor NF],
     manifest_freights_total                             AS [Fretes/Total],
+    (COALESCE(manifest_freights_total, 0) + COALESCE(sub_coleta.receita_coleta, 0))
+                                                        AS [Receita Total Transportada],
     pick_sequence_code                                  AS [Coleta/Número],
     contract_number                                     AS [CIOT/Número],
     CASE contract_type
@@ -146,7 +148,15 @@ SELECT
     obs_financeira                                      AS [Comentários Fechamento],
     metadata                                            AS [Metadata],
     data_extracao                                       AS [Data de extracao]
-FROM dbo.manifestos
+FROM dbo.manifestos AS m
+LEFT JOIN (
+    SELECT
+        corporation_sequence_number,
+        SUM(COALESCE(valor_total, 0)) AS receita_coleta
+    FROM dbo.fretes
+    WHERE COALESCE(excluido_na_origem, 0) = 0
+    GROUP BY corporation_sequence_number
+) sub_coleta ON sub_coleta.corporation_sequence_number = m.pick_sequence_code
 OUTER APPLY OPENJSON(CASE WHEN ISJSON(metadata) = 1 THEN metadata END)
 WITH (
     mft_vie_onr_document NVARCHAR(255) '$.mft_vie_onr_document',
@@ -192,7 +202,7 @@ OUTER APPLY (
         ELSE N'Terceiro / Autônomo'
     END AS tipo_motorista
 ) tipo_motorista
-WHERE excluido_na_origem = 0;
+WHERE m.excluido_na_origem = 0;
 GO
 
 PRINT 'View vw_manifestos_powerbi criada/atualizada com sucesso!';
