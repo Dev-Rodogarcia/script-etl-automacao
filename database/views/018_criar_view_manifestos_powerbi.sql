@@ -126,7 +126,12 @@ SELECT
     trailer2_weight_capacity                            AS [Carreta 2/Capacidade Peso],
     vehicle_weight_capacity                             AS [Veículo/Capacidade Peso],
     vehicle_cubic_weight                                AS [Veículo/Peso Cubado],
-    capacidade_kg                                       AS [Capacidade Lotação Kg],
+    CASE
+        WHEN COALESCE(trailer1_weight_capacity, 0) = 0
+            THEN COALESCE(vehicle_weight_capacity, 0)
+        ELSE
+            COALESCE(trailer1_weight_capacity, 0) + COALESCE(trailer2_weight_capacity, 0)
+    END                                                 AS [Capacidade Lotação Kg],
     REPLACE(REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', ''), '"', '')
                                                         AS [Descarregamento/Destinatários],
     REPLACE(REPLACE(REPLACE(unloading_recipient_names, '[', ''), ']', ''), '"', '')
@@ -142,29 +147,35 @@ SELECT
     metadata                                            AS [Metadata],
     data_extracao                                       AS [Data de extracao]
 FROM dbo.manifestos
+OUTER APPLY OPENJSON(CASE WHEN ISJSON(metadata) = 1 THEN metadata END)
+WITH (
+    mft_vie_onr_document NVARCHAR(255) '$.mft_vie_onr_document',
+    mft_vie_onr_cnpj NVARCHAR(255) '$.mft_vie_onr_cnpj',
+    vehicle_owner_document NVARCHAR(255) '$.vehicle_owner_document',
+    owner_document NVARCHAR(255) '$.owner_document',
+    mft_vie_owner_document NVARCHAR(255) '$.mft_vie_owner_document'
+) metadata_proprietario
 OUTER APPLY (
     SELECT NULLIF(
         REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
             COALESCE(
-                CASE WHEN ISJSON(metadata) = 1 THEN JSON_VALUE(metadata, '$.mft_vie_onr_document') END,
-                CASE WHEN ISJSON(metadata) = 1 THEN JSON_VALUE(metadata, '$.mft_vie_onr_cnpj') END,
-                CASE WHEN ISJSON(metadata) = 1 THEN JSON_VALUE(metadata, '$.vehicle_owner_document') END,
-                CASE WHEN ISJSON(metadata) = 1 THEN JSON_VALUE(metadata, '$.owner_document') END,
-                CASE WHEN ISJSON(metadata) = 1 THEN JSON_VALUE(metadata, '$.mft_vie_owner_document') END
+                metadata_proprietario.mft_vie_onr_document,
+                metadata_proprietario.mft_vie_onr_cnpj,
+                metadata_proprietario.vehicle_owner_document,
+                metadata_proprietario.owner_document,
+                metadata_proprietario.mft_vie_owner_document
             ),
             '.', ''), '-', ''), '/', ''), ' ', ''), CHAR(9), ''
         ),
         ''
     ) AS proprietario_documento
 ) proprietario_documento
+LEFT JOIN dbo.manifestos_frota_propria_cnpjs cnpj
+    ON cnpj.ativo = 1
+   AND cnpj.cnpj = proprietario_documento.proprietario_documento
 OUTER APPLY (
     SELECT CASE
-        WHEN EXISTS (
-            SELECT 1
-            FROM dbo.manifestos_frota_propria_cnpjs cnpj
-            WHERE cnpj.ativo = 1
-              AND cnpj.cnpj = proprietario_documento.proprietario_documento
-        )
+        WHEN cnpj.cnpj IS NOT NULL
           OR UPPER(LTRIM(RTRIM(COALESCE(vehicle_owner, '')))) COLLATE Latin1_General_CI_AI = N'RODOGARCIA TRANSPORTES RODOVIARIOS LTDA'
         THEN N'Frota Própria'
         WHEN LOWER(LTRIM(RTRIM(COALESCE(contract_type, '')))) COLLATE Latin1_General_CI_AI IN (
@@ -181,7 +192,7 @@ OUTER APPLY (
         ELSE N'Terceiro / Autônomo'
     END AS tipo_motorista
 ) tipo_motorista
-WHERE COALESCE(excluido_na_origem, 0) = 0;
+WHERE excluido_na_origem = 0;
 GO
 
 PRINT 'View vw_manifestos_powerbi criada/atualizada com sucesso!';
