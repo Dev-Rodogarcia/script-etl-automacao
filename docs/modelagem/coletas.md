@@ -10,6 +10,8 @@ Representar solicitacoes de coleta vindas do GraphQL (`pick`) para operacao, SLA
 - Chave primaria: `id`.
 - Chave unica de negocio: `sequence_code`.
 - Deduplicacao: o upsert usa `sequence_code` como chave de negocio, mantendo idempotencia entre reprocessamentos; `metadata` preserva o payload completo.
+- Ligacao com fretes: a API GraphQL nao liga o frete por `sequenceCode`; a ponte real e `Freight.pickItemId = Pick.pickItems[].id`.
+- `pick_items_ids` armazena um JSON array somente com os IDs de `Pick.pickItems`, por exemplo `[4717944]`, para permitir a soma da receita dos fretes vinculados a uma coleta.
 
 ## De/Para JSON API -> SQL
 
@@ -40,6 +42,7 @@ Representar solicitacoes de coleta vindas do GraphQL (`pick`) para operacao, SLA
 | `user.name` | `usuario_nome` |
 | `finishDate` | `finish_date` |
 | `manifestItemPickId` | `manifest_item_pick_id` |
+| `pickItems[].id` | `pick_items_ids` |
 | `vehicleTypeId` | `vehicle_type_id` |
 | `cancellationReason` | `cancellation_reason` |
 | `cancellationUserId` | `cancellation_user_id` |

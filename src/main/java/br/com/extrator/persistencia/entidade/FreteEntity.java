@@ -82,6 +82,7 @@ public class FreteEntity {
     private OffsetDateTime finishedAt;
     private OffsetDateTime fitDpnPerformanceFinishedAt;
     private Long corporationSequenceNumber;
+    private Long pickItemId;
 
     // --- Campos Expandidos (22 campos do CSV) ---
     private Long pagadorId;
@@ -327,6 +328,14 @@ public class FreteEntity {
 
     public void setCorporationSequenceNumber(final Long corporationSequenceNumber) {
         this.corporationSequenceNumber = corporationSequenceNumber;
+    }
+
+    public Long getPickItemId() {
+        return pickItemId;
+    }
+
+    public void setPickItemId(final Long pickItemId) {
+        this.pickItemId = pickItemId;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

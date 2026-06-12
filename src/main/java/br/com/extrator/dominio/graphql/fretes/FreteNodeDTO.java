@@ -120,6 +120,9 @@ public class FreteNodeDTO {
     @JsonProperty("corporationSequenceNumber")
     private Long corporationSequenceNumber;
 
+    @JsonProperty("pickItemId")
+    private Long pickItemId;
+
     // --- Campos Expandidos (Objetos Aninhados) ---
     @JsonProperty("payer")
     private PayerDTO payer;
@@ -450,6 +453,14 @@ public class FreteNodeDTO {
 
     public void setCorporationSequenceNumber(final Long corporationSequenceNumber) {
         this.corporationSequenceNumber = corporationSequenceNumber;
+    }
+
+    public Long getPickItemId() {
+        return pickItemId;
+    }
+
+    public void setPickItemId(final Long pickItemId) {
+        this.pickItemId = pickItemId;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

@@ -95,6 +95,7 @@ public class ColetaEntity {
     private String comments;
     private Long agentId;
     private Long manifestItemPickId;
+    private String pickItemsIds;
     private Long vehicleTypeId;
 
     private String cancellationReason;
@@ -373,6 +374,14 @@ public class ColetaEntity {
 
     public void setManifestItemPickId(final Long manifestItemPickId) {
         this.manifestItemPickId = manifestItemPickId;
+    }
+
+    public String getPickItemsIds() {
+        return pickItemsIds;
+    }
+
+    public void setPickItemsIds(final String pickItemsIds) {
+        this.pickItemsIds = pickItemsIds;
     }
 
     public Long getVehicleTypeId() {

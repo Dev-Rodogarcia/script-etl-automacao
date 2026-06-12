@@ -83,6 +83,7 @@ public final class GraphQLQueries {
                     comments
                     agentId
                     manifestItemPickId
+                    pickItems { id }
                     vehicleTypeId
                     invoicesCubedWeight
                     cancellationReason
@@ -144,6 +145,7 @@ public final class GraphQLQueries {
                     serviceType
                     deliveryPredictionDate
                     corporationSequenceNumber
+                    pickItemId
                     corporation { id nickname cnpj }
                     customerPriceTable { name }
                     freightClassification { name }

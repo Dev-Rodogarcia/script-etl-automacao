@@ -24,6 +24,7 @@ Controlar manifestos operacionais retornados pelo DataExport ESL Cloud, com foco
   - `sequence_code + "_MDFE_" + mdfe_number` quando somente MDF-e existe.
   - SHA-256 canonico do `metadata` estavel quando ambos faltam.
 - O hash por `metadata` remove campos volateis antes de calcular identidade: `mobile_read_at`, `departured_at`, `closed_at`, `finished_at`, `vehicle_departure_km`, `closing_km`, `traveled_km`, `finalized_manifest_items_count`, `mft_mfs_number`, `mft_mfs_key`, `mdfe_status`, `mft_aoe_comments`, `mft_aoe_rer_name`.
+- Regra analitica de receita transportada: `manifestos.pick_sequence_code` identifica a coleta (`coletas.sequence_code`); a receita adicional da coleta vem de `fretes.valor_total` quando `fretes.pick_item_id` aparece no JSON array `coletas.pick_items_ids`.
 - Soft delete logico: `excluido_na_origem BIT NOT NULL DEFAULT 0`.
 
 ## Matriz de rastreabilidade

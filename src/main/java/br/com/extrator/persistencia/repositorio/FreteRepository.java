@@ -65,7 +65,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
     private static final List<String> COLUNAS_MERGE = List.of(
         "id", "servico_em", "criado_em", "status", "cortesia", "modal", "tipo_frete", "valor_total", "valor_notas", "peso_notas",
         "id_corporacao", "id_cidade_destino", "data_previsao_entrega", "service_date", "finished_at",
-        "fit_dpn_performance_finished_at", "corporation_sequence_number", "pagador_id", "pagador_nome",
+        "fit_dpn_performance_finished_at", "corporation_sequence_number", "pick_item_id", "pagador_id", "pagador_nome",
         "remetente_id", "remetente_nome", "origem_cidade", "origem_uf", "destinatario_id", "destinatario_nome",
         "destino_cidade", "destino_uf", "filial_nome", "numero_nota_fiscal", "tabela_preco_nome",
         "classificacao_nome", "centro_custo_nome", "usuario_nome", "reference_number", "chave_cte", "numero_cte",
@@ -604,7 +604,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         final String sql = String.format("""
             MERGE %s WITH (HOLDLOCK) AS target
             USING (VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
@@ -618,7 +618,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 ?, ?, CAST(0 AS bit)
             ))
                 AS source (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
-                           finished_at, fit_dpn_performance_finished_at, corporation_sequence_number,
+                           finished_at, fit_dpn_performance_finished_at, corporation_sequence_number, pick_item_id,
                            pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
                            filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
                            taxed_weight, real_weight, total_cubic_volume, subtotal,
@@ -649,6 +649,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     finished_at = source.finished_at,
                     fit_dpn_performance_finished_at = source.fit_dpn_performance_finished_at,
                     corporation_sequence_number = source.corporation_sequence_number,
+                    pick_item_id = source.pick_item_id,
                     pagador_id = source.pagador_id,
                     pagador_nome = source.pagador_nome,
                     remetente_id = source.remetente_id,
@@ -732,7 +733,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     excluido_na_origem = source.excluido_na_origem
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
-                        finished_at, fit_dpn_performance_finished_at, corporation_sequence_number,
+                        finished_at, fit_dpn_performance_finished_at, corporation_sequence_number, pick_item_id,
                         pagador_id, pagador_nome, remetente_id, remetente_nome, origem_cidade, origem_uf, destinatario_id, destinatario_nome, destino_cidade, destino_uf,
                            filial_nome, numero_nota_fiscal, tabela_preco_nome, classificacao_nome, centro_custo_nome, usuario_nome, reference_number, chave_cte, numero_cte, serie_cte, invoices_total_volumes,
                            taxed_weight, real_weight, total_cubic_volume, subtotal,
@@ -745,7 +746,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
                         metadata, data_extracao, excluido_na_origem)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.cortesia, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega, source.service_date,
-                        source.finished_at, source.fit_dpn_performance_finished_at, source.corporation_sequence_number,
+                        source.finished_at, source.fit_dpn_performance_finished_at, source.corporation_sequence_number, source.pick_item_id,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
                         source.filial_nome, source.numero_nota_fiscal, source.tabela_preco_nome, source.classificacao_nome, source.centro_custo_nome, source.usuario_nome, source.reference_number, source.chave_cte, source.numero_cte, source.serie_cte, source.invoices_total_volumes,
                         source.taxed_weight, source.real_weight, source.total_cubic_volume, source.subtotal,
@@ -784,6 +785,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             statement.setObject(paramIndex++, frete.getFinishedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
             statement.setObject(paramIndex++, frete.getFitDpnPerformanceFinishedAt(), Types.TIMESTAMP_WITH_TIMEZONE);
             statement.setObject(paramIndex++, frete.getCorporationSequenceNumber(), Types.BIGINT);
+            statement.setObject(paramIndex++, frete.getPickItemId(), Types.BIGINT);
             // Campos expandidos (22 campos do CSV)
             statement.setObject(paramIndex++, frete.getPagadorId(), Types.BIGINT);
             statement.setString(paramIndex++, frete.getPagadorNome());

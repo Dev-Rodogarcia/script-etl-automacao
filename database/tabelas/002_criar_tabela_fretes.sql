@@ -28,6 +28,7 @@ BEGIN
         finished_at DATETIMEOFFSET,
         fit_dpn_performance_finished_at DATETIMEOFFSET,
         corporation_sequence_number BIGINT,
+        pick_item_id BIGINT,
 
         -- Campos Expandidos (22 campos do CSV)
         pagador_id BIGINT,
@@ -146,5 +147,32 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_fretes_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna fretes.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.fretes', N'pick_item_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.fretes
+    ADD pick_item_id BIGINT NULL;
+    PRINT 'Coluna fretes.pick_item_id adicionada em tabela existente.';
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fretes_pick_item_id'
+      AND object_id = OBJECT_ID(N'dbo.fretes')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_pick_item_id
+        ON dbo.fretes(pick_item_id)
+        INCLUDE (id, valor_total, excluido_na_origem)
+        WHERE pick_item_id IS NOT NULL;
+    PRINT 'Índice IX_fretes_pick_item_id criado com sucesso!';
+END
+ELSE
+BEGIN
+    PRINT 'Índice IX_fretes_pick_item_id já existe. Pulando criação.';
 END
 GO

@@ -34,6 +34,7 @@ BEGIN
         usuario_nome NVARCHAR(255),
         finish_date DATE,
         manifest_item_pick_id BIGINT,
+        pick_items_ids NVARCHAR(MAX),
         vehicle_type_id BIGINT,
 
         cancellation_reason NVARCHAR(MAX),
@@ -72,5 +73,13 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_coletas_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna coletas.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.coletas', N'pick_items_ids') IS NULL
+BEGIN
+    ALTER TABLE dbo.coletas
+    ADD pick_items_ids NVARCHAR(MAX) NULL;
+    PRINT 'Coluna coletas.pick_items_ids adicionada em tabela existente.';
 END
 GO

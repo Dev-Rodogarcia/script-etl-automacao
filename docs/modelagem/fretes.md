@@ -18,6 +18,7 @@ Armazenar fretes da API GraphQL ESL Cloud como base operacional e financeira par
 - Upsert idempotente por `id`.
 - Indices analiticos atuais incluem `servico_em`, `data_extracao`, `data_referencia_faturamento/is_elegivel_faturamento`, `filial_nome_key` e ativos por origem.
 - Campos de faturamento `data_referencia_faturamento` e `is_elegivel_faturamento` sao materializados no banco a partir de `cte_issued_at`/`servico_em`, cortesia e classificacao.
+- Ligacao com coletas: `pick_item_id` materializa `Freight.pickItemId` e deve ser cruzado com os IDs guardados em `dbo.coletas.pick_items_ids`.
 - Soft delete logico: `excluido_na_origem BIT NOT NULL DEFAULT 0`.
 
 ## Matriz de rastreabilidade
@@ -76,6 +77,7 @@ Armazenar fretes da API GraphQL ESL Cloud como base operacional e financeira par
 | `serviceType` | string/integer | `serviceType` | `service_type` | `INT` |
 | `deliveryPredictionDate` | date string/null | `deliveryPredictionDate` | `data_previsao_entrega` | `DATE` |
 | `corporationSequenceNumber` | integer | `corporationSequenceNumber` | `corporation_sequence_number` | `BIGINT` |
+| `pickItemId` | integer/null | `pickItemId` | `pick_item_id` | `BIGINT` |
 | `corporation.id` | string/integer | `corporation.id` | `metadata` | `NVARCHAR(MAX)` |
 | `corporation.nickname` | string | `corporation.nickname` | `filial_nome`, `filial_apelido` | `NVARCHAR(255)` |
 | `corporation.cnpj` | string | `corporation.cnpj` | `filial_cnpj` | `NVARCHAR(50)` |

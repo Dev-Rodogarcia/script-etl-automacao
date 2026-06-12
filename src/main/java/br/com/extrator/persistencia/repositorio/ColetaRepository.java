@@ -77,7 +77,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 SELECT
                     ? AS id, ? AS sequence_code, ? AS request_date, ? AS request_hour, ? AS service_date, ? AS status, ? AS total_value, ? AS total_weight, ? AS total_volumes,
                     ? AS cliente_nome, ? AS cliente_doc, ? AS local_coleta, ? AS numero_coleta, ? AS complemento_coleta, ? AS cidade_coleta, ? AS bairro_coleta, ? AS uf_coleta, ? AS cep_coleta, ? AS filial_id, ? AS filial_nome, ? AS usuario_nome,
-                    ? AS finish_date, ? AS manifest_item_pick_id, ? AS vehicle_type_id,
+                    ? AS finish_date, ? AS manifest_item_pick_id, ? AS pick_items_ids, ? AS vehicle_type_id,
                     ? AS cancellation_reason, ? AS cancellation_user_id,
                     ? AS destroy_reason, ? AS destroy_user_id, ? AS status_updated_at,
                     ? AS taxed_weight, ? AS pick_region, ? AS last_occurrence, ? AS acao_ocorrencia, ? AS numero_tentativas,
@@ -108,6 +108,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     usuario_nome = source.usuario_nome,
                     finish_date = source.finish_date,
                     manifest_item_pick_id = source.manifest_item_pick_id,
+                    pick_items_ids = source.pick_items_ids,
                     vehicle_type_id = source.vehicle_type_id,
                     cancellation_reason = source.cancellation_reason,
                     cancellation_user_id = source.cancellation_user_id,
@@ -126,7 +127,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 INSERT (
                     id, sequence_code, request_date, request_hour, service_date, status, total_value, total_weight, total_volumes,
                     cliente_nome, cliente_doc, local_coleta, numero_coleta, complemento_coleta, cidade_coleta, bairro_coleta, uf_coleta, cep_coleta, filial_id, filial_nome, usuario_nome,
-                    finish_date, manifest_item_pick_id, vehicle_type_id,
+                    finish_date, manifest_item_pick_id, pick_items_ids, vehicle_type_id,
                     cancellation_reason, cancellation_user_id,
                     destroy_reason, destroy_user_id, status_updated_at,
                     taxed_weight, pick_region, last_occurrence, acao_ocorrencia, numero_tentativas,
@@ -135,7 +136,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                 VALUES (
                     source.id, source.sequence_code, source.request_date, source.request_hour, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
                     source.cliente_nome, source.cliente_doc, source.local_coleta, source.numero_coleta, source.complemento_coleta, source.cidade_coleta, source.bairro_coleta, source.uf_coleta, source.cep_coleta, source.filial_id, source.filial_nome, source.usuario_nome,
-                    source.finish_date, source.manifest_item_pick_id, source.vehicle_type_id,
+                    source.finish_date, source.manifest_item_pick_id, source.pick_items_ids, source.vehicle_type_id,
                     source.cancellation_reason, source.cancellation_user_id,
                     source.destroy_reason, source.destroy_user_id, source.status_updated_at,
                     source.taxed_weight, source.pick_region, source.last_occurrence, source.acao_ocorrencia, source.numero_tentativas,
@@ -155,11 +156,11 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             int expectedCount;
             try {
                 final int metaCount = statement.getParameterMetaData().getParameterCount();
-                expectedCount = (metaCount > 0 ? metaCount : 36);
+                expectedCount = (metaCount > 0 ? metaCount : 37);
                 logger.debug("MERGE de Coletas preparado: {} parâmetro(s) esperado(s)", expectedCount);
             } catch (final SQLException pmEx) {
                 logger.debug("Não foi possível obter ParameterMetaData: {}", pmEx.getMessage());
-                expectedCount = 36;
+                expectedCount = 37;
             }
             // Define os parâmetros de forma segura e na ordem correta.
             int paramIndex = 1;
@@ -187,6 +188,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
             statement.setString(paramIndex++, coleta.getUsuarioNome());
             setDateParameter(statement, paramIndex++, coleta.getFinishDate());
             statement.setObject(paramIndex++, coleta.getManifestItemPickId(), Types.BIGINT);
+            statement.setString(paramIndex++, coleta.getPickItemsIds());
             statement.setObject(paramIndex++, coleta.getVehicleTypeId(), Types.BIGINT);
             statement.setString(paramIndex++, coleta.getCancellationReason());
             statement.setObject(paramIndex++, coleta.getCancellationUserId(), Types.BIGINT);

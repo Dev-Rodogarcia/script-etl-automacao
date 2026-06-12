@@ -29,8 +29,11 @@ Atributos-chave:
 package br.com.extrator.integracao.mapeamento.graphql.coletas;
 
 import br.com.extrator.dominio.graphql.coletas.ColetaNodeDTO;
+import br.com.extrator.dominio.graphql.coletas.PickItemDTO;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,6 +159,7 @@ public class ColetaMapper {
         entity.setComments(dto.getComments());
         entity.setAgentId(dto.getAgentId());
         entity.setManifestItemPickId(dto.getManifestItemPickId());
+        entity.setPickItemsIds(serializarPickItemIds(dto));
         entity.setVehicleTypeId(dto.getVehicleTypeId());
 
         // 2. Conversão segura de tipos de data
@@ -178,6 +182,22 @@ public class ColetaMapper {
         entity.setMetadata(metadata);
 
         return entity;
+    }
+
+    private String serializarPickItemIds(final ColetaNodeDTO dto) {
+        if (dto.getPickItems() == null || dto.getPickItems().isEmpty()) {
+            return null;
+        }
+        final List<Long> ids = dto.getPickItems().stream()
+            .filter(Objects::nonNull)
+            .map(PickItemDTO::getId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        if (ids.isEmpty()) {
+            return null;
+        }
+        return MapperUtil.toJson(ids);
     }
 
     /**

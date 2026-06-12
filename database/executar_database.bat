@@ -54,16 +54,26 @@ cd /d "%~dp0"
 
 REM --- Detectar modo ---
 set "MODO_RECRIAR=0"
+set "MODO_FORCE=0"
+
+:PARSE_ARGS
+if "%~1"=="" goto :ARGS_OK
 if /i "%~1"=="--help" goto :MOSTRAR_AJUDA
 if /i "%~1"=="-h" goto :MOSTRAR_AJUDA
 if /i "%~1"=="/?" goto :MOSTRAR_AJUDA
 if /i "%~1"=="--recriar" set "MODO_RECRIAR=1"
+if /i "%~1"=="--force" set "MODO_FORCE=1"
+shift
+goto :PARSE_ARGS
+
+:ARGS_OK
 
 echo.
 if "%MODO_RECRIAR%"=="1" (
     echo ============================================
     echo   EXECUTAR DATABASE - MODO DEV ^(--recriar^)
     echo   ATENCAO: banco sera apagado e recriado.
+    if "%MODO_FORCE%"=="1" echo   FORCE: confirmacao manual desabilitada.
     echo ============================================
 ) else (
     echo ============================================
@@ -87,7 +97,7 @@ if not exist "config.bat" (
 )
 
 REM --- 2. Carregar config.bat ---
-call config.bat
+call "%~dp0config.bat"
 
 REM --- 3. Validar variaveis obrigatorias ---
 if "%DB_SERVER%"=="" (
@@ -195,10 +205,12 @@ for %%F in (
     "migrations\033_tuning_indices_fatos.sql"
     "migrations\034_adicionar_hash_linha_usuarios.sql"
     "migrations\035_drop_views_legadas_powerbi.sql"
+    "migrations\036_corrigir_chave_manifestos_fallback_identificador.sql"
     "migrations\037_adicionar_status_fatura.sql"
     "migrations\038_atualizar_min_frete_cotacoes_matriz_uf.sql"
     "migrations\039_criar_dim_calendario_referencia_faturamento.sql"
     "migrations\040_criar_indice_performance_fretes.sql"
+    "migrations\041_adicionar_chave_pick_item_coletas_fretes.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -383,6 +395,7 @@ echo      Apaga e recria o banco definido em config.bat ^(ex.: ETL_SISTEMA^).
 echo      Depois cria tabelas base, aplica migrations, indices, views, procedures,
 echo      cargas iniciais SQL e validacoes.
 echo      Requer digitacao de RECRIAR para confirmar.
+echo      Use --force junto com --recriar para automacoes controladas.
 echo.
 echo Configuracao:
 echo   Copie config_exemplo.bat para config.bat e ajuste DB_SERVER, DB_PORT,
@@ -454,16 +467,30 @@ exit /b 0
 echo ATENCAO: Esta operacao vai APAGAR todos os dados do banco [%DB_NAME%].
 echo.
 set "CONFIRMA="
-set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
-if /i not "%CONFIRMA%"=="RECRIAR" (
-    echo Operacao cancelada.
+if /i "%MODO_FORCE%"=="1" (
+    echo [FORCE] Confirmacao manual ignorada por --force.
+) else (
+    set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
+    if /i not "%CONFIRMA%"=="RECRIAR" (
+        echo Operacao cancelada.
+        set "SQLCMDPASSWORD="
+        exit /b 2
+    )
+)
+
+echo.
+echo [CHECK] Permissao para recriar banco...
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% %AUTH_CMD% -d master -Q "IF ISNULL(IS_SRVROLEMEMBER('sysadmin'), 0) <> 1 AND ISNULL(IS_SRVROLEMEMBER('dbcreator'), 0) <> 1 AND ISNULL(HAS_PERMS_BY_NAME(NULL, NULL, 'CREATE ANY DATABASE'), 0) <> 1 BEGIN RAISERROR('Login atual nao tem permissao para CREATE DATABASE em master.', 16, 1); END" -b
+if errorlevel 1 (
+    echo [ERRO] Permissao insuficiente para recriar banco de dados: %DB_NAME%
     set "SQLCMDPASSWORD="
-    exit /b 2
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
 )
 
 echo.
 echo [EXEC] DROP / CREATE DATABASE [%DB_NAME%]...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% %AUTH_CMD% -d master -Q "IF DB_ID('%DB_NAME%') IS NOT NULL BEGIN ALTER DATABASE [%DB_NAME%] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%DB_NAME%]; END; CREATE DATABASE [%DB_NAME%];"
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% %AUTH_CMD% -d master -Q "IF DB_ID('%DB_NAME%') IS NOT NULL BEGIN ALTER DATABASE [%DB_NAME%] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%DB_NAME%]; END; CREATE DATABASE [%DB_NAME%];" -b
 if errorlevel 1 (
     echo [ERRO] Falha ao recriar banco de dados: %DB_NAME%
     set "SQLCMDPASSWORD="

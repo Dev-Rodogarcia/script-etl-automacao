@@ -308,6 +308,27 @@ END
 ELSE
     PRINT '    Indice IX_fretes_performance_minuta_cobertura ja existe ou colunas obrigatorias ausentes';
 
+-- Indice para ligar receita de fretes aos itens de coleta vindos da API GraphQL
+IF COL_LENGTH('dbo.fretes', 'pick_item_id') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'valor_total') IS NOT NULL
+   AND COL_LENGTH('dbo.fretes', 'excluido_na_origem') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'IX_fretes_pick_item_id'
+         AND object_id = OBJECT_ID('dbo.fretes')
+   )
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_fretes_pick_item_id
+    ON dbo.fretes(pick_item_id)
+    INCLUDE (id, valor_total, excluido_na_origem)
+    WHERE pick_item_id IS NOT NULL;
+
+    PRINT '  Indice IX_fretes_pick_item_id criado';
+END
+ELSE
+    PRINT '    Indice IX_fretes_pick_item_id ja existe ou colunas obrigatorias ausentes';
+
 -- ============================================================================
 -- LOCALIZACAO DE CARGAS - Indices para otimizar queries
 -- ============================================================================

@@ -89,6 +89,7 @@ public class FreteMapper {
         entity.setIdCorporacao(dto.getCorporationId());
         entity.setIdCidadeDestino(dto.getDestinationCityId());
         entity.setCorporationSequenceNumber(dto.getCorporationSequenceNumber());
+        entity.setPickItemId(dto.getPickItemId());
 
         // 1.1. Mapeamento dos campos expandidos (22 campos do CSV)
         if (dto.getPayer() != null) {

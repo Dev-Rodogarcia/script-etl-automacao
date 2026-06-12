@@ -8,8 +8,6 @@ for %%I in ("%~dp0..\..") do set "REPO_ROOT=%%~fI"
 pushd "%REPO_ROOT%"
 set "JAVA_BASE_OPTS=--enable-native-access=ALL-UNNAMED -DETL_BASE_DIR=%REPO_ROOT% -Detl.base.dir=%REPO_ROOT%"
 set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
-set "DB_STARTUP_LOG=%REPO_ROOT%\logs\aplicacao\operacoes\database_startup.log"
-set "DB_STARTUP_MARKER=%REPO_ROOT%\runtime\database_startup.ok"
 set "BASICS_READY=0"
 set "STARTUP_READY=0"
 set "SQLITE_AUTH_DB="
@@ -25,9 +23,19 @@ REM Para compilar, use o ambiente de desenvolvimento separadamente.
 REM ----------------------------------------------------------------
 set "PROD_MODE=1"
 set "PROD_NONINTERACTIVE=0"
+set "BACKFILL_DIRECT=0"
+if /i "%~1"=="--hard-backfill" (
+    set "PROD_NONINTERACTIVE=1"
+    set "BACKFILL_DIRECT=1"
+)
+if /i "%~1"=="--backfill-completo" (
+    set "PROD_NONINTERACTIVE=1"
+    set "BACKFILL_DIRECT=1"
+)
 if /i "%~1"=="--auto-intervalo" set "PROD_NONINTERACTIVE=1"
 if /i "%~1"=="--auto-extracao-completa" set "PROD_NONINTERACTIVE=1"
 
+if "%BACKFILL_DIRECT%"=="1" goto :RUN_BACKFILL_COMPLETO
 if /i "%~1"=="--auto-intervalo" goto :RUN_AUTO_INTERVALO
 if /i "%~1"=="--auto-extracao-completa" (
     call :PREPARE_SECURITY
@@ -67,15 +75,16 @@ echo ================================================================
 echo.
 echo 01. Extracao completa operacional ^(D-1..D + replay/validacao + Raster se habilitada^)
 echo 02. Loop de extracao 30 minutos ^(inclui inventario, sinistros e Raster se habilitada^)
-echo 03. Extracao por intervalo ^(inclui inventario, sinistros e Raster se habilitada^)
-echo 04. Testar API especifica ^(GraphQL, DataExport ou Raster^)
-echo 05. Validar configuracoes
-echo 06. Bateria extrema e relatorio de saude do ETL
-echo 07. Exportar CSV
-echo 08. Auditar estrutura das APIs
-echo 09. Ver ajuda de comandos
-echo 10. Gerenciar usuarios de acesso ^(tecla U^)
-echo 11. Extracao rapida ultimas 24h ^(sem replay^)
+echo 03. Backfill Completo ^(90 dias^) - Schema Ja Pronto
+echo 04. Extracao por intervalo ^(inclui inventario, sinistros e Raster se habilitada^)
+echo 05. Testar API especifica ^(GraphQL, DataExport ou Raster^)
+echo 06. Validar configuracoes
+echo 07. Bateria extrema e relatorio de saude do ETL
+echo 08. Exportar CSV
+echo 09. Auditar estrutura das APIs
+echo 10. Ver ajuda de comandos
+echo 11. Gerenciar usuarios de acesso ^(tecla U^)
+echo 12. Extracao rapida ultimas 24h ^(sem replay^)
 echo 00. Sair
 echo.
 echo Cobertura atual do ETL:
@@ -87,7 +96,7 @@ if not "%BASICS_READY%"=="1" (
     echo Ambiente sera validado ao executar a primeira opcao.
     echo.
 ) else if not "%STARTUP_READY%"=="1" (
-    echo Banco e objetos operacionais serao preparados apos a autenticacao da primeira acao que exigir escrita.
+    echo Banco e tabelas base serao validados apos a autenticacao da primeira acao que exigir escrita.
     echo.
 )
 call :READ_MENU_OPTION
@@ -105,15 +114,16 @@ if errorlevel 1 (
 
 if "%OP%"=="1" goto :RUN_01
 if "%OP%"=="2" goto :RUN_05
-if "%OP%"=="3" goto :RUN_04
-if "%OP%"=="4" goto :RUN_02
-if "%OP%"=="5" goto :RUN_03
-if "%OP%"=="6" goto :RUN_06
-if "%OP%"=="7" goto :RUN_07
-if "%OP%"=="8" goto :RUN_08
-if "%OP%"=="9" goto :RUN_AJUDA
-if "%OP%"=="10" goto :RUN_09
-if "%OP%"=="11" goto :RUN_11
+if "%OP%"=="3" goto :RUN_BACKFILL_COMPLETO
+if "%OP%"=="4" goto :RUN_04
+if "%OP%"=="5" goto :RUN_02
+if "%OP%"=="6" goto :RUN_03
+if "%OP%"=="7" goto :RUN_06
+if "%OP%"=="8" goto :RUN_07
+if "%OP%"=="9" goto :RUN_08
+if "%OP%"=="10" goto :RUN_AJUDA
+if "%OP%"=="11" goto :RUN_09
+if "%OP%"=="12" goto :RUN_11
 if "%OP%"=="0" goto :TRY_EXIT
 if "%OP%"=="00" goto :TRY_EXIT
 
@@ -198,6 +208,108 @@ if defined PREV_NONINTERACTIVE (
     set "EXTRATOR_NONINTERACTIVE="
 )
 goto :END_WITH_CODE
+
+:RUN_BACKFILL_COMPLETO
+set "BACKFILL_EXIT=0"
+set "BACKFILL_DATA_INICIO="
+set "BACKFILL_DATA_FIM="
+
+call :PREPARE_SECURITY
+if errorlevel 1 (
+    set "BACKFILL_EXIT=1"
+    goto :BACKFILL_COMPLETO_DONE
+)
+
+call :EXECUTION_SAFETY_GATE "Backfill completo 90 dias"
+if errorlevel 1 (
+    set "BACKFILL_EXIT=1"
+    goto :BACKFILL_COMPLETO_DONE
+)
+
+if not "%BACKFILL_DIRECT%"=="1" (
+    echo.
+    echo ================================================================
+    echo   BACKFILL COMPLETO - SCHEMA JA PRONTO
+    echo ================================================================
+    echo Nenhuma DDL sera executada por este fluxo.
+    echo O banco e as tabelas base devem existir antes da carga.
+    echo Pressione qualquer tecla para validar o schema e iniciar o backfill.
+    echo ================================================================
+    pause >nul
+)
+
+call :PREPARE_DATABASE
+if errorlevel 1 (
+    set "BACKFILL_EXIT=1"
+    goto :BACKFILL_COMPLETO_DONE
+)
+
+for /f "delims=" %%D in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Date).AddDays(-90).ToString('yyyy-MM-dd')"') do set "BACKFILL_DATA_INICIO=%%D"
+for /f "delims=" %%D in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Date).ToString('yyyy-MM-dd')"') do set "BACKFILL_DATA_FIM=%%D"
+
+if not defined BACKFILL_DATA_INICIO (
+    echo.
+    echo [ERRO] Nao foi possivel calcular a data inicial do backfill.
+    set "BACKFILL_EXIT=1"
+    goto :BACKFILL_COMPLETO_DONE
+)
+if not defined BACKFILL_DATA_FIM (
+    echo.
+    echo [ERRO] Nao foi possivel calcular a data final do backfill.
+    set "BACKFILL_EXIT=1"
+    goto :BACKFILL_COMPLETO_DONE
+)
+
+echo.
+echo ================================================================
+echo BACKFILL COMPLETO
+echo ================================================================
+echo Periodo: !BACKFILL_DATA_INICIO! a !BACKFILL_DATA_FIM!
+echo Escopo: todas as APIs e entidades habilitadas
+echo Schema: pre-existente, validado em modo somente leitura
+echo ================================================================
+
+call :EXPORT_AUTH_SESSION
+set "PREV_SKIP_AUTH_CHECK=%EXTRATOR_SKIP_AUTH_CHECK%"
+set "PREV_NONINTERACTIVE=%EXTRATOR_NONINTERACTIVE%"
+set "PREV_MENU_CHILD=%EXTRATOR_MENU_CHILD%"
+set "EXTRATOR_SKIP_AUTH_CHECK=1"
+set "EXTRATOR_NONINTERACTIVE=1"
+set "EXTRATOR_MENU_CHILD=1"
+call "%SCRIPT_ROOT%04-extracao_por_intervalo.bat" "!BACKFILL_DATA_INICIO!" "!BACKFILL_DATA_FIM!"
+set "BACKFILL_EXTRACAO_EXIT=!ERRORLEVEL!"
+if defined PREV_SKIP_AUTH_CHECK (
+    set "EXTRATOR_SKIP_AUTH_CHECK=%PREV_SKIP_AUTH_CHECK%"
+) else (
+    set "EXTRATOR_SKIP_AUTH_CHECK="
+)
+if defined PREV_NONINTERACTIVE (
+    set "EXTRATOR_NONINTERACTIVE=%PREV_NONINTERACTIVE%"
+) else (
+    set "EXTRATOR_NONINTERACTIVE="
+)
+if defined PREV_MENU_CHILD (
+    set "EXTRATOR_MENU_CHILD=%PREV_MENU_CHILD%"
+) else (
+    set "EXTRATOR_MENU_CHILD="
+)
+
+if not "!BACKFILL_EXTRACAO_EXIT!"=="0" (
+    set "BACKFILL_EXIT=!BACKFILL_EXTRACAO_EXIT!"
+    echo.
+    echo [AVISO] Materializacao das fatos BI ignorada porque a extracao retornou codigo !BACKFILL_EXIT!.
+) else (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "BACKFILL_EXIT=!ERRORLEVEL!"
+)
+
+:BACKFILL_COMPLETO_DONE
+if "%BACKFILL_DIRECT%"=="1" (
+    set "AUTO_EXIT=!BACKFILL_EXIT!"
+    goto :END_WITH_CODE
+)
+call :WAIT_AFTER_MENU_ACTION "Backfill completo" "!BACKFILL_EXIT!"
+goto :MENU
 
 :RUN_01
 call :PREPARE_SECURITY
@@ -541,40 +653,77 @@ exit /b 0
 :PREPARE_DATABASE
 if "%STARTUP_READY%"=="1" exit /b 0
 
-if /i "%EXTRATOR_SKIP_DB_PREPARE%"=="1" (
-    echo.
-    echo [INFO] Preparo de banco ignorado por EXTRATOR_SKIP_DB_PREPARE=1.
-    set "STARTUP_READY=1"
-    exit /b 0
-)
-
-call :DATABASE_MARKER_FRESH
-if not errorlevel 1 (
-    echo.
-    echo [OK] Preparo de banco recente. Pulando sqlcmd nesta inicializacao.
-    echo [INFO] Para forcar, defina EXTRATOR_FORCE_DB_PREPARE=1.
-    set "STARTUP_READY=1"
-    exit /b 0
-)
-
-if exist "%REPO_ROOT%\database\executar_database.bat" (
-    echo.
-    echo Preparando ambiente do banco...
-    set "EXTRATOR_DB_SILENT=1"
-    if not exist "%REPO_ROOT%\logs\aplicacao\operacoes" mkdir "%REPO_ROOT%\logs\aplicacao\operacoes" >nul 2>&1
-    call "%REPO_ROOT%\database\executar_database.bat" > "%DB_STARTUP_LOG%" 2>&1
-    set "EXTRATOR_DB_SILENT="
-    if errorlevel 1 (
-        echo [AVISO] Pipeline de banco retornou erro. Veja logs\aplicacao\operacoes\database_startup.log
-        timeout /t 3 /nobreak >nul 2>&1
-    ) else (
-        call :WRITE_DATABASE_MARKER
-        echo [OK] Ambiente de banco preparado, incluindo inventario/sinistros, Raster e views do BI.
-        echo [INFO] Referencia: logs\aplicacao\operacoes\database_startup.log
-    )
-)
+echo.
+echo Validando schema do banco ^(somente leitura^)...
+call :VALIDATE_DATABASE_READY
+if errorlevel 1 exit /b 1
 set "STARTUP_READY=1"
+echo [OK] Banco e objetos minimos validados. Nenhuma DDL foi executada.
 exit /b 0
+
+:VALIDATE_DATABASE_READY
+setlocal EnableExtensions DisableDelayedExpansion
+
+if not exist "%REPO_ROOT%\database\config.bat" (
+    echo [ERRO] Configuracao de banco nao encontrada: %REPO_ROOT%\database\config.bat
+    endlocal & exit /b 1
+)
+
+call "%REPO_ROOT%\database\config.bat"
+
+if "%DB_SERVER%"=="" (
+    echo [ERRO] DB_SERVER nao definido no config.bat.
+    endlocal & exit /b 1
+)
+if "%DB_NAME%"=="" (
+    echo [ERRO] DB_NAME nao definido no config.bat.
+    endlocal & exit /b 1
+)
+
+set "DB_SERVER_TARGET=%DB_SERVER%"
+if not "%DB_PORT%"=="" set "DB_SERVER_TARGET=%DB_SERVER%,%DB_PORT%"
+set "SQLCMD_FLAGS=-I -f 65001"
+if not "%SQLCMD_EXTRA_ARGS%"=="" set "SQLCMD_FLAGS=%SQLCMD_FLAGS% %SQLCMD_EXTRA_ARGS%"
+
+where sqlcmd >nul 2>nul
+if errorlevel 1 (
+    echo [ERRO] sqlcmd nao encontrado no PATH.
+    endlocal & exit /b 1
+)
+
+if "%DB_USER%"=="" (
+    set "AUTH_CMD=-E"
+    set "SQLCMDPASSWORD="
+    echo Autenticacao: Windows ^(integrada^)
+) else (
+    if "%DB_PASSWORD%"=="" (
+        echo [ERRO] DB_USER definido mas DB_PASSWORD esta vazio no config.bat.
+        endlocal & exit /b 1
+    )
+    set "AUTH_CMD=-U %DB_USER%"
+    set "SQLCMDPASSWORD=%DB_PASSWORD%"
+    echo Autenticacao: SQL ^(%DB_USER%^)
+)
+
+echo Servidor: %DB_SERVER_TARGET%  ^|  Banco: %DB_NAME%
+echo   [CHECK] Existencia do banco...
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d master %AUTH_CMD% -Q "SET NOCOUNT ON; IF DB_ID(N'%DB_NAME%') IS NULL BEGIN RAISERROR('Banco %DB_NAME% nao existe. Crie o schema manualmente antes de executar o ETL.', 16, 1); END; SELECT DB_ID(N'%DB_NAME%') AS database_id;" -b
+if errorlevel 1 (
+    echo [ERRO] Banco %DB_NAME% nao esta pronto.
+    set "SQLCMDPASSWORD="
+    endlocal & exit /b 1
+)
+
+echo   [CHECK] Tabelas base e procedures de materializacao...
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "SET NOCOUNT ON; DECLARE @missing TABLE (tipo varchar(20) NOT NULL, nome sysname NOT NULL); INSERT INTO @missing(tipo, nome) SELECT 'TABLE', v.nome FROM (VALUES (N'coletas'),(N'fretes'),(N'manifestos'),(N'cotacoes'),(N'localizacao_cargas'),(N'contas_a_pagar'),(N'faturas_por_cliente'),(N'dim_calendario'),(N'log_extracoes'),(N'page_audit'),(N'dim_usuarios'),(N'sys_execution_history'),(N'sys_auditoria_temp'),(N'sys_execution_audit'),(N'sys_execution_watermark'),(N'dim_usuarios_historico'),(N'schema_migrations'),(N'etl_invalid_records'),(N'inventario'),(N'sinistros'),(N'sys_replay_idempotency'),(N'sys_reconciliation_quarantine'),(N'raster_viagens'),(N'raster_viagem_paradas'),(N'localizacao_cargas_regiao_destino_alias'),(N'manifestos_frota_propria_cnpjs'),(N'fato_gestao_vista_fretes'),(N'fato_gestao_vista_coletores'),(N'fato_fretes_faturamento'),(N'fato_gestao_vista_faturas')) AS v(nome) WHERE OBJECT_ID(N'dbo.' + v.nome, N'U') IS NULL; INSERT INTO @missing(tipo, nome) SELECT 'PROCEDURE', v.nome FROM (VALUES (N'sp_carga_fato_gestao_vista_fretes'),(N'sp_carga_fato_gestao_vista_coletores'),(N'sp_carga_fato_fretes_faturamento'),(N'sp_carga_fato_gestao_vista_faturas')) AS v(nome) WHERE OBJECT_ID(N'dbo.' + v.nome, N'P') IS NULL; IF EXISTS (SELECT 1 FROM @missing) BEGIN SELECT tipo, nome FROM @missing ORDER BY tipo, nome; RAISERROR('Schema manual incompleto. Execute o DDL manualmente antes de rodar automacoes de carga.', 16, 1); RETURN; END; SELECT 'OK' AS schema_status;" -b
+if errorlevel 1 (
+    echo [ERRO] Schema manual incompleto. Nenhuma correcao automatica sera aplicada.
+    set "SQLCMDPASSWORD="
+    endlocal & exit /b 1
+)
+
+set "SQLCMDPASSWORD="
+endlocal & exit /b 0
 
 :MATERIALIZAR_FATOS_BI_POST_RUN
 setlocal EnableExtensions DisableDelayedExpansion
@@ -666,17 +815,6 @@ goto :MATERIALIZAR_FATOS_BI_ERRO
 set "SQLCMDPASSWORD="
 endlocal & exit /b 1
 
-:DATABASE_MARKER_FRESH
-if /i "%EXTRATOR_FORCE_DB_PREPARE%"=="1" exit /b 1
-if not exist "%DB_STARTUP_MARKER%" exit /b 1
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$marker=$env:DB_STARTUP_MARKER; $repo=$env:REPO_ROOT; $ttl=1440; if ($env:EXTRATOR_DB_PREPARE_TTL_MINUTES) { [int]::TryParse($env:EXTRATOR_DB_PREPARE_TTL_MINUTES, [ref]$ttl) | Out-Null }; $item=Get-Item -LiteralPath $marker -ErrorAction SilentlyContinue; if (-not $item) { exit 1 }; if ((New-TimeSpan -Start $item.LastWriteTime -End (Get-Date)).TotalMinutes -gt $ttl) { exit 1 }; $databaseRoot=Join-Path $repo 'database'; $paths=@('tabelas','migrations','indices','views','views-dimensao','procedures','validacao') | ForEach-Object { Join-Path $databaseRoot $_ }; $newer=Get-ChildItem -LiteralPath $paths -Recurse -Filter *.sql -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $item.LastWriteTime } | Select-Object -First 1; if ($newer) { exit 1 }; exit 0"
-exit /b %ERRORLEVEL%
-
-:WRITE_DATABASE_MARKER
-if not exist "%REPO_ROOT%\runtime" mkdir "%REPO_ROOT%\runtime" >nul 2>&1
-> "%DB_STARTUP_MARKER%" echo prepared_at=%DATE% %TIME%
-exit /b 0
-
 :START_MATERIALIZACAO_BI_SCHEDULER
 echo.
 echo [INFO] Scheduler isolado de materializacao BI desativado.
@@ -716,13 +854,13 @@ exit /b 1
 
 :READ_MENU_OPTION
 set "OP="
-set /p "OP=Escolha uma opcao [1-11, U=Usuarios, 0=Sair]: " || exit /b 1
+set /p "OP=Escolha uma opcao [1-12, U=Usuarios, 0=Sair]: " || exit /b 1
 set "OP=%OP: =%"
 if not defined OP exit /b 2
 if "%OP%"=="00" set "OP=0"
 if "%OP:~0,1%"=="0" if not "%OP%"=="0" set "OP=%OP:~1%"
-if /i "%OP%"=="U" set "OP=10"
-for %%V in (0 1 2 3 4 5 6 7 8 9 10 11) do (
+if /i "%OP%"=="U" set "OP=11"
+for %%V in (0 1 2 3 4 5 6 7 8 9 10 11 12) do (
     if "%OP%"=="%%V" exit /b 0
 )
 exit /b 2

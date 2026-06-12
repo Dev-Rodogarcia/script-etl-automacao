@@ -50,6 +50,7 @@ package br.com.extrator.dominio.graphql.coletas;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
@@ -158,6 +159,9 @@ public class ColetaNodeDTO {
 
     @JsonProperty("manifestItemPickId")
     private Long manifestItemPickId;
+
+    @JsonProperty("pickItems")
+    private List<PickItemDTO> pickItems;
 
     // --- Campos Expandidos (Objetos Aninhados) ---
     @JsonProperty("customer")
@@ -432,6 +436,14 @@ public class ColetaNodeDTO {
 
     public void setManifestItemPickId(final Long manifestItemPickId) {
         this.manifestItemPickId = manifestItemPickId;
+    }
+
+    public List<PickItemDTO> getPickItems() {
+        return pickItems;
+    }
+
+    public void setPickItems(final List<PickItemDTO> pickItems) {
+        this.pickItems = pickItems;
     }
 
     // --- Getters e Setters para Campos Expandidos ---

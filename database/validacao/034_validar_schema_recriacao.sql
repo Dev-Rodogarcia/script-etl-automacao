@@ -108,10 +108,12 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'033_tuning_indices_fatos'),
     (N'034_adicionar_hash_linha_usuarios'),
     (N'035_drop_views_legadas_powerbi'),
+    (N'036_corrigir_chave_manifestos_fallback_identificador'),
     (N'037_adicionar_status_fatura'),
     (N'038_atualizar_min_frete_cotacoes_matriz_uf'),
     (N'039_criar_dim_calendario_referencia_faturamento'),
-    (N'040_criar_indice_performance_fretes');
+    (N'040_criar_indice_performance_fretes'),
+    (N'041_adicionar_chave_pick_item_coletas_fretes');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -137,6 +139,12 @@ IF COL_LENGTH(N'dbo.fretes', N'fit_dpn_performance_finished_at') IS NULL
 IF COL_LENGTH(N'dbo.fretes', N'corporation_sequence_number') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.corporation_sequence_number', N'Coluna da migration 006 ausente');
 
+IF COL_LENGTH(N'dbo.fretes', N'pick_item_id') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fretes.pick_item_id', N'Coluna da migration 041 ausente');
+
+IF COL_LENGTH(N'dbo.coletas', N'pick_items_ids') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.coletas.pick_items_ids', N'Coluna da migration 041 ausente');
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes i
@@ -157,6 +165,28 @@ IF NOT EXISTS (
         N'INDICE',
         N'IX_fretes_performance_minuta_cobertura',
         N'Indice de cobertura por minuta do Dashboard de Performance ausente ou fora do contrato'
+    );
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes i
+    INNER JOIN sys.index_columns ic
+        ON ic.object_id = i.object_id
+       AND ic.index_id = i.index_id
+       AND ic.key_ordinal = 1
+    INNER JOIN sys.columns c
+        ON c.object_id = ic.object_id
+       AND c.column_id = ic.column_id
+    WHERE i.name = N'IX_fretes_pick_item_id'
+      AND i.object_id = OBJECT_ID(N'dbo.fretes')
+      AND i.type_desc = N'NONCLUSTERED'
+      AND i.is_disabled = 0
+      AND c.name = N'pick_item_id'
+)
+    INSERT INTO @falhas VALUES (
+        N'INDICE',
+        N'IX_fretes_pick_item_id',
+        N'Indice de ligacao Freight.pickItemId -> Pick.pickItems[].id ausente ou fora do contrato'
     );
 
 IF COL_LENGTH(N'dbo.log_extracoes', N'noop_count') IS NULL
