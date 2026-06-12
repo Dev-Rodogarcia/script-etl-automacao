@@ -4,152 +4,7 @@
 -- ============================================
 
 CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
-SELECT
-
-    CAST(m.created_at AS TIME(0)) AS [Hora (Solicitacao)],
-
-    CAST(m.created_at AS TIME(0)) AS [Hora (Criação)],
-    m.sequence_code                                     AS [Número],
-    m.identificador_unico                               AS [Identificador Único],
-    CASE m.status
-        WHEN 'closed' THEN 'encerrado'
-        WHEN 'in_transit' THEN 'em trânsito'
-        WHEN 'pending' THEN 'pendente'
-        ELSE m.status
-    END                                                 AS [Status],
-    m.classification                                    AS [Classificação],
-    m.branch_nickname                                   AS [Filial],
-    m.branch_nickname                                   AS [Filial Emissora],
-    m.created_at                                        AS [Data criação],
-    m.departured_at                                     AS [Saída],
-    m.closed_at                                         AS [Fechamento],
-    m.finished_at                                       AS [Chegada],
-    m.mdfe_number                                       AS [MDFe],
-    m.mdfe_key                                          AS [MDF-es/Chave],
-    CASE m.mdfe_status
-        WHEN 'pending' THEN 'pendente'
-        WHEN 'closed' THEN 'encerrado'
-        WHEN 'issued' THEN 'emitido'
-        WHEN 'rejected' THEN 'rejeitado'
-        ELSE m.mdfe_status
-    END                                                 AS [MDFe/Status],
-    m.distribution_pole                                 AS [Polo de distribuição],
-    m.vehicle_plate                                     AS [Veículo/Placa],
-    m.vehicle_type                                      AS [Tipo Veículo],
-    m.vehicle_owner                                     AS [Proprietário/Nome],
-    proprietario_documento.proprietario_documento       AS [Proprietário/Documento],
-    tipo_motorista.tipo_motorista                       AS [Tipo Motorista],
-    m.driver_name                                       AS [Motorista],
-    m.vehicle_departure_km                              AS [Km saída],
-    m.closing_km                                        AS [Km chegada],
-    m.traveled_km                                       AS [KM viagem],
-    CASE WHEN m.manual_km = 1 THEN 'é manual'
-         WHEN m.manual_km = 0 THEN 'não é manual'
-         ELSE NULL
-    END                                                 AS [Km manual],
-    m.invoices_count                                    AS [Qtd NF],
-    m.invoices_volumes                                  AS [Volumes NF],
-    m.invoices_weight                                   AS [Peso NF],
-    m.total_taxed_weight                                AS [Total peso taxado],
-    m.total_cubic_volume                                AS [Total M3],
-    m.invoices_value                                    AS [Valor NF],
-    m.manifest_freights_total                           AS [Fretes/Total],
-    (COALESCE(m.manifest_freights_total, 0) + COALESCE(sub_coleta.receita_coleta, 0))
-                                                        AS [Receita Total Transportada],
-    m.pick_sequence_code                                AS [Coleta/Número],
-    m.contract_number                                   AS [CIOT/Número],
-    CASE m.contract_type
-        WHEN 'aggregate' THEN 'prestador agregado'
-        WHEN 'driver' THEN 'motorista autônomo'
-        ELSE m.contract_type
-    END                                                 AS [Tipo de contrato],
-    CASE m.calculation_type
-        WHEN 'price_table' THEN 'tabela de preço'
-        WHEN 'agreed' THEN 'acordado'
-        ELSE m.calculation_type
-    END                                                 AS [Tipo de cálculo],
-    CASE m.cargo_type
-        WHEN 'fractioned' THEN 'carga fracionada'
-        WHEN 'closed' THEN 'carga fechada'
-        ELSE m.cargo_type
-    END                                                 AS [Tipo de carga],
-    m.daily_subtotal                                    AS [Diária],
-    m.total_cost                                        AS [Custo total],
-    m.freight_subtotal                                  AS [Valor frete],
-    m.fuel_subtotal                                     AS [Combustível],
-    m.toll_subtotal                                     AS [Pedágio],
-    m.driver_services_total                             AS [Serviços motorista/Total],
-    m.operational_expenses_total                        AS [Despesa operacional],
-    m.inss_value                                        AS [Dados do agregado/INSS],
-    m.sest_senat_value                                  AS [Dados do agregado/SEST/SENAT],
-    m.ir_value                                          AS [Dados do agregado/IR],
-    m.paying_total                                      AS [Saldo a pagar],
-    m.uniq_destinations_count                           AS [Destinos únicos/Qtd],
-    m.generate_mdfe                                     AS [Gerar MDF-e],
-    m.monitoring_request                                AS [Solicitou Monitoramento],
-    CASE 
-        WHEN m.monitoring_request = 1 THEN 'sim'
-        WHEN m.monitoring_request = 0 THEN 'não'
-        ELSE NULL
-    END                                                 AS [Solicitação Monitoramento],
-    m.mobile_read_at                                    AS [Leitura Móvel/Em],
-    m.km                                                AS [KM Total],
-    m.delivery_manifest_items_count                     AS [Itens/Entrega],
-    m.transfer_manifest_items_count                     AS [Itens/Transferência],
-    m.pick_manifest_items_count                         AS [Itens/Coleta],
-    m.dispatch_draft_manifest_items_count               AS [Itens/Despacho Rascunho],
-    m.consolidation_manifest_items_count                AS [Itens/Consolidação],
-    m.reverse_pick_manifest_items_count                 AS [Itens/Coleta Reversa],
-    m.manifest_items_count                              AS [Itens/Total],
-    m.finalized_manifest_items_count                    AS [Itens/Finalizados],
-    m.calculated_pick_count                             AS [Calculado/Coleta],
-    m.calculated_delivery_count                         AS [Calculado/Entrega],
-    m.calculated_dispatch_count                         AS [Calculado/Despacho],
-    m.calculated_consolidation_count                    AS [Calculado/Consolidação],
-    m.calculated_reverse_pick_count                     AS [Calculado/Coleta Reversa],
-    m.pick_subtotal                                     AS [Valor/Coletas],
-    m.delivery_subtotal                                 AS [Valor/Entregas],
-    m.dispatch_subtotal                                 AS [Despachos],
-    m.consolidation_subtotal                            AS [Consolidações],
-    m.reverse_pick_subtotal                             AS [Coleta Reversa],
-    m.advance_subtotal                                  AS [Adiantamento],
-    m.fleet_costs_subtotal                              AS [Custos Frota],
-    m.additionals_subtotal                              AS [Adicionais],
-    m.discounts_subtotal                                AS [Descontos],
-    m.discount_value                                    AS [Desconto/Valor],
-    m.adjustment_comments                               AS [Liberação de Custo de Agregado/Comentários],
-    m.iks_id                                            AS [IKS ID],
-    m.programacao_sequence_code                         AS [Programação/Número],
-    m.programacao_starting_at                           AS [Programação/Início],
-    m.programacao_ending_at                             AS [Programação/Término],
-    m.trailer1_license_plate                            AS [Carreta 1/Placa],
-    m.trailer1_weight_capacity                          AS [Carreta 1/Capacidade Peso],
-    m.trailer2_license_plate                            AS [Carreta 2/Placa],
-    m.trailer2_weight_capacity                          AS [Carreta 2/Capacidade Peso],
-    m.vehicle_weight_capacity                           AS [Veículo/Capacidade Peso],
-    m.vehicle_cubic_weight                              AS [Veículo/Peso Cubado],
-    CASE
-        WHEN COALESCE(m.trailer1_weight_capacity, 0) = 0
-            THEN COALESCE(m.vehicle_weight_capacity, 0)
-        ELSE
-            COALESCE(m.trailer1_weight_capacity, 0) + COALESCE(m.trailer2_weight_capacity, 0)
-    END                                                 AS [Capacidade Lotação Kg],
-    REPLACE(REPLACE(REPLACE(m.unloading_recipient_names, '[', ''), ']', ''), '"', '')
-                                                        AS [Descarregamento/Destinatários],
-    REPLACE(REPLACE(REPLACE(m.unloading_recipient_names, '[', ''), ']', ''), '"', '')
-                                                        AS [Local de Descarregamento],
-    REPLACE(REPLACE(REPLACE(m.delivery_region_names, '[', ''), ']', ''), '"', '')
-                                                        AS [Entrega/Regiões],
-    m.programacao_cliente                               AS [Programação/Cliente],
-    m.programacao_tipo_servico                          AS [Programação/Tipo Serviço],
-    m.creation_user_name                                AS [Usuário/Emissor],
-    m.adjustment_user_name                              AS [Usuário/Ajuste],
-    m.obs_operacional                                   AS [Liberação/Comentários Operacionais],
-    m.obs_financeira                                    AS [Comentários Fechamento],
-    m.metadata                                          AS [Metadata],
-    m.data_extracao                                     AS [Data de extracao]
-FROM dbo.manifestos AS m
-LEFT JOIN (
+WITH CTE_Coletas_Receita AS (
     SELECT
         c.sequence_code AS sequence_code,
         SUM(COALESCE(f.valor_total, 0)) AS receita_coleta
@@ -165,7 +20,157 @@ LEFT JOIN (
        AND COALESCE(f.excluido_na_origem, 0) = 0
     WHERE COALESCE(c.excluido_na_origem, 0) = 0
     GROUP BY c.sequence_code
-) AS sub_coleta ON sub_coleta.sequence_code = m.pick_sequence_code
+)
+SELECT
+    CAST(MAX(m.created_at) AS TIME(0))                 AS [Hora (Solicitacao)],
+    CAST(MAX(m.created_at) AS TIME(0))                 AS [Hora (Criação)],
+    m.sequence_code                                     AS [Número],
+    MAX(m.identificador_unico)                          AS [Identificador Único],
+    CASE MAX(m.status)
+        WHEN 'closed' THEN 'encerrado'
+        WHEN 'in_transit' THEN 'em trânsito'
+        WHEN 'pending' THEN 'pendente'
+        ELSE MAX(m.status)
+    END                                                 AS [Status],
+    MAX(m.classification)                               AS [Classificação],
+    MAX(m.branch_nickname)                              AS [Filial],
+    MAX(m.branch_nickname)                              AS [Filial Emissora],
+    MAX(m.created_at)                                   AS [Data criação],
+    MAX(m.departured_at)                                AS [Saída],
+    MAX(m.closed_at)                                    AS [Fechamento],
+    MAX(m.finished_at)                                  AS [Chegada],
+    MAX(m.mdfe_number)                                  AS [MDFe],
+    MAX(m.mdfe_key)                                     AS [MDF-es/Chave],
+    CASE MAX(m.mdfe_status)
+        WHEN 'pending' THEN 'pendente'
+        WHEN 'closed' THEN 'encerrado'
+        WHEN 'issued' THEN 'emitido'
+        WHEN 'rejected' THEN 'rejeitado'
+        ELSE MAX(m.mdfe_status)
+    END                                                 AS [MDFe/Status],
+    MAX(m.distribution_pole)                            AS [Polo de distribuição],
+    MAX(m.vehicle_plate)                                AS [Veículo/Placa],
+    MAX(m.vehicle_type)                                 AS [Tipo Veículo],
+    MAX(m.vehicle_owner)                                AS [Proprietário/Nome],
+    MAX(proprietario_documento.proprietario_documento)  AS [Proprietário/Documento],
+    MAX(tipo_motorista.tipo_motorista)                  AS [Tipo Motorista],
+    MAX(m.driver_name)                                  AS [Motorista],
+    MAX(m.vehicle_departure_km)                         AS [Km saída],
+    MAX(m.closing_km)                                   AS [Km chegada],
+    MAX(m.traveled_km)                                  AS [KM viagem],
+    CASE MAX(CAST(m.manual_km AS INT))
+        WHEN 1 THEN 'é manual'
+        WHEN 0 THEN 'não é manual'
+        ELSE NULL
+    END                                                 AS [Km manual],
+    MAX(m.invoices_count)                               AS [Qtd NF],
+    MAX(m.invoices_volumes)                             AS [Volumes NF],
+    MAX(m.invoices_weight)                              AS [Peso NF],
+    MAX(m.total_taxed_weight)                           AS [Total peso taxado],
+    MAX(m.total_cubic_volume)                           AS [Total M3],
+    MAX(m.invoices_value)                               AS [Valor NF],
+    MAX(m.manifest_freights_total)                      AS [Fretes/Total],
+    SUM(COALESCE(sub_coleta.receita_coleta, 0))         AS [Coletas/Total],
+    (
+        MAX(COALESCE(m.manifest_freights_total, 0))
+        + SUM(COALESCE(sub_coleta.receita_coleta, 0))
+    )                                                   AS [Receita Total Transportada],
+    STRING_AGG(CAST(m.pick_sequence_code AS NVARCHAR(MAX)), N', ')
+                                                        AS [Coleta/Número],
+    MAX(m.contract_number)                              AS [CIOT/Número],
+    CASE MAX(m.contract_type)
+        WHEN 'aggregate' THEN 'prestador agregado'
+        WHEN 'driver' THEN 'motorista autônomo'
+        ELSE MAX(m.contract_type)
+    END                                                 AS [Tipo de contrato],
+    CASE MAX(m.calculation_type)
+        WHEN 'price_table' THEN 'tabela de preço'
+        WHEN 'agreed' THEN 'acordado'
+        ELSE MAX(m.calculation_type)
+    END                                                 AS [Tipo de cálculo],
+    CASE MAX(m.cargo_type)
+        WHEN 'fractioned' THEN 'carga fracionada'
+        WHEN 'closed' THEN 'carga fechada'
+        ELSE MAX(m.cargo_type)
+    END                                                 AS [Tipo de carga],
+    MAX(m.daily_subtotal)                               AS [Diária],
+    MAX(m.total_cost)                                   AS [Custo total],
+    MAX(m.freight_subtotal)                             AS [Valor frete],
+    MAX(m.fuel_subtotal)                                AS [Combustível],
+    MAX(m.toll_subtotal)                                AS [Pedágio],
+    MAX(m.driver_services_total)                        AS [Serviços motorista/Total],
+    MAX(m.operational_expenses_total)                   AS [Despesa operacional],
+    MAX(m.inss_value)                                   AS [Dados do agregado/INSS],
+    MAX(m.sest_senat_value)                             AS [Dados do agregado/SEST/SENAT],
+    MAX(m.ir_value)                                     AS [Dados do agregado/IR],
+    MAX(m.paying_total)                                 AS [Saldo a pagar],
+    MAX(m.uniq_destinations_count)                      AS [Destinos únicos/Qtd],
+    CAST(MAX(CAST(m.generate_mdfe AS INT)) AS BIT)      AS [Gerar MDF-e],
+    CAST(MAX(CAST(m.monitoring_request AS INT)) AS BIT) AS [Solicitou Monitoramento],
+    CASE MAX(CAST(m.monitoring_request AS INT))
+        WHEN 1 THEN 'sim'
+        WHEN 0 THEN 'não'
+        ELSE NULL
+    END                                                 AS [Solicitação Monitoramento],
+    MAX(m.mobile_read_at)                               AS [Leitura Móvel/Em],
+    MAX(m.km)                                           AS [KM Total],
+    MAX(m.delivery_manifest_items_count)                AS [Itens/Entrega],
+    MAX(m.transfer_manifest_items_count)                AS [Itens/Transferência],
+    MAX(m.pick_manifest_items_count)                    AS [Itens/Coleta],
+    MAX(m.dispatch_draft_manifest_items_count)          AS [Itens/Despacho Rascunho],
+    MAX(m.consolidation_manifest_items_count)           AS [Itens/Consolidação],
+    MAX(m.reverse_pick_manifest_items_count)            AS [Itens/Coleta Reversa],
+    MAX(m.manifest_items_count)                         AS [Itens/Total],
+    MAX(m.finalized_manifest_items_count)               AS [Itens/Finalizados],
+    MAX(m.calculated_pick_count)                        AS [Calculado/Coleta],
+    MAX(m.calculated_delivery_count)                    AS [Calculado/Entrega],
+    MAX(m.calculated_dispatch_count)                    AS [Calculado/Despacho],
+    MAX(m.calculated_consolidation_count)               AS [Calculado/Consolidação],
+    MAX(m.calculated_reverse_pick_count)                AS [Calculado/Coleta Reversa],
+    MAX(m.pick_subtotal)                                AS [Valor/Coletas],
+    MAX(m.delivery_subtotal)                            AS [Valor/Entregas],
+    MAX(m.dispatch_subtotal)                            AS [Despachos],
+    MAX(m.consolidation_subtotal)                       AS [Consolidações],
+    MAX(m.reverse_pick_subtotal)                        AS [Coleta Reversa],
+    MAX(m.advance_subtotal)                             AS [Adiantamento],
+    MAX(m.fleet_costs_subtotal)                         AS [Custos Frota],
+    MAX(m.additionals_subtotal)                         AS [Adicionais],
+    MAX(m.discounts_subtotal)                           AS [Descontos],
+    MAX(m.discount_value)                               AS [Desconto/Valor],
+    MAX(m.adjustment_comments)                          AS [Liberação de Custo de Agregado/Comentários],
+    MAX(m.iks_id)                                       AS [IKS ID],
+    MAX(m.programacao_sequence_code)                    AS [Programação/Número],
+    MAX(m.programacao_starting_at)                      AS [Programação/Início],
+    MAX(m.programacao_ending_at)                        AS [Programação/Término],
+    MAX(m.trailer1_license_plate)                       AS [Carreta 1/Placa],
+    MAX(m.trailer1_weight_capacity)                     AS [Carreta 1/Capacidade Peso],
+    MAX(m.trailer2_license_plate)                       AS [Carreta 2/Placa],
+    MAX(m.trailer2_weight_capacity)                     AS [Carreta 2/Capacidade Peso],
+    MAX(m.vehicle_weight_capacity)                      AS [Veículo/Capacidade Peso],
+    MAX(m.vehicle_cubic_weight)                         AS [Veículo/Peso Cubado],
+    CASE
+        WHEN COALESCE(MAX(m.trailer1_weight_capacity), 0) = 0
+            THEN COALESCE(MAX(m.vehicle_weight_capacity), 0)
+        ELSE
+            COALESCE(MAX(m.trailer1_weight_capacity), 0) + COALESCE(MAX(m.trailer2_weight_capacity), 0)
+    END                                                 AS [Capacidade Lotação Kg],
+    MAX(REPLACE(REPLACE(REPLACE(m.unloading_recipient_names, '[', ''), ']', ''), '"', ''))
+                                                        AS [Descarregamento/Destinatários],
+    MAX(REPLACE(REPLACE(REPLACE(m.unloading_recipient_names, '[', ''), ']', ''), '"', ''))
+                                                        AS [Local de Descarregamento],
+    MAX(REPLACE(REPLACE(REPLACE(m.delivery_region_names, '[', ''), ']', ''), '"', ''))
+                                                        AS [Entrega/Regiões],
+    MAX(m.programacao_cliente)                          AS [Programação/Cliente],
+    MAX(m.programacao_tipo_servico)                     AS [Programação/Tipo Serviço],
+    MAX(m.creation_user_name)                           AS [Usuário/Emissor],
+    MAX(m.adjustment_user_name)                         AS [Usuário/Ajuste],
+    MAX(m.obs_operacional)                              AS [Liberação/Comentários Operacionais],
+    MAX(m.obs_financeira)                               AS [Comentários Fechamento],
+    MAX(m.metadata)                                     AS [Metadata],
+    MAX(m.data_extracao)                                AS [Data de extracao]
+FROM dbo.manifestos AS m
+LEFT JOIN CTE_Coletas_Receita AS sub_coleta
+    ON sub_coleta.sequence_code = m.pick_sequence_code
 OUTER APPLY OPENJSON(CASE WHEN ISJSON(m.metadata) = 1 THEN m.metadata END)
 WITH (
     mft_vie_onr_document NVARCHAR(255) '$.mft_vie_onr_document',
@@ -211,7 +216,8 @@ OUTER APPLY (
         ELSE N'Terceiro / Autônomo'
     END AS tipo_motorista
 ) tipo_motorista
-WHERE m.excluido_na_origem = 0;
+WHERE m.excluido_na_origem = 0
+GROUP BY m.sequence_code;
 GO
 
 PRINT 'View vw_manifestos_powerbi criada/atualizada com sucesso!';
