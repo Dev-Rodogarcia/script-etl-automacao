@@ -85,10 +85,10 @@ END
 GO
 
 -- ============================================
--- Validação 3: vw_dim_veiculos (Chave: Placa)
+-- Validação 3: vw_dim_veiculos (Chave: Placa + Filial)
 -- ============================================
 PRINT '';
-PRINT '3. Validando vw_dim_veiculos (Chave: Placa)...';
+PRINT '3. Validando vw_dim_veiculos (Chave: Placa + Filial)...';
 
 IF EXISTS (SELECT 1 FROM sys.views WHERE name = 'vw_dim_veiculos' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -96,22 +96,27 @@ BEGIN
     DECLARE @VeiculosDistinct INT;
     
     SELECT @VeiculosTotal = COUNT(*) FROM dbo.vw_dim_veiculos;
-    SELECT @VeiculosDistinct = COUNT(DISTINCT Placa) FROM dbo.vw_dim_veiculos;
+    SELECT @VeiculosDistinct = COUNT(*)
+    FROM (
+        SELECT Placa, Filial
+        FROM dbo.vw_dim_veiculos
+        GROUP BY Placa, Filial
+    ) v;
     
     IF @VeiculosTotal = @VeiculosDistinct
     BEGIN
-        PRINT '   ✅ OK: vw_dim_veiculos - ' + CAST(@VeiculosTotal AS VARCHAR) + ' veículos únicos';
+        PRINT '   ✅ OK: vw_dim_veiculos - ' + CAST(@VeiculosTotal AS VARCHAR) + ' veículos/filiais únicos';
     END
     ELSE
     BEGIN
-        PRINT '   ❌ ERRO: vw_dim_veiculos tem placas duplicadas!';
+        PRINT '   ❌ ERRO: vw_dim_veiculos tem combinações Placa + Filial duplicadas!';
         PRINT '   Total de linhas: ' + CAST(@VeiculosTotal AS VARCHAR);
-        PRINT '   Placas únicas: ' + CAST(@VeiculosDistinct AS VARCHAR);
-        PRINT '   Placas duplicadas encontradas:';
+        PRINT '   Combinações únicas: ' + CAST(@VeiculosDistinct AS VARCHAR);
+        PRINT '   Combinações duplicadas encontradas:';
         
-        SELECT Placa, COUNT(*) AS Quantidade
+        SELECT Placa, Filial, COUNT(*) AS Quantidade
         FROM dbo.vw_dim_veiculos
-        GROUP BY Placa
+        GROUP BY Placa, Filial
         HAVING COUNT(*) > 1;
     END
 END
@@ -122,10 +127,10 @@ END
 GO
 
 -- ============================================
--- Validação 4: vw_dim_motoristas (Chave: NomeMotorista)
+-- Validação 4: vw_dim_motoristas (Chave: NomeMotorista + Filial)
 -- ============================================
 PRINT '';
-PRINT '4. Validando vw_dim_motoristas (Chave: NomeMotorista)...';
+PRINT '4. Validando vw_dim_motoristas (Chave: NomeMotorista + Filial)...';
 
 IF EXISTS (SELECT 1 FROM sys.views WHERE name = 'vw_dim_motoristas' AND schema_id = SCHEMA_ID('dbo'))
 BEGIN
@@ -133,22 +138,27 @@ BEGIN
     DECLARE @MotoristasDistinct INT;
     
     SELECT @MotoristasTotal = COUNT(*) FROM dbo.vw_dim_motoristas;
-    SELECT @MotoristasDistinct = COUNT(DISTINCT NomeMotorista) FROM dbo.vw_dim_motoristas;
+    SELECT @MotoristasDistinct = COUNT(*)
+    FROM (
+        SELECT NomeMotorista, Filial
+        FROM dbo.vw_dim_motoristas
+        GROUP BY NomeMotorista, Filial
+    ) m;
     
     IF @MotoristasTotal = @MotoristasDistinct
     BEGIN
-        PRINT '   ✅ OK: vw_dim_motoristas - ' + CAST(@MotoristasTotal AS VARCHAR) + ' motoristas únicos';
+        PRINT '   ✅ OK: vw_dim_motoristas - ' + CAST(@MotoristasTotal AS VARCHAR) + ' motoristas/filiais únicos';
     END
     ELSE
     BEGIN
-        PRINT '   ❌ ERRO: vw_dim_motoristas tem nomes duplicados!';
+        PRINT '   ❌ ERRO: vw_dim_motoristas tem combinações NomeMotorista + Filial duplicadas!';
         PRINT '   Total de linhas: ' + CAST(@MotoristasTotal AS VARCHAR);
-        PRINT '   Nomes únicos: ' + CAST(@MotoristasDistinct AS VARCHAR);
-        PRINT '   Nomes duplicados encontrados:';
+        PRINT '   Combinações únicas: ' + CAST(@MotoristasDistinct AS VARCHAR);
+        PRINT '   Combinações duplicadas encontradas:';
         
-        SELECT NomeMotorista, COUNT(*) AS Quantidade
+        SELECT NomeMotorista, Filial, COUNT(*) AS Quantidade
         FROM dbo.vw_dim_motoristas
-        GROUP BY NomeMotorista
+        GROUP BY NomeMotorista, Filial
         HAVING COUNT(*) > 1;
     END
 END
