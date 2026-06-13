@@ -183,7 +183,8 @@ IF NOT EXISTS (
             'EXEC dbo.sp_carga_fato_gestao_vista_fretes;',
             'EXEC dbo.sp_carga_fato_gestao_vista_coletores;',
             'EXEC dbo.sp_carga_fato_fretes_faturamento;',
-            'EXEC dbo.sp_carga_fato_gestao_vista_faturas;'
+            'EXEC dbo.sp_carga_fato_gestao_vista_faturas;',
+            'EXEC dbo.sp_carga_fato_gestao_vista_manifestos;'
         )
 
         $dbExitCode = 0

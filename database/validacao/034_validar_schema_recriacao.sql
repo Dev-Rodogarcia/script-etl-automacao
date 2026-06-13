@@ -40,7 +40,8 @@ INSERT INTO @tabelas (nome) VALUES
     (N'fato_gestao_vista_fretes'),
     (N'fato_gestao_vista_coletores'),
     (N'fato_fretes_faturamento'),
-    (N'fato_gestao_vista_faturas');
+    (N'fato_gestao_vista_faturas'),
+    (N'fato_gestao_vista_manifestos');
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'TABELA', t.nome, N'Tabela dbo.' + t.nome + N' ausente'
@@ -56,6 +57,7 @@ INSERT INTO @views (nome) VALUES
     (N'vw_contas_a_pagar_powerbi'),
     (N'vw_localizacao_cargas_powerbi'),
     (N'vw_manifestos_powerbi'),
+    (N'vw_fato_manifestos_dash'),
     (N'vw_bi_monitoramento'),
     (N'vw_inventario_powerbi'),
     (N'vw_sinistros_powerbi'),
@@ -113,7 +115,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'038_atualizar_min_frete_cotacoes_matriz_uf'),
     (N'039_criar_dim_calendario_referencia_faturamento'),
     (N'040_criar_indice_performance_fretes'),
-    (N'041_adicionar_chave_pick_item_coletas_fretes');
+    (N'041_adicionar_chave_pick_item_coletas_fretes'),
+    (N'042_criar_fato_gestao_vista_manifestos');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -603,6 +606,51 @@ IF NOT EXISTS (
 IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_faturas', N'P') IS NULL
     INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_faturas', N'Procedure de carga da fato de faturas por cliente ausente');
 
+IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'sequence_code') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.sequence_code', N'Chave operacional da fato de manifestos ausente');
+
+IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'receita_total') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.receita_total', N'Receita materializada da fato de manifestos ausente');
+
+IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'capacidade_lotacao_kg') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.capacidade_lotacao_kg', N'Capacidade materializada da fato de manifestos ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.key_constraints
+    WHERE name = N'PK_fato_gv_manifestos'
+      AND parent_object_id = OBJECT_ID(N'dbo.fato_gestao_vista_manifestos')
+      AND type = N'PK'
+)
+    INSERT INTO @falhas VALUES (N'PK', N'PK_fato_gv_manifestos', N'PK por sequence_code da fato de manifestos ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fato_manifestos_data_filial'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_manifestos')
+      AND filter_definition LIKE N'%excluido_na_origem%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_manifestos_data_filial', N'Indice de periodo/filial da fato de manifestos ausente');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'IX_fato_manifestos_filtros'
+      AND object_id = OBJECT_ID(N'dbo.fato_gestao_vista_manifestos')
+      AND filter_definition LIKE N'%excluido_na_origem%'
+)
+    INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_manifestos_filtros', N'Indice de filtros da fato de manifestos ausente');
+
+IF OBJECT_ID(N'dbo.sp_carga_fato_gestao_vista_manifestos', N'P') IS NULL
+    INSERT INTO @falhas VALUES (N'PROCEDURE', N'dbo.sp_carga_fato_gestao_vista_manifestos', N'Procedure de carga da fato de manifestos ausente');
+
+IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_fato_manifestos_dash')) NOT LIKE N'%fato_gestao_vista_manifestos%'
+    INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_fato_manifestos_dash', N'View leve de manifestos deve consumir a fato materializada');
+
+IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_manifestos_powerbi')) LIKE N'%OPENJSON%'
+    INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_manifestos_powerbi', N'View de compatibilidade de manifestos nao deve executar OPENJSON sob demanda');
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.columns
@@ -653,6 +701,7 @@ INSERT INTO @viewsSoftDelete (nome) VALUES
     (N'vw_contas_a_pagar_powerbi'),
     (N'vw_localizacao_cargas_powerbi'),
     (N'vw_manifestos_powerbi'),
+    (N'vw_fato_manifestos_dash'),
     (N'vw_inventario_powerbi'),
     (N'vw_sinistros_powerbi'),
     (N'vw_raster_sm_transit_time'),

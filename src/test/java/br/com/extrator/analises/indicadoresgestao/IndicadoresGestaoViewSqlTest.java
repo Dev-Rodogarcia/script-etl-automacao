@@ -122,6 +122,36 @@ class IndicadoresGestaoViewSqlTest {
 
         assertContem(sql, "[Filial Emissora]");
         assertContem(sql, "[Local de Descarregamento]");
+        assertContem(sql, "FROM dbo.fato_gestao_vista_manifestos");
+        assertFalse(sql.contains("OPENJSON"));
+        assertSemMojibake(sql, "database/views/018_criar_view_manifestos_powerbi.sql");
+    }
+
+    @Test
+    void fatoManifestosDashDeveConsumirTabelaMaterializadaSemAgregacaoSobDemanda() throws IOException {
+        final String tabelaSql = lerSql("database/tabelas/032_criar_tabela_fato_gestao_vista_manifestos.sql");
+        final String migrationSql = lerSql("database/migrations/042_criar_fato_gestao_vista_manifestos.sql");
+        final String indicesSql = lerSql("database/indices/002_criar_indices_fato_gestao_vista_manifestos.sql");
+        final String procedureSql = lerSql("database/procedures/005_criar_sp_carga_fato_gestao_vista_manifestos.sql");
+        final String viewSql = lerSql("database/views/025_criar_view_fato_manifestos_dash.sql");
+
+        assertContem(tabelaSql, "CREATE TABLE dbo.fato_gestao_vista_manifestos");
+        assertContem(tabelaSql, "sequence_code BIGINT NOT NULL");
+        assertContem(tabelaSql, "receita_total DECIMAL(18, 2) NULL");
+        assertContem(tabelaSql, "capacidade_lotacao_kg DECIMAL(18, 2) NULL");
+        assertContem(tabelaSql, "CONSTRAINT PK_fato_gv_manifestos PRIMARY KEY CLUSTERED (sequence_code)");
+        assertContem(migrationSql, "042_criar_fato_gestao_vista_manifestos");
+        assertContem(indicesSql, "IX_fato_manifestos_data_filial");
+        assertContem(indicesSql, "IX_fato_manifestos_filtros");
+        assertContem(procedureSql, "CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_gestao_vista_manifestos");
+        assertContem(procedureSql, "OPENJSON(CASE WHEN ISJSON(c.pick_items_ids) = 1 THEN c.pick_items_ids END)");
+        assertContem(procedureSql, "MERGE dbo.fato_gestao_vista_manifestos");
+        assertContem(viewSql, "FROM dbo.fato_gestao_vista_manifestos");
+        assertFalse(viewSql.contains("OPENJSON"));
+        assertFalse(SELECT_STAR_PATTERN.matcher(viewSql).find());
+        assertSemMojibake(tabelaSql, "database/tabelas/032_criar_tabela_fato_gestao_vista_manifestos.sql");
+        assertSemMojibake(migrationSql, "database/migrations/042_criar_fato_gestao_vista_manifestos.sql");
+        assertSemMojibake(procedureSql, "database/procedures/005_criar_sp_carga_fato_gestao_vista_manifestos.sql");
     }
 
     @Test
@@ -172,9 +202,13 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "migrations\\032_criar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "migrations\\033_tuning_indices_fatos.sql");
         assertContem(sql, "migrations\\039_criar_dim_calendario_referencia_faturamento.sql");
+        assertContem(sql, "migrations\\042_criar_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "tabelas\\008_criar_tabela_dim_calendario.sql");
+        assertContem(sql, "tabelas\\032_criar_tabela_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "procedures\\004_criar_sp_carga_fato_gestao_vista_faturas.sql");
+        assertContem(sql, "procedures\\005_criar_sp_carga_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "validacao\\041_validar_fato_gestao_vista_faturas.sql");
+        assertContem(sql, "validacao\\045_validar_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
         assertContem(sql, "validacao\\042_validar_contrato_dashboard_performance.sql");
         assertContem(sql, "Contrato critico da view de fretes nao foi publicado");
@@ -188,11 +222,15 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(validacao, "032_criar_fato_gestao_vista_faturas");
         assertContem(validacao, "033_tuning_indices_fatos");
         assertContem(validacao, "039_criar_dim_calendario_referencia_faturamento");
+        assertContem(validacao, "042_criar_fato_gestao_vista_manifestos");
         assertContem(validacao, "dbo.dim_calendario");
         assertContem(validacao, "dbo.fato_gestao_vista_faturas");
+        assertContem(validacao, "dbo.fato_gestao_vista_manifestos");
         assertContem(validacao, "IX_fato_gv_coletores_periodo_filial");
+        assertContem(validacao, "IX_fato_manifestos_data_filial");
         assertContem(validacao, "data_emissao_cte");
         assertContem(validacao, "dbo.sp_carga_fato_gestao_vista_faturas");
+        assertContem(validacao, "dbo.sp_carga_fato_gestao_vista_manifestos");
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Comprovante Anexado]");
         assertContem(validacao, "dbo.vw_fretes_powerbi.[Responsável Região Destino Key]");
         assertContem(validacao, "dbo.vw_cotacoes_powerbi.[Usuario Key]");
@@ -236,6 +274,7 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_coletores;");
         assertContem(script, "EXEC dbo.sp_carga_fato_fretes_faturamento;");
         assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_faturas;");
+        assertContem(script, "EXEC dbo.sp_carga_fato_gestao_vista_manifestos;");
     }
 
     @Test
@@ -279,6 +318,7 @@ class IndicadoresGestaoViewSqlTest {
             "database/views/012_criar_view_fretes_powerbi.sql",
             "database/views/015_criar_view_cotacoes_powerbi.sql",
             "database/views/018_criar_view_manifestos_powerbi.sql",
+            "database/views/025_criar_view_fato_manifestos_dash.sql",
             "database/views/023_publicar_wrappers_dashboard_dev_explicitos.sql"
         )) {
             final String sql = lerSql(caminho);
@@ -296,6 +336,7 @@ class IndicadoresGestaoViewSqlTest {
 
         assertContem(sql, "vw_fretes_powerbi");
         assertContem(sql, "vw_manifestos_powerbi");
+        assertContem(sql, "vw_fato_manifestos_dash");
         assertContem(sql, "vw_cotacoes_powerbi");
         assertContem(sql, "STRING_AGG(CONVERT(NVARCHAR(MAX), QUOTENAME(c.name))");
         assertContem(sql, "CREATE OR ALTER VIEW dbo.");

@@ -211,6 +211,7 @@ for %%F in (
     "migrations\039_criar_dim_calendario_referencia_faturamento.sql"
     "migrations\040_criar_indice_performance_fretes.sql"
     "migrations\041_adicionar_chave_pick_item_coletas_fretes.sql"
+    "migrations\042_criar_fato_gestao_vista_manifestos.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F
@@ -232,6 +233,7 @@ REM --- Indices (nao-criticos - avisa e continua) ---
 echo [ETAPA] Indices de performance...
 for %%F in (
     "indices\001_criar_indices_performance.sql"
+    "indices\002_criar_indices_fato_gestao_vista_manifestos.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
@@ -252,6 +254,7 @@ for %%F in (
     "views\016_criar_view_contas_a_pagar_powerbi.sql"
     "views\017_criar_view_localizacao_cargas_powerbi.sql"
     "views\018_criar_view_manifestos_powerbi.sql"
+    "views\025_criar_view_fato_manifestos_dash.sql"
     "views\020_criar_view_inventario_powerbi.sql"
     "views\021_criar_view_sinistros_powerbi.sql"
     "views\022_criar_view_raster_sm_transit_time.sql"
@@ -291,6 +294,7 @@ for %%F in (
     "procedures\002_criar_sp_carga_fato_gestao_vista_coletores.sql"
     "procedures\003_criar_sp_carga_fato_fretes_faturamento.sql"
     "procedures\004_criar_sp_carga_fato_gestao_vista_faturas.sql"
+    "procedures\005_criar_sp_carga_fato_gestao_vista_manifestos.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
@@ -340,6 +344,14 @@ if errorlevel 1 (
     if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
     exit /b 1
 )
+echo   [EXEC] dbo.sp_carga_fato_gestao_vista_manifestos
+sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_manifestos;" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na carga materializada Gestao a Vista ^(manifestos^).
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
 echo [OK] Cargas iniciais das fatos BI concluidas.
 echo [INFO] Dimensoes de usuarios sao sincronizadas automaticamente pelo ciclo Java de extracao.
 echo.
@@ -359,6 +371,7 @@ for %%F in (
     "validacao\040_validar_fato_fretes_faturamento.sql"
     "validacao\041_validar_fato_gestao_vista_faturas.sql"
     "validacao\043_validar_indice_performance_fretes.sql"
+    "validacao\045_validar_fato_gestao_vista_manifestos.sql"
 ) do (
     if exist %%F (
         echo   [EXEC] %%~F
@@ -443,6 +456,7 @@ for %%F in (
     "tabelas\029_criar_tabela_fato_gestao_vista_coletores.sql"
     "tabelas\030_criar_tabela_fato_fretes_faturamento.sql"
     "tabelas\031_criar_tabela_fato_gestao_vista_faturas.sql"
+    "tabelas\032_criar_tabela_fato_gestao_vista_manifestos.sql"
 ) do (
     if not exist %%F (
         echo [ERRO] Script nao encontrado: %%~F

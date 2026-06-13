@@ -1,10 +1,8 @@
--- ============================================
--- View de compatibilidade 'vw_manifestos_powerbi'
--- A regra pesada de manifestos e parsing JSON agora e materializada em
--- dbo.fato_gestao_vista_manifestos por dbo.sp_carga_fato_gestao_vista_manifestos.
--- ============================================
+-- ============================================================================
+-- View leve de Manifestos para o Dashboard
+-- ============================================================================
 
-CREATE OR ALTER VIEW dbo.vw_manifestos_powerbi AS
+CREATE OR ALTER VIEW dbo.vw_fato_manifestos_dash AS
 SELECT
     hora_solicitacao                 AS [Hora (Solicitacao)],
     hora_criacao                     AS [Hora (Criação)],
@@ -113,5 +111,5 @@ FROM dbo.fato_gestao_vista_manifestos
 WHERE excluido_na_origem = 0;
 GO
 
-PRINT 'View vw_manifestos_powerbi criada/atualizada com sucesso.';
+PRINT 'View dbo.vw_fato_manifestos_dash criada/atualizada com sucesso.';
 GO

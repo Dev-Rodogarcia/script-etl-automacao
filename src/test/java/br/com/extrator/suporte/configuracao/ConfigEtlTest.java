@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class ConfigEtlTest {
 
     @Test
-    void deveMapearTargetsDeMaterializacaoBiParaQuatroProcedures() {
+    void deveMapearTargetsDeMaterializacaoBiParaCincoProcedures() {
         final String chaveTargets = "etl.bi.procedures.target";
         final String chaveProceduresLegada = "etl.materializacao.fatos_bi.procedures";
         final String targetsAnterior = System.getProperty(chaveTargets);
@@ -20,7 +20,8 @@ class ConfigEtlTest {
         try {
             System.setProperty(
                 chaveTargets,
-                "fato_fretes_faturamento,fato_gestao_vista_faturas,fato_gestao_vista_fretes,fato_gestao_vista_coletores"
+                "fato_fretes_faturamento,fato_gestao_vista_faturas,fato_gestao_vista_fretes,"
+                    + "fato_gestao_vista_coletores,fato_gestao_vista_manifestos"
             );
             System.clearProperty(chaveProceduresLegada);
 
@@ -29,7 +30,8 @@ class ConfigEtlTest {
                     "dbo.sp_carga_fato_fretes_faturamento",
                     "dbo.sp_carga_fato_gestao_vista_faturas",
                     "dbo.sp_carga_fato_gestao_vista_fretes",
-                    "dbo.sp_carga_fato_gestao_vista_coletores"
+                    "dbo.sp_carga_fato_gestao_vista_coletores",
+                    "dbo.sp_carga_fato_gestao_vista_manifestos"
                 ),
                 ConfigEtl.obterMaterializacaoFatosBiProcedures()
             );

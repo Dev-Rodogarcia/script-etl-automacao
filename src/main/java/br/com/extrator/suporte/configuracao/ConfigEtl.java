@@ -39,25 +39,29 @@ public final class ConfigEtl {
         "dbo.sp_carga_fato_fretes_faturamento",
         "dbo.sp_carga_fato_gestao_vista_faturas",
         "dbo.sp_carga_fato_gestao_vista_fretes",
-        "dbo.sp_carga_fato_gestao_vista_coletores"
+        "dbo.sp_carga_fato_gestao_vista_coletores",
+        "dbo.sp_carga_fato_gestao_vista_manifestos"
     );
     private static final List<String> MATERIALIZACAO_FATOS_BI_TARGETS_PADRAO = List.of(
         "fato_fretes_faturamento",
         "fato_gestao_vista_faturas",
         "fato_gestao_vista_fretes",
-        "fato_gestao_vista_coletores"
+        "fato_gestao_vista_coletores",
+        "fato_gestao_vista_manifestos"
     );
     private static final Map<String, String> MATERIALIZACAO_FATOS_BI_TARGET_TO_PROCEDURE = Map.of(
         "fato_fretes_faturamento", "dbo.sp_carga_fato_fretes_faturamento",
         "fato_gestao_vista_faturas", "dbo.sp_carga_fato_gestao_vista_faturas",
         "fato_gestao_vista_fretes", "dbo.sp_carga_fato_gestao_vista_fretes",
-        "fato_gestao_vista_coletores", "dbo.sp_carga_fato_gestao_vista_coletores"
+        "fato_gestao_vista_coletores", "dbo.sp_carga_fato_gestao_vista_coletores",
+        "fato_gestao_vista_manifestos", "dbo.sp_carga_fato_gestao_vista_manifestos"
     );
     private static final Set<String> MATERIALIZACAO_FATOS_BI_PROCEDURES_PERMITIDAS = Set.of(
         "dbo.sp_carga_fato_fretes_faturamento",
         "dbo.sp_carga_fato_gestao_vista_faturas",
         "dbo.sp_carga_fato_gestao_vista_fretes",
-        "dbo.sp_carga_fato_gestao_vista_coletores"
+        "dbo.sp_carga_fato_gestao_vista_coletores",
+        "dbo.sp_carga_fato_gestao_vista_manifestos"
     );
 
     private ConfigEtl() {

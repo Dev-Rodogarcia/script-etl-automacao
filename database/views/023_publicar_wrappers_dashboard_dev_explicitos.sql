@@ -36,6 +36,7 @@ VALUES
     (N'vw_contas_a_pagar_powerbi'),
     (N'vw_localizacao_cargas_powerbi'),
     (N'vw_manifestos_powerbi'),
+    (N'vw_fato_manifestos_dash'),
     (N'vw_bi_monitoramento'),
     (N'vw_inventario_powerbi'),
     (N'vw_sinistros_powerbi'),

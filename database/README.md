@@ -54,6 +54,7 @@ Checklist mínimo por mudança estrutural:
 | `dbo.fato_gestao_vista_coletores` | `EXEC dbo.sp_carga_fato_gestao_vista_coletores;` | SQL nativo, publicado em `database/procedures/002_criar_sp_carga_fato_gestao_vista_coletores.sql`. |
 | `dbo.fato_fretes_faturamento` | `EXEC dbo.sp_carga_fato_fretes_faturamento;` | SQL nativo, publicado em `database/procedures/003_criar_sp_carga_fato_fretes_faturamento.sql`. |
 | `dbo.fato_gestao_vista_faturas` | `EXEC dbo.sp_carga_fato_gestao_vista_faturas;` | SQL nativo, publicado em `database/procedures/004_criar_sp_carga_fato_gestao_vista_faturas.sql`. |
+| `dbo.fato_gestao_vista_manifestos` | `EXEC dbo.sp_carga_fato_gestao_vista_manifestos;` | SQL nativo, publicado em `database/procedures/005_criar_sp_carga_fato_gestao_vista_manifestos.sql`. |
 | `dbo.dim_usuarios` | `java -jar target\extrator.jar --extracao-intervalo YYYY-MM-DD YYYY-MM-DD` | Sincronizada automaticamente como primeiro passo do ciclo Java/API GraphQL. |
 | `dbo.dim_usuarios_historico` | Ciclo Java de extração | Alimentada pelos mecanismos Java de estado/histórico quando aplicável. |
 
@@ -87,6 +88,7 @@ ORDER BY data_extracao DESC;
 | `dbo.fato_gestao_vista_coletores` | Fato BI | Carga SQL de `fretes`, `manifestos` e `inventario` | 1 linha por data/filial/classificação | `data_referencia`, `filial_key`, `classificacao` |
 | `dbo.fato_fretes_faturamento` | Fato BI | Carga SQL de `fretes` + status CT-e de `faturas_por_cliente` | 1 linha por frete validado para faturamento | `frete_id` |
 | `dbo.fato_gestao_vista_faturas` | Fato BI | Carga SQL de `faturas_por_cliente` | 1 linha por título/`unique_id` | `unique_id` |
+| `dbo.fato_gestao_vista_manifestos` | Fato BI | Carga SQL de `manifestos` + `coletas` + `fretes` | 1 linha por manifesto | `sequence_code` |
 | `dbo.inventario` | Negócio | Data Export | 1 linha por ordem/minuta consolidada por chave técnica | `identificador_unico` |
 | `dbo.sinistros` | Negócio | Data Export | 1 linha por sinistro + NF consolidada por chave técnica | `identificador_unico` |
 | `dbo.raster_viagens` | Negócio | Raster `getEventoFimViagem` | 1 linha por viagem/SM | `cod_solicitacao` |
@@ -120,6 +122,7 @@ ORDER BY data_extracao DESC;
 - `dbo.fato_gestao_vista_coletores` consolida `dbo.fretes`, `dbo.manifestos` e `dbo.inventario` por competência, filial e classificação operacional.
 - `dbo.fato_fretes_faturamento.frete_id = dbo.fretes.id`; quando houver `chave_cte`, a carga cruza `dbo.faturas_por_cliente.chave_cte` para validar CT-e cancelado.
 - `dbo.fato_gestao_vista_faturas.unique_id = dbo.faturas_por_cliente.unique_id`; a carga materializa datas, status, valor operacional e cliente para Aging/Tabela.
+- `dbo.fato_gestao_vista_manifestos.sequence_code = dbo.manifestos.sequence_code`; a carga resolve a receita por `coletas.pick_items_ids` + `fretes.pick_item_id` e publica `dbo.vw_fato_manifestos_dash` sem `OPENJSON` sob demanda.
 - `dbo.coletas.cancellation_user_id` e `dbo.coletas.destroy_user_id` podem ser ligados a `dbo.dim_usuarios.user_id`
 - `dbo.raster_viagem_paradas.cod_solicitacao = dbo.raster_viagens.cod_solicitacao`
 - `dbo.dim_usuarios_historico.user_id = dbo.dim_usuarios.user_id`
@@ -610,6 +613,31 @@ ORDER BY data_extracao DESC;
 | `pedidos_cliente` | `NVARCHAR(MAX)` | Lista textual de pedidos do cliente. |
 | `metadata` | `NVARCHAR(MAX)` | JSON bruto do relatório de faturamento. |
 | `data_extracao` | `DATETIME2` | Momento da gravação/atualização no banco. |
+
+### `dbo.fato_gestao_vista_manifestos`
+
+- Fonte: carga SQL `dbo.sp_carga_fato_gestao_vista_manifestos`
+- Grão: 1 linha por manifesto operacional, usando `sequence_code` como chave.
+- Observações importantes:
+  - Materializa a lógica pesada que antes ficava em `dbo.vw_manifestos_powerbi`, incluindo `OPENJSON` de `coletas.pick_items_ids` e consolidação de `fretes.pick_item_id`.
+  - `receita_total` preserva a receita transportada consolidada para KPIs de custo/receita do Dashboard.
+  - `filial_key`, `status_key`, `motorista_key`, `placa_veiculo_key`, `tipo_carga_key` e `tipo_contrato_key` são chaves normalizadas para filtros sargable.
+  - `dbo.vw_fato_manifestos_dash` e `dbo.vw_manifestos_powerbi` apenas projetam colunas da fato e filtram `excluido_na_origem = 0`.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `sequence_code` | `BIGINT` | Número operacional do manifesto e PK da fato. |
+| `data_criacao` | `DATETIMEOFFSET(3)` | Data/hora de criação do manifesto, usada como filtro principal. |
+| `numero_manifesto` | `BIGINT` | Alias operacional preservado para compatibilidade com as views. |
+| `filial_key` | `NVARCHAR(255)` | Filial normalizada para filtros e escopo. |
+| `status` | `NVARCHAR(100)` | Status traduzido/publicado para o Dashboard. |
+| `tipo_motorista` | `NVARCHAR(50)` | Classificação Frota Própria, Agregado ou Terceiro/Autônomo. |
+| `placa_veiculo` | `NVARCHAR(50)` | Placa do veículo do manifesto. |
+| `custo_total` | `DECIMAL(19,4)` | Custo total consolidado do manifesto. |
+| `receita_total` | `DECIMAL(19,4)` | Receita total transportada, derivada de coletas/fretes associados. |
+| `capacidade_lotacao_kg` | `DECIMAL(18,3)` | Capacidade de lotação do veículo em kg. |
+| `peso_taxado` | `DECIMAL(18,3)` | Peso taxado consolidado do manifesto. |
+| `hash_linha` | `BINARY(32)` | Hash SHA-256 da linha de negócio para carga incremental. |
 
 ### `dbo.fato_gestao_vista_faturas`
 
