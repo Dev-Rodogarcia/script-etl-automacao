@@ -111,7 +111,8 @@ public class ExtracaoPorIntervaloUseCase {
         try (AutoCloseable ignored = executionLockManager.acquire(EXECUTION_LOCK_RESOURCE)) {
         final boolean modoRapido24h = request.modoRapido24h();
         final Map<String, String> overridesTemporarios = new LinkedHashMap<>();
-        overridesTemporarios.put(PROP_PRUNE_AUSENTES_FRETES, Boolean.TRUE.toString());
+        final boolean pruneAusentesFretesAtivo = deveExecutarPruneAusentesFretes(request);
+        overridesTemporarios.put(PROP_PRUNE_AUSENTES_FRETES, Boolean.toString(pruneAusentesFretesAtivo));
         overridesTemporarios.put(PROP_LOOKBACK_MODO_FRETES, resolverModoLookbackFretes(request));
         overridesTemporarios.put(PROP_TIMEOUT_FRETES, resolverTimeoutMinimo(PROP_TIMEOUT_FRETES, TIMEOUT_FRETES_INTERVALO_MS));
         overridesTemporarios.put(
@@ -166,6 +167,13 @@ public class ExtracaoPorIntervaloUseCase {
         }
         if (request.modoExecucao() != ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO) {
             log.console("Modo de execucao: {}", request.modoExecucao());
+        }
+        if (!pruneAusentesFretesAtivo) {
+            log.info(
+                "Prune de fretes ausentes ignorado: modo_execucao={} | modo_loop_daemon={}",
+                request.modoExecucao(),
+                modoLoopDaemon
+            );
         }
 
         final ValidadorLimiteExtracao validador = new ValidadorLimiteExtracao();
@@ -412,6 +420,18 @@ public class ExtracaoPorIntervaloUseCase {
             return ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO.modoLookbackFretes();
         }
         return request.modoExecucao().modoLookbackFretes();
+    }
+
+    private boolean deveExecutarPruneAusentesFretes(final ExtracaoPorIntervaloRequest request) {
+        if (request == null || request.modoExecucao() == null) {
+            return false;
+        }
+        if (request.modoExecucao() == ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL
+            || request.modoExecucao() == ExtracaoPorIntervaloRequest.ModoExecucao.RETROFIT) {
+            return false;
+        }
+        return request.modoLoopDaemon()
+            && request.modoExecucao() == ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO;
     }
 
     private String resolverInteiroMinimo(final String propriedade, final int valorMinimo) {

@@ -81,7 +81,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         "fiscal_cfop_code", "fiscal_tax_value", "fiscal_pis_value", "fiscal_cofins_value", "filial_apelido",
         "cte_id", "cte_emission_type", "cte_created_at", "fiscal_calculation_basis", "fiscal_tax_rate",
         "fiscal_pis_rate", "fiscal_cofins_rate", "fiscal_has_difal", "fiscal_difal_origin",
-        "fiscal_difal_destination", "metadata", "data_extracao", "excluido_na_origem"
+        "fiscal_difal_destination", "metadata", "data_extracao", "excluido_na_origem", "data_exclusao_origem"
     );
     private static final List<String> COLUNAS_ATUALIZAVEIS = List.copyOf(COLUNAS_MERGE.subList(1, COLUNAS_MERGE.size()));
     private static final String DATA_REFERENCIA_FATURAMENTO_SQL = "COALESCE(source.cte_issued_at, source.servico_em)";
@@ -163,7 +163,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 try (Statement stmt = conexao.createStatement()) {
                     stmt.execute("CREATE TABLE #fretes_periodo_api_ids (id BIGINT NOT NULL PRIMARY KEY)");
                     stmt.execute("CREATE TABLE #fretes_periodo_candidatos (id BIGINT NOT NULL PRIMARY KEY)");
-                    stmt.execute("CREATE TABLE #fretes_periodo_delete (id BIGINT NOT NULL PRIMARY KEY)");
+                    stmt.execute("CREATE TABLE #fretes_periodo_expurgo (id BIGINT NOT NULL PRIMARY KEY)");
                 }
 
                 if (!idsNormalizados.isEmpty()) {
@@ -224,7 +224,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
                 liberarRegistrosPresentesNaQuarentena(conexao, dataInicio, dataFim, agora, executionUuid, cycleId);
 
-                final boolean executarDelete = decision.allowDeletion() || !ConfigEtl.isFretePruneGuardrailAtivo();
+                final boolean executarExpurgo = decision.allowDeletion() || !ConfigEtl.isFretePruneGuardrailAtivo();
                 registrarCandidatosNaQuarentena(
                     conexao,
                     dataInicio,
@@ -232,11 +232,11 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     agora,
                     executionUuid,
                     cycleId,
-                    executarDelete,
+                    executarExpurgo,
                     buildGuardrailReason(decision)
                 );
 
-                if (!executarDelete) {
+                if (!executarExpurgo) {
                     conexao.commit();
                     logger.warn(
                         "Prune de fretes bloqueado por guardrail: periodo={}..{} | ids_api={} | candidatos={} | baseline_mediana={} | ratio={}",
@@ -250,7 +250,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     return 0;
                 }
 
-                final int removidos = deletarCandidatosElegiveis(
+                final int removidos = marcarCandidatosElegiveisComoExcluidos(
                     conexao,
                     dataInicio,
                     dataFim,
@@ -262,7 +262,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
                 if (candidatos > removidos) {
                     logger.info(
-                        "Quarentena de prune de fretes atualizada sem delete imediato: periodo={}..{} | candidatos={} | removidos={} | minimo_ausencias={}",
+                        "Quarentena de prune de fretes atualizada sem expurgo imediato: periodo={}..{} | candidatos={} | expurgados={} | minimo_ausencias={}",
                         dataInicio,
                         dataFim,
                         candidatos,
@@ -273,7 +273,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
 
                 conexao.commit();
                 logger.info(
-                    "Reconciliacao de fretes por periodo concluida: periodo={}..{} | ids_api={} | removidos={}",
+                    "Reconciliacao de fretes por periodo concluida: periodo={}..{} | ids_api={} | expurgados={}",
                     dataInicio,
                     dataFim,
                     idsNormalizados.size(),
@@ -463,15 +463,15 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
         }
     }
 
-    private int deletarCandidatosElegiveis(final Connection conexao,
-                                           final LocalDate dataInicio,
-                                           final LocalDate dataFim,
-                                           final LocalDateTime agora,
-                                           final String executionUuid,
-                                           final String cycleId,
-                                           final int minimoAusencias) throws SQLException {
-        final String sqlPopularDelete = """
-            INSERT INTO #fretes_periodo_delete (id)
+    private int marcarCandidatosElegiveisComoExcluidos(final Connection conexao,
+                                                       final LocalDate dataInicio,
+                                                       final LocalDate dataFim,
+                                                       final LocalDateTime agora,
+                                                       final String executionUuid,
+                                                       final String cycleId,
+                                                       final int minimoAusencias) throws SQLException {
+        final String sqlPopularExpurgo = """
+            INSERT INTO #fretes_periodo_expurgo (id)
             SELECT q.record_id
               FROM dbo.sys_reconciliation_quarantine q
               JOIN #fretes_periodo_candidatos c
@@ -482,7 +482,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                AND q.released_at IS NULL
                AND q.absence_hits >= ?
             """;
-        try (PreparedStatement ps = conexao.prepareStatement(sqlPopularDelete)) {
+        try (PreparedStatement ps = conexao.prepareStatement(sqlPopularExpurgo)) {
             ps.setString(1, ENTIDADE_QUARENTENA);
             ps.setObject(2, dataInicio, Types.DATE);
             ps.setObject(3, dataFim, Types.DATE);
@@ -490,16 +490,18 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             ps.executeUpdate();
         }
 
-        final String sqlDelete = """
-            DELETE f
+        final String sqlExpurgo = """
+            UPDATE f
+               SET excluido_na_origem = 1,
+                   data_exclusao_origem = GETDATE()
               FROM dbo.fretes f
-              JOIN #fretes_periodo_delete d
+              JOIN #fretes_periodo_expurgo d
                 ON d.id = f.id
              WHERE COALESCE(f.service_date, CONVERT(date, f.servico_em)) BETWEEN ? AND ?
                AND COALESCE(f.excluido_na_origem, 0) = 0
             """;
         final int removidos;
-        try (PreparedStatement ps = conexao.prepareStatement(sqlDelete)) {
+        try (PreparedStatement ps = conexao.prepareStatement(sqlExpurgo)) {
             ps.setObject(1, dataInicio, Types.DATE);
             ps.setObject(2, dataFim, Types.DATE);
             removidos = ps.executeUpdate();
@@ -509,13 +511,13 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
             final String sqlAtualizarQuarentena = """
                 UPDATE q
                    SET released_at = ?,
-                       release_reason = 'PRUNE_DELETE',
+                       release_reason = 'PRUNE_LOGICO',
                        last_guardrail_reason = NULL,
                        last_execution_uuid = COALESCE(?, last_execution_uuid),
                        last_cycle_id = COALESCE(?, last_cycle_id),
                        updated_at = SYSDATETIME()
                   FROM dbo.sys_reconciliation_quarantine q
-                  JOIN #fretes_periodo_delete d
+                  JOIN #fretes_periodo_expurgo d
                     ON d.id = q.record_id
                  WHERE q.entity_name = ?
                    AND q.window_start = ?
@@ -615,7 +617,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, CAST(0 AS bit)
+                ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))
             ))
                 AS source (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
                            finished_at, fit_dpn_performance_finished_at, corporation_sequence_number, pick_item_id,
@@ -629,7 +631,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                            fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
                            filial_apelido, cte_id, cte_emission_type, cte_created_at,
                            fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
-                           metadata, data_extracao, excluido_na_origem)
+                           metadata, data_extracao, excluido_na_origem, data_exclusao_origem)
             ON target.id = source.id
             WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
@@ -730,7 +732,8 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                     fiscal_difal_destination = source.fiscal_difal_destination,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
                 INSERT (id, servico_em, criado_em, status, cortesia, modal, tipo_frete, valor_total, valor_notas, peso_notas, id_corporacao, id_cidade_destino, data_previsao_entrega, service_date,
                         finished_at, fit_dpn_performance_finished_at, corporation_sequence_number, pick_item_id,
@@ -744,7 +747,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         fiscal_cst_type, fiscal_cfop_code, fiscal_tax_value, fiscal_pis_value, fiscal_cofins_value,
                         filial_apelido, cte_id, cte_emission_type, cte_created_at,
                         fiscal_calculation_basis, fiscal_tax_rate, fiscal_pis_rate, fiscal_cofins_rate, fiscal_has_difal, fiscal_difal_origin, fiscal_difal_destination,
-                        metadata, data_extracao, excluido_na_origem)
+                        metadata, data_extracao, excluido_na_origem, data_exclusao_origem)
                 VALUES (source.id, source.servico_em, source.criado_em, source.status, source.cortesia, source.modal, source.tipo_frete, source.valor_total, source.valor_notas, source.peso_notas, source.id_corporacao, source.id_cidade_destino, source.data_previsao_entrega, source.service_date,
                         source.finished_at, source.fit_dpn_performance_finished_at, source.corporation_sequence_number, source.pick_item_id,
                         source.pagador_id, source.pagador_nome, source.remetente_id, source.remetente_nome, source.origem_cidade, source.origem_uf, source.destinatario_id, source.destinatario_nome, source.destino_cidade, source.destino_uf,
@@ -757,7 +760,7 @@ public class FreteRepository extends AbstractRepository<FreteEntity> {
                         source.fiscal_cst_type, source.fiscal_cfop_code, source.fiscal_tax_value, source.fiscal_pis_value, source.fiscal_cofins_value,
                         source.filial_apelido, source.cte_id, source.cte_emission_type, source.cte_created_at,
                         source.fiscal_calculation_basis, source.fiscal_tax_rate, source.fiscal_pis_rate, source.fiscal_cofins_rate, source.fiscal_has_difal, source.fiscal_difal_origin, source.fiscal_difal_destination,
-                        source.metadata, source.data_extracao, source.excluido_na_origem);
+                        source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem);
             """, tabelaAlvo, freshnessGuard, DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL,
             DATA_REFERENCIA_FATURAMENTO_SQL, ELEGIVEL_FATURAMENTO_SQL);
 

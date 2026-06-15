@@ -290,9 +290,13 @@ public class ManifestoDTO {
     @JsonProperty("uniq_destinations_count")
     private Integer uniqDestinationsCount;
     
-    // 57. Tipo de contrato
+    // 57. Tipo de contrato do veículo
     @JsonProperty("contract_type")
-    private String contractType;
+    private String tipoContratoVeiculo;
+
+    // 57.1. Tipo de contrato do motorista
+    @JsonProperty("mft_mdr_contract_type")
+    private String tipoContratoMotorista;
     
     // 58. Tipo de cálculo
     @JsonProperty("calculation_type")
@@ -502,7 +506,8 @@ public class ManifestoDTO {
         allProps.put("manifest_items_count", manifestItemsCount);
         allProps.put("finalized_manifest_items_count", finalizedManifestItemsCount);
         allProps.put("uniq_destinations_count", uniqDestinationsCount);
-        allProps.put("contract_type", contractType);
+        allProps.put("contract_type", tipoContratoVeiculo);
+        allProps.put("mft_mdr_contract_type", tipoContratoMotorista);
         allProps.put("calculation_type", calculationType);
         allProps.put("cargo_type", cargoType);
         allProps.put("calculated_pick_count", calculatedPickCount);
@@ -994,12 +999,28 @@ public class ManifestoDTO {
         this.uniqDestinationsCount = uniqDestinationsCount;
     }
 
+    public String getTipoContratoVeiculo() {
+        return tipoContratoVeiculo;
+    }
+
+    public void setTipoContratoVeiculo(final String tipoContratoVeiculo) {
+        this.tipoContratoVeiculo = tipoContratoVeiculo;
+    }
+
+    public String getTipoContratoMotorista() {
+        return tipoContratoMotorista;
+    }
+
+    public void setTipoContratoMotorista(final String tipoContratoMotorista) {
+        this.tipoContratoMotorista = tipoContratoMotorista;
+    }
+
     public String getContractType() {
-        return contractType;
+        return tipoContratoVeiculo;
     }
 
     public void setContractType(final String contractType) {
-        this.contractType = contractType;
+        this.tipoContratoVeiculo = contractType;
     }
 
     public String getCalculationType() {

@@ -190,7 +190,8 @@ BEGIN
                 MAX(COALESCE(ml.manifest_freights_total, 0)) + SUM(COALESCE(rc.receita_coleta, 0)) AS receita_total,
                 STRING_AGG(CONVERT(NVARCHAR(MAX), ml.pick_sequence_code), N', ') AS coleta_numeros,
                 MAX(ml.contract_number) AS contract_number,
-                MAX(ml.contract_type) AS contract_type_raw,
+                MAX(ml.contract_type) AS contract_type_vehicle_raw,
+                MAX(ml.driver_contract_type) AS contract_type_driver_raw,
                 MAX(ml.calculation_type) AS calculation_type_raw,
                 MAX(ml.cargo_type) AS cargo_type_raw,
                 MAX(ml.daily_subtotal) AS diaria,
@@ -326,6 +327,10 @@ BEGIN
                 a.receita_total,
                 a.coleta_numeros,
                 a.contract_number,
+                tipo_contrato_veiculo.tipo_contrato_veiculo,
+                NULLIF(LOWER(LTRIM(RTRIM(tipo_contrato_veiculo.tipo_contrato_veiculo))), N'') AS tipo_contrato_veiculo_key,
+                tipo_contrato_motorista.tipo_contrato_motorista,
+                NULLIF(LOWER(LTRIM(RTRIM(tipo_contrato_motorista.tipo_contrato_motorista))), N'') AS tipo_contrato_motorista_key,
                 tipo_contrato.tipo_contrato,
                 NULLIF(LOWER(LTRIM(RTRIM(tipo_contrato.tipo_contrato))), N'') AS tipo_contrato_key,
                 tipo_calculo.tipo_calculo,
@@ -415,6 +420,9 @@ BEGIN
                     COALESCE(CONVERT(NVARCHAR(40), a.fretes_total), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(40), a.coletas_total), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(40), a.receita_total), N'__NULL__'),
+                    COALESCE(tipo_contrato_veiculo.tipo_contrato_veiculo, N'__NULL__'),
+                    COALESCE(tipo_contrato_motorista.tipo_contrato_motorista, N'__NULL__'),
+                    COALESCE(tipo_contrato.tipo_contrato, N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(40), a.custo_total), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(40), a.valor_frete), N'__NULL__'),
                     COALESCE(CONVERT(NVARCHAR(40), a.combustivel), N'__NULL__'),
@@ -446,10 +454,41 @@ BEGIN
                 END AS mdfe_status
             ) mdfe_status
             CROSS APPLY (
-                SELECT CASE a.contract_type_raw
-                    WHEN N'aggregate' THEN N'prestador agregado'
-                    WHEN N'driver' THEN N'motorista autônomo'
-                    ELSE a.contract_type_raw
+                SELECT CASE a.contract_type_vehicle_raw
+                    WHEN N'aggregate' THEN N'Agregado'
+                    WHEN N'driver' THEN N'Motorista'
+                    ELSE a.contract_type_vehicle_raw
+                END AS tipo_contrato_veiculo
+            ) tipo_contrato_veiculo
+            CROSS APPLY (
+                SELECT CASE a.contract_type_driver_raw
+                    WHEN N'company' THEN N'Próprio'
+                    WHEN N'aggregate' THEN N'Agregado'
+                    WHEN N'third_party' THEN N'Terceiro'
+                    ELSE a.contract_type_driver_raw
+                END AS tipo_contrato_motorista
+            ) tipo_contrato_motorista
+            CROSS APPLY (
+                SELECT CASE
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Agregado'
+                        THEN N'Agregado'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Terceiro'
+                        THEN N'Terceiro'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Próprio'
+                        THEN N'Frota'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Motorista'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Agregado'
+                        THEN N'Frota + PX'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Motorista'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Terceiro'
+                        THEN N'Frota + PX'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Motorista'
+                     AND tipo_contrato_motorista.tipo_contrato_motorista = N'Próprio'
+                        THEN N'Frota'
+                    ELSE NULL
                 END AS tipo_contrato
             ) tipo_contrato
             CROSS APPLY (
@@ -525,6 +564,10 @@ BEGIN
                 receita_total = source.receita_total,
                 coleta_numeros = source.coleta_numeros,
                 contract_number = source.contract_number,
+                tipo_contrato_veiculo = source.tipo_contrato_veiculo,
+                tipo_contrato_veiculo_key = source.tipo_contrato_veiculo_key,
+                tipo_contrato_motorista = source.tipo_contrato_motorista,
+                tipo_contrato_motorista_key = source.tipo_contrato_motorista_key,
                 tipo_contrato = source.tipo_contrato,
                 tipo_contrato_key = source.tipo_contrato_key,
                 tipo_calculo = source.tipo_calculo,
@@ -608,8 +651,10 @@ BEGIN
                 tipo_motorista_key, motorista, motorista_key, km_saida, km_chegada,
                 km_viagem, km_manual, km_total, qtd_nf, volumes_nf, peso_nf, peso_taxado,
                 total_m3, valor_nf, fretes_total, coletas_total, receita_total, coleta_numeros,
-                contract_number, tipo_contrato, tipo_contrato_key, tipo_calculo, tipo_carga,
-                tipo_carga_key, diaria, custo_total, valor_frete, combustivel, pedagio,
+                contract_number, tipo_contrato_veiculo, tipo_contrato_veiculo_key,
+                tipo_contrato_motorista, tipo_contrato_motorista_key, tipo_contrato,
+                tipo_contrato_key, tipo_calculo, tipo_carga, tipo_carga_key, diaria,
+                custo_total, valor_frete, combustivel, pedagio,
                 servicos_motorista_total, despesa_operacional, inss_value, sest_senat_value,
                 ir_value, saldo_pagar, uniq_destinations_count, gerar_mdfe, solicitou_monitoramento,
                 solicitacao_monitoramento, leitura_movel_em, itens_entrega, itens_transferencia,
@@ -639,7 +684,9 @@ BEGIN
                 source.km_saida, source.km_chegada, source.km_viagem, source.km_manual, source.km_total,
                 source.qtd_nf, source.volumes_nf, source.peso_nf, source.peso_taxado, source.total_m3,
                 source.valor_nf, source.fretes_total, source.coletas_total, source.receita_total,
-                source.coleta_numeros, source.contract_number, source.tipo_contrato,
+                source.coleta_numeros, source.contract_number, source.tipo_contrato_veiculo,
+                source.tipo_contrato_veiculo_key, source.tipo_contrato_motorista,
+                source.tipo_contrato_motorista_key, source.tipo_contrato,
                 source.tipo_contrato_key, source.tipo_calculo, source.tipo_carga, source.tipo_carga_key,
                 source.diaria, source.custo_total, source.valor_frete, source.combustivel,
                 source.pedagio, source.servicos_motorista_total, source.despesa_operacional,

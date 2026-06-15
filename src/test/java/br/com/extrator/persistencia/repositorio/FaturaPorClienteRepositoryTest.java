@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,13 @@ class FaturaPorClienteRepositoryTest {
     void deveReconciliarAliasLegadoAntesDoMergeFinal() throws Exception {
         try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:fpc_alias?mode=memory&cache=shared")) {
             conexao.createStatement().execute("ATTACH DATABASE ':memory:' AS dbo");
+            registrarGetDate(conexao);
             conexao.createStatement().execute("""
                 CREATE TABLE dbo.faturas_por_cliente (
                     unique_id TEXT PRIMARY KEY,
-                    metadata TEXT
+                    metadata TEXT,
+                    excluido_na_origem INTEGER NOT NULL DEFAULT 0,
+                    data_exclusao_origem TEXT
                 )
             """);
             conexao.createStatement().execute("INSERT INTO dbo.faturas_por_cliente (unique_id, metadata) VALUES ('NFSE-123456', '{}')");
@@ -48,10 +52,13 @@ class FaturaPorClienteRepositoryTest {
     void deveRemoverAliasesDuplicadosAposPromoverUniqueIdCanonico() throws Exception {
         try (Connection conexao = DriverManager.getConnection("jdbc:sqlite:file:fpc_alias_dup?mode=memory&cache=shared")) {
             conexao.createStatement().execute("ATTACH DATABASE ':memory:' AS dbo");
+            registrarGetDate(conexao);
             conexao.createStatement().execute("""
                 CREATE TABLE dbo.faturas_por_cliente (
                     unique_id TEXT PRIMARY KEY,
-                    metadata TEXT
+                    metadata TEXT,
+                    excluido_na_origem INTEGER NOT NULL DEFAULT 0,
+                    data_exclusao_origem TEXT
                 )
             """);
             conexao.createStatement().execute("INSERT INTO dbo.faturas_por_cliente (unique_id, metadata) VALUES ('FPC-HASH-ABC', '{}')");
@@ -76,7 +83,12 @@ class FaturaPorClienteRepositoryTest {
 
     private List<String> listarUniqueIds(final Connection conexao) throws Exception {
         try (PreparedStatement ps = conexao.prepareStatement(
-            "SELECT unique_id FROM dbo.faturas_por_cliente ORDER BY unique_id"
+            """
+            SELECT unique_id
+              FROM dbo.faturas_por_cliente
+             WHERE COALESCE(excluido_na_origem, 0) = 0
+             ORDER BY unique_id
+            """
         ); ResultSet rs = ps.executeQuery()) {
             final java.util.ArrayList<String> ids = new java.util.ArrayList<>();
             while (rs.next()) {
@@ -84,5 +96,14 @@ class FaturaPorClienteRepositoryTest {
             }
             return List.copyOf(ids);
         }
+    }
+
+    private void registrarGetDate(final Connection conexao) throws SQLException {
+        org.sqlite.Function.create(conexao, "GETDATE", new org.sqlite.Function() {
+            @Override
+            protected void xFunc() throws SQLException {
+                result("2026-06-15 12:00:00");
+            }
+        });
     }
 }

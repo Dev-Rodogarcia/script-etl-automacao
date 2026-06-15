@@ -44,6 +44,7 @@ class ExtracaoPorIntervaloUseCaseTest {
     private static final String PROP_TIMEOUT_COLETAS = "ETL_GRAPHQL_TIMEOUT_ENTIDADE_COLETAS_MS";
     private static final String PROP_BACKFILL_MAX_EXPANSAO = "ETL_REFERENCIAL_COLETAS_BACKFILL_MAX_EXPANSAO_DIAS";
     private static final String PROP_LOOKBACK_MODO_FRETES = "ETL_FRETES_PERFORMANCE_LOOKBACK_MODO";
+    private static final String PROP_PRUNE_AUSENTES_FRETES = "ETL_FRETES_PRUNE_AUSENTES";
     private static final String PROP_TIMEOUT_COLETAS_INTERVALO = "etl.graphql.timeout.entidade.coletas.intervalo.ms";
     private static final String PROP_MAX_EXPANSAO_INTERVALO = "etl.referencial.coletas.backfill.max_expansao_dias.intervalo";
     private static final String PROP_MAX_FALHAS_INTERVALO = "etl.intervalo.coletas.max_consecutive_failures";
@@ -72,6 +73,7 @@ class ExtracaoPorIntervaloUseCaseTest {
         System.clearProperty(PROP_TIMEOUT_COLETAS);
         System.clearProperty(PROP_BACKFILL_MAX_EXPANSAO);
         System.clearProperty(PROP_LOOKBACK_MODO_FRETES);
+        System.clearProperty(PROP_PRUNE_AUSENTES_FRETES);
         System.clearProperty(PROP_TIMEOUT_COLETAS_INTERVALO);
         System.clearProperty(PROP_MAX_EXPANSAO_INTERVALO);
         System.clearProperty(PROP_MAX_FALHAS_INTERVALO);
@@ -156,6 +158,26 @@ class ExtracaoPorIntervaloUseCaseTest {
 
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO, extracao.requestCapturada.modoExecucao());
         assertTrue(extracao.requestCapturada.modoLoopDaemon());
+    }
+
+    @Test
+    void microBatchDoDaemonDeveDesabilitarPruneDeAusentesFretes() {
+        assertPruneConfiguradoParaModo(ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH, "false");
+    }
+
+    @Test
+    void reconciliacaoDedicadaDeveHabilitarPruneDeAusentesFretes() {
+        assertPruneConfiguradoParaModo(ExtracaoPorIntervaloRequest.ModoExecucao.RECONCILIACAO, "true");
+    }
+
+    @Test
+    void backfillDeveDesabilitarPruneDeAusentesFretes() {
+        assertPruneConfiguradoParaModo(ExtracaoPorIntervaloRequest.ModoExecucao.BACKFILL, "false");
+    }
+
+    @Test
+    void retrofitDeveDesabilitarPruneDeAusentesFretes() {
+        assertPruneConfiguradoParaModo(ExtracaoPorIntervaloRequest.ModoExecucao.RETROFIT, "false");
     }
 
     @Test
@@ -406,6 +428,43 @@ class ExtracaoPorIntervaloUseCaseTest {
         final LocalDate inicio = LocalDate.of(2026, 1, 1);
         final LocalDate fim = inicio.plusDays((30L * quantidadeBlocos) - 1L);
         return new ExtracaoPorIntervaloRequest(inicio, fim, "graphql", "coletas", false, false);
+    }
+
+    private void assertPruneConfiguradoParaModo(
+        final ExtracaoPorIntervaloRequest.ModoExecucao modoExecucao,
+        final String valorEsperado
+    ) {
+        final Queue<StepExecutionResult> resultados = filaDeResultados(
+            resultadoGraphql("usuarios_sistema", StepStatus.SUCCESS, "ok usuarios"),
+            resultadoGraphql("fretes", StepStatus.SUCCESS, "ok fretes")
+        );
+        final Queue<Optional<LogExtracaoInfo>> logs = filaDeLogs(logCompleto(12), logCompleto(42));
+        final Queue<IntegridadeEtlPort.ResultadoIntegridade> integridade = filaDeIntegridade(integridadeValida());
+        final Queue<String> pruneObservado = new ArrayDeque<>();
+
+        final GraphQLGateway gateway = (dataInicio, dataFim, entidade) -> {
+            pruneObservado.add(System.getProperty(PROP_PRUNE_AUSENTES_FRETES));
+            return resultados.remove();
+        };
+
+        final ExtracaoPorIntervaloUseCase useCase = criarUseCase(
+            gateway,
+            new SequencialExtractionLogQueryPort(logs),
+            new SequencialIntegridadePort(integridade)
+        );
+        final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
+            LocalDate.of(2026, 4, 27),
+            LocalDate.of(2026, 4, 28),
+            "graphql",
+            "fretes",
+            true,
+            false,
+            modoExecucao
+        );
+
+        assertDoesNotThrow(() -> useCase.executar(request));
+
+        assertEquals(List.of(valorEsperado, valorEsperado), List.copyOf(pruneObservado));
     }
 
     private Queue<StepExecutionResult> filaDeResultados(final StepExecutionResult... resultados) {

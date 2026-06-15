@@ -128,7 +128,8 @@ public class ManifestoMapper {
         
         entity.setPickSequenceCode(dto.getPickSequenceCode());
         entity.setContractNumber(dto.getContractNumber());
-        entity.setContractType(dto.getContractType());
+        entity.setContractType(dto.getTipoContratoVeiculo());
+        entity.setDriverContractType(dto.getTipoContratoMotorista());
         entity.setCalculationType(dto.getCalculationType());
         entity.setCargoType(dto.getCargoType());
         

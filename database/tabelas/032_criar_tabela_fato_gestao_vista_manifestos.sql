@@ -69,6 +69,10 @@ BEGIN
         coleta_numeros NVARCHAR(MAX) NULL,
 
         contract_number NVARCHAR(50) NULL,
+        tipo_contrato_veiculo NVARCHAR(100) NULL,
+        tipo_contrato_veiculo_key NVARCHAR(100) NULL,
+        tipo_contrato_motorista NVARCHAR(100) NULL,
+        tipo_contrato_motorista_key NVARCHAR(100) NULL,
         tipo_contrato NVARCHAR(100) NULL,
         tipo_contrato_key NVARCHAR(100) NULL,
         tipo_calculo NVARCHAR(100) NULL,

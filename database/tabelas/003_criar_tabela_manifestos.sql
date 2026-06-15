@@ -42,6 +42,7 @@ BEGIN
         pick_sequence_code BIGINT,
         contract_number NVARCHAR(50),
         contract_type NVARCHAR(50),
+        driver_contract_type NVARCHAR(50),
         calculation_type NVARCHAR(50),
         cargo_type NVARCHAR(255),
         daily_subtotal DECIMAL(18, 2),
@@ -121,6 +122,7 @@ BEGIN
         -- Coluna de Auditoria
         data_extracao DATETIME2 DEFAULT GETDATE(),
         excluido_na_origem BIT NOT NULL CONSTRAINT DF_manifestos_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL,
 
         -- Constraint UNIQUE alinhada com a chave de MERGE
         CONSTRAINT UQ_manifestos_chave_composta UNIQUE (chave_merge_hash)
@@ -140,6 +142,22 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_manifestos_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna manifestos.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.manifestos', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.manifestos
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna manifestos.data_exclusao_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.manifestos', N'driver_contract_type') IS NULL
+BEGIN
+    ALTER TABLE dbo.manifestos
+    ADD driver_contract_type NVARCHAR(50) NULL;
+    PRINT 'Coluna manifestos.driver_contract_type adicionada em tabela existente.';
 END
 GO
 

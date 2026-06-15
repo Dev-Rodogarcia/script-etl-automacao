@@ -52,7 +52,8 @@ BEGIN
 
         -- Coluna de Auditoria
         data_extracao DATETIME2 DEFAULT GETDATE(),
-        excluido_na_origem BIT NOT NULL CONSTRAINT DF_cotacoes_excluido_na_origem DEFAULT (0)
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_cotacoes_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL
     );
     
     PRINT 'Tabela cotacoes criada com sucesso!';
@@ -69,5 +70,13 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_cotacoes_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna cotacoes.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.cotacoes', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.cotacoes
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna cotacoes.data_exclusao_origem adicionada em tabela existente.';
 END
 GO

@@ -260,7 +260,7 @@ public class FreteExtractor implements ChunkedEntityExtractor<FreteNodeDTO> {
             );
             if (removidos > 0) {
                 logger.warn(
-                    "Reconciliacao por periodo removeu {} frete(s) ausente(s) na API para {} a {}",
+                    "Reconciliacao por periodo expurgou logicamente {} frete(s) ausente(s) na API para {} a {}",
                     removidos,
                     ultimaDataInicio,
                     ultimaDataFim
@@ -639,7 +639,7 @@ public class FreteExtractor implements ChunkedEntityExtractor<FreteNodeDTO> {
             );
             if (removidos > 0) {
                 logger.warn(
-                    "Reconciliacao por periodo removeu {} frete(s) ausente(s) na API para {} a {}",
+                    "Reconciliacao por periodo expurgou logicamente {} frete(s) ausente(s) na API para {} a {}",
                     removidos,
                     ultimaDataInicio,
                     ultimaDataFim

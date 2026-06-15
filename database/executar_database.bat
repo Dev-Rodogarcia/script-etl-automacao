@@ -212,6 +212,8 @@ for %%F in (
     "migrations\040_criar_indice_performance_fretes.sql"
     "migrations\041_adicionar_chave_pick_item_coletas_fretes.sql"
     "migrations\042_criar_fato_gestao_vista_manifestos.sql"
+    "migrations\043_materializar_tipo_contrato_manifestos.sql"
+    "migrations\044_adicionar_data_exclusao_origem_tabelas_base.sql"
 ) do (
     if not exist %%F (
         echo   [SKIP] Nao encontrada: %%~F

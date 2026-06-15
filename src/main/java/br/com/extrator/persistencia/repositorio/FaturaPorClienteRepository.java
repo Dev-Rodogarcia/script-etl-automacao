@@ -217,10 +217,11 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                     pedidos_cliente = source.pedidos_cliente,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
-                INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, status, classificacao, estado, pagador_nome, pagador_documento, cliente_cnpj, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao, excluido_na_origem)
-                VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.status, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.cliente_cnpj, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao, source.excluido_na_origem);
+                INSERT (unique_id, valor_frete, valor_fatura, third_party_ctes_value, numero_cte, chave_cte, numero_nfse, status_cte, status_cte_result, data_emissao_cte, numero_fatura, data_emissao_fatura, data_vencimento_fatura, data_baixa_fatura, fit_ant_ils_original_due_date, fit_ant_document, fit_ant_issue_date, fit_ant_value, filial, tipo_frete, status, classificacao, estado, pagador_nome, pagador_documento, cliente_cnpj, remetente_nome, remetente_documento, destinatario_nome, destinatario_documento, vendedor_nome, notas_fiscais, pedidos_cliente, metadata, data_extracao, excluido_na_origem, data_exclusao_origem)
+                VALUES (source.unique_id, source.valor_frete, source.valor_fatura, source.third_party_ctes_value, source.numero_cte, source.chave_cte, source.numero_nfse, source.status_cte, source.status_cte_result, source.data_emissao_cte, source.numero_fatura, source.data_emissao_fatura, source.data_vencimento_fatura, source.data_baixa_fatura, source.fit_ant_ils_original_due_date, source.fit_ant_document, source.fit_ant_issue_date, source.fit_ant_value, source.filial, source.tipo_frete, source.status, source.classificacao, source.estado, source.pagador_nome, source.pagador_documento, source.cliente_cnpj, source.remetente_nome, source.remetente_documento, source.destinatario_nome, source.destinatario_documento, source.vendedor_nome, source.notas_fiscais, source.pedidos_cliente, source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem);
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
 
@@ -274,7 +275,8 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                     ? AS pedidos_cliente,
                     ? AS metadata,
                     ? AS data_extracao,
-                    CAST(0 AS bit) AS excluido_na_origem
+                    CAST(0 AS bit) AS excluido_na_origem,
+                    CAST(NULL AS datetime2(0)) AS data_exclusao_origem
             ) AS source
             """;
     }
@@ -317,9 +319,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
                 .filter(alias -> !uniqueIdCanonico.equals(alias))
                 .toList();
             if (!aliasesLegados.isEmpty()) {
-                final int removidos = excluirAliasesLegados(conexao, aliasesLegados);
+                final int removidos = inativarAliasesLegados(conexao, aliasesLegados);
                 logger.info(
-                    "Aliases legados removidos de faturas_por_cliente apos reconciliacao com unique_id canonico: {} | aliases={} | removidos={}",
+                    "Aliases legados inativados em faturas_por_cliente apos reconciliacao com unique_id canonico: {} | aliases={} | inativados={}",
                     uniqueIdCanonico,
                     aliasesLegados,
                     removidos
@@ -338,7 +340,13 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
         }
 
         try (PreparedStatement pstmt = conexao.prepareStatement(
-            "UPDATE dbo.faturas_por_cliente SET unique_id = ? WHERE unique_id = ?"
+            """
+            UPDATE dbo.faturas_por_cliente
+               SET unique_id = ?,
+                   excluido_na_origem = 0,
+                   data_exclusao_origem = NULL
+             WHERE unique_id = ?
+            """
         )) {
             pstmt.setString(1, uniqueIdCanonico);
             pstmt.setString(2, aliasLegado);
@@ -352,9 +360,9 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             .skip(1)
             .toList();
         if (!aliasesDuplicados.isEmpty()) {
-            final int removidos = excluirAliasesLegados(conexao, aliasesDuplicados);
+            final int removidos = inativarAliasesLegados(conexao, aliasesDuplicados);
             logger.info(
-                "Aliases legados duplicados removidos apos promover unique_id canonico em faturas_por_cliente: {} | aliases={} | removidos={}",
+                "Aliases legados duplicados inativados apos promover unique_id canonico em faturas_por_cliente: {} | aliases={} | inativados={}",
                 uniqueIdCanonico,
                 aliasesDuplicados,
                 removidos
@@ -391,12 +399,18 @@ public class FaturaPorClienteRepository extends AbstractRepository<FaturaPorClie
             .toList();
     }
 
-    private int excluirAliasesLegados(final Connection conexao, final List<String> aliasesLegados) throws SQLException {
+    private int inativarAliasesLegados(final Connection conexao, final List<String> aliasesLegados) throws SQLException {
         if (aliasesLegados == null || aliasesLegados.isEmpty()) {
             return 0;
         }
         final String placeholders = String.join(",", Collections.nCopies(aliasesLegados.size(), "?"));
-        final String sql = "DELETE FROM dbo.faturas_por_cliente WHERE unique_id IN (" + placeholders + ")";
+        final String sql = """
+            UPDATE dbo.faturas_por_cliente
+               SET excluido_na_origem = 1,
+                   data_exclusao_origem = GETDATE()
+             WHERE unique_id IN (%s)
+               AND COALESCE(excluido_na_origem, 0) = 0
+            """.formatted(placeholders);
         try (PreparedStatement pstmt = conexao.prepareStatement(sql)) {
             int index = 1;
             for (final String alias : aliasesLegados) {

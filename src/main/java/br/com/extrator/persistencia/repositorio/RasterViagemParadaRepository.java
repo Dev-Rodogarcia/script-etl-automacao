@@ -23,14 +23,14 @@ public class RasterViagemParadaRepository extends AbstractRepository<RasterViage
 
         final String sql = """
             MERGE dbo.raster_viagem_paradas WITH (HOLDLOCK) AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
                 AS source (
                     cod_solicitacao, ordem, tipo, cod_ibge_cidade, cnpj_cliente, codigo_cliente,
                     data_hora_prev_chegada, data_hora_prev_saida, data_hora_real_chegada,
                     data_hora_real_saida, latitude, longitude, dentro_prazo_raster,
                     diferenca_tempo_raster, km_percorrido_entrega, km_restante_entrega,
                     chegou_na_entrega, data_hora_ultima_posicao, latitude_ultima_posicao,
-                    longitude_ultima_posicao, referencia_ultima_posicao, metadata, data_extracao, excluido_na_origem
+                    longitude_ultima_posicao, referencia_ultima_posicao, metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
             ON target.cod_solicitacao = source.cod_solicitacao
                AND target.ordem = source.ordem
@@ -57,7 +57,8 @@ public class RasterViagemParadaRepository extends AbstractRepository<RasterViage
                     referencia_ultima_posicao = source.referencia_ultima_posicao,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     cod_solicitacao, ordem, tipo, cod_ibge_cidade, cnpj_cliente, codigo_cliente,
@@ -65,7 +66,7 @@ public class RasterViagemParadaRepository extends AbstractRepository<RasterViage
                     data_hora_real_saida, latitude, longitude, dentro_prazo_raster,
                     diferenca_tempo_raster, km_percorrido_entrega, km_restante_entrega,
                     chegou_na_entrega, data_hora_ultima_posicao, latitude_ultima_posicao,
-                    longitude_ultima_posicao, referencia_ultima_posicao, metadata, data_extracao, excluido_na_origem
+                    longitude_ultima_posicao, referencia_ultima_posicao, metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
                 VALUES (
                     source.cod_solicitacao, source.ordem, source.tipo, source.cod_ibge_cidade, source.cnpj_cliente,
@@ -74,7 +75,7 @@ public class RasterViagemParadaRepository extends AbstractRepository<RasterViage
                     source.dentro_prazo_raster, source.diferenca_tempo_raster, source.km_percorrido_entrega,
                     source.km_restante_entrega, source.chegou_na_entrega, source.data_hora_ultima_posicao,
                     source.latitude_ultima_posicao, source.longitude_ultima_posicao, source.referencia_ultima_posicao,
-                    source.metadata, source.data_extracao, source.excluido_na_origem
+                    source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem
                 );
             """;
 

@@ -116,7 +116,8 @@ public class OrphanReconciliationRepository implements OrphanReconciliationStore
         final String placeholders = String.join(",", Collections.nCopies(lote.size(), "?"));
         final String sql = """
             UPDATE %1$s
-               SET excluido_na_origem = 1
+               SET excluido_na_origem = 1,
+                   data_exclusao_origem = GETDATE()
              WHERE excluido_na_origem = 0
                AND %2$s IN (%3$s)
             """.formatted(tableName, keyExpression, placeholders);

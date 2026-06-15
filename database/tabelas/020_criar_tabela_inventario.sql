@@ -31,7 +31,8 @@ BEGIN
         flag_comprovante_anexado BIT NOT NULL CONSTRAINT DF_inventario_flag_comprovante_anexado DEFAULT (0),
         metadata NVARCHAR(MAX) NULL,
         data_extracao DATETIME2 DEFAULT GETDATE(),
-        excluido_na_origem BIT NOT NULL CONSTRAINT DF_inventario_excluido_na_origem DEFAULT (0)
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_inventario_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL
     );
 
     CREATE INDEX IX_inventario_sequence_code ON dbo.inventario (sequence_code);
@@ -45,5 +46,13 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_inventario_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna inventario.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.inventario', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.inventario
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna inventario.data_exclusao_origem adicionada em tabela existente.';
 END
 GO

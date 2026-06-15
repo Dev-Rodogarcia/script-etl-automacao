@@ -85,7 +85,8 @@ public record ExtracaoPorIntervaloRequest(
         INTERVALO("intervalo"),
         MICRO_BATCH("micro_batch"),
         RECONCILIACAO("reconciliacao"),
-        BACKFILL("backfill");
+        BACKFILL("backfill"),
+        RETROFIT("backfill");
 
         private final String modoLookbackFretes;
 

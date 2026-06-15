@@ -252,7 +252,8 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     nfse_issued_at = source.nfse_issued_at,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     sequence_code, requested_at, operation_type, customer_doc, customer_name,
@@ -262,7 +263,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
                     disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
                     collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
-                    metadata, data_extracao, excluido_na_origem
+                    metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
                 VALUES (
                     source.sequence_code, source.requested_at, source.operation_type, source.customer_doc, source.customer_name,
@@ -272,14 +273,14 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     source.customer_nickname, source.sender_document, source.sender_nickname, source.receiver_document, source.receiver_nickname,
                     source.disapprove_comments, source.freight_comments, source.discount_subtotal, source.itr_subtotal, source.tde_subtotal,
                     source.collect_subtotal, source.delivery_subtotal, source.other_fees, source.cte_issued_at, source.nfse_issued_at,
-                    source.metadata, source.data_extracao, source.excluido_na_origem
+                    source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem
                 );
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
 
     private String construirSourceClauseValues() {
         return """
-            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
                 AS source (
                     sequence_code, requested_at, operation_type, customer_doc, customer_name,
                     origin_city, origin_state, destination_city, destination_state, price_table,
@@ -288,7 +289,7 @@ public class CotacaoRepository extends AbstractRepository<CotacaoEntity> {
                     customer_nickname, sender_document, sender_nickname, receiver_document, receiver_nickname,
                     disapprove_comments, freight_comments, discount_subtotal, itr_subtotal, tde_subtotal,
                     collect_subtotal, delivery_subtotal, other_fees, cte_issued_at, nfse_issued_at,
-                    metadata, data_extracao, excluido_na_origem
+                    metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
             """;
     }

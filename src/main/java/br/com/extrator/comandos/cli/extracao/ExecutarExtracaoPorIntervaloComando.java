@@ -46,6 +46,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     private static final LoggerConsole log = LoggerConsole.getLogger(ExecutarExtracaoPorIntervaloComando.class);
     private static final String FLAG_MODO_LOOP_DAEMON = "--modo-loop-daemon";
     private static final String FLAG_MODO_RAPIDO_24H = "--modo-rapido-24h";
+    private static final String FLAG_RETROFIT = "--retrofit";
 
     private final ExtracaoPorIntervaloUseCase extracaoPorIntervaloUseCase;
 
@@ -81,11 +82,14 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         final List<String> argumentosLimpos = new ArrayList<>();
         boolean modoLoopDaemon = false;
         boolean modoRapido24h = false;
+        boolean modoRetrofit = false;
         for (final String arg : args) {
             if (arg != null && FLAG_MODO_LOOP_DAEMON.equalsIgnoreCase(arg.trim())) {
                 modoLoopDaemon = true;
             } else if (arg != null && FLAG_MODO_RAPIDO_24H.equalsIgnoreCase(arg.trim())) {
                 modoRapido24h = true;
+            } else if (arg != null && FLAG_RETROFIT.equalsIgnoreCase(arg.trim())) {
+                modoRetrofit = true;
             } else {
                 argumentosLimpos.add(arg);
             }
@@ -139,13 +143,19 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
             return null;
         }
 
+        final ExtracaoPorIntervaloRequest.ModoExecucao modoExecucao = modoRetrofit
+            ? ExtracaoPorIntervaloRequest.ModoExecucao.RETROFIT
+            : modoLoopDaemon || modoRapido24h
+                ? ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH
+                : ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO;
         final ExtracaoPorIntervaloRequest request = new ExtracaoPorIntervaloRequest(
             dataInicio,
             dataFim,
             apiEspecifica,
             entidadeEspecifica,
             modoLoopDaemon,
-            modoRapido24h
+            modoRapido24h,
+            modoExecucao
         );
         return new ParametrosParseados(request);
     }
@@ -153,7 +163,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
     private void exibirUso() {
         log.error("ERRO: Argumentos insuficientes");
         log.console(
-            "Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-loop-daemon] [--modo-rapido-24h]"
+            "Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--modo-loop-daemon] [--modo-rapido-24h] [--retrofit]"
         );
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 graphql");
@@ -162,6 +172,7 @@ public class ExecutarExtracaoPorIntervaloComando implements Comando {
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 inventario");
         log.console("Exemplo rapido: --extracao-intervalo 2026-04-27 2026-04-28 --modo-rapido-24h");
         log.console("Exemplo: --extracao-intervalo 2024-11-01 2025-03-31 --modo-loop-daemon");
+        log.console("Exemplo retrofit: --extracao-intervalo 2024-11-01 2025-03-31 --retrofit");
     }
 
     private String inferirApiPorEntidade(final String entidadeEspecifica) {

@@ -185,17 +185,18 @@ public class LocalizacaoCargaRepository extends AbstractRepository<LocalizacaoCa
                     metadata = source.metadata,
                     localizacao_hash = source.localizacao_hash,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
-                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao, excluido_na_origem)
-                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.taxed_weight_decimal, source.invoices_value, source.invoices_value_decimal, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_normalized, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.localizacao_hash, source.data_extracao, source.excluido_na_origem);
+                INSERT (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao, excluido_na_origem, data_exclusao_origem)
+                VALUES (source.sequence_number, source.type, source.service_at, source.invoices_volumes, source.taxed_weight, source.taxed_weight_decimal, source.invoices_value, source.invoices_value_decimal, source.total_value, source.service_type, source.branch_nickname, source.predicted_delivery_at, source.destination_location_name, source.destination_branch_nickname, source.classification, source.status, source.status_normalized, source.status_branch_nickname, source.origin_location_name, source.origin_branch_nickname, source.fit_fln_cln_nickname, source.metadata, source.localizacao_hash, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem);
             """.formatted(tabelaAlvo, sourceClause, freshnessGuard);
     }
 
     private String construirSourceClauseValues() {
         return """
-            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
-                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao, excluido_na_origem)
+            (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
+                AS source (sequence_number, type, service_at, invoices_volumes, taxed_weight, taxed_weight_decimal, invoices_value, invoices_value_decimal, total_value, service_type, branch_nickname, predicted_delivery_at, destination_location_name, destination_branch_nickname, classification, status, status_normalized, status_branch_nickname, origin_location_name, origin_branch_nickname, fit_fln_cln_nickname, metadata, localizacao_hash, data_extracao, excluido_na_origem, data_exclusao_origem)
             """;
     }
 

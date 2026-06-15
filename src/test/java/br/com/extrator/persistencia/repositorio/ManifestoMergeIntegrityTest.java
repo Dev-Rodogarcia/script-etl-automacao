@@ -9,6 +9,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -31,6 +32,7 @@ class ManifestoMergeIntegrityTest {
             conexao.setAutoCommit(false);
 
             try {
+                garantirColunasGovernanca(conexao);
                 inserirColetaPai(conexao, pickSequenceCode);
 
                 final TestableManifestoRepository repository = new TestableManifestoRepository();
@@ -96,6 +98,18 @@ class ManifestoMergeIntegrityTest {
             statement.setString(1, "it-mf-" + pickSequenceCode);
             statement.setLong(2, pickSequenceCode);
             statement.executeUpdate();
+        }
+    }
+
+    private static void garantirColunasGovernanca(final Connection conexao) throws SQLException {
+        final String sql = """
+            IF COL_LENGTH(N'dbo.manifestos', N'driver_contract_type') IS NULL
+                ALTER TABLE dbo.manifestos ADD driver_contract_type NVARCHAR(50) NULL;
+            IF COL_LENGTH(N'dbo.manifestos', N'data_exclusao_origem') IS NULL
+                ALTER TABLE dbo.manifestos ADD data_exclusao_origem DATETIME2(0) NULL;
+            """;
+        try (Statement statement = conexao.createStatement()) {
+            statement.execute(sql);
         }
     }
 

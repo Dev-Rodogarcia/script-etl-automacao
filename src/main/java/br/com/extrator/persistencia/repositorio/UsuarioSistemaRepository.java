@@ -95,9 +95,10 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
                     V.data_atualizacao,
                     V.ultima_extracao_em,
                     V.excluido_na_origem,
+                    V.data_exclusao_origem,
                     %s AS hash_linha
-                FROM (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
-                    AS V (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem)
+                FROM (VALUES (?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
+                    AS V (id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem, data_exclusao_origem)
             ) AS S
             ON T.user_id = S.id
             WHEN MATCHED AND (
@@ -115,10 +116,11 @@ public class UsuarioSistemaRepository extends AbstractRepository<UsuarioSistemaE
                     T.data_atualizacao = S.data_atualizacao,
                     T.ultima_extracao_em = S.ultima_extracao_em,
                     T.excluido_na_origem = S.excluido_na_origem,
+                    T.data_exclusao_origem = S.data_exclusao_origem,
                     T.hash_linha = S.hash_linha
             WHEN NOT MATCHED THEN
-                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem, hash_linha)
-                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem, S.hash_linha);
+                INSERT (user_id, nome, ativo, origem_atualizado_em, data_atualizacao, ultima_extracao_em, excluido_na_origem, data_exclusao_origem, hash_linha)
+                VALUES (S.id, S.nome, S.ativo, S.origem_atualizado_em, S.data_atualizacao, S.ultima_extracao_em, S.excluido_na_origem, S.data_exclusao_origem, S.hash_linha);
             """, NOME_TABELA, HASH_USUARIO_SQL, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {

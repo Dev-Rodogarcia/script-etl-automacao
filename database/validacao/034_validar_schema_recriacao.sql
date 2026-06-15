@@ -116,7 +116,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'039_criar_dim_calendario_referencia_faturamento'),
     (N'040_criar_indice_performance_fretes'),
     (N'041_adicionar_chave_pick_item_coletas_fretes'),
-    (N'042_criar_fato_gestao_vista_manifestos');
+    (N'042_criar_fato_gestao_vista_manifestos'),
+    (N'043_materializar_tipo_contrato_manifestos'),
+    (N'044_adicionar_data_exclusao_origem_tabelas_base');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -147,6 +149,9 @@ IF COL_LENGTH(N'dbo.fretes', N'pick_item_id') IS NULL
 
 IF COL_LENGTH(N'dbo.coletas', N'pick_items_ids') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.coletas.pick_items_ids', N'Coluna da migration 041 ausente');
+
+IF COL_LENGTH(N'dbo.manifestos', N'driver_contract_type') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.manifestos.driver_contract_type', N'Contrato do motorista da migration 043 ausente');
 
 IF NOT EXISTS (
     SELECT 1
@@ -281,6 +286,29 @@ INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'COLUNA', tabela + N'.excluido_na_origem', N'Coluna de soft delete da migration 027 ausente'
 FROM @softDeleteTables
 WHERE COL_LENGTH(tabela, N'excluido_na_origem') IS NULL;
+
+DECLARE @softDeleteTimestampTables TABLE (
+    tabela NVARCHAR(128) NOT NULL
+);
+
+INSERT INTO @softDeleteTimestampTables (tabela) VALUES
+    (N'dbo.coletas'),
+    (N'dbo.fretes'),
+    (N'dbo.manifestos'),
+    (N'dbo.cotacoes'),
+    (N'dbo.localizacao_cargas'),
+    (N'dbo.contas_a_pagar'),
+    (N'dbo.faturas_por_cliente'),
+    (N'dbo.inventario'),
+    (N'dbo.sinistros'),
+    (N'dbo.dim_usuarios'),
+    (N'dbo.raster_viagens'),
+    (N'dbo.raster_viagem_paradas');
+
+INSERT INTO @falhas (tipo, nome, detalhe)
+SELECT N'COLUNA', tabela + N'.data_exclusao_origem', N'Carimbo temporal do expurgo logico da migration 044 ausente'
+FROM @softDeleteTimestampTables
+WHERE COL_LENGTH(tabela, N'data_exclusao_origem') IS NULL;
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'INDICE', indice, N'Indice filtrado de ativos da migration 027 ausente ou sem filtro esperado'
@@ -614,6 +642,12 @@ IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'receita_total') IS NULL
 
 IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'capacidade_lotacao_kg') IS NULL
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.capacidade_lotacao_kg', N'Capacidade materializada da fato de manifestos ausente');
+
+IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'tipo_contrato_veiculo') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.tipo_contrato_veiculo', N'Tipo de contrato do veiculo materializado ausente');
+
+IF COL_LENGTH(N'dbo.fato_gestao_vista_manifestos', N'tipo_contrato_motorista') IS NULL
+    INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.fato_gestao_vista_manifestos.tipo_contrato_motorista', N'Tipo de contrato do motorista materializado ausente');
 
 IF NOT EXISTS (
     SELECT 1

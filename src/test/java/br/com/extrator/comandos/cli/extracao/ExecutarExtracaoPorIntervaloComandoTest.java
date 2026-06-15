@@ -103,6 +103,24 @@ class ExecutarExtracaoPorIntervaloComandoTest {
         assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH, useCase.requestCapturada.modoExecucao());
     }
 
+    @Test
+    void deveAceitarFlagRetrofit() throws Exception {
+        final CapturingExtracaoPorIntervaloUseCase useCase = new CapturingExtracaoPorIntervaloUseCase();
+        final ExecutarExtracaoPorIntervaloComando comando = new ExecutarExtracaoPorIntervaloComando(useCase);
+
+        comando.executar(new String[] {
+            "--extracao-intervalo",
+            "2026-04-01",
+            "2026-04-30",
+            "graphql",
+            "fretes",
+            "--retrofit"
+        });
+
+        assertNotNull(useCase.requestCapturada);
+        assertEquals(ExtracaoPorIntervaloRequest.ModoExecucao.RETROFIT, useCase.requestCapturada.modoExecucao());
+    }
+
     private static final class CapturingExtracaoPorIntervaloUseCase extends ExtracaoPorIntervaloUseCase {
         private ExtracaoPorIntervaloRequest requestCapturada;
 

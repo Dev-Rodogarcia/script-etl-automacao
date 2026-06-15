@@ -82,6 +82,7 @@ public class FluxoCompletoUseCase {
     private static final Path ARQUIVO_ULTIMO_RUN = LogStoragePaths.RUNTIME_STATE_DIR.resolve("last_run.properties");
     private static final String PROPRIEDADE_ULTIMO_RUN = "last_successful_run";
     private static final String PROP_LOOKBACK_MODO_FRETES = "ETL_FRETES_PERFORMANCE_LOOKBACK_MODO";
+    private static final String PROP_PRUNE_AUSENTES_FRETES = "ETL_FRETES_PRUNE_AUSENTES";
     private final PreBackfillReferencialColetasUseCase preBackfillReferencialColetasUseCase;
     private final ExecutionLockManager executionLockManager;
 
@@ -106,9 +107,11 @@ public class FluxoCompletoUseCase {
         final Map<String, String> overridesTemporarios = modoLoopDaemon
             ? Map.of(
                 PROP_LOOKBACK_MODO_FRETES,
-                ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH.modoLookbackFretes()
+                ExtracaoPorIntervaloRequest.ModoExecucao.MICRO_BATCH.modoLookbackFretes(),
+                PROP_PRUNE_AUSENTES_FRETES,
+                Boolean.FALSE.toString()
             )
-            : Map.of();
+            : Map.of(PROP_PRUNE_AUSENTES_FRETES, Boolean.FALSE.toString());
         try (ScopedSystemPropertyOverride scopedOverride = ScopedSystemPropertyOverride.apply(overridesTemporarios)) {
         BannerUtil.exibirBannerExtracaoCompleta();
 

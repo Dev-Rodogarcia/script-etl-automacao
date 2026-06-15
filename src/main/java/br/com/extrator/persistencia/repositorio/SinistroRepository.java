@@ -60,7 +60,7 @@ public class SinistroRepository extends AbstractRepository<SinistroEntity> {
         );
         final String sql = String.format("""
             MERGE %s AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
                 AS source (
                     identificador_unico, sequence_code, opening_at_date, occurrence_at_date, occurrence_at_time,
                     expected_solution_date, insurance_claim_location, informed_by, finished_at_date, finished_at_time,
@@ -69,7 +69,7 @@ public class SinistroRepository extends AbstractRepository<SinistroEntity> {
                     customer_credit_entries_subtotal, responsible_credits_subtotal,
                     responsible_debit_entries_subtotal, insurer_credits_subtotal, insurance_claim_total,
                     branch_nickname, event_name, user_name, vehicle_plate, occurrence_description, occurrence_code,
-                    treatment_at, dealing_type, solution_type, metadata, data_extracao, excluido_na_origem
+                    treatment_at, dealing_type, solution_type, metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
             ON target.identificador_unico = source.identificador_unico
             WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
@@ -107,7 +107,8 @@ public class SinistroRepository extends AbstractRepository<SinistroEntity> {
                     solution_type = source.solution_type,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     identificador_unico, sequence_code, opening_at_date, occurrence_at_date, occurrence_at_time,
@@ -117,7 +118,7 @@ public class SinistroRepository extends AbstractRepository<SinistroEntity> {
                     customer_credit_entries_subtotal, responsible_credits_subtotal,
                     responsible_debit_entries_subtotal, insurer_credits_subtotal, insurance_claim_total,
                     branch_nickname, event_name, user_name, vehicle_plate, occurrence_description, occurrence_code,
-                    treatment_at, dealing_type, solution_type, metadata, data_extracao, excluido_na_origem
+                    treatment_at, dealing_type, solution_type, metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
                 VALUES (
                     source.identificador_unico, source.sequence_code, source.opening_at_date, source.occurrence_at_date, source.occurrence_at_time,
@@ -127,7 +128,7 @@ public class SinistroRepository extends AbstractRepository<SinistroEntity> {
                     source.customer_credit_entries_subtotal, source.responsible_credits_subtotal,
                     source.responsible_debit_entries_subtotal, source.insurer_credits_subtotal, source.insurance_claim_total,
                     source.branch_nickname, source.event_name, source.user_name, source.vehicle_plate, source.occurrence_description, source.occurrence_code,
-                    source.treatment_at, source.dealing_type, source.solution_type, source.metadata, source.data_extracao, source.excluido_na_origem
+                    source.treatment_at, source.dealing_type, source.solution_type, source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem
                 );
             """, NOME_TABELA, freshnessGuard);
 

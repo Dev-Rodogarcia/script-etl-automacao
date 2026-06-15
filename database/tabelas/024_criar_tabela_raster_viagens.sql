@@ -36,7 +36,8 @@ BEGIN
         link_timeline NVARCHAR(1000) NULL,
         metadata NVARCHAR(MAX) NULL,
         data_extracao DATETIME2(3) NOT NULL CONSTRAINT DF_raster_viagens_data_extracao DEFAULT SYSUTCDATETIME(),
-        excluido_na_origem BIT NOT NULL CONSTRAINT DF_raster_viagens_excluido_na_origem DEFAULT (0)
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_raster_viagens_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL
     );
 
     PRINT 'Tabela raster_viagens criada com sucesso!';
@@ -53,6 +54,14 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_raster_viagens_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna raster_viagens.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.raster_viagens', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.raster_viagens
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna raster_viagens.data_exclusao_origem adicionada em tabela existente.';
 END
 GO
 

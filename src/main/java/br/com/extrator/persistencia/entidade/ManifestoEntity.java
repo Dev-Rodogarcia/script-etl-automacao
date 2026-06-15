@@ -115,6 +115,7 @@ public class ManifestoEntity {
     private String adjustmentUserName; // Usuário do Acerto
 
     private String contractType;
+    private String driverContractType;
     private String calculationType;
     private String cargoType;
     private BigDecimal freightSubtotal;
@@ -486,6 +487,14 @@ public class ManifestoEntity {
 
     public void setContractType(final String contractType) {
         this.contractType = contractType;
+    }
+
+    public String getDriverContractType() {
+        return driverContractType;
+    }
+
+    public void setDriverContractType(final String driverContractType) {
+        this.driverContractType = driverContractType;
     }
 
     public String getCalculationType() {

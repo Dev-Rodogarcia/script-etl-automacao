@@ -29,6 +29,7 @@ BEGIN
         metadata NVARCHAR(MAX) NULL,
         data_extracao DATETIME2(3) NOT NULL CONSTRAINT DF_raster_viagem_paradas_data_extracao DEFAULT SYSUTCDATETIME(),
         excluido_na_origem BIT NOT NULL CONSTRAINT DF_raster_viagem_paradas_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL,
         CONSTRAINT PK_raster_viagem_paradas PRIMARY KEY (cod_solicitacao, ordem)
     );
 
@@ -46,6 +47,14 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_raster_viagem_paradas_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna raster_viagem_paradas.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.raster_viagem_paradas', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.raster_viagem_paradas
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna raster_viagem_paradas.data_exclusao_origem adicionada em tabela existente.';
 END
 GO
 

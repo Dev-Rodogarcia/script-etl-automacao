@@ -70,7 +70,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         "vehicle_type", "vehicle_owner", "driver_name", "branch_nickname", "vehicle_departure_km", "closing_km",
         "traveled_km", "invoices_count", "invoices_volumes", "invoices_weight", "total_taxed_weight",
         "total_cubic_volume", "invoices_value", "manifest_freights_total", "pick_sequence_code", "contract_number",
-        "contract_type", "calculation_type", "cargo_type", "daily_subtotal", "total_cost", "freight_subtotal",
+        "contract_type", "driver_contract_type", "calculation_type", "cargo_type", "daily_subtotal", "total_cost", "freight_subtotal",
         "fuel_subtotal", "toll_subtotal", "driver_services_total", "operational_expenses_total", "inss_value",
         "sest_senat_value", "ir_value", "paying_total", "manual_km", "generate_mdfe", "monitoring_request",
         "uniq_destinations_count", "creation_user_name", "adjustment_user_name", "metadata", "data_extracao",
@@ -85,7 +85,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         "programacao_ending_at", "trailer1_license_plate", "trailer1_weight_capacity", "trailer2_license_plate",
         "trailer2_weight_capacity", "vehicle_weight_capacity", "vehicle_cubic_weight", "capacidade_kg",
         "obs_operacional", "obs_financeira", "unloading_recipient_names", "delivery_region_names",
-        "programacao_cliente", "programacao_tipo_servico", "excluido_na_origem"
+        "programacao_cliente", "programacao_tipo_servico", "excluido_na_origem", "data_exclusao_origem"
     );
     private static final java.util.List<String> COLUNAS_PROMOCAO_ATUALIZAVEIS =
         java.util.List.copyOf(COLUNAS_PROMOCAO.subList(1, COLUNAS_PROMOCAO.size()));
@@ -308,8 +308,8 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
         );
         final String sql = String.format("""
             MERGE %s WITH (HOLDLOCK) AS target
-            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit)))
-                AS source (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem)
+            USING (VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(0 AS bit), CAST(NULL AS datetime2(0))))
+                AS source (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, driver_contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem, data_exclusao_origem)
             ON %s
             WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
                 UPDATE SET
@@ -341,6 +341,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     pick_sequence_code = source.pick_sequence_code,
                     contract_number = source.contract_number,
                     contract_type = source.contract_type,
+                    driver_contract_type = source.driver_contract_type,
                     calculation_type = source.calculation_type,
                     cargo_type = source.cargo_type,
                     daily_subtotal = source.daily_subtotal,
@@ -363,10 +364,11 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
                     metadata = source.metadata,
                     identificador_unico = source.identificador_unico,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
-                INSERT (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem)
-                VALUES (source.sequence_code, source.identificador_unico, source.status, source.created_at, source.departured_at, source.closed_at, source.finished_at, source.mdfe_number, source.mdfe_key, source.mdfe_status, source.distribution_pole, source.classification, source.vehicle_plate, source.vehicle_type, source.vehicle_owner, source.driver_name, source.branch_nickname, source.vehicle_departure_km, source.closing_km, source.traveled_km, source.invoices_count, source.invoices_volumes, source.invoices_weight, source.total_taxed_weight, source.total_cubic_volume, source.invoices_value, source.manifest_freights_total, source.pick_sequence_code, source.contract_number, source.contract_type, source.calculation_type, source.cargo_type, source.daily_subtotal, source.total_cost, source.freight_subtotal, source.fuel_subtotal, source.toll_subtotal, source.driver_services_total, source.operational_expenses_total, source.inss_value, source.sest_senat_value, source.ir_value, source.paying_total, source.manual_km, source.generate_mdfe, source.monitoring_request, source.uniq_destinations_count, source.creation_user_name, source.adjustment_user_name, source.metadata, source.data_extracao, source.excluido_na_origem);
+                INSERT (sequence_code, identificador_unico, status, created_at, departured_at, closed_at, finished_at, mdfe_number, mdfe_key, mdfe_status, distribution_pole, classification, vehicle_plate, vehicle_type, vehicle_owner, driver_name, branch_nickname, vehicle_departure_km, closing_km, traveled_km, invoices_count, invoices_volumes, invoices_weight, total_taxed_weight, total_cubic_volume, invoices_value, manifest_freights_total, pick_sequence_code, contract_number, contract_type, driver_contract_type, calculation_type, cargo_type, daily_subtotal, total_cost, freight_subtotal, fuel_subtotal, toll_subtotal, driver_services_total, operational_expenses_total, inss_value, sest_senat_value, ir_value, paying_total, manual_km, generate_mdfe, monitoring_request, uniq_destinations_count, creation_user_name, adjustment_user_name, metadata, data_extracao, excluido_na_origem, data_exclusao_origem)
+                VALUES (source.sequence_code, source.identificador_unico, source.status, source.created_at, source.departured_at, source.closed_at, source.finished_at, source.mdfe_number, source.mdfe_key, source.mdfe_status, source.distribution_pole, source.classification, source.vehicle_plate, source.vehicle_type, source.vehicle_owner, source.driver_name, source.branch_nickname, source.vehicle_departure_km, source.closing_km, source.traveled_km, source.invoices_count, source.invoices_volumes, source.invoices_weight, source.total_taxed_weight, source.total_cubic_volume, source.invoices_value, source.manifest_freights_total, source.pick_sequence_code, source.contract_number, source.contract_type, source.driver_contract_type, source.calculation_type, source.cargo_type, source.daily_subtotal, source.total_cost, source.freight_subtotal, source.fuel_subtotal, source.toll_subtotal, source.driver_services_total, source.operational_expenses_total, source.inss_value, source.sest_senat_value, source.ir_value, source.paying_total, source.manual_km, source.generate_mdfe, source.monitoring_request, source.uniq_destinations_count, source.creation_user_name, source.adjustment_user_name, source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem);
             """, tabelaAlvo, CONDICAO_CHAVE_MERGE, freshnessGuard);
 
         try (PreparedStatement statement = conexao.prepareStatement(sql)) {
@@ -421,6 +423,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             statement.setObject(paramIndex++, manifesto.getPickSequenceCode(), Types.BIGINT);
             statement.setString(paramIndex++, manifesto.getContractNumber());
             statement.setString(paramIndex++, truncate(manifesto.getContractType(), 50, "contract_type"));
+            statement.setString(paramIndex++, truncate(manifesto.getDriverContractType(), 50, "driver_contract_type"));
             statement.setString(paramIndex++, truncate(manifesto.getCalculationType(), 50, "calculation_type"));
             statement.setString(paramIndex++, truncate(manifesto.getCargoType(), 255, "cargo_type"));
             setBigDecimalParameter(statement, paramIndex++, manifesto.getDailySubtotal());
@@ -444,7 +447,7 @@ public class ManifestoRepository extends AbstractRepository<ManifestoEntity> {
             setInstantParameter(statement, paramIndex++, Instant.now()); // UTC timestamp
             
             // ✅ VALIDAR número de parâmetros
-            final int expectedParams = 51;
+            final int expectedParams = 52;
             if (paramIndex != expectedParams + 1) { // +1 porque paramIndex é 1-based
                 throw new SQLException(String.format(
                     "ERRO DE PROGRAMAÇÃO: SQL espera %d parâmetros, mas apenas %d foram setados!",

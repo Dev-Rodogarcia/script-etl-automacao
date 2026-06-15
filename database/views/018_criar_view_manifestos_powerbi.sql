@@ -43,6 +43,8 @@ SELECT
     receita_total                    AS [Receita Total Transportada],
     coleta_numeros                   AS [Coleta/Número],
     contract_number                  AS [CIOT/Número],
+    tipo_contrato_veiculo            AS [Tipo de contrato do veículo],
+    tipo_contrato_motorista          AS [Tipo de contrato do motorista],
     tipo_contrato                    AS [Tipo de contrato],
     tipo_calculo                     AS [Tipo de cálculo],
     tipo_carga                       AS [Tipo de carga],

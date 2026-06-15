@@ -81,7 +81,8 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     ? AS cancellation_reason, ? AS cancellation_user_id,
                     ? AS destroy_reason, ? AS destroy_user_id, ? AS status_updated_at,
                     ? AS taxed_weight, ? AS pick_region, ? AS last_occurrence, ? AS acao_ocorrencia, ? AS numero_tentativas,
-                    ? AS metadata, ? AS data_extracao, CAST(0 AS bit) AS excluido_na_origem
+                    ? AS metadata, ? AS data_extracao, CAST(0 AS bit) AS excluido_na_origem,
+                    CAST(NULL AS datetime2(0)) AS data_exclusao_origem
             ) AS source
             ON target.id = source.id
             WHEN MATCHED AND (%s OR target.excluido_na_origem = 1) THEN
@@ -122,7 +123,8 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     numero_tentativas = source.numero_tentativas,
                     metadata = source.metadata,
                     data_extracao = source.data_extracao,
-                    excluido_na_origem = source.excluido_na_origem
+                    excluido_na_origem = source.excluido_na_origem,
+                    data_exclusao_origem = source.data_exclusao_origem
             WHEN NOT MATCHED THEN
                 INSERT (
                     id, sequence_code, request_date, request_hour, service_date, status, total_value, total_weight, total_volumes,
@@ -131,7 +133,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     cancellation_reason, cancellation_user_id,
                     destroy_reason, destroy_user_id, status_updated_at,
                     taxed_weight, pick_region, last_occurrence, acao_ocorrencia, numero_tentativas,
-                    metadata, data_extracao, excluido_na_origem
+                    metadata, data_extracao, excluido_na_origem, data_exclusao_origem
                 )
                 VALUES (
                     source.id, source.sequence_code, source.request_date, source.request_hour, source.service_date, source.status, source.total_value, source.total_weight, source.total_volumes,
@@ -140,7 +142,7 @@ public class ColetaRepository extends AbstractRepository<ColetaEntity> {
                     source.cancellation_reason, source.cancellation_user_id,
                     source.destroy_reason, source.destroy_user_id, source.status_updated_at,
                     source.taxed_weight, source.pick_region, source.last_occurrence, source.acao_ocorrencia, source.numero_tentativas,
-                    source.metadata, source.data_extracao, source.excluido_na_origem
+                    source.metadata, source.data_extracao, source.excluido_na_origem, source.data_exclusao_origem
                 );
             """, NOME_TABELA, freshnessGuard);
 

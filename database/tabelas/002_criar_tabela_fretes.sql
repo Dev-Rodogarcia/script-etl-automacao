@@ -130,7 +130,8 @@ BEGIN
 
         -- Coluna de Auditoria
         data_extracao DATETIME2 DEFAULT GETDATE(),
-        excluido_na_origem BIT NOT NULL CONSTRAINT DF_fretes_excluido_na_origem DEFAULT (0)
+        excluido_na_origem BIT NOT NULL CONSTRAINT DF_fretes_excluido_na_origem DEFAULT (0),
+        data_exclusao_origem DATETIME2(0) NULL
     );
     
     PRINT 'Tabela fretes criada com sucesso!';
@@ -147,6 +148,14 @@ BEGIN
     ADD excluido_na_origem BIT NOT NULL
         CONSTRAINT DF_fretes_excluido_na_origem DEFAULT (0) WITH VALUES;
     PRINT 'Coluna fretes.excluido_na_origem adicionada em tabela existente.';
+END
+GO
+
+IF COL_LENGTH(N'dbo.fretes', N'data_exclusao_origem') IS NULL
+BEGIN
+    ALTER TABLE dbo.fretes
+    ADD data_exclusao_origem DATETIME2(0) NULL;
+    PRINT 'Coluna fretes.data_exclusao_origem adicionada em tabela existente.';
 END
 GO
 
