@@ -85,6 +85,7 @@ echo 09. Auditar estrutura das APIs
 echo 10. Ver ajuda de comandos
 echo 11. Gerenciar usuarios de acesso ^(tecla U^)
 echo 12. Extracao rapida ultimas 24h ^(sem replay^)
+echo 13. Retrofit historico por intervalo ^(exige Daemon parado^)
 echo 00. Sair
 echo.
 echo Cobertura atual do ETL:
@@ -124,6 +125,7 @@ if "%OP%"=="9" goto :RUN_08
 if "%OP%"=="10" goto :RUN_AJUDA
 if "%OP%"=="11" goto :RUN_09
 if "%OP%"=="12" goto :RUN_11
+if "%OP%"=="13" goto :RUN_RETROFIT
 if "%OP%"=="0" goto :TRY_EXIT
 if "%OP%"=="00" goto :TRY_EXIT
 
@@ -459,6 +461,37 @@ if defined PREV_MENU_CHILD (
 call :WAIT_AFTER_MENU_ACTION "Extracao rapida 24h" "!RUN_11_EXIT!"
 goto :MENU
 
+:RUN_RETROFIT
+call :PREPARE_SECURITY
+if errorlevel 1 goto :MENU
+call :AUTH_CHECK RUN_EXTRACAO_INTERVALO "Executar Retrofit historico"
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :RETROFIT_SAFETY_GATE
+if errorlevel 1 (
+    timeout /t 2 /nobreak >nul 2>&1
+    goto :MENU
+)
+call :PREPARE_DATABASE
+if errorlevel 1 goto :MENU
+call :RUN_SCRIPT_AUTHORIZED "11-retrofit.bat"
+set "RUN_RETROFIT_EXIT=!ERRORLEVEL!"
+if "!RUN_RETROFIT_EXIT!"=="0" (
+    call :MATERIALIZAR_FATOS_BI_POST_RUN
+    set "RUN_RETROFIT_EXIT=!ERRORLEVEL!"
+) else if "!RUN_RETROFIT_EXIT!"=="3" (
+    echo.
+    echo [INFO] Retrofit cancelado pelo operador. Materializacao nao executada.
+    set "RUN_RETROFIT_EXIT=0"
+) else (
+    echo.
+    echo [AVISO] Materializacao ignorada porque o Retrofit retornou codigo !RUN_RETROFIT_EXIT!.
+)
+call :WAIT_AFTER_MENU_ACTION "Retrofit historico" "!RUN_RETROFIT_EXIT!"
+goto :MENU
+
 :RUN_05
 call :PREPARE_SECURITY
 if errorlevel 1 goto :MENU
@@ -542,6 +575,31 @@ if errorlevel 1 exit /b 1
 
 set "BASICS_READY=1"
 exit /b 0
+
+:RETROFIT_SAFETY_GATE
+if not exist "%SCRIPT_ROOT%verificar_execucao_ativa.ps1" (
+    echo.
+    echo [ERRO] Verificador de execucao ativa nao encontrado:
+    echo   %SCRIPT_ROOT%verificar_execucao_ativa.ps1
+    exit /b 1
+)
+
+call :RUN_EXECUTION_SAFETY_CHECK
+if "%SAFETY_EXIT%"=="0" (
+    echo.
+    echo [OK] Daemon parado e nenhuma execucao concorrente detectada.
+    exit /b 0
+)
+if "%SAFETY_EXIT%"=="2" (
+    echo.
+    echo [BLOQUEIO] Retrofit cancelado: existe execucao ativa.
+    echo [INFO] Pare o Daemon manualmente pela opcao 02 e confirme o estado STOPPED.
+    exit /b 1
+)
+
+echo.
+echo [ERRO] Falha ao validar o estado do Daemon ^(codigo %SAFETY_EXIT%^).
+exit /b 1
 
 :EXECUTION_SAFETY_GATE
 set "SAFETY_CONTEXT=%~1"
@@ -854,13 +912,13 @@ exit /b 1
 
 :READ_MENU_OPTION
 set "OP="
-set /p "OP=Escolha uma opcao [1-12, U=Usuarios, 0=Sair]: " || exit /b 1
+set /p "OP=Escolha uma opcao [1-13, U=Usuarios, 0=Sair]: " || exit /b 1
 set "OP=%OP: =%"
 if not defined OP exit /b 2
 if "%OP%"=="00" set "OP=0"
 if "%OP:~0,1%"=="0" if not "%OP%"=="0" set "OP=%OP:~1%"
 if /i "%OP%"=="U" set "OP=11"
-for %%V in (0 1 2 3 4 5 6 7 8 9 10 11 12) do (
+for %%V in (0 1 2 3 4 5 6 7 8 9 10 11 12 13) do (
     if "%OP%"=="%%V" exit /b 0
 )
 exit /b 2

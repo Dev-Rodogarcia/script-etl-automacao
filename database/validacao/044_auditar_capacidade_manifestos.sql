@@ -27,13 +27,9 @@ WITH comparacao AS (
         m.trailer1_weight_capacity,
         m.trailer2_weight_capacity,
         m.capacidade_kg AS capacidade_legada_origem,
-        CASE
-            WHEN COALESCE(m.trailer1_weight_capacity, 0) = 0
-                THEN COALESCE(m.vehicle_weight_capacity, 0)
-            ELSE
-                COALESCE(m.trailer1_weight_capacity, 0)
-                + COALESCE(m.trailer2_weight_capacity, 0)
-        END AS capacidade_esperada,
+        COALESCE(m.vehicle_weight_capacity, 0)
+            + COALESCE(m.trailer1_weight_capacity, 0)
+            + COALESCE(m.trailer2_weight_capacity, 0) AS capacidade_esperada,
         TRY_CONVERT(DECIMAL(18, 2), v.[Capacidade Lotação Kg]) AS capacidade_view,
         m.total_taxed_weight
     FROM dbo.manifestos m
@@ -85,13 +81,9 @@ WITH comparacao AS (
         m.vehicle_weight_capacity,
         m.trailer1_weight_capacity,
         m.trailer2_weight_capacity,
-        CASE
-            WHEN COALESCE(m.trailer1_weight_capacity, 0) = 0
-                THEN COALESCE(m.vehicle_weight_capacity, 0)
-            ELSE
-                COALESCE(m.trailer1_weight_capacity, 0)
-                + COALESCE(m.trailer2_weight_capacity, 0)
-        END AS capacidade_esperada,
+        COALESCE(m.vehicle_weight_capacity, 0)
+            + COALESCE(m.trailer1_weight_capacity, 0)
+            + COALESCE(m.trailer2_weight_capacity, 0) AS capacidade_esperada,
         TRY_CONVERT(DECIMAL(18, 2), v.[Capacidade Lotação Kg]) AS capacidade_view,
         m.total_taxed_weight
     FROM dbo.manifestos m

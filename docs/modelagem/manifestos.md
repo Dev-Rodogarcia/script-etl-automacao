@@ -65,6 +65,9 @@ Controlar manifestos operacionais retornados pelo DataExport ESL Cloud, com foco
 | `finalized_manifest_items_count` | integer | `finalizedManifestItemsCount` | `finalized_manifest_items_count` | `INT` |
 | `uniq_destinations_count` | integer | `uniqDestinationsCount` | `uniq_destinations_count` | `INT` |
 | `contract_type` | string | `contractType` | `contract_type` | `NVARCHAR(50)` |
+| derivado na carga SQL de `contract_type` | string/null | n/a | `tipo_contrato_veiculo` | `NVARCHAR(100)` |
+| derivado na carga SQL de `mft_mdr_contract_type` | string/null | n/a | `tipo_contrato_motorista` | `NVARCHAR(100)` |
+| calculado via `CASE WHEN` unificado | string/null | n/a | `tipo_contrato` | `NVARCHAR(100)` |
 | `calculation_type` | string | `calculationType` | `calculation_type` | `NVARCHAR(50)` |
 | `cargo_type` | string | `cargoType` | `cargo_type` | `NVARCHAR(255)` |
 | `calculated_pick_count` | integer | `calculatedPickCount` | `calculated_pick_count` | `INT` |
@@ -120,10 +123,15 @@ Controlar manifestos operacionais retornados pelo DataExport ESL Cloud, com foco
 | `mft_uer_name` | string | `creationUserName` | `creation_user_name` | `NVARCHAR(255)` |
 | `mft_vie_license_plate` | string | `vehiclePlate` | `vehicle_plate` | `NVARCHAR(10)` |
 | `mft_vie_weight_capacity` | string decimal | `vehicleWeightCapacity` | `vehicle_weight_capacity`, `capacidade_kg` | `DECIMAL(18,2)` |
+| calculado na carga SQL | decimal | n/a | `capacidade_lotacao_kg` | `DECIMAL(18,2)` |
 | `mft_vie_cubic_weight` | string decimal | `vehicleCubicWeight` | `vehicle_cubic_weight` | `DECIMAL(18,2)` |
 | `mft_vie_onr_name` | string | `vehicleOwner` | `vehicle_owner` | `NVARCHAR(255)` |
 | `mft_vie_vee_name` | string | `vehicleType` | `vehicle_type` | `NVARCHAR(255)` |
 | payload completo | object | `getAllProperties()` | `metadata` | `NVARCHAR(MAX)` |
+
+## Observacoes operacionais
+
+- A capacidade de lotacao e calculada via `COALESCE` unindo as capacidades do veiculo trator e dos reboques ativos, garantindo paridade total entre o motor logistico e a camada BI.
 
 ## Campos previstos fora da amostra
 

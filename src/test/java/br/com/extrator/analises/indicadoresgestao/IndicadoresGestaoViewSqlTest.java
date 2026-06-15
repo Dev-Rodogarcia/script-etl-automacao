@@ -145,6 +145,10 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(indicesSql, "IX_fato_manifestos_filtros");
         assertContem(procedureSql, "CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_gestao_vista_manifestos");
         assertContem(procedureSql, "OPENJSON(CASE WHEN ISJSON(c.pick_items_ids) = 1 THEN c.pick_items_ids END)");
+        assertContem(procedureSql, "COALESCE(MAX(ml.vehicle_weight_capacity), 0)");
+        assertContem(procedureSql, "+ COALESCE(MAX(ml.trailer1_weight_capacity), 0)");
+        assertContem(procedureSql, "+ COALESCE(MAX(ml.trailer2_weight_capacity), 0)");
+        assertFalse(procedureSql.contains("WHEN COALESCE(MAX(ml.trailer1_weight_capacity), 0) = 0"));
         assertContem(procedureSql, "MERGE dbo.fato_gestao_vista_manifestos");
         assertContem(viewSql, "FROM dbo.fato_gestao_vista_manifestos");
         assertFalse(viewSql.contains("OPENJSON"));

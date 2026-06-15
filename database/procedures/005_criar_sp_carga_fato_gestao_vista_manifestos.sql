@@ -248,12 +248,11 @@ BEGIN
                 MAX(ml.trailer2_weight_capacity) AS carreta2_capacidade_peso,
                 MAX(ml.vehicle_weight_capacity) AS veiculo_capacidade_peso,
                 MAX(ml.vehicle_cubic_weight) AS veiculo_peso_cubado,
-                CASE
-                    WHEN COALESCE(MAX(ml.trailer1_weight_capacity), 0) = 0
-                        THEN COALESCE(MAX(ml.vehicle_weight_capacity), 0)
-                    ELSE COALESCE(MAX(ml.trailer1_weight_capacity), 0)
-                       + COALESCE(MAX(ml.trailer2_weight_capacity), 0)
-                END AS capacidade_lotacao_kg,
+                (
+                    COALESCE(MAX(ml.vehicle_weight_capacity), 0)
+                    + COALESCE(MAX(ml.trailer1_weight_capacity), 0)
+                    + COALESCE(MAX(ml.trailer2_weight_capacity), 0)
+                ) AS capacidade_lotacao_kg,
                 MAX(REPLACE(REPLACE(REPLACE(ml.unloading_recipient_names, '[', ''), ']', ''), '"', '')) AS descarregamento_destinatarios,
                 MAX(REPLACE(REPLACE(REPLACE(ml.unloading_recipient_names, '[', ''), ']', ''), '"', '')) AS local_descarregamento,
                 MAX(REPLACE(REPLACE(REPLACE(ml.delivery_region_names, '[', ''), ']', ''), '"', '')) AS entrega_regioes,
