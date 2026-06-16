@@ -128,6 +128,7 @@ BEGIN
                 END AS tipo_motorista
             ) tipo_motorista
             WHERE COALESCE(m.excluido_na_origem, 0) = 0
+              AND (m.vehicle_plate IS NULL OR m.vehicle_plate <> N'ACM0000')
               AND (
                     @cargaCompleta = 1
                  OR (

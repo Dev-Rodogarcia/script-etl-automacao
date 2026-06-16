@@ -44,6 +44,7 @@ SELECT
     tipo_contrato_veiculo            AS [Tipo de contrato do veículo],
     tipo_contrato_motorista          AS [Tipo de contrato do motorista],
     tipo_contrato                    AS [Tipo de contrato],
+    tipo_contrato_key                AS [Tipo de contrato key],
     tipo_calculo                     AS [Tipo de cálculo],
     tipo_carga                       AS [Tipo de carga],
     diaria                           AS [Diária],
