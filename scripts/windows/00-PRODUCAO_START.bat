@@ -6,7 +6,7 @@ if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 65001 >nul
 set "SCRIPT_ROOT=%~dp0"
 for %%I in ("%~dp0..\..") do set "REPO_ROOT=%%~fI"
 pushd "%REPO_ROOT%"
-set "JAVA_BASE_OPTS=--enable-native-access=ALL-UNNAMED -DETL_BASE_DIR=%REPO_ROOT% -Detl.base.dir=%REPO_ROOT%"
+set "JAVA_BASE_OPTS=--enable-native-access=ALL-UNNAMED "-DETL_BASE_DIR=%REPO_ROOT%" "-Detl.base.dir=%REPO_ROOT%""
 set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
 set "BASICS_READY=0"
 set "STARTUP_READY=0"
@@ -721,66 +721,12 @@ exit /b 0
 
 :VALIDATE_DATABASE_READY
 setlocal EnableExtensions DisableDelayedExpansion
-
-if not exist "%REPO_ROOT%\database\config.bat" (
-    echo [ERRO] Configuracao de banco nao encontrada: %REPO_ROOT%\database\config.bat
-    endlocal & exit /b 1
-)
-
-call "%REPO_ROOT%\database\config.bat"
-
-if "%DB_SERVER%"=="" (
-    echo [ERRO] DB_SERVER nao definido no config.bat.
-    endlocal & exit /b 1
-)
-if "%DB_NAME%"=="" (
-    echo [ERRO] DB_NAME nao definido no config.bat.
-    endlocal & exit /b 1
-)
-
-set "DB_SERVER_TARGET=%DB_SERVER%"
-if not "%DB_PORT%"=="" set "DB_SERVER_TARGET=%DB_SERVER%,%DB_PORT%"
-set "SQLCMD_FLAGS=-I -f 65001"
-if not "%SQLCMD_EXTRA_ARGS%"=="" set "SQLCMD_FLAGS=%SQLCMD_FLAGS% %SQLCMD_EXTRA_ARGS%"
-
-where sqlcmd >nul 2>nul
+echo   [CHECK] Conexao JDBC, pool e schema minimo de producao...
+java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --validar
 if errorlevel 1 (
-    echo [ERRO] sqlcmd nao encontrado no PATH.
+    echo [ERRO] Validacao Java/JDBC falhou. Nenhuma correcao automatica sera aplicada.
     endlocal & exit /b 1
 )
-
-if "%DB_USER%"=="" (
-    set "AUTH_CMD=-E"
-    set "SQLCMDPASSWORD="
-    echo Autenticacao: Windows ^(integrada^)
-) else (
-    if "%DB_PASSWORD%"=="" (
-        echo [ERRO] DB_USER definido mas DB_PASSWORD esta vazio no config.bat.
-        endlocal & exit /b 1
-    )
-    set "AUTH_CMD=-U %DB_USER%"
-    set "SQLCMDPASSWORD=%DB_PASSWORD%"
-    echo Autenticacao: SQL ^(%DB_USER%^)
-)
-
-echo Servidor: %DB_SERVER_TARGET%  ^|  Banco: %DB_NAME%
-echo   [CHECK] Existencia do banco...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d master %AUTH_CMD% -Q "SET NOCOUNT ON; IF DB_ID(N'%DB_NAME%') IS NULL BEGIN RAISERROR('Banco %DB_NAME% nao existe. Crie o schema manualmente antes de executar o ETL.', 16, 1); END; SELECT DB_ID(N'%DB_NAME%') AS database_id;" -b
-if errorlevel 1 (
-    echo [ERRO] Banco %DB_NAME% nao esta pronto.
-    set "SQLCMDPASSWORD="
-    endlocal & exit /b 1
-)
-
-echo   [CHECK] Tabelas base e procedures de materializacao...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "SET NOCOUNT ON; DECLARE @missing TABLE (tipo varchar(20) NOT NULL, nome sysname NOT NULL); INSERT INTO @missing(tipo, nome) SELECT 'TABLE', v.nome FROM (VALUES (N'coletas'),(N'fretes'),(N'manifestos'),(N'cotacoes'),(N'localizacao_cargas'),(N'contas_a_pagar'),(N'faturas_por_cliente'),(N'dim_calendario'),(N'log_extracoes'),(N'page_audit'),(N'dim_usuarios'),(N'sys_execution_history'),(N'sys_auditoria_temp'),(N'sys_execution_audit'),(N'sys_execution_watermark'),(N'dim_usuarios_historico'),(N'schema_migrations'),(N'etl_invalid_records'),(N'inventario'),(N'sinistros'),(N'sys_replay_idempotency'),(N'sys_reconciliation_quarantine'),(N'raster_viagens'),(N'raster_viagem_paradas'),(N'localizacao_cargas_regiao_destino_alias'),(N'manifestos_frota_propria_cnpjs'),(N'fato_gestao_vista_fretes'),(N'fato_gestao_vista_coletores'),(N'fato_fretes_faturamento'),(N'fato_gestao_vista_faturas')) AS v(nome) WHERE OBJECT_ID(N'dbo.' + v.nome, N'U') IS NULL; INSERT INTO @missing(tipo, nome) SELECT 'PROCEDURE', v.nome FROM (VALUES (N'sp_carga_fato_gestao_vista_fretes'),(N'sp_carga_fato_gestao_vista_coletores'),(N'sp_carga_fato_fretes_faturamento'),(N'sp_carga_fato_gestao_vista_faturas')) AS v(nome) WHERE OBJECT_ID(N'dbo.' + v.nome, N'P') IS NULL; IF EXISTS (SELECT 1 FROM @missing) BEGIN SELECT tipo, nome FROM @missing ORDER BY tipo, nome; RAISERROR('Schema manual incompleto. Execute o DDL manualmente antes de rodar automacoes de carga.', 16, 1); RETURN; END; SELECT 'OK' AS schema_status;" -b
-if errorlevel 1 (
-    echo [ERRO] Schema manual incompleto. Nenhuma correcao automatica sera aplicada.
-    set "SQLCMDPASSWORD="
-    endlocal & exit /b 1
-)
-
-set "SQLCMDPASSWORD="
 endlocal & exit /b 0
 
 :MATERIALIZAR_FATOS_BI_POST_RUN
@@ -789,89 +735,14 @@ echo.
 echo ================================================================
 echo MATERIALIZAR FATOS BI ^(POST-RUN^)
 echo ================================================================
-
-if not exist "%REPO_ROOT%\database\config.bat" (
-    echo [ERRO] Configuracao de banco nao encontrada: %REPO_ROOT%\database\config.bat
-    endlocal & exit /b 1
-)
-
-call "%REPO_ROOT%\database\config.bat"
-
-if "%DB_SERVER%"=="" (
-    echo [ERRO] DB_SERVER nao definido no config.bat.
-    endlocal & exit /b 1
-)
-if "%DB_NAME%"=="" (
-    echo [ERRO] DB_NAME nao definido no config.bat.
-    endlocal & exit /b 1
-)
-
-set "DB_SERVER_TARGET=%DB_SERVER%"
-if not "%DB_PORT%"=="" set "DB_SERVER_TARGET=%DB_SERVER%,%DB_PORT%"
-set "SQLCMD_FLAGS=-I -f 65001"
-if not "%SQLCMD_EXTRA_ARGS%"=="" set "SQLCMD_FLAGS=%SQLCMD_FLAGS% %SQLCMD_EXTRA_ARGS%"
-
-where sqlcmd >nul 2>nul
+echo Executando: java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --materializar-fatos-bi
+java %JAVA_BASE_OPTS% -jar "%JAR_PATH%" --materializar-fatos-bi
 if errorlevel 1 (
-    echo [ERRO] sqlcmd nao encontrado no PATH.
+    echo [ERRO] Falha na materializacao BI via Java/JDBC.
     endlocal & exit /b 1
 )
-
-if "%DB_USER%"=="" (
-    set "AUTH_CMD=-E"
-    set "SQLCMDPASSWORD="
-    echo Autenticacao: Windows ^(integrada^)
-) else (
-    if "%DB_PASSWORD%"=="" (
-        echo [ERRO] DB_USER definido mas DB_PASSWORD esta vazio no config.bat.
-        endlocal & exit /b 1
-    )
-    set "AUTH_CMD=-U %DB_USER%"
-    set "SQLCMDPASSWORD=%DB_PASSWORD%"
-    echo Autenticacao: SQL ^(%DB_USER%^)
-)
-
-echo Servidor: %DB_SERVER_TARGET%  ^|  Banco: %DB_NAME%
-echo.
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
-if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FRETES
-
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
-if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_COLETORES
-
-echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
-if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FATURAMENTO
-
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
-if errorlevel 1 goto :MATERIALIZAR_FATOS_BI_ERRO_FATURAS
-
-set "SQLCMDPASSWORD="
 echo [OK] Fatos BI materializadas no pos-run.
 endlocal & exit /b 0
-
-:MATERIALIZAR_FATOS_BI_ERRO_FRETES
-echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
-goto :MATERIALIZAR_FATOS_BI_ERRO
-
-:MATERIALIZAR_FATOS_BI_ERRO_COLETORES
-echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
-goto :MATERIALIZAR_FATOS_BI_ERRO
-
-:MATERIALIZAR_FATOS_BI_ERRO_FATURAMENTO
-echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
-goto :MATERIALIZAR_FATOS_BI_ERRO
-
-:MATERIALIZAR_FATOS_BI_ERRO_FATURAS
-echo [ERRO] Falha na carga materializada de Faturas por Cliente.
-goto :MATERIALIZAR_FATOS_BI_ERRO
-
-:MATERIALIZAR_FATOS_BI_ERRO
-set "SQLCMDPASSWORD="
-endlocal & exit /b 1
 
 :START_MATERIALIZACAO_BI_SCHEDULER
 echo.

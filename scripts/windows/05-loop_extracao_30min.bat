@@ -29,7 +29,7 @@ if /i not "%EXTRATOR_SKIP_CHCP%"=="1" chcp 1252 >nul
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%.") do set "SCRIPT_DIR=%%~fI"
 for %%I in ("%SCRIPT_DIR%\..\..") do set "REPO_ROOT=%%~fI"
-set "JAVA_BASE_OPTS=--enable-native-access=ALL-UNNAMED -DETL_BASE_DIR=%REPO_ROOT% -Detl.base.dir=%REPO_ROOT%"
+set "JAVA_BASE_OPTS=--enable-native-access=ALL-UNNAMED "-DETL_BASE_DIR=%REPO_ROOT%" "-Detl.base.dir=%REPO_ROOT%""
 set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
 set "LOOP_LOG=%REPO_ROOT%\logs\daemon\runtime\loop_daemon_console.log"
 

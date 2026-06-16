@@ -28,6 +28,9 @@ public class MaterializarFatosBiComando implements Comando {
         final int timeoutSegundos = ConfigEtl.obterMaterializacaoFatosBiTimeoutSegundos();
         final FatoMaterializacaoResumo resumo = job.executar(procedures, timeoutSegundos);
         imprimirResumo(resumo);
+        if (resumo.houveFalha()) {
+            throw new IllegalStateException("Materializacao de fatos BI concluiu com falhas parciais.");
+        }
     }
 
     private void imprimirResumo(final FatoMaterializacaoResumo resumo) {

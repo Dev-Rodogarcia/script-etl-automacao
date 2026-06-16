@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-# cd C:\Users\suporte\Documents\projetos\etl-extracao-dados
+# cd C:\Users\suporte\Documents\projetos\etl-dash\etl-extracao-dados
 # python auditoria_etl.py --start 2026-05-29 --end 2026-05-30
 
 import argparse

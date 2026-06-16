@@ -20,12 +20,50 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 final class ConfigBancoValidator {
     private static final Logger logger = LoggerFactory.getLogger(ConfigBancoValidator.class);
+    private static final List<ObjetoBanco> OBJETOS_PRODUCAO_MINIMOS = List.of(
+        tabela("coletas"),
+        tabela("fretes"),
+        tabela("manifestos"),
+        tabela("cotacoes"),
+        tabela("localizacao_cargas"),
+        tabela("contas_a_pagar"),
+        tabela("faturas_por_cliente"),
+        tabela("dim_calendario"),
+        tabela("log_extracoes"),
+        tabela("page_audit"),
+        tabela("dim_usuarios"),
+        tabela("sys_execution_history"),
+        tabela("sys_auditoria_temp"),
+        tabela("sys_execution_audit"),
+        tabela("sys_execution_watermark"),
+        tabela("dim_usuarios_historico"),
+        tabela("schema_migrations"),
+        tabela("etl_invalid_records"),
+        tabela("inventario"),
+        tabela("sinistros"),
+        tabela("sys_replay_idempotency"),
+        tabela("sys_reconciliation_quarantine"),
+        tabela("raster_viagens"),
+        tabela("raster_viagem_paradas"),
+        tabela("localizacao_cargas_regiao_destino_alias"),
+        tabela("manifestos_frota_propria_cnpjs"),
+        tabela("fato_gestao_vista_fretes"),
+        tabela("fato_gestao_vista_coletores"),
+        tabela("fato_fretes_faturamento"),
+        tabela("fato_gestao_vista_faturas"),
+        procedure("sp_carga_fato_gestao_vista_fretes"),
+        procedure("sp_carga_fato_gestao_vista_coletores"),
+        procedure("sp_carga_fato_fretes_faturamento"),
+        procedure("sp_carga_fato_gestao_vista_faturas")
+    );
 
     private ConfigBancoValidator() {
     }
@@ -108,6 +146,35 @@ final class ConfigBancoValidator {
         }
     }
 
+    static void validarObjetosProducaoMinimos() {
+        logger.info("Validando objetos minimos de producao no banco de dados...");
+
+        final List<String> ausentes = new ArrayList<>();
+        try (Connection conexao = obterConexaoValidacao(
+                ConfigBanco.obterUrlBancoDados(),
+                ConfigBanco.obterUsuarioBancoDados(),
+                ConfigBanco.obterSenhaBancoDados(),
+                ConfigBanco.obterTimeoutValidacaoConexao())) {
+            for (final ObjetoBanco objeto : OBJETOS_PRODUCAO_MINIMOS) {
+                if (!objetoExiste(conexao, objeto)) {
+                    ausentes.add(objeto.descricao());
+                }
+            }
+        } catch (final SQLException e) {
+            logger.error("Erro ao validar objetos minimos de producao: {}", e.getMessage());
+            throw new RuntimeException("Falha ao validar objetos minimos de producao", e);
+        }
+
+        if (!ausentes.isEmpty()) {
+            throw new IllegalStateException(
+                "Schema manual incompleto. Objetos ausentes: " + String.join(", ", ausentes)
+                    + ". Execute o DDL manualmente antes de rodar automacoes de carga."
+            );
+        }
+
+        logger.info("Objetos minimos de producao validados com sucesso");
+    }
+
     private static Connection obterConexaoValidacao(final String url,
                                                     final String usuario,
                                                     final String senha,
@@ -151,6 +218,26 @@ final class ConfigBancoValidator {
                 return rs.next() && rs.getInt(1) > 0;
             }
         }
+    }
+
+    private static boolean objetoExiste(final Connection conexao, final ObjetoBanco objeto) throws SQLException {
+        final String sql = "SELECT CASE WHEN OBJECT_ID(?, ?) IS NULL THEN 0 ELSE 1 END";
+
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setString(1, objeto.nomeQualificado());
+            stmt.setString(2, objeto.tipoSqlServer());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        }
+    }
+
+    private static ObjetoBanco tabela(final String nome) {
+        return new ObjetoBanco("TABLE", "dbo", nome, "U");
+    }
+
+    private static ObjetoBanco procedure(final String nome) {
+        return new ObjetoBanco("PROCEDURE", "dbo", nome, "P");
     }
 
     private static RuntimeException criarErroConexaoBanco(final Throwable causa) {
@@ -206,5 +293,15 @@ final class ConfigBancoValidator {
         }
         final String mensagem = atual.getMessage();
         return (mensagem == null || mensagem.isBlank()) ? atual.getClass().getSimpleName() : mensagem;
+    }
+
+    private record ObjetoBanco(String tipo, String schema, String nome, String tipoSqlServer) {
+        String nomeQualificado() {
+            return schema + "." + nome;
+        }
+
+        String descricao() {
+            return tipo + " " + nomeQualificado();
+        }
     }
 }

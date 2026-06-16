@@ -161,4 +161,8 @@ public final class ConfigBanco {
     public static void validarTabelasEssenciais() {
         ConfigBancoValidator.validarTabelasEssenciais();
     }
+
+    public static void validarObjetosProducaoMinimos() {
+        ConfigBancoValidator.validarObjetosProducaoMinimos();
+    }
 }

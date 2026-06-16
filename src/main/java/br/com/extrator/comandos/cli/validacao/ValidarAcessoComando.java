@@ -51,7 +51,9 @@ public class ValidarAcessoComando implements Comando {
             }
             infoConsole("[OK] Pool HikariCP: OK - {}", GerenciadorConexao.obterEstatisticasPool());
 
-            infoConsole("[OK] Tabela dbo.log_extracoes deve existir (criada via scripts SQL em database/)");
+            infoConsole("[INFO] Validando schema minimo de producao...");
+            ConfigBanco.validarObjetosProducaoMinimos();
+            infoConsole("[OK] Schema minimo de producao: OK");
 
             infoConsole("[INFO] Validando configuracoes das APIs...");
             infoConsole("[OK] Configuracoes das APIs: OK");

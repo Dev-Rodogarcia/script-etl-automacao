@@ -215,9 +215,9 @@ java -jar target/extrator.jar --loop-daemon-stop
 
 A pasta `/docs/moderno` contém detalhamentos minuciosos para novos desenvolvedores ou depuração profunda:
 
-* 📂 [Guia Geral de Documentos](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/docs/index.md): Índice unificado de conhecimento.
-* ☕ [Arquitetura Detalhada](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/docs/moderno/arquitetura.md): Mapa completo de pacotes e Composition Root.
-* 📦 [Fluxo do Ciclo Completo](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/docs/moderno/fluxos/ciclo-completo.md): Raciocínio de extração de ponta a ponta.
-* ⚙️ [Runbook Operacional do Daemon](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/docs/moderno/runbook-daemon.md): Passo a passo detalhado para manutenção em servidores de produção.
-* 🛡️ [Manual de Resiliência e Timeouts](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/docs/moderno/resiliencia.md): Como o sistema lida com falhas da API ESL Cloud.
-* 📂 [Estrutura de Tabelas e Catálogo SQL](file:///C:/Users/suporte/Documents/projetos/etl-extracao-dados/database/README.md): Catálogo completo mapeando todas as colunas físicas e tabelas persistidas.
+* 📂 [Guia Geral de Documentos](docs/index.md): Índice unificado de conhecimento.
+* ☕ [Arquitetura Detalhada](docs/moderno/arquitetura.md): Mapa completo de pacotes e Composition Root.
+* 📦 [Fluxo do Ciclo Completo](docs/moderno/fluxos/ciclo-completo.md): Raciocínio de extração de ponta a ponta.
+* ⚙️ [Runbook Operacional do Daemon](docs/moderno/runbook-daemon.md): Passo a passo detalhado para manutenção em servidores de produção.
+* 🛡️ [Manual de Resiliência e Timeouts](docs/moderno/resiliencia.md): Como o sistema lida com falhas da API ESL Cloud.
+* 📂 [Estrutura de Tabelas e Catálogo SQL](database/README.md): Catálogo completo mapeando todas as colunas físicas e tabelas persistidas.

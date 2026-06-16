@@ -493,7 +493,7 @@ public class LoggingService {
                             || nomeNormalizado.endsWith(".md")
                             || nomeNormalizado.endsWith(".out")
                             || nomeNormalizado.endsWith(".err"))
-                            && !"readme.txt".equals(nomeNormalizado);
+                            && !ehDocumentoVersionadoDaRaiz(nomeNormalizado);
                     if (!elegivel) {
                         continue;
                     }
@@ -516,6 +516,12 @@ public class LoggingService {
         } catch (final IOException | SecurityException e) {
             logger.warn("Não foi possível organizar artefatos operacionais: {}", e.getMessage());
         }
+    }
+
+    static boolean ehDocumentoVersionadoDaRaiz(final String nomeNormalizado) {
+        return "readme.txt".equals(nomeNormalizado)
+            || "readme.md".equals(nomeNormalizado)
+            || "agents.md".equals(nomeNormalizado);
     }
 
     private String sanitizarComponenteArquivo(final String value) {
