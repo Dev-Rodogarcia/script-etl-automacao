@@ -63,7 +63,7 @@ public class ValidacaoEtlExtremaUseCase {
         this.metadataHasher = metadataHasher;
         this.repository = new ValidacaoApiBanco24hDetalhadaRepository(log, metadataHasher);
         this.comparator = new ValidacaoApiBanco24hDetalhadaComparator(repository);
-        this.apiCollector = new ValidacaoApiBanco24hDetalhadaApiCollector(metadataHasher, repository);
+        this.apiCollector = new ValidacaoApiBanco24hDetalhadaApiCollector(metadataHasher);
         this.metadataDiff = new ValidacaoEtlExtremaMetadataDiff();
     }
 

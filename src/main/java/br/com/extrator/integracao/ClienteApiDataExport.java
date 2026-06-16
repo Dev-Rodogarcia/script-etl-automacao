@@ -594,13 +594,6 @@ public class ClienteApiDataExport {
     private <T> ResultadoExtracao<T> buscarDadosDiretos(final LocalDate dataInicio,
                                                         final LocalDate dataFim,
                                                         final ConfiguracaoEntidade config,
-                                                        final TypeReference<List<T>> typeReference) {
-        return buscarDadosDiretos(dataInicio, dataFim, config, typeReference, null);
-    }
-
-    private <T> ResultadoExtracao<T> buscarDadosDiretos(final LocalDate dataInicio,
-                                                        final LocalDate dataFim,
-                                                        final ConfiguracaoEntidade config,
                                                         final TypeReference<List<T>> typeReference,
                                                         final PageChunkConsumer<T> chunkConsumer) {
         final Instant inicio = timeWindowSupport.inicioDoDia(dataInicio);

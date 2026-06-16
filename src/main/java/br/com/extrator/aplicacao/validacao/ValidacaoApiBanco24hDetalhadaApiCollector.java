@@ -11,7 +11,6 @@ Conecta com:
 - Mappers (mapeamento.*): ManifestoMapper, CotacaoMapper, LocalizacaoCargaMapper, ContasAPagarMapper, FaturaPorClienteMapper, FreteMapper, ColetaMapper
 - Deduplicator (integracao.dataexport.support)
 - ValidacaoApiBanco24hDetalhadaMetadataHasher (para hashing de metadados)
-- ValidacaoApiBanco24hDetalhadaRepository (para queries em banco)
 
 Fluxo geral:
 1) criarEntidades() retorna lista das entidades ativas para validacao detalhada.
@@ -23,7 +22,6 @@ Atributos-chave:
 - clienteDataExport, clienteGraphQL: clientes API.
 - mappers: diversos mappers de DTO -> Entity.
 - metadataHasher: para SHA256 de metadados.
-- repository: para consultas auxiliares de janela/log.
 Metodos principais:
 - criarEntidades(Connection, LocalDate, LocalDate): cria lista de entidades ativas.
 - carregarManifestos/Cotacoes/Localizacao/...(): metodos para cada entidade (DataExport).
@@ -96,11 +94,9 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
     private final ColetaMapper coletaMapper;
     private final UsuarioSistemaMapper usuarioSistemaMapper;
     private final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher;
-    private final ValidacaoApiBanco24hDetalhadaRepository repository;
 
     ValidacaoApiBanco24hDetalhadaApiCollector(
-        final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher,
-        final ValidacaoApiBanco24hDetalhadaRepository repository
+        final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher
     ) {
         this(
             new ClienteApiDataExport(),
@@ -115,8 +111,7 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
             new FreteMapper(),
             new ColetaMapper(),
             new UsuarioSistemaMapper(),
-            metadataHasher,
-            repository
+            metadataHasher
         );
     }
 
@@ -133,8 +128,7 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         final FreteMapper freteMapper,
         final ColetaMapper coletaMapper,
         final UsuarioSistemaMapper usuarioSistemaMapper,
-        final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher,
-        final ValidacaoApiBanco24hDetalhadaRepository repository
+        final ValidacaoApiBanco24hDetalhadaMetadataHasher metadataHasher
     ) {
         this.clienteDataExport = clienteDataExport;
         this.clienteGraphQL = clienteGraphQL;
@@ -149,7 +143,6 @@ final class ValidacaoApiBanco24hDetalhadaApiCollector {
         this.coletaMapper = coletaMapper;
         this.usuarioSistemaMapper = usuarioSistemaMapper;
         this.metadataHasher = metadataHasher;
-        this.repository = repository;
     }
 
     List<EntidadeValidacao> criarEntidades(

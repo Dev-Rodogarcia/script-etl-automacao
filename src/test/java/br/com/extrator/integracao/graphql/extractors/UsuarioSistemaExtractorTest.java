@@ -136,12 +136,10 @@ class UsuarioSistemaExtractorTest {
         private boolean fullLoadChamado;
         private LocalDateTime inicioRecebido;
         private LocalDateTime fimRecebido;
-        private String origemChamada;
 
         @Override
         public ResultadoExtracao<IndividualNodeDTO> buscarUsuariosSistema(final LocalDate dataInicio, final LocalDate dataFim) {
             incrementalChamado = true;
-            origemChamada = "local_date";
             return ResultadoExtracao.completo(List.of(), 0, 0);
         }
 
@@ -151,7 +149,6 @@ class UsuarioSistemaExtractorTest {
             incrementalChamado = true;
             inicioRecebido = atualizadoApos;
             fimRecebido = atualizadoAte;
-            origemChamada = "local_date_time";
             return ResultadoExtracao.completo(List.of(), 0, 0);
         }
 

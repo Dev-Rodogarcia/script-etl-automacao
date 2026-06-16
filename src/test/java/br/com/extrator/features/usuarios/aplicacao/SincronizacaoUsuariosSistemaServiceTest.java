@@ -115,7 +115,6 @@ class SincronizacaoUsuariosSistemaServiceTest {
         private boolean fullLoadChamado;
         private String executionUuidRecebido;
         private LocalDateTime inicioRecebido;
-        private LocalDateTime fimRecebido;
 
         private RecordingClienteApiGraphQL(final ResultadoExtracao<IndividualNodeDTO> resultado) {
             this.resultado = resultado;
@@ -131,7 +130,6 @@ class SincronizacaoUsuariosSistemaServiceTest {
                                                                           final LocalDateTime atualizadoAte) {
             incrementalChamado = true;
             inicioRecebido = atualizadoApos;
-            fimRecebido = atualizadoAte;
             return resultado;
         }
 

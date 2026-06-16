@@ -28,7 +28,6 @@ import br.com.extrator.integracao.mapeamento.dataexport.sinistros.SinistroMapper
 import br.com.extrator.integracao.mapeamento.graphql.coletas.ColetaMapper;
 import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
-import br.com.extrator.suporte.console.LoggerConsole;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class ValidacaoApiBanco24hDetalhadaApiCollectorTest {
@@ -104,19 +103,6 @@ class ValidacaoApiBanco24hDetalhadaApiCollectorTest {
     }
 
     private ValidacaoApiBanco24hDetalhadaApiCollector novoCollector(final RecordingClienteApiGraphQL clienteGraphQL) {
-        return novoCollector(
-            clienteGraphQL,
-            new ValidacaoApiBanco24hDetalhadaRepository(
-                LoggerConsole.getLogger(ValidacaoApiBanco24hDetalhadaApiCollectorTest.class),
-                new ValidacaoApiBanco24hDetalhadaMetadataHasher()
-            )
-        );
-    }
-
-    private ValidacaoApiBanco24hDetalhadaApiCollector novoCollector(
-        final RecordingClienteApiGraphQL clienteGraphQL,
-        final ValidacaoApiBanco24hDetalhadaRepository repository
-    ) {
         return new ValidacaoApiBanco24hDetalhadaApiCollector(
             new ClienteApiDataExport(),
             clienteGraphQL,
@@ -130,8 +116,7 @@ class ValidacaoApiBanco24hDetalhadaApiCollectorTest {
             new FreteMapper(),
             new ColetaMapper(),
             new UsuarioSistemaMapper(),
-            new ValidacaoApiBanco24hDetalhadaMetadataHasher(),
-            repository
+            new ValidacaoApiBanco24hDetalhadaMetadataHasher()
         );
     }
 

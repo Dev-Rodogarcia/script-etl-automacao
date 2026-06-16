@@ -61,20 +61,10 @@ final class GraphQLColetaSupport {
         );
     }
 
-    private ResultadoExtracao<ColetaNodeDTO> buscarColetasDia(final String executionUuid, final LocalDate data) {
-        return buscarColetasDia(executionUuid, data, null);
-    }
-
     private ResultadoExtracao<ColetaNodeDTO> buscarColetasDia(final String executionUuid,
                                                               final LocalDate data,
                                                               final PageChunkConsumer<ColetaNodeDTO> chunkConsumer) {
         return buscarColetasDiaComCampo(executionUuid, data, "requestDate", chunkConsumer);
-    }
-
-    private ResultadoExtracao<ColetaNodeDTO> buscarColetasDiaComCampo(final String executionUuid,
-                                                                      final LocalDate data,
-                                                                      final String campoData) {
-        return buscarColetasDiaComCampo(executionUuid, data, campoData, null);
     }
 
     private ResultadoExtracao<ColetaNodeDTO> buscarColetasDiaComCampo(final String executionUuid,

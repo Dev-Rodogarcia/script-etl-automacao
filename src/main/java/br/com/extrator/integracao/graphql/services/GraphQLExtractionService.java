@@ -35,7 +35,6 @@ Atributos-chave:
 - logRepository: dependencia de acesso a banco.
 - logger: logger da classe para diagnostico.
 - log: campo de estado para "log".
-- entidadeEspecifica: campo de estado para "entidade especifica".
 [DOC-FILE-END]============================================================== */
 
 package br.com.extrator.integracao.graphql.services;
@@ -61,7 +60,6 @@ import br.com.extrator.integracao.mapeamento.graphql.fretes.FreteMapper;
 import br.com.extrator.integracao.mapeamento.graphql.usuarios.UsuarioSistemaMapper;
 import br.com.extrator.integracao.comum.ChunkedEntityExtractor;
 import br.com.extrator.integracao.comum.ConstantesExtracao;
-import br.com.extrator.integracao.comum.EntityExtractor;
 import br.com.extrator.integracao.comum.ExtractionHelper;
 import br.com.extrator.integracao.comum.ExtractionLogger;
 import br.com.extrator.integracao.comum.ExtractionResult;
@@ -158,10 +156,7 @@ public class GraphQLExtractionService {
      * @param entidade Nome da entidade específica (null = todas)
      * @throws RuntimeException Se houver falha crítica na extração
      */
-    private String entidadeEspecifica;
-    
     public void execute(final LocalDate dataInicio, final LocalDate dataFim, final String entidade) {
-        this.entidadeEspecifica = entidade;
         resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         final List<ExtractionResult> resultados = new ArrayList<>();
@@ -290,7 +285,6 @@ public class GraphQLExtractionService {
     }
     
     public ExtractionResult executarSomenteColetasReferencial(final LocalDate dataInicio, final LocalDate dataFim) {
-        this.entidadeEspecifica = ConstantesEntidades.COLETAS;
         resultadosPendentesPersistencia.clear();
         final LocalDateTime inicioExecucao = RelogioSistema.agora();
         boolean houveFalhaExecucao = false;

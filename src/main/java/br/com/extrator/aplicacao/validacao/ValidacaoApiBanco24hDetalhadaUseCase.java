@@ -83,7 +83,7 @@ public class ValidacaoApiBanco24hDetalhadaUseCase {
             log,
             repository,
             new ValidacaoApiBanco24hDetalhadaComparator(repository),
-            new ValidacaoApiBanco24hDetalhadaApiCollector(metadataHasher, repository)
+            new ValidacaoApiBanco24hDetalhadaApiCollector(metadataHasher)
         );
     }
 
