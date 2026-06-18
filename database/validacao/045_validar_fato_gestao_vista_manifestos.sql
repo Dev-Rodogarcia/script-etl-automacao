@@ -99,6 +99,46 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM dbo.fato_gestao_vista_manifestos
+        WHERE excluido_na_origem = 0
+          AND tipo_contrato_veiculo_key = N'agregado'
+          AND (
+                proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
+             OR proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
+          )
+          AND (tipo_contrato_key IS NULL OR tipo_contrato_key <> N'frota + px')
+    )
+        INSERT INTO @falhas VALUES (N'REGRA_NEGOCIO', N'dbo.fato_gestao_vista_manifestos.tipo_contrato', N'DALGA/LM agregados devem ser classificados como Frota + PX');
+
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.fato_gestao_vista_manifestos
+        WHERE excluido_na_origem = 0
+          AND tipo_contrato_veiculo_key = N'agregado'
+          AND tipo_contrato_motorista_key IS NULL
+          AND (
+                proprietario_nome IS NULL
+             OR (
+                    proprietario_nome COLLATE Latin1_General_CI_AI NOT LIKE N'%DALGA%'
+                AND proprietario_nome COLLATE Latin1_General_CI_AI NOT LIKE N'%LM TRANSPORTES%'
+                )
+          )
+          AND (tipo_contrato_key IS NULL OR tipo_contrato_key <> N'terceiro')
+    )
+        INSERT INTO @falhas VALUES (N'REGRA_NEGOCIO', N'dbo.fato_gestao_vista_manifestos.tipo_contrato', N'Agregados sem motorista informado devem cair em Terceiro');
+
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.fato_gestao_vista_manifestos
+        WHERE excluido_na_origem = 0
+          AND tipo_contrato_veiculo_key = N'motorista'
+          AND tipo_contrato_motorista_key IS NULL
+          AND (tipo_contrato_key IS NULL OR tipo_contrato_key <> N'frota + px')
+    )
+        INSERT INTO @falhas VALUES (N'REGRA_NEGOCIO', N'dbo.fato_gestao_vista_manifestos.tipo_contrato', N'Motoristas sem motorista informado devem cair em Frota + PX');
+
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.fato_gestao_vista_manifestos
         GROUP BY sequence_code
         HAVING COUNT_BIG(1) > 1
     )

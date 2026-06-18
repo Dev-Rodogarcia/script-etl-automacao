@@ -119,7 +119,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'042_criar_fato_gestao_vista_manifestos'),
     (N'043_materializar_tipo_contrato_manifestos'),
     (N'044_adicionar_data_exclusao_origem_tabelas_base'),
-    (N'045_criar_indice_manifestos_competencia_operacional');
+    (N'045_criar_indice_manifestos_competencia_operacional'),
+    (N'046_reclassificar_tipo_contrato_manifestos');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN

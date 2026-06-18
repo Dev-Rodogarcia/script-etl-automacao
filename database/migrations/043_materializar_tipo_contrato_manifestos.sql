@@ -67,6 +67,7 @@ BEGIN
     ;WITH contratos AS (
         SELECT
             m.sequence_code,
+            MAX(m.vehicle_owner) AS proprietario_nome,
             MAX(m.contract_type) AS contract_type_vehicle_raw,
             MAX(m.driver_contract_type) AS contract_type_driver_raw
         FROM dbo.manifestos AS m
@@ -76,6 +77,7 @@ BEGIN
     traduzidos AS (
         SELECT
             c.sequence_code,
+            c.proprietario_nome,
             CASE c.contract_type_vehicle_raw
                 WHEN N'aggregate' THEN N'Agregado'
                 WHEN N'driver' THEN N'Motorista'
@@ -95,6 +97,24 @@ BEGIN
             t.tipo_contrato_veiculo,
             t.tipo_contrato_motorista,
             CASE
+                WHEN t.tipo_contrato_veiculo = N'Agregado'
+                 AND (
+                        t.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
+                     OR t.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
+                     )
+                    THEN N'Frota + PX'
+                WHEN t.tipo_contrato_veiculo = N'Agregado'
+                 AND (
+                        t.tipo_contrato_motorista IS NULL
+                     OR LTRIM(RTRIM(t.tipo_contrato_motorista)) = N''
+                     )
+                    THEN N'Terceiro'
+                WHEN t.tipo_contrato_veiculo = N'Motorista'
+                 AND (
+                        t.tipo_contrato_motorista IS NULL
+                     OR LTRIM(RTRIM(t.tipo_contrato_motorista)) = N''
+                     )
+                    THEN N'Frota + PX'
                 WHEN t.tipo_contrato_veiculo = N'Agregado' AND t.tipo_contrato_motorista = N'Agregado' THEN N'Agregado'
                 WHEN t.tipo_contrato_veiculo = N'Agregado' AND t.tipo_contrato_motorista = N'Terceiro' THEN N'Terceiro'
                 WHEN t.tipo_contrato_veiculo = N'Agregado' AND t.tipo_contrato_motorista = N'Próprio' THEN N'Frota'

@@ -495,6 +495,24 @@ BEGIN
             CROSS APPLY (
                 SELECT CASE
                     WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
+                     AND (
+                            a.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
+                         OR a.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
+                         )
+                        THEN N'Frota + PX'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
+                     AND (
+                            tipo_contrato_motorista.tipo_contrato_motorista IS NULL
+                         OR LTRIM(RTRIM(tipo_contrato_motorista.tipo_contrato_motorista)) = N''
+                         )
+                        THEN N'Terceiro'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Motorista'
+                     AND (
+                            tipo_contrato_motorista.tipo_contrato_motorista IS NULL
+                         OR LTRIM(RTRIM(tipo_contrato_motorista.tipo_contrato_motorista)) = N''
+                         )
+                        THEN N'Frota + PX'
+                    WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
                      AND tipo_contrato_motorista.tipo_contrato_motorista = N'Agregado'
                         THEN N'Agregado'
                     WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
