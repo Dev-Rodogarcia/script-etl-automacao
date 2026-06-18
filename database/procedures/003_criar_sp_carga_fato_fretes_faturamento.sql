@@ -122,11 +122,8 @@ BEGIN
                 COALESCE(f.filial_nome_key, NULLIF(LOWER(LTRIM(RTRIM(f.filial_nome))), N'')) AS filial_key,
                 NULLIF(LTRIM(RTRIM(f.filial_apelido)), N'') AS filial_apelido,
                 NULLIF(LTRIM(RTRIM(f.filial_cnpj)), N'') AS filial_cnpj,
-                COALESCE(
-                    NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), N''),
-                    NULLIF(LTRIM(RTRIM(f.filial_nome)), N'')
-                ) AS responsavel_regiao_destino,
-                COALESCE(lc.destination_branch_key, f.filial_nome_key, N'sem_responsavel') AS responsavel_regiao_destino_key,
+                NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), N'') AS responsavel_regiao_destino,
+                COALESCE(lc.destination_branch_key, N'sem_responsavel') AS responsavel_regiao_destino_key,
                 COALESCE(NULLIF(LTRIM(RTRIM(lc.destination_location_name)), N''), f.destino_uf, N'SEM_REGIAO') AS regiao_destino,
                 f.pagador_id,
                 NULLIF(LTRIM(RTRIM(f.pagador_nome)), N'') AS pagador_nome,

@@ -193,6 +193,7 @@ BEGIN
                 FROM (VALUES (f.data_extracao), (lc.data_extracao)) AS atualizacoes(valor)
             ) AS data_atualizacao
             WHERE f.corporation_sequence_number IS NOT NULL
+              AND UPPER(NULLIF(LTRIM(RTRIM(REPLACE(COALESCE(f.tipo_frete, N''), N'Freight::', N''))), N'')) <> N'COMPLEMENTAR'
         ),
         fretes_regras AS (
             SELECT

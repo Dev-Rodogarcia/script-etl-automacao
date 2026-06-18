@@ -263,7 +263,8 @@ OUTER APPLY (
             )
         END AS performance_diferenca_dias
 ) AS indicador_perf
-WHERE COALESCE(f.excluido_na_origem, 0) = 0;
+WHERE COALESCE(f.excluido_na_origem, 0) = 0
+  AND UPPER(NULLIF(LTRIM(RTRIM(REPLACE(COALESCE(f.tipo_frete, N''), N'Freight::', N''))), N'')) <> N'COMPLEMENTAR';
 GO
 
 PRINT 'View vw_fretes_powerbi criada/atualizada com sucesso!';

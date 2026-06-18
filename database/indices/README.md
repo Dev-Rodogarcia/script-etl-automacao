@@ -30,6 +30,7 @@ executar_indices.bat
 - `IX_manifestos_data_extracao` - Otimiza queries de auditoria por data de extração
 - `IX_manifestos_busca_sequence` - Otimiza busca por sequence_code + data
 - `IX_manifestos_created_at` - Otimiza busca por data de criação do manifesto
+- `IX_manifestos_competencia_operacional` - Otimiza competência operacional por saída com fallback para criação
 
 ### Cotações
 - `IX_cotacoes_data_extracao` - Otimiza queries de auditoria

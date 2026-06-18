@@ -622,12 +622,13 @@ ORDER BY data_extracao DESC;
   - Materializa a lógica pesada que antes ficava em `dbo.vw_manifestos_powerbi`, incluindo `OPENJSON` de `coletas.pick_items_ids` e consolidação de `fretes.pick_item_id`.
   - `receita_total` preserva a receita transportada consolidada para KPIs de custo/receita do Dashboard.
   - `filial_key`, `status_key`, `motorista_key`, `placa_veiculo_key`, `tipo_carga_key` e `tipo_contrato_key` são chaves normalizadas para filtros sargable.
+  - `data_criacao` mantém o nome legado por contrato, mas armazena a competência operacional do manifesto: `departured_at` e, quando a saída não existe, `created_at`.
   - `dbo.vw_fato_manifestos_dash` e `dbo.vw_manifestos_powerbi` apenas projetam colunas da fato e filtram `excluido_na_origem = 0`.
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
 | `sequence_code` | `BIGINT` | Número operacional do manifesto e PK da fato. |
-| `data_criacao` | `DATETIMEOFFSET(3)` | Data/hora de criação do manifesto, usada como filtro principal. |
+| `data_criacao` | `DATETIMEOFFSET(3)` | Competência operacional do manifesto, baseada na saída com fallback para criação, usada como filtro principal. |
 | `numero_manifesto` | `BIGINT` | Alias operacional preservado para compatibilidade com as views. |
 | `filial_key` | `NVARCHAR(255)` | Filial normalizada para filtros e escopo. |
 | `status` | `NVARCHAR(100)` | Status traduzido/publicado para o Dashboard. |

@@ -79,9 +79,13 @@ BEGIN
         manifestos_linha AS (
             SELECT
                 m.*,
+                competencia_operacional.data_competencia_operacional,
                 proprietario_documento.proprietario_documento,
                 tipo_motorista.tipo_motorista
             FROM dbo.manifestos AS m
+            CROSS APPLY (
+                SELECT COALESCE(m.departured_at, m.created_at) AS data_competencia_operacional
+            ) competencia_operacional
             OUTER APPLY OPENJSON(CASE WHEN ISJSON(m.metadata) = 1 THEN m.metadata END)
             WITH (
                 mft_vie_onr_document NVARCHAR(255) '$.mft_vie_onr_document',
@@ -132,21 +136,41 @@ BEGIN
               AND (
                     @cargaCompleta = 1
                  OR (
-                        m.created_at >= @DataInicio
+                        m.departured_at >= @DataInicio
+                    AND m.departured_at < @DataFimExclusivo
+                 )
+                 OR (
+                        m.departured_at IS NULL
+                    AND m.created_at >= @DataInicio
                     AND m.created_at < @DataFimExclusivo
                  )
               )
+        ),
+        manifestos_expurgo AS (
+            SELECT DISTINCT
+                m.sequence_code
+            FROM dbo.manifestos AS m
+            WHERE @cargaCompleta = 1
+               OR (
+                        m.departured_at >= @DataInicio
+                    AND m.departured_at < @DataFimExclusivo
+                  )
+               OR (
+                        m.departured_at IS NULL
+                    AND m.created_at >= @DataInicio
+                    AND m.created_at < @DataFimExclusivo
+                  )
         ),
         agregados AS (
             SELECT
                 ml.sequence_code,
                 ml.sequence_code AS numero_manifesto,
                 MAX(ml.identificador_unico) AS identificador_unico,
-                MAX(ml.created_at) AS data_criacao,
-                CAST(MAX(ml.created_at) AS DATE) AS data_criacao_date,
+                MAX(ml.data_competencia_operacional) AS data_criacao,
+                CAST(MAX(ml.data_competencia_operacional) AS DATE) AS data_criacao_date,
                 CASE
-                    WHEN MAX(ml.created_at) IS NULL THEN NULL
-                    ELSE YEAR(CAST(MAX(ml.created_at) AS DATE)) * 100 + MONTH(CAST(MAX(ml.created_at) AS DATE))
+                    WHEN MAX(ml.data_competencia_operacional) IS NULL THEN NULL
+                    ELSE YEAR(CAST(MAX(ml.data_competencia_operacional) AS DATE)) * 100 + MONTH(CAST(MAX(ml.data_competencia_operacional) AS DATE))
                 END AS data_criacao_yyyymm,
                 CAST(MAX(ml.created_at) AS TIME(0)) AS hora_solicitacao,
                 CAST(MAX(ml.created_at) AS TIME(0)) AS hora_criacao,
@@ -715,8 +739,18 @@ BEGIN
          AND target.excluido_na_origem = 0
          AND (
                 @cargaCompleta = 1
+             OR EXISTS (
+                    SELECT 1
+                    FROM manifestos_expurgo AS me
+                    WHERE me.sequence_code = target.sequence_code
+             )
              OR (
-                    target.data_criacao_date >= @DataInicio
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM dbo.manifestos AS m_fallback
+                        WHERE m_fallback.sequence_code = target.sequence_code
+                    )
+                AND target.data_criacao_date >= @DataInicio
                 AND target.data_criacao_date < @DataFimExclusivo
              )
          )

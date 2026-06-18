@@ -61,6 +61,19 @@ END
 ELSE
     PRINT '    Indice IX_manifestos_created_at ja existe';
 
+-- Indice para competencia operacional: saida com fallback sargable para criacao
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_manifestos_competencia_operacional' AND object_id = OBJECT_ID('dbo.manifestos'))
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_manifestos_competencia_operacional
+    ON dbo.manifestos(departured_at, created_at)
+    INCLUDE (sequence_code, identificador_unico, pick_sequence_code, vehicle_plate, excluido_na_origem, data_extracao)
+    WITH (DATA_COMPRESSION = PAGE);
+
+    PRINT '  Indice IX_manifestos_competencia_operacional criado';
+END
+ELSE
+    PRINT '    Indice IX_manifestos_competencia_operacional ja existe';
+
 -- ============================================================================
 -- COTACOES - Indices para otimizar queries
 -- ============================================================================

@@ -70,6 +70,32 @@ BEGIN
     )
         INSERT INTO @falhas VALUES (N'INDICE', N'IX_fato_manifestos_filtros', N'Indice de filtros do Dashboard ausente ou sem filtro de ativos');
 
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes i
+        JOIN sys.index_columns k1
+          ON k1.object_id = i.object_id
+         AND k1.index_id = i.index_id
+         AND k1.key_ordinal = 1
+        JOIN sys.columns c1
+          ON c1.object_id = k1.object_id
+         AND c1.column_id = k1.column_id
+        JOIN sys.index_columns k2
+          ON k2.object_id = i.object_id
+         AND k2.index_id = i.index_id
+         AND k2.key_ordinal = 2
+        JOIN sys.columns c2
+          ON c2.object_id = k2.object_id
+         AND c2.column_id = k2.column_id
+        WHERE i.name = N'IX_manifestos_competencia_operacional'
+          AND i.object_id = OBJECT_ID(N'dbo.manifestos')
+          AND i.type_desc = N'NONCLUSTERED'
+          AND i.is_disabled = 0
+          AND c1.name = N'departured_at'
+          AND c2.name = N'created_at'
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'IX_manifestos_competencia_operacional', N'Indice de competencia operacional em dbo.manifestos ausente');
+
     IF EXISTS (
         SELECT 1
         FROM dbo.fato_gestao_vista_manifestos
