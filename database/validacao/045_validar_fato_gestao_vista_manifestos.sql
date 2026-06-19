@@ -101,13 +101,11 @@ BEGIN
         FROM dbo.fato_gestao_vista_manifestos
         WHERE excluido_na_origem = 0
           AND tipo_contrato_veiculo_key = N'agregado'
-          AND (
-                proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
-             OR proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
-          )
+          AND proprietario_nome COLLATE Latin1_General_CI_AI
+              LIKE N'%LM TRANSPORTES INTERESTADUAIS SERVICOS E COMERCIO S.A%'
           AND (tipo_contrato_key IS NULL OR tipo_contrato_key <> N'frota + px')
     )
-        INSERT INTO @falhas VALUES (N'REGRA_NEGOCIO', N'dbo.fato_gestao_vista_manifestos.tipo_contrato', N'DALGA/LM agregados devem ser classificados como Frota + PX');
+        INSERT INTO @falhas VALUES (N'REGRA_NEGOCIO', N'dbo.fato_gestao_vista_manifestos.tipo_contrato', N'LM Transportes agregados devem ser classificados como Frota + PX');
 
     IF EXISTS (
         SELECT 1
@@ -117,10 +115,8 @@ BEGIN
           AND tipo_contrato_motorista_key IS NULL
           AND (
                 proprietario_nome IS NULL
-             OR (
-                    proprietario_nome COLLATE Latin1_General_CI_AI NOT LIKE N'%DALGA%'
-                AND proprietario_nome COLLATE Latin1_General_CI_AI NOT LIKE N'%LM TRANSPORTES%'
-                )
+             OR proprietario_nome COLLATE Latin1_General_CI_AI
+                NOT LIKE N'%LM TRANSPORTES INTERESTADUAIS SERVICOS E COMERCIO S.A%'
           )
           AND (tipo_contrato_key IS NULL OR tipo_contrato_key <> N'terceiro')
     )

@@ -49,10 +49,8 @@ DECLARE @LinhasAfetadas INT = 0;
         f.sequence_code,
         CASE
             WHEN f.tipo_contrato_veiculo = N'Agregado'
-             AND (
-                    f.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
-                 OR f.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
-                 )
+             AND f.proprietario_nome COLLATE Latin1_General_CI_AI
+                 LIKE N'%LM TRANSPORTES INTERESTADUAIS SERVICOS E COMERCIO S.A%'
                 THEN N'Frota + PX'
             WHEN f.tipo_contrato_veiculo = N'Agregado'
              AND (
@@ -107,7 +105,7 @@ SET @LinhasAfetadas = @@ROWCOUNT;
 INSERT INTO dbo.schema_migrations (migration_id, notes)
 VALUES (
     @MigrationId,
-    N'Reclassifica Tipo de contrato para excecoes DALGA/LM e fallbacks de motorista vazio.'
+    N'Reclassifica Tipo de contrato para excecao LM Transportes e fallbacks de motorista vazio.'
 );
 
 COMMIT TRANSACTION;

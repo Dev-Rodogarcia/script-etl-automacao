@@ -98,10 +98,8 @@ BEGIN
             t.tipo_contrato_motorista,
             CASE
                 WHEN t.tipo_contrato_veiculo = N'Agregado'
-                 AND (
-                        t.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
-                     OR t.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
-                     )
+                 AND t.proprietario_nome COLLATE Latin1_General_CI_AI
+                     LIKE N'%LM TRANSPORTES INTERESTADUAIS SERVICOS E COMERCIO S.A%'
                     THEN N'Frota + PX'
                 WHEN t.tipo_contrato_veiculo = N'Agregado'
                  AND (

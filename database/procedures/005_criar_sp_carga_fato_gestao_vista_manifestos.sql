@@ -495,10 +495,8 @@ BEGIN
             CROSS APPLY (
                 SELECT CASE
                     WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
-                     AND (
-                            a.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%DALGA%'
-                         OR a.proprietario_nome COLLATE Latin1_General_CI_AI LIKE N'%LM TRANSPORTES%'
-                         )
+                     AND a.proprietario_nome COLLATE Latin1_General_CI_AI
+                         LIKE N'%LM TRANSPORTES INTERESTADUAIS SERVICOS E COMERCIO S.A%'
                         THEN N'Frota + PX'
                     WHEN tipo_contrato_veiculo.tipo_contrato_veiculo = N'Agregado'
                      AND (
