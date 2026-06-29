@@ -33,10 +33,21 @@ database/config.bat
 .codex-local/
 .tmp/
 .maven-clean/
+.envrc
+.direnv/
 .history/
 .fleet/
 .vs/
 *.code-workspace
+
+# Gerenciadores/processos locais
+ecosystem.config.js
+ecosystem.config.cjs
+ecosystem.*.config.js
+ecosystem.*.config.cjs
+pm2*.json
+.pm2/
+dump.pm2
 
 # Relatorios gerados automaticamente
 docs/relatorio-validacao-etl-*.md
@@ -68,17 +79,21 @@ temp/
 *.err
 *.tmp
 *.temp
+*.log.*
 tmp_*.sql
 dump_*.sql
 backup_*.sql
 *.pid
+*.pid.lock
 *.state
 *.orig
 *.rej
 *.stackdump
 *.hprof
+*.heapdump
 hs_err_pid*
 replay_pid*
+.attach_pid*
 *~
 
 # Saidas geradas pelo projeto
