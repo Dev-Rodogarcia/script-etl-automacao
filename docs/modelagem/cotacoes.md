@@ -12,7 +12,7 @@ Registrar cotacoes Data Export para analise comercial, conversao em fretes e aco
 
 ## AVISO OPERACIONAL - `vw_cotacoes_powerbi`
 
-> A coluna `[Min. Frete/KG]` da view `dbo.vw_cotacoes_powerbi` NAO e calculada por divisao de `Valor frete / Peso taxado`. Desde a migration `database/migrations/038_atualizar_min_frete_cotacoes_matriz_uf.sql`, ela usa uma matriz tarifaria hardcoded por UF origem x UF destino.
+> A coluna `[Min. Frete/KG]` da view `dbo.vw_cotacoes_powerbi` NAO e calculada por divisao de `Valor frete / Peso taxado`. Desde a migration historica `database/migrations/historico_arquivado/038_atualizar_min_frete_cotacoes_matriz_uf.sql`, ela usa uma matriz tarifaria hardcoded por UF origem x UF destino.
 
 O contrato esta materializado no arquivo base `database/views/015_criar_view_cotacoes_powerbi.sql`. Qualquer alteracao de tarifa, UF coberta ou regra de fallback deve ser feita na migration apropriada e refletida nesse arquivo base para manter paridade de recriacao do schema.
 

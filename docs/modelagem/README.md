@@ -31,7 +31,7 @@ A lista de fatos-alvo e controlada por `ETL_BI_PROCEDURES_TARGET` / `etl.bi.proc
 
 O script `scripts/windows/10-expurgo-orfaos-noturno.ps1` continua executando a reconciliacao noturna e dispara as cargas materializadas do BI ao final. A falha do expurgo logico, entretanto, nao bloqueia mais essa chamada: o script registra evento/marcador de falha do expurgo e segue para `Invoke-MaterializacaoFatosBi`. Sustentacao deve tratar falhas de expurgo e falhas de materializacao como incidentes separados.
 
-Execucoes pontuais pelo menu de producao ainda podem chamar `MATERIALIZAR_FATOS_BI_POST_RUN` apos extracoes bem-sucedidas. Portanto, a topologia vigente tem tres pontos de carga: loop daemon intradia, pos-run operacional e janela noturna resiliente.
+Execucoes pontuais pelo menu de producao ainda podem chamar `MATERIALIZAR_FATOS_BI_POST_RUN` apos extracoes bem-sucedidas. O instalador `database/executar_database.bat` so materializa fatos quando executado explicitamente com `--com-cargas`. Portanto, a topologia vigente de carga recorrente permanece concentrada em loop daemon intradia, pos-run operacional e janela noturna resiliente.
 
 ## Contrato temporal
 

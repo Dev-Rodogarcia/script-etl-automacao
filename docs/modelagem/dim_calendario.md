@@ -14,7 +14,7 @@ Centralizar regras de dias uteis para fatos analiticos, especialmente a retroaca
 ## Manutencao
 
 - A carga estatica cobre `2019-12-01` a `2032-12-31`.
-- Feriados nacionais fixos e moveis brasileiros sao populados por SQL em `database/tabelas/008_criar_tabela_dim_calendario.sql` e `database/migrations/039_criar_dim_calendario_referencia_faturamento.sql`.
+- Feriados nacionais fixos e moveis brasileiros sao populados por SQL em `database/tabelas/008_criar_tabela_dim_calendario.sql` e na migration historica `database/migrations/historico_arquivado/039_criar_dim_calendario_referencia_faturamento.sql`.
 - `Carnaval` e `Corpus Christi` ficam separados como `is_ponto_facultativo`, permitindo ajustar a politica operacional sem confundir com feriado nacional.
 - Sustentacao deve revisar anualmente os pontos facultativos e feriados novos por lei federal antes de dezembro, recalculando `is_dia_util` e `data_referencia_faturamento` apos qualquer alteracao.
 

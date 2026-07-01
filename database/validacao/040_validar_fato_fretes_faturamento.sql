@@ -45,6 +45,34 @@ BEGIN
         INSERT INTO @falhas VALUES (N'INDICE', N'IX_dim_calendario_referencia_faturamento', N'Indice de referencia de faturamento do calendario ausente');
 END;
 
+IF OBJECT_ID(N'dbo.regras_atribuicao_filial', N'U') IS NULL
+BEGIN
+    INSERT INTO @falhas VALUES (N'TABELA', N'dbo.regras_atribuicao_filial', N'Tabela parametrica de atribuicao de filial ausente');
+END
+ELSE
+BEGIN
+    DECLARE @colunasRegras TABLE (nome SYSNAME NOT NULL);
+    INSERT INTO @colunasRegras (nome) VALUES
+        (N'pagador_documento_key'),
+        (N'filial_destino_nome'),
+        (N'filial_destino_key'),
+        (N'ativo');
+
+    INSERT INTO @falhas (tipo, nome, detalhe)
+    SELECT N'COLUNA', N'dbo.regras_atribuicao_filial.' + c.nome, N'Coluna essencial da regra de atribuicao ausente'
+    FROM @colunasRegras c
+    WHERE COL_LENGTH(N'dbo.regras_atribuicao_filial', c.nome) IS NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'UX_regras_atribuicao_filial_pagador_ativo'
+          AND object_id = OBJECT_ID(N'dbo.regras_atribuicao_filial')
+          AND is_unique = 1
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'UX_regras_atribuicao_filial_pagador_ativo', N'Indice unico de regra ativa por pagador ausente');
+END;
+
 IF OBJECT_ID(N'dbo.fato_fretes_faturamento', N'U') IS NULL
 BEGIN
     INSERT INTO @falhas VALUES (N'TABELA', N'dbo.fato_fretes_faturamento', N'Tabela fato ausente');

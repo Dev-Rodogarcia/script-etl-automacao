@@ -188,34 +188,29 @@ class IndicadoresGestaoViewSqlTest {
     }
 
     @Test
-    void executorDatabaseDeveAplicarMigrationsRecentesDoContratoDeFretes() throws IOException {
+    void executorDatabaseDevePublicarBaselineEMigrationsNovasSemReexecutarHistorico() throws IOException {
         final String sql = lerSql("database/executar_database.bat");
         final String validacao = lerSql("database/validacao/034_validar_schema_recriacao.sql");
         final String validacaoPerformance =
                 lerSql("database/validacao/042_validar_contrato_dashboard_performance.sql");
 
-        assertContem(sql, "migrations\\016_materializar_faturamento_fretes.sql");
-        assertContem(sql, "migrations\\017_localizacao_cargas_dashboard_operacional.sql");
-        assertContem(sql, "migrations\\018_adicionar_indice_coletas_request_date_dashboard.sql");
-        assertContem(sql, "migrations\\019_adicionar_comprovante_fretes_performance.sql");
-        assertContem(sql, "migrations\\020_adicionar_tipo_motorista_manifestos.sql");
-        assertContem(sql, "migrations\\021_materializar_comprovante_inventario.sql");
-        assertContem(sql, "migrations\\022_corrigir_volumes_fretes_faturamento.sql");
-        assertContem(sql, "migrations\\025_materializar_chave_responsavel_destino.sql");
-        assertContem(sql, "migrations\\026_materializar_chave_usuario_cotacoes.sql");
-        assertContem(sql, "migrations\\032_criar_fato_gestao_vista_faturas.sql");
-        assertContem(sql, "migrations\\033_tuning_indices_fatos.sql");
-        assertContem(sql, "migrations\\039_criar_dim_calendario_referencia_faturamento.sql");
-        assertContem(sql, "migrations\\042_criar_fato_gestao_vista_manifestos.sql");
+        assertContem(sql, "set \"MASTER_SQL=%TEMP%\\run_master.sql\"");
+        assertContem(sql, "dir /b /a-d /on \"migrations\\*.sql\"");
+        assertContem(sql, "migrations\\historico_arquivado");
+        assertContem(sql, "--com-cargas");
+        assertFalse(sql.contains("migrations\\016_materializar_faturamento_fretes.sql"));
+        assertFalse(sql.contains("migrations\\042_criar_fato_gestao_vista_manifestos.sql"));
         assertContem(sql, "tabelas\\008_criar_tabela_dim_calendario.sql");
         assertContem(sql, "tabelas\\032_criar_tabela_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "procedures\\004_criar_sp_carga_fato_gestao_vista_faturas.sql");
         assertContem(sql, "procedures\\005_criar_sp_carga_fato_gestao_vista_manifestos.sql");
+        assertContem(sql, "call :MASTER_ADD_EXEC \"dbo.sp_carga_fato_gestao_vista_faturas\"");
+        assertContem(sql, "call :MASTER_ADD_EXEC \"dbo.sp_carga_fato_gestao_vista_manifestos\"");
         assertContem(sql, "validacao\\041_validar_fato_gestao_vista_faturas.sql");
         assertContem(sql, "validacao\\045_validar_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
         assertContem(sql, "validacao\\042_validar_contrato_dashboard_performance.sql");
-        assertContem(sql, "Contrato critico da view de fretes nao foi publicado");
+        assertContem(sql, "Cargas materializadas BI ignoradas");
         assertContem(validacaoPerformance, "Responsável Região Destino Key");
         assertContem(validacaoPerformance, "THROW 53002");
         assertContem(validacao, "019_adicionar_comprovante_fretes_performance");
@@ -370,7 +365,14 @@ class IndicadoresGestaoViewSqlTest {
     }
 
     private String lerSql(final String caminhoRelativo) throws IOException {
-        return Files.readString(Path.of(caminhoRelativo), StandardCharsets.UTF_8);
+        Path caminho = Path.of(caminhoRelativo);
+        if (!Files.exists(caminho) && caminhoRelativo.startsWith("database/migrations/")) {
+            caminho = Path.of(caminhoRelativo.replace(
+                "database/migrations/",
+                "database/migrations/historico_arquivado/"
+            ));
+        }
+        return Files.readString(caminho, StandardCharsets.UTF_8);
     }
 
     private void assertContem(final String sql, final String trechoEsperado) {

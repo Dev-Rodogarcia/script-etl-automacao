@@ -6,6 +6,7 @@ Fontes usadas para montar este documento:
 
 - `database/tabelas/*.sql`
 - `database/migrations/*.sql`
+- `database/migrations/historico_arquivado/*.sql`
 - `database/security_sqlite/*.sql`
 - repositórios Java com DDL idempotente de fallback para estruturas técnicas
 
@@ -30,23 +31,25 @@ Isso significa atualizar, quando aplicável:
 - `database/indices/` quando a mudança exigir novo índice, remoção ou ajuste de índice;
 - `database/validacao/` quando a mudança alterar critério de conferência, integridade ou diagnóstico operacional;
 - `database/README.md` quando a estrutura documentada mudar;
-- `database/executar_database.bat` quando entrar nova migration ou quando a ordem de execução precisar mudar.
+- `database/executar_database.bat` quando a ordem de execução precisar mudar.
 
 Regra prática:
 
 - migration sem reflexo no baseline é considerada entrega incompleta;
-- recriar o banco com `database/executar_database.bat --recriar` deve levar ao mesmo estado estrutural esperado de um banco antigo que recebeu todas as migrations.
+- recriar o banco com `database/executar_database.bat --recriar` deve levar ao mesmo estado estrutural esperado de um banco antigo que recebeu todas as migrations consolidadas no baseline;
+- migrations antigas ja consolidadas no baseline ficam em `database/migrations/historico_arquivado/` e nao sao executadas automaticamente;
+- apenas arquivos `.sql` diretamente em `database/migrations/` sao considerados migrations novas pelo instalador.
 
 Checklist mínimo por mudança estrutural:
 
 1. alterar a migration;
 2. refletir a mudança no script-base correspondente em `tabelas/views/indices/validacao`;
-3. incluir a migration nova em `database/executar_database.bat`;
+3. manter a migration nova diretamente em `database/migrations/` ate ela ser consolidada no baseline;
 4. revisar este `README` se o catálogo ou a regra operacional mudou.
 
 ## Cargas iniciais após recriação
 
-`database/executar_database.bat` publica o schema e, em seguida, executa obrigatoriamente as cargas SQL nativas das tabelas fato. As procedures são chamadas sem parâmetros, portanto fazem carga completa idempotente e deixam as fatos materializadas prontas antes das validações.
+`database/executar_database.bat` publica o schema em lote unico via `sqlcmd` e nao executa cargas BI por padrao. Para materializar as tabelas fato no mesmo fluxo, execute `database/executar_database.bat --com-cargas` ou combine `--recriar --com-cargas` em janela controlada. As procedures sao chamadas sem parametros, portanto fazem carga completa idempotente e podem disputar locks com o daemon Java.
 
 | Tabela | Carga inicial | Observação |
 | --- | --- | --- |
@@ -918,7 +921,7 @@ ORDER BY data_extracao DESC;
 ### `dbo.schema_migrations`
 
 - Papel: controle de migrations aplicadas
-- Observação importante: também possui script-base em `database/tabelas/018_criar_tabela_schema_migrations.sql` para cenários de recriação manual do schema sem depender da migration `001`
+- Observação importante: também possui script-base em `database/tabelas/018_criar_tabela_schema_migrations.sql` para cenários de recriação manual do schema sem depender da migration historica `001`
 
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
@@ -982,7 +985,8 @@ ORDER BY data_extracao DESC;
 ## Onde os scripts vivem
 
 - SQL Server base: `database/tabelas/`
-- Ajustes estruturais: `database/migrations/`
+- Ajustes estruturais novos: `database/migrations/`
+- Migrations consolidadas/arquivadas: `database/migrations/historico_arquivado/`
 - Segurança SQLite local: `database/security_sqlite/`
 - Execução dos scripts SQL Server: `database/executar_database.bat`
 

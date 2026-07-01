@@ -30,6 +30,9 @@ BEGIN
     IF OBJECT_ID(N'dbo.faturas_por_cliente', N'U') IS NULL
         THROW 51043, 'Tabela dbo.faturas_por_cliente nao encontrada. A carga precisa dela para validar status real de CT-e.', 1;
 
+    IF OBJECT_ID(N'dbo.regras_atribuicao_filial', N'U') IS NULL
+        THROW 51049, 'Tabela dbo.regras_atribuicao_filial nao encontrada. Execute a migration 047 antes da carga.', 1;
+
     IF OBJECT_ID(N'dbo.dim_calendario', N'U') IS NULL
         THROW 51048, 'Tabela dbo.dim_calendario nao encontrada. Execute a migration 039 antes da carga.', 1;
 
@@ -118,8 +121,8 @@ BEGIN
                 f.cte_issued_at AS data_emissao_cte,
                 f.criado_em,
                 f.id_corporacao AS filial_id,
-                NULLIF(LTRIM(RTRIM(f.filial_nome)), N'') AS filial_nome,
-                COALESCE(f.filial_nome_key, NULLIF(LOWER(LTRIM(RTRIM(f.filial_nome))), N'')) AS filial_key,
+                COALESCE(regra.filial_destino_nome, NULLIF(LTRIM(RTRIM(f.filial_nome)), N'')) AS filial_nome,
+                COALESCE(regra.filial_destino_key, f.filial_nome_key, NULLIF(LOWER(LTRIM(RTRIM(f.filial_nome))), N'')) AS filial_key,
                 NULLIF(LTRIM(RTRIM(f.filial_apelido)), N'') AS filial_apelido,
                 NULLIF(LTRIM(RTRIM(f.filial_cnpj)), N'') AS filial_cnpj,
                 NULLIF(LTRIM(RTRIM(lc.destination_branch_nickname)), N'') AS responsavel_regiao_destino,
@@ -194,6 +197,9 @@ BEGIN
                     LTRIM(RTRIM(COALESCE(f.pagador_documento, N''))),
                     N'.', N''), N'-', N''), N'/', N''), N' ', N''), CHAR(9), N''), N'')) AS pagador_documento_key
             ) AS docs
+            LEFT JOIN dbo.regras_atribuicao_filial AS regra
+                ON regra.pagador_documento_key = docs.pagador_documento_key
+               AND regra.ativo = 1
             CROSS APPLY (
                 SELECT LOWER(NULLIF(LTRIM(RTRIM(
                     CASE f.status

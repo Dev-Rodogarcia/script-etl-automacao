@@ -55,6 +55,7 @@ final class ConfigBancoValidator {
         tabela("raster_viagem_paradas"),
         tabela("localizacao_cargas_regiao_destino_alias"),
         tabela("manifestos_frota_propria_cnpjs"),
+        tabela("regras_atribuicao_filial"),
         tabela("fato_gestao_vista_fretes"),
         tabela("fato_gestao_vista_coletores"),
         tabela("fato_fretes_faturamento"),

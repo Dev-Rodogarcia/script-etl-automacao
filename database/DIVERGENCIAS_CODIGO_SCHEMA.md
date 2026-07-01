@@ -12,7 +12,7 @@ Este arquivo registra o que foi encontrado ao comparar entidades/repositórios J
 
 ### `dbo.schema_migrations`
 
-- Situação encontrada: a tabela existia como migration (`database/migrations/001_criar_tabela_schema_migrations.sql`), mas não tinha script-base em `database/tabelas/`.
+- Situação encontrada: a tabela existia como migration (`database/migrations/historico_arquivado/001_criar_tabela_schema_migrations.sql`), mas não tinha script-base em `database/tabelas/`.
 - Ajuste aplicado:
   - criado `database/tabelas/018_criar_tabela_schema_migrations.sql`
   - incluído no fluxo de `database/executar_database.bat`
@@ -28,14 +28,14 @@ Este arquivo registra o que foi encontrado ao comparar entidades/repositórios J
   - `total_records` tinha `DEFAULT 0` no Java e não tinha default no script-base
 - Ajuste aplicado:
   - alinhado `database/tabelas/012_criar_tabela_sys_execution_history.sql`
-  - criada `database/migrations/005_alinhar_sys_execution_history_schema.sql`
+  - criada `database/migrations/historico_arquivado/005_alinhar_sys_execution_history_schema.sql`
 - Estado atual:
   - recriação do zero já nasce correta pelo script-base
   - bancos existentes podem ser normalizados pela migration `005`
 
 ### `dbo.manifestos` -> `dbo.coletas`
 
-- Situação encontrada: a FK seletiva `manifestos.pick_sequence_code -> coletas.sequence_code` existia apenas como migration (`database/migrations/007_adicionar_fk_seletiva_manifestos_coletas.sql`), e não no script-base de criação da tabela.
+- Situação encontrada: a FK seletiva `manifestos.pick_sequence_code -> coletas.sequence_code` existia apenas como migration (`database/migrations/historico_arquivado/007_adicionar_fk_seletiva_manifestos_coletas.sql`), e não no script-base de criação da tabela.
 - Ajuste aplicado:
   - alinhado `database/tabelas/003_criar_tabela_manifestos.sql`
   - o script-base agora também cria `IX_manifestos_pick_sequence_code`
@@ -57,7 +57,7 @@ Este arquivo registra o que foi encontrado ao comparar entidades/repositórios J
 
 ### SQL Server
 
-- `ExecutionHistoryRepository` continua com DDL idempotente para `dbo.sys_execution_history`, mas a fonte canônica agora está em `database/tabelas/012_criar_tabela_sys_execution_history.sql` e `database/migrations/005_alinhar_sys_execution_history_schema.sql`.
+- `ExecutionHistoryRepository` continua com DDL idempotente para `dbo.sys_execution_history`, mas a fonte canônica agora está em `database/tabelas/012_criar_tabela_sys_execution_history.sql` e `database/migrations/historico_arquivado/005_alinhar_sys_execution_history_schema.sql`.
 - `AuditorEstruturaApi` continua com DDL idempotente para `dbo.sys_auditoria_temp`, já coberta por `database/tabelas/013_criar_tabela_sys_auditoria_temp.sql`.
 - `InvalidRecordAuditRepository` continua com DDL idempotente para `dbo.etl_invalid_records`, já coberta por `database/tabelas/019_criar_tabela_etl_invalid_records.sql`.
 

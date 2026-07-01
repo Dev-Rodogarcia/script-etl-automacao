@@ -41,7 +41,8 @@ INSERT INTO @tabelas (nome) VALUES
     (N'fato_gestao_vista_coletores'),
     (N'fato_fretes_faturamento'),
     (N'fato_gestao_vista_faturas'),
-    (N'fato_gestao_vista_manifestos');
+    (N'fato_gestao_vista_manifestos'),
+    (N'regras_atribuicao_filial');
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'TABELA', t.nome, N'Tabela dbo.' + t.nome + N' ausente'
@@ -120,7 +121,9 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'043_materializar_tipo_contrato_manifestos'),
     (N'044_adicionar_data_exclusao_origem_tabelas_base'),
     (N'045_criar_indice_manifestos_competencia_operacional'),
-    (N'046_reclassificar_tipo_contrato_manifestos');
+    (N'046_reclassificar_tipo_contrato_manifestos'),
+    (N'047_criar_tabela_regras_atribuicao_filial'),
+    (N'048_inserir_regra_frigelar_cwb');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -132,6 +135,43 @@ BEGIN
         FROM dbo.schema_migrations sm
         WHERE sm.migration_id = m.migration_id
     );
+END;
+
+IF OBJECT_ID(N'dbo.regras_atribuicao_filial', N'U') IS NOT NULL
+BEGIN
+    DECLARE @colunasRegrasAtribuicao TABLE (nome SYSNAME NOT NULL);
+    INSERT INTO @colunasRegrasAtribuicao (nome) VALUES
+        (N'id'),
+        (N'pagador_documento_key'),
+        (N'filial_destino_nome'),
+        (N'filial_destino_key'),
+        (N'ativo'),
+        (N'motivo');
+
+    INSERT INTO @falhas (tipo, nome, detalhe)
+    SELECT N'COLUNA', N'dbo.regras_atribuicao_filial.' + c.nome, N'Coluna essencial da tabela de regras ausente'
+    FROM @colunasRegrasAtribuicao c
+    WHERE COL_LENGTH(N'dbo.regras_atribuicao_filial', c.nome) IS NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'UX_regras_atribuicao_filial_pagador_ativo'
+          AND object_id = OBJECT_ID(N'dbo.regras_atribuicao_filial')
+          AND is_unique = 1
+          AND filter_definition LIKE N'%ativo%'
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'UX_regras_atribuicao_filial_pagador_ativo', N'Indice unico de regra ativa por pagador ausente');
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dbo.regras_atribuicao_filial
+        WHERE pagador_documento_key = N'92660406007040'
+          AND filial_destino_nome = N'CWB - RODOGARCIA'
+          AND filial_destino_key = N'cwb - rodogarcia'
+          AND ativo = 1
+    )
+        INSERT INTO @falhas VALUES (N'DADO', N'dbo.regras_atribuicao_filial.FRIGELAR', N'Regra ativa FRIGELAR -> CWB ausente ou fora do contrato');
 END;
 
 IF COL_LENGTH(N'dbo.coletas', N'request_hour') IS NULL

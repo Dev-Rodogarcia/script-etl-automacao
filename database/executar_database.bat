@@ -3,7 +3,7 @@ SETLOCAL EnableExtensions DisableDelayedExpansion
 
 REM ================================================================
 REM Script : database/executar_database.bat
-REM Papel  : Executa scripts SQL Server do sistema ESL Cloud.
+REM Papel  : Publica o schema SQL Server do sistema ESL Cloud.
 REM Regra  : toda mudanca estrutural nova em migrations deve ser refletida
 REM          tambem nos scripts-base de database\tabelas, views, indices,
 REM          validacao e demais artefatos afetados para permitir recriacao
@@ -12,18 +12,31 @@ REM
 REM MODOS DE USO:
 REM
 REM   executar_database.bat
-REM     Modo PADRAO (seguro):
+REM     Modo PADRAO (seguro e rapido):
 REM     - Banco ja deve existir
 REM     - Garante tabelas base sem usar DROP/CREATE DATABASE
-REM     - Executa: migrations, indices, views, procedures, cargas iniciais, validacoes
+REM     - Executa DDL em lote unico via sqlcmd master temporario
+REM     - Executa: tabelas, migrations novas na raiz, indices, views,
+REM       contrato critico e procedures
+REM     - NAO executa cargas materializadas BI
 REM     - NAO executa DROP/CREATE DATABASE
-REM     - Idempotente - pode rodar multiplas vezes
+REM
+REM   executar_database.bat --com-cargas
+REM     Modo PADRAO com materializacao:
+REM     - Executa todo o DDL do modo padrao
+REM     - Executa as 5 procedures pesadas de materializacao BI
+REM     - Executa validacoes de leitura apos as cargas
+REM     - Use somente com o daemon Java parado ou em janela controlada
 REM
 REM   executar_database.bat --recriar
 REM     Modo DEV (destrutivo - requer confirmacao):
 REM     - Apaga e recria o banco do zero
-REM     - Executa: tabelas, migrations, indices, views, procedures, cargas iniciais, validacoes
+REM     - Executa DDL em lote unico via sqlcmd master temporario
+REM     - NAO executa cargas materializadas BI sem --com-cargas
 REM     - ATENCAO: todos os dados serao perdidos
+REM
+REM   executar_database.bat --recriar --com-cargas
+REM     Recria o banco e, ao final, executa as cargas BI e validacoes.
 REM
 REM   executar_database.bat --help
 REM     Mostra um resumo operacional rapido sem conectar no SQL Server.
@@ -37,10 +50,10 @@ REM OPCOES ADICIONAIS (config.bat):
 REM   DB_PORT           : porta do SQL Server (ex.: 1433)
 REM   SQLCMD_EXTRA_ARGS : flags extras do sqlcmd (ex.: -C para confiar no certificado)
 REM
-REM CARGAS INICIAIS:
-REM   As fatos materializadas SQL sao carregadas obrigatoriamente apos publicar
-REM   tabelas, migrations, indices, views e procedures. As dimensoes de usuarios
-REM   sao sincronizadas automaticamente no inicio do ciclo Java de extracao.
+REM CARGAS BI:
+REM   As fatos materializadas SQL somente sao carregadas quando --com-cargas
+REM   for informado. Sem essa flag, este script publica DDL e finaliza sem
+REM   disputar locks pesados com o daemon Java.
 REM
 REM BANCO SQLite DE AUTENTICACAO:
 REM   Gerenciado exclusivamente pela aplicacao Java (extrator.jar).
@@ -55,6 +68,8 @@ cd /d "%~dp0"
 REM --- Detectar modo ---
 set "MODO_RECRIAR=0"
 set "MODO_FORCE=0"
+set "MODO_COM_CARGAS=0"
+set "MASTER_SQL=%TEMP%\run_master.sql"
 
 :PARSE_ARGS
 if "%~1"=="" goto :ARGS_OK
@@ -63,6 +78,7 @@ if /i "%~1"=="-h" goto :MOSTRAR_AJUDA
 if /i "%~1"=="/?" goto :MOSTRAR_AJUDA
 if /i "%~1"=="--recriar" set "MODO_RECRIAR=1"
 if /i "%~1"=="--force" set "MODO_FORCE=1"
+if /i "%~1"=="--com-cargas" set "MODO_COM_CARGAS=1"
 shift
 goto :PARSE_ARGS
 
@@ -80,6 +96,11 @@ if "%MODO_RECRIAR%"=="1" (
     echo   EXECUTAR DATABASE - MODO PADRAO
     echo   Banco existente - sem DROP/CREATE
     echo ============================================
+)
+if "%MODO_COM_CARGAS%"=="1" (
+    echo   Cargas BI: ATIVADAS ^(--com-cargas^)
+) else (
+    echo   Cargas BI: ignoradas ^(use --com-cargas para materializar^)
 )
 echo.
 
@@ -147,253 +168,57 @@ if "%DB_USER%"=="" (
 )
 echo Servidor: %DB_SERVER_TARGET%  ^|  Banco: %DB_NAME%
 echo Opcoes sqlcmd: %SQLCMD_FLAGS%
+echo Master SQL: %MASTER_SQL%
 echo.
 
-REM ================================================================
-REM MODO DEV: recriar banco do zero (apenas com --recriar)
-REM ================================================================
 if /i "%MODO_RECRIAR%"=="1" (
-    call :RECRIAR_BANCO
+    call :CONFIRMAR_RECRIACAO
     if errorlevel 2 exit /b 0
     if errorlevel 1 exit /b 1
 )
 
-REM ================================================================
-REM AMBOS OS MODOS: tabelas base, migrations, indices, views, validacoes
-REM ================================================================
-
-REM --- Tabelas base (idempotente - cria faltantes sem recriar o banco) ---
-if /i not "%MODO_RECRIAR%"=="1" (
-    call :GARANTIR_TABELAS_BASE
-    if errorlevel 1 exit /b 1
-)
-
-REM --- Migrations (criticas - para em erro) ---
-echo [ETAPA] Migrations...
-for %%F in (
-    "migrations\001_criar_tabela_schema_migrations.sql"
-    "migrations\002_corrigir_constraint_manifestos.sql"
-    "migrations\004_adicionar_request_hour_coletas.sql"
-    "migrations\005_alinhar_sys_execution_history_schema.sql"
-    "migrations\006_alterar_fretes_indicadores_gestao.sql"
-    "migrations\007_adicionar_fk_seletiva_manifestos_coletas.sql"
-    "migrations\008_criar_tabela_sys_replay_idempotency.sql"
-    "migrations\009_criar_tabela_sys_reconciliation_quarantine.sql"
-    "migrations\010_harden_coletas_sequence_code.sql"
-    "migrations\011_alinhar_chave_merge_manifestos_orfaos.sql"
-    "migrations\012_adicionar_frete_cortesia.sql"
-    "migrations\013_ajustar_precisao_cubagem_fretes.sql"
-    "migrations\014_criar_tabelas_raster.sql"
-    "migrations\015_adicionar_cliente_cnpj_faturas_por_cliente.sql"
-    "migrations\016_materializar_faturamento_fretes.sql"
-    "migrations\017_localizacao_cargas_dashboard_operacional.sql"
-    "migrations\018_adicionar_indice_coletas_request_date_dashboard.sql"
-    "migrations\019_adicionar_comprovante_fretes_performance.sql"
-    "migrations\020_adicionar_tipo_motorista_manifestos.sql"
-    "migrations\021_materializar_comprovante_inventario.sql"
-    "migrations\022_corrigir_volumes_fretes_faturamento.sql"
-    "migrations\023_adicionar_noop_count_log_extracoes.sql"
-    "migrations\024_drop_faturas_graphql.sql"
-    "migrations\025_materializar_chave_responsavel_destino.sql"
-    "migrations\026_materializar_chave_usuario_cotacoes.sql"
-    "migrations\027_adicionar_excluido_na_origem.sql"
-    "migrations\028_corrigir_chave_unica_manifestos.sql"
-    "migrations\029_criar_fato_gestao_vista_fretes.sql"
-    "migrations\030_criar_fato_gestao_vista_coletores.sql"
-    "migrations\031_criar_fato_fretes_faturamento.sql"
-    "migrations\032_criar_fato_gestao_vista_faturas.sql"
-    "migrations\033_tuning_indices_fatos.sql"
-    "migrations\034_adicionar_hash_linha_usuarios.sql"
-    "migrations\035_drop_views_legadas_powerbi.sql"
-    "migrations\036_corrigir_chave_manifestos_fallback_identificador.sql"
-    "migrations\037_adicionar_status_fatura.sql"
-    "migrations\038_atualizar_min_frete_cotacoes_matriz_uf.sql"
-    "migrations\039_criar_dim_calendario_referencia_faturamento.sql"
-    "migrations\040_criar_indice_performance_fretes.sql"
-    "migrations\041_adicionar_chave_pick_item_coletas_fretes.sql"
-    "migrations\042_criar_fato_gestao_vista_manifestos.sql"
-    "migrations\043_materializar_tipo_contrato_manifestos.sql"
-    "migrations\044_adicionar_data_exclusao_origem_tabelas_base.sql"
-    "migrations\045_criar_indice_manifestos_competencia_operacional.sql"
-    "migrations\046_reclassificar_tipo_contrato_manifestos.sql"
-) do (
-    if not exist %%F (
-        echo   [SKIP] Nao encontrada: %%~F
-    ) else (
-        echo   [EXEC] %%~F
-        sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
-        if errorlevel 1 (
-            echo [ERRO] Falha critica na migration: %%~F
-            set "SQLCMDPASSWORD="
-            if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-            exit /b 1
-        )
-    )
-)
-echo [OK] Migrations concluidas.
-echo.
-
-REM --- Indices (nao-criticos - avisa e continua) ---
-echo [ETAPA] Indices de performance...
-for %%F in (
-    "indices\001_criar_indices_performance.sql"
-    "indices\002_criar_indices_fato_gestao_vista_manifestos.sql"
-) do (
-    if exist %%F (
-        echo   [EXEC] %%~F
-        sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F"
-        if errorlevel 1 echo   [AVISO] Indice pode ja existir: %%~F
-    )
-)
-echo [OK] Indices concluidos.
-echo.
-
-REM --- Views Power BI, analiticas e Dimensao (nao-criticas - avisa e continua) ---
-echo [ETAPA] Views ^(Power BI + Analiticas + Dimensao^)...
-for %%F in (
-    "views\011_criar_view_faturas_por_cliente_powerbi.sql"
-    "views\012_criar_view_fretes_powerbi.sql"
-    "views\013_criar_view_coletas_powerbi.sql"
-    "views\015_criar_view_cotacoes_powerbi.sql"
-    "views\016_criar_view_contas_a_pagar_powerbi.sql"
-    "views\017_criar_view_localizacao_cargas_powerbi.sql"
-    "views\018_criar_view_manifestos_powerbi.sql"
-    "views\025_criar_view_fato_manifestos_dash.sql"
-    "views\020_criar_view_inventario_powerbi.sql"
-    "views\021_criar_view_sinistros_powerbi.sql"
-    "views\022_criar_view_raster_sm_transit_time.sql"
-    "views\019_criar_view_bi_monitoramento.sql"
-    "views-dimensao\019_criar_view_dim_filiais.sql"
-    "views-dimensao\020_criar_view_dim_clientes.sql"
-    "views-dimensao\021_criar_view_dim_veiculos.sql"
-    "views-dimensao\022_criar_view_dim_motoristas.sql"
-    "views-dimensao\023_criar_view_dim_planocontas.sql"
-    "views-dimensao\024_criar_view_dim_usuarios.sql"
-) do (
-    if exist %%F (
-        echo   [EXEC] %%~F
-        sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F"
-        if errorlevel 1 echo   [AVISO] View pode ja existir: %%~F
-    )
-)
-echo [OK] Views concluidas.
-echo.
-
-REM --- Contrato critico consumido pelo Dashboard (para em erro) ---
-echo [ETAPA] Validando contrato critico da view de fretes...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "validacao\042_validar_contrato_dashboard_performance.sql" -b
+echo [ETAPA] Montando master SQL temporario...
+call :MONTAR_MASTER_SQL
 if errorlevel 1 (
-    echo [ERRO] Contrato critico da view de fretes nao foi publicado.
     set "SQLCMDPASSWORD="
     if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
     exit /b 1
 )
-echo [OK] Contrato critico da view de fretes validado.
+echo [OK] Master SQL montado.
 echo.
 
-REM --- Stored Procedures (criticas - para em erro) ---
-echo [ETAPA] Stored Procedures...
-for %%F in (
-    "procedures\001_criar_sp_carga_fato_gestao_vista_fretes.sql"
-    "procedures\002_criar_sp_carga_fato_gestao_vista_coletores.sql"
-    "procedures\003_criar_sp_carga_fato_fretes_faturamento.sql"
-    "procedures\004_criar_sp_carga_fato_gestao_vista_faturas.sql"
-    "procedures\005_criar_sp_carga_fato_gestao_vista_manifestos.sql"
-) do (
-    if exist %%F (
-        echo   [EXEC] %%~F
-        sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
-        if errorlevel 1 (
-            echo [ERRO] Falha critica na procedure: %%~F
-            set "SQLCMDPASSWORD="
-            if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-            exit /b 1
-        )
-    )
+echo [ETAPA] Executando master SQL em uma unica sessao sqlcmd...
+if /i "%MODO_RECRIAR%"=="1" (
+    sqlcmd %SQLCMD_FLAGS% -S "%DB_SERVER_TARGET%" %AUTH_CMD% -d master -v DB_NAME="%DB_NAME%" -i "%MASTER_SQL%" -b
+) else (
+    sqlcmd %SQLCMD_FLAGS% -S "%DB_SERVER_TARGET%" -d "%DB_NAME%" %AUTH_CMD% -i "%MASTER_SQL%" -b
 )
-echo [OK] Stored Procedures concluidas.
+if errorlevel 1 (
+    echo [ERRO] Falha na execucao do master SQL.
+    echo [INFO] Master preservado para diagnostico: %MASTER_SQL%
+    set "SQLCMDPASSWORD="
+    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+    exit /b 1
+)
+echo [OK] Master SQL executado.
 echo.
 
-REM --- Cargas iniciais obrigatorias das fatos SQL (criticas - para em erro) ---
-echo [ETAPA] Cargas iniciais das fatos BI...
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_fretes
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_fretes;" -b
-if errorlevel 1 (
-    echo [ERRO] Falha na carga materializada Gestao a Vista ^(fretes^).
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
-)
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_coletores
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_coletores;" -b
-if errorlevel 1 (
-    echo [ERRO] Falha na carga materializada Gestao a Vista ^(coletores^).
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
-)
-echo   [EXEC] dbo.sp_carga_fato_fretes_faturamento
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_fretes_faturamento;" -b
-if errorlevel 1 (
-    echo [ERRO] Falha na carga materializada de Faturamento de Fretes.
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
-)
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_faturas
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_faturas;" -b
-if errorlevel 1 (
-    echo [ERRO] Falha na carga materializada de Faturas por Cliente.
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
-)
-echo   [EXEC] dbo.sp_carga_fato_gestao_vista_manifestos
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -Q "EXEC dbo.sp_carga_fato_gestao_vista_manifestos;" -b
-if errorlevel 1 (
-    echo [ERRO] Falha na carga materializada Gestao a Vista ^(manifestos^).
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
-)
-echo [OK] Cargas iniciais das fatos BI concluidas.
-echo [INFO] Dimensoes de usuarios sao sincronizadas automaticamente pelo ciclo Java de extracao.
-echo.
-
-REM --- Validacoes de leitura (seguras, sem scripts destrutivos) ---
-REM Excluidos: 027 diagnosticar_null, 030 api_vs_banco, 031 limpar_dados
-echo [ETAPA] Validacoes...
-for %%F in (
-    "validacao\025_validar_views_dimensao.sql"
-    "validacao\026_validar_tipo_destroy_user_id.sql"
-    "validacao\028_validacao_rapida_extracao.sql"
-    "validacao\032_validar_orfaos_manifestos_coletas.sql"
-    "validacao\034_validar_schema_recriacao.sql"
-    "validacao\036_validar_volumes_fretes_faturamento.sql"
-    "validacao\038_validar_fato_gestao_vista_fretes.sql"
-    "validacao\039_validar_fato_gestao_vista_coletores.sql"
-    "validacao\040_validar_fato_fretes_faturamento.sql"
-    "validacao\041_validar_fato_gestao_vista_faturas.sql"
-    "validacao\043_validar_indice_performance_fretes.sql"
-    "validacao\045_validar_fato_gestao_vista_manifestos.sql"
-) do (
-    if exist %%F (
-        echo   [EXEC] %%~F
-        sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
-        if errorlevel 1 echo   [AVISO] Validacao retornou aviso: %%~F
-    )
-)
-echo [OK] Validacoes concluidas.
-echo.
-
-REM Limpar senha da memoria
+del /q "%MASTER_SQL%" >nul 2>nul
 set "SQLCMDPASSWORD="
 
 echo ============================================
 if "%MODO_RECRIAR%"=="1" (
-    echo   CONCLUIDO - Banco recriado e configurado.
+    if "%MODO_COM_CARGAS%"=="1" (
+        echo   CONCLUIDO - Banco recriado, configurado e materializado.
+    ) else (
+        echo   CONCLUIDO - Banco recriado e schema publicado sem cargas BI.
+    )
 ) else (
-    echo   CONCLUIDO - Scripts SQL executados sem recriar o banco.
+    if "%MODO_COM_CARGAS%"=="1" (
+        echo   CONCLUIDO - Schema publicado e cargas BI executadas.
+    ) else (
+        echo   CONCLUIDO - Schema publicado sem executar cargas BI.
+    )
 )
 echo ============================================
 echo.
@@ -404,14 +229,18 @@ exit /b 0
 echo.
 echo Uso:
 echo   executar_database.bat
-echo      Atualiza um banco existente. Cria tabelas faltantes, aplica migrations,
-echo      indices, views, procedures, cargas iniciais SQL e validacoes seguras.
+echo      Atualiza um banco existente. Publica tabelas, migrations novas da raiz,
+echo      indices, views, procedures e contrato critico em uma unica sessao sqlcmd.
+echo      Nao executa cargas BI por padrao.
+echo.
+echo   executar_database.bat --com-cargas
+echo      Executa o fluxo acima e, ao final, materializa as 5 fatos BI e roda
+echo      validacoes de leitura. Use com o daemon parado ou em janela controlada.
 echo.
 echo   executar_database.bat --recriar
 echo      Apaga e recria o banco definido em config.bat ^(ex.: ETL_SISTEMA^).
-echo      Depois cria tabelas base, aplica migrations, indices, views, procedures,
-echo      cargas iniciais SQL e validacoes.
-echo      Requer digitacao de RECRIAR para confirmar.
+echo      Depois publica o schema em lote unico. Nao executa cargas BI sem
+echo      --com-cargas. Requer digitacao de RECRIAR para confirmar.
 echo      Use --force junto com --recriar para automacoes controladas.
 echo.
 echo Configuracao:
@@ -419,15 +248,43 @@ echo   Copie config_exemplo.bat para config.bat e ajuste DB_SERVER, DB_PORT,
 echo   DB_NAME, DB_USER, DB_PASSWORD e SQLCMD_EXTRA_ARGS.
 echo.
 echo Observacoes:
-echo   - Pare o daemon antes de recriar ou apagar o banco.
+echo   - Pare o daemon antes de recriar, apagar ou materializar o banco.
+echo   - Migrations antigas consolidadas ficam em migrations\historico_arquivado.
+echo   - Apenas scripts .sql diretamente em migrations\ sao executados.
 echo   - Scripts destrutivos de validacao/limpeza nao rodam automaticamente.
 echo   - Dimensoes de usuarios entram no primeiro passo do ciclo Java de extracao.
 echo   - O banco SQLite de autenticacao nao e recriado por este script.
 echo.
 exit /b 0
 
-:GARANTIR_TABELAS_BASE
-echo [ETAPA] Garantindo tabelas base...
+:CONFIRMAR_RECRIACAO
+echo ATENCAO: Esta operacao vai APAGAR todos os dados do banco [%DB_NAME%].
+echo.
+set "CONFIRMA="
+if /i "%MODO_FORCE%"=="1" (
+    echo [FORCE] Confirmacao manual ignorada por --force.
+    exit /b 0
+)
+set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
+if /i not "%CONFIRMA%"=="RECRIAR" (
+    echo Operacao cancelada.
+    set "SQLCMDPASSWORD="
+    exit /b 2
+)
+exit /b 0
+
+:MONTAR_MASTER_SQL
+if exist "%MASTER_SQL%" del /q "%MASTER_SQL%" >nul 2>nul
+> "%MASTER_SQL%" echo :ON ERROR EXIT
+>> "%MASTER_SQL%" echo SET NOCOUNT ON;
+>> "%MASTER_SQL%" echo GO
+
+if /i "%MODO_RECRIAR%"=="1" (
+    call :MASTER_ADD_RECRIAR
+    if errorlevel 1 exit /b 1
+)
+
+call :MASTER_ADD_SECTION "Tabelas base"
 for %%F in (
     "tabelas\001_criar_tabela_coletas.sql"
     "tabelas\002_criar_tabela_fretes.sql"
@@ -461,71 +318,171 @@ for %%F in (
     "tabelas\030_criar_tabela_fato_fretes_faturamento.sql"
     "tabelas\031_criar_tabela_fato_gestao_vista_faturas.sql"
     "tabelas\032_criar_tabela_fato_gestao_vista_manifestos.sql"
+    "tabelas\033_criar_tabela_regras_atribuicao_filial.sql"
 ) do (
-    if not exist %%F (
-        echo [ERRO] Script nao encontrado: %%~F
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
-    echo   [EXEC] %%~F
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "%%~F" -b
-    if errorlevel 1 (
-        echo [ERRO] Falha em: %%~F
-        set "SQLCMDPASSWORD="
-        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-        exit /b 1
-    )
+    call :MASTER_ADD_REQUIRED "%%~F"
+    if errorlevel 1 exit /b 1
 )
-echo [OK] Tabelas base garantidas.
-echo.
-exit /b 0
 
-:RECRIAR_BANCO
-echo ATENCAO: Esta operacao vai APAGAR todos os dados do banco [%DB_NAME%].
-echo.
-set "CONFIRMA="
-if /i "%MODO_FORCE%"=="1" (
-    echo [FORCE] Confirmacao manual ignorada por --force.
-) else (
-    set /p "CONFIRMA=Confirma a recreacao do banco? (RECRIAR/N): "
-    if /i not "%CONFIRMA%"=="RECRIAR" (
-        echo Operacao cancelada.
-        set "SQLCMDPASSWORD="
-        exit /b 2
+if /i "%MODO_RECRIAR%"=="1" (
+    if exist "seguranca\024_configurar_permissoes_usuario.sql" (
+        call :MASTER_ADD_SECTION "Seguranca SQL Server"
+        call :MASTER_ADD_REQUIRED "seguranca\024_configurar_permissoes_usuario.sql"
+        if errorlevel 1 exit /b 1
     )
 )
 
-echo.
-echo [CHECK] Permissao para recriar banco...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% %AUTH_CMD% -d master -Q "IF ISNULL(IS_SRVROLEMEMBER('sysadmin'), 0) <> 1 AND ISNULL(IS_SRVROLEMEMBER('dbcreator'), 0) <> 1 AND ISNULL(HAS_PERMS_BY_NAME(NULL, NULL, 'CREATE ANY DATABASE'), 0) <> 1 BEGIN RAISERROR('Login atual nao tem permissao para CREATE DATABASE em master.', 16, 1); END" -b
-if errorlevel 1 (
-    echo [ERRO] Permissao insuficiente para recriar banco de dados: %DB_NAME%
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
+call :MASTER_ADD_SECTION "Migrations novas da raiz"
+set "MIGRATIONS_COUNT=0"
+for /f "delims=" %%F in ('dir /b /a-d /on "migrations\*.sql" 2^>nul') do (
+    call :MASTER_ADD_REQUIRED "migrations\%%F"
+    if errorlevel 1 exit /b 1
+    set /a MIGRATIONS_COUNT+=1 >nul
+)
+if "%MIGRATIONS_COUNT%"=="0" (
+    echo   [INFO] Nenhuma migration nova encontrada em migrations\*.sql
+    call :MASTER_ADD_INFO "Nenhuma migration nova encontrada em migrations\\*.sql"
 )
 
-echo.
-echo [EXEC] DROP / CREATE DATABASE [%DB_NAME%]...
-sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% %AUTH_CMD% -d master -Q "IF DB_ID('%DB_NAME%') IS NOT NULL BEGIN ALTER DATABASE [%DB_NAME%] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%DB_NAME%]; END; CREATE DATABASE [%DB_NAME%];" -b
-if errorlevel 1 (
-    echo [ERRO] Falha ao recriar banco de dados: %DB_NAME%
-    set "SQLCMDPASSWORD="
-    if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
-    exit /b 1
+call :MASTER_ADD_SECTION "Indices de performance"
+for %%F in (
+    "indices\001_criar_indices_performance.sql"
+    "indices\002_criar_indices_fato_gestao_vista_manifestos.sql"
+) do (
+    call :MASTER_ADD_OPTIONAL "%%~F"
+    if errorlevel 1 exit /b 1
 )
-echo [OK] Banco [%DB_NAME%] recriado.
-echo.
 
-call :GARANTIR_TABELAS_BASE
+call :MASTER_ADD_SECTION "Views Power BI, Analiticas e Dimensao"
+for %%F in (
+    "views\011_criar_view_faturas_por_cliente_powerbi.sql"
+    "views\012_criar_view_fretes_powerbi.sql"
+    "views\013_criar_view_coletas_powerbi.sql"
+    "views\015_criar_view_cotacoes_powerbi.sql"
+    "views\016_criar_view_contas_a_pagar_powerbi.sql"
+    "views\017_criar_view_localizacao_cargas_powerbi.sql"
+    "views\018_criar_view_manifestos_powerbi.sql"
+    "views\025_criar_view_fato_manifestos_dash.sql"
+    "views\020_criar_view_inventario_powerbi.sql"
+    "views\021_criar_view_sinistros_powerbi.sql"
+    "views\022_criar_view_raster_sm_transit_time.sql"
+    "views\019_criar_view_bi_monitoramento.sql"
+    "views-dimensao\019_criar_view_dim_filiais.sql"
+    "views-dimensao\020_criar_view_dim_clientes.sql"
+    "views-dimensao\021_criar_view_dim_veiculos.sql"
+    "views-dimensao\022_criar_view_dim_motoristas.sql"
+    "views-dimensao\023_criar_view_dim_planocontas.sql"
+    "views-dimensao\024_criar_view_dim_usuarios.sql"
+) do (
+    call :MASTER_ADD_OPTIONAL "%%~F"
+    if errorlevel 1 exit /b 1
+)
+
+call :MASTER_ADD_SECTION "Contrato critico da view de fretes"
+call :MASTER_ADD_REQUIRED "validacao\042_validar_contrato_dashboard_performance.sql"
 if errorlevel 1 exit /b 1
 
-REM Seguranca SQL Server (permissoes - apenas no recriar)
-if exist "seguranca\024_configurar_permissoes_usuario.sql" (
-    echo   [EXEC] seguranca\024_configurar_permissoes_usuario.sql
-    sqlcmd %SQLCMD_FLAGS% -S %DB_SERVER_TARGET% -d %DB_NAME% %AUTH_CMD% -i "seguranca\024_configurar_permissoes_usuario.sql" -b
-    if errorlevel 1 echo   [AVISO] Permissoes retornaram erro - verifique manualmente.
-    echo.
+call :MASTER_ADD_SECTION "Stored Procedures"
+for %%F in (
+    "procedures\001_criar_sp_carga_fato_gestao_vista_fretes.sql"
+    "procedures\002_criar_sp_carga_fato_gestao_vista_coletores.sql"
+    "procedures\003_criar_sp_carga_fato_fretes_faturamento.sql"
+    "procedures\004_criar_sp_carga_fato_gestao_vista_faturas.sql"
+    "procedures\005_criar_sp_carga_fato_gestao_vista_manifestos.sql"
+) do (
+    call :MASTER_ADD_REQUIRED "%%~F"
+    if errorlevel 1 exit /b 1
 )
+
+if /i "%MODO_COM_CARGAS%"=="1" (
+    echo [ETAPA] Cargas materializadas BI
+    >> "%MASTER_SQL%" echo PRINT N'[ETAPA] Cargas materializadas BI';
+    >> "%MASTER_SQL%" echo GO
+    call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_fretes"
+    call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_coletores"
+    call :MASTER_ADD_EXEC "dbo.sp_carga_fato_fretes_faturamento"
+    call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_faturas"
+    call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_manifestos"
+
+    echo [ETAPA] Validacoes de leitura
+    >> "%MASTER_SQL%" echo PRINT N'[ETAPA] Validacoes de leitura';
+    >> "%MASTER_SQL%" echo GO
+    for %%F in (
+        "validacao\025_validar_views_dimensao.sql"
+        "validacao\026_validar_tipo_destroy_user_id.sql"
+        "validacao\028_validacao_rapida_extracao.sql"
+        "validacao\032_validar_orfaos_manifestos_coletas.sql"
+        "validacao\034_validar_schema_recriacao.sql"
+        "validacao\036_validar_volumes_fretes_faturamento.sql"
+        "validacao\038_validar_fato_gestao_vista_fretes.sql"
+        "validacao\039_validar_fato_gestao_vista_coletores.sql"
+        "validacao\040_validar_fato_fretes_faturamento.sql"
+        "validacao\041_validar_fato_gestao_vista_faturas.sql"
+        "validacao\043_validar_indice_performance_fretes.sql"
+        "validacao\045_validar_fato_gestao_vista_manifestos.sql"
+    ) do (
+        call :MASTER_ADD_OPTIONAL "%%~F"
+        if errorlevel 1 exit /b 1
+    )
+) else (
+    call :MASTER_ADD_INFO "Cargas materializadas BI ignoradas. Reexecute com --com-cargas para materializar fatos."
+)
+
+exit /b 0
+
+:MASTER_ADD_RECRIAR
+>> "%MASTER_SQL%" echo PRINT N'[CHECK] Permissao para recriar banco $(DB_NAME)';
+>> "%MASTER_SQL%" echo IF ISNULL(IS_SRVROLEMEMBER('sysadmin'), 0^) ^<^> 1 AND ISNULL(IS_SRVROLEMEMBER('dbcreator'), 0^) ^<^> 1 AND ISNULL(HAS_PERMS_BY_NAME(NULL, NULL, 'CREATE ANY DATABASE'), 0^) ^<^> 1
+>> "%MASTER_SQL%" echo BEGIN
+>> "%MASTER_SQL%" echo     RAISERROR('Login atual nao tem permissao para CREATE DATABASE em master.', 16, 1^);
+>> "%MASTER_SQL%" echo END
+>> "%MASTER_SQL%" echo GO
+>> "%MASTER_SQL%" echo PRINT N'[EXEC] DROP / CREATE DATABASE [$(DB_NAME)]';
+>> "%MASTER_SQL%" echo IF DB_ID(N'$(DB_NAME)'^) IS NOT NULL
+>> "%MASTER_SQL%" echo BEGIN
+>> "%MASTER_SQL%" echo     ALTER DATABASE [$(DB_NAME)] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+>> "%MASTER_SQL%" echo     DROP DATABASE [$(DB_NAME)];
+>> "%MASTER_SQL%" echo END
+>> "%MASTER_SQL%" echo CREATE DATABASE [$(DB_NAME)];
+>> "%MASTER_SQL%" echo GO
+>> "%MASTER_SQL%" echo USE [$(DB_NAME)];
+>> "%MASTER_SQL%" echo GO
+exit /b 0
+
+:MASTER_ADD_SECTION
+echo [ETAPA] %~1
+>> "%MASTER_SQL%" echo PRINT N'[ETAPA] %~1';
+>> "%MASTER_SQL%" echo GO
+exit /b 0
+
+:MASTER_ADD_INFO
+>> "%MASTER_SQL%" echo PRINT N'[INFO] %~1';
+>> "%MASTER_SQL%" echo GO
+exit /b 0
+
+:MASTER_ADD_OPTIONAL
+if not exist "%~1" (
+    echo   [SKIP] %~1
+    exit /b 0
+)
+call :MASTER_ADD_REQUIRED "%~1"
+exit /b %ERRORLEVEL%
+
+:MASTER_ADD_REQUIRED
+if not exist "%~1" (
+    echo [ERRO] Script nao encontrado: %~1
+    exit /b 1
+)
+echo   [ADD] %~1
+>> "%MASTER_SQL%" echo PRINT N'[EXEC] %~1';
+>> "%MASTER_SQL%" echo GO
+>> "%MASTER_SQL%" echo :r "%~dp0%~1"
+>> "%MASTER_SQL%" echo GO
+exit /b 0
+
+:MASTER_ADD_EXEC
+echo   [ADD] EXEC %~1
+>> "%MASTER_SQL%" echo PRINT N'[EXEC] %~1';
+>> "%MASTER_SQL%" echo EXEC %~1;
+>> "%MASTER_SQL%" echo GO
 exit /b 0

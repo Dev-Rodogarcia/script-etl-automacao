@@ -29,7 +29,8 @@ class FretesPerformanceIndexSqlTest {
             assertTrue(sql.contains("destino_cidade"));
         }
 
-        assertTrue(executor.contains("migrations\\040_criar_indice_performance_fretes.sql"));
+        assertTrue(executor.contains("dir /b /a-d /on \"migrations\\*.sql\""));
+        assertFalse(executor.contains("migrations\\040_criar_indice_performance_fretes.sql"));
         assertTrue(executor.contains("validacao\\043_validar_indice_performance_fretes.sql"));
         assertTrue(validacao.contains("key_ordinal = 1"));
         assertTrue(validacao.contains("ic.is_included_column = 1"));
@@ -40,6 +41,13 @@ class FretesPerformanceIndexSqlTest {
     }
 
     private static String ler(String caminho) throws IOException {
-        return Files.readString(Path.of(caminho), StandardCharsets.UTF_8);
+        Path path = Path.of(caminho);
+        if (!Files.exists(path) && caminho.startsWith("database/migrations/")) {
+            path = Path.of(caminho.replace(
+                "database/migrations/",
+                "database/migrations/historico_arquivado/"
+            ));
+        }
+        return Files.readString(path, StandardCharsets.UTF_8);
     }
 }
