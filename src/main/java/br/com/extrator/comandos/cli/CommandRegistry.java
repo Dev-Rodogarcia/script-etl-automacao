@@ -39,6 +39,7 @@ import br.com.extrator.comandos.cli.auditoria.AuditarEstruturaApiComando;
 import br.com.extrator.comandos.cli.auditoria.ExecutarAuditoriaComando;
 import br.com.extrator.comandos.cli.base.Comando;
 import br.com.extrator.comandos.cli.console.ExibirAjudaComando;
+import br.com.extrator.comandos.cli.extracao.ExecutarFechamentoMensalComando;
 import br.com.extrator.comandos.cli.extracao.ExecutarExtracaoPorIntervaloComando;
 import br.com.extrator.comandos.cli.extracao.ExecutarFluxoCompletoComando;
 import br.com.extrator.comandos.cli.extracao.ExpurgoOrfaosComando;
@@ -86,6 +87,7 @@ public final class CommandRegistry {
     private static void registrarComandosPadrao(final Map<String, Comando> comandos) {
         comandos.put("--fluxo-completo", lazy(ExecutarFluxoCompletoComando::new));
         comandos.put("--extracao-intervalo", lazy(ExecutarExtracaoPorIntervaloComando::new));
+        comandos.put("--fechamento-mensal", lazy(ExecutarFechamentoMensalComando::new));
         comandos.put("--recovery", lazy(RecoveryComando::new));
         comandos.put("--expurgo-orfaos", lazy(ExpurgoOrfaosComando::new));
         comandos.put("--loop", lazy(LoopExtracaoComando::new));

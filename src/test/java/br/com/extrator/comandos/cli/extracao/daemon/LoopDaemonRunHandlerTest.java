@@ -9,10 +9,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,7 +49,7 @@ class LoopDaemonRunHandlerTest {
                 : LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 9876L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             () -> java.time.Duration.ofSeconds(30)
         );
@@ -57,6 +61,158 @@ class LoopDaemonRunHandlerTest {
         assertFalse(Files.exists(stateStore.getStopFile()), "Stop file deve ser limpo ao finalizar");
         assertFalse(Files.exists(stateStore.getForceRunFile()), "Force run file deve ser limpo ao finalizar");
         assertEquals("STOPPED", stateStore.loadState().getProperty("status"), "Estado final deve ser STOPPED");
+    }
+
+    @Test
+    void deveAgendarProximoCicloComIntervaloDeSessentaMinutos() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final AtomicReference<LocalDateTime> proximoCapturado = new AtomicReference<>();
+
+        final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+            stateStore,
+            historyWriter,
+            () -> { },
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+            (proximoCiclo, store) -> {
+                proximoCapturado.set(proximoCiclo);
+                return LoopDaemonRunHandler.WaitResult.STOP_REQUESTED;
+            },
+            cicloLog -> () -> { },
+            () -> 9877L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
+            false,
+            () -> java.time.Duration.ofSeconds(30)
+        );
+
+        final LocalDateTime antes = LocalDateTime.now();
+        handler.executar();
+        final LocalDateTime depois = LocalDateTime.now();
+
+        assertFalse(
+            proximoCapturado.get().isBefore(antes.plusMinutes(60)),
+            "Proximo ciclo deve respeitar o fallback de 60 minutos"
+        );
+        assertTrue(
+            proximoCapturado.get().isBefore(depois.plusMinutes(60).plusSeconds(2)),
+            "Proximo ciclo deve ser calculado a partir do fim do ciclo atual"
+        );
+    }
+
+    @Test
+    void deveExecutarFechamentoMensalNoDiaPrimeiroAntesDoFluxoIntradiaERegistrarSucesso() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final Path fechamentoState = tempDir.resolve("daemon").resolve("fechamento_mensal.state");
+        final List<String> ordem = new ArrayList<>();
+        final AtomicReference<LocalDate> dataInicioCapturada = new AtomicReference<>();
+        final AtomicReference<LocalDate> dataFimCapturada = new AtomicReference<>();
+
+        final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+            stateStore,
+            historyWriter,
+            () -> ordem.add("intradia"),
+            () -> null,
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+            (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
+            cicloLog -> () -> { },
+            () -> 13579L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
+            false,
+            () -> java.time.Duration.ofSeconds(30),
+            (dataInicio, dataFim) -> {
+                ordem.add("mensal");
+                dataInicioCapturada.set(dataInicio);
+                dataFimCapturada.set(dataFim);
+            },
+            () -> LocalDate.of(2026, 7, 1),
+            fechamentoState
+        );
+
+        handler.executar();
+
+        final Properties estadoFechamento = carregarProperties(fechamentoState);
+        assertEquals(List.of("mensal", "intradia"), ordem);
+        assertEquals(LocalDate.of(2026, 6, 1), dataInicioCapturada.get());
+        assertEquals(LocalDate.of(2026, 6, 30), dataFimCapturada.get());
+        assertEquals("2026-06", estadoFechamento.getProperty("last_attempted_competencia"));
+        assertEquals("SUCCESS", estadoFechamento.getProperty("status"));
+    }
+
+    @Test
+    void deveIgnorarFechamentoMensalJaMarcadoComoSuccessOuRunningNaMesmaCompetencia() throws Exception {
+        for (final String statusJaRegistrado : List.of("SUCCESS", "RUNNING")) {
+            final Path baseDir = tempDir.resolve("daemon-" + statusJaRegistrado.toLowerCase());
+            final DaemonStateStore stateStore = novoStore(baseDir);
+            final DaemonHistoryWriter historyWriter = novoHistoryWriter(baseDir);
+            final Path fechamentoState = baseDir.resolve("fechamento_mensal.state");
+            final Properties estadoInicial = new Properties();
+            estadoInicial.setProperty("last_attempted_competencia", "2026-06");
+            estadoInicial.setProperty("status", statusJaRegistrado);
+            salvarProperties(fechamentoState, estadoInicial);
+
+            final AtomicInteger fechamentoExecutado = new AtomicInteger();
+            final AtomicInteger intradiaExecutada = new AtomicInteger();
+
+            final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+                stateStore,
+                historyWriter,
+                intradiaExecutada::incrementAndGet,
+                () -> null,
+                (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+                (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
+                cicloLog -> () -> { },
+                () -> 13580L,
+                LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
+                false,
+                () -> java.time.Duration.ofSeconds(30),
+                (dataInicio, dataFim) -> fechamentoExecutado.incrementAndGet(),
+                () -> LocalDate.of(2026, 7, 1),
+                fechamentoState
+            );
+
+            handler.executar();
+
+            final Properties estadoFinal = carregarProperties(fechamentoState);
+            assertEquals(0, fechamentoExecutado.get(), "Nao deve repetir fechamento " + statusJaRegistrado);
+            assertEquals(1, intradiaExecutada.get(), "Loop intradia deve continuar normalmente");
+            assertEquals(statusJaRegistrado, estadoFinal.getProperty("status"));
+        }
+    }
+
+    @Test
+    void falhaNoFechamentoMensalDeveRegistrarErrorEContinuarFluxoIntradia() throws Exception {
+        final DaemonStateStore stateStore = novoStore();
+        final DaemonHistoryWriter historyWriter = novoHistoryWriter();
+        final Path fechamentoState = tempDir.resolve("daemon").resolve("fechamento_mensal.state");
+        final AtomicInteger intradiaExecutada = new AtomicInteger();
+
+        final LoopDaemonRunHandler handler = new LoopDaemonRunHandler(
+            stateStore,
+            historyWriter,
+            intradiaExecutada::incrementAndGet,
+            () -> null,
+            (inicio, fimExtracao, sucesso, detalheFalha) -> null,
+            (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
+            cicloLog -> () -> { },
+            () -> 13581L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
+            false,
+            () -> java.time.Duration.ofSeconds(30),
+            (dataInicio, dataFim) -> {
+                throw new IllegalStateException("falha mensal simulada");
+            },
+            () -> LocalDate.of(2026, 7, 1),
+            fechamentoState
+        );
+
+        handler.executar();
+
+        final Properties estadoFechamento = carregarProperties(fechamentoState);
+        assertEquals(1, intradiaExecutada.get());
+        assertEquals("2026-06", estadoFechamento.getProperty("last_attempted_competencia"));
+        assertEquals("ERROR", estadoFechamento.getProperty("status"));
+        assertTrue(estadoFechamento.getProperty("last_error").contains("falha mensal simulada"));
     }
 
     @Test
@@ -78,7 +234,7 @@ class LoopDaemonRunHandlerTest {
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 24680L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             () -> java.time.Duration.ofSeconds(30)
         );
@@ -124,7 +280,7 @@ class LoopDaemonRunHandlerTest {
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 24681L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             () -> java.time.Duration.ofSeconds(30)
         );
@@ -156,7 +312,7 @@ class LoopDaemonRunHandlerTest {
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 4321L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             () -> java.time.Duration.ofSeconds(30)
         );
@@ -221,7 +377,7 @@ class LoopDaemonRunHandlerTest {
             (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
             cicloLog -> () -> { },
             () -> 2468L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             () -> java.time.Duration.ofMillis(200)
         );
@@ -257,7 +413,7 @@ class LoopDaemonRunHandlerTest {
                 (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.TIME_ELAPSED,
                 cicloLog -> () -> { },
                 () -> 97531L,
-                30L,
+                LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
                 false,
                 () -> java.time.Duration.ofSeconds(30)
             );
@@ -300,7 +456,7 @@ class LoopDaemonRunHandlerTest {
                 (proximoCiclo, store) -> LoopDaemonRunHandler.WaitResult.STOP_REQUESTED,
                 cicloLog -> () -> { },
                 () -> 8642L,
-                30L,
+                LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
                 false,
                 () -> java.time.Duration.ofSeconds(30)
             );
@@ -326,24 +482,49 @@ class LoopDaemonRunHandlerTest {
     }
 
     private DaemonStateStore novoStore() {
+        return novoStore(tempDir.resolve("daemon"));
+    }
+
+    private DaemonStateStore novoStore(final Path baseDir) {
         return new DaemonStateStore(
-            tempDir.resolve("daemon"),
-            tempDir.resolve("daemon").resolve("loop_daemon.state"),
-            tempDir.resolve("daemon").resolve("loop_daemon.pid"),
-            tempDir.resolve("daemon").resolve("loop_daemon.stop"),
-            tempDir.resolve("daemon").resolve("loop_daemon.force_run")
+            baseDir,
+            baseDir.resolve("loop_daemon.state"),
+            baseDir.resolve("loop_daemon.pid"),
+            baseDir.resolve("loop_daemon.stop"),
+            baseDir.resolve("loop_daemon.force_run")
         );
     }
 
     private DaemonHistoryWriter novoHistoryWriter() {
+        return novoHistoryWriter(tempDir.resolve("daemon"));
+    }
+
+    private DaemonHistoryWriter novoHistoryWriter(final Path baseDir) {
         return new DaemonHistoryWriter(
-            tempDir.resolve("daemon"),
-            tempDir.resolve("daemon").resolve("ciclos"),
-            tempDir.resolve("daemon").resolve("history"),
-            tempDir.resolve("daemon").resolve("reconciliacao"),
+            baseDir,
+            baseDir.resolve("ciclos"),
+            baseDir.resolve("history"),
+            baseDir.resolve("reconciliacao"),
             "extrator.loop.reconciliacao.history.dir",
             false
         );
+    }
+
+    private Properties carregarProperties(final Path path) throws Exception {
+        final Properties properties = new Properties();
+        try (var reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
+    }
+
+    private void salvarProperties(final Path path, final Properties properties) throws Exception {
+        if (path.getParent() != null) {
+            Files.createDirectories(path.getParent());
+        }
+        try (var writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+            properties.store(writer, "test-state");
+        }
     }
 
     private Path localizarPrimeiroLogCiclo(final Path cyclesDir) throws Exception {

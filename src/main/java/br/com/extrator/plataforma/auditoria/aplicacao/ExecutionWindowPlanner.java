@@ -9,14 +9,12 @@ import java.util.Optional;
 
 import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest.ModoExecucao;
 import br.com.extrator.aplicacao.portas.ExecutionAuditPort;
-import br.com.extrator.features.fretes.aplicacao.FretesExecutionWindowStrategy;
-import br.com.extrator.features.localizacao.aplicacao.LocalizacaoCargasExecutionWindowStrategy;
 import br.com.extrator.features.usuarios.aplicacao.UsuariosExecutionWindowStrategy;
 import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
+import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class ExecutionWindowPlanner {
-    private static final int REPLAY_MINIMO_DIAS = 7;
     private final ExecutionAuditPort executionAuditPort;
     private final Map<String, FeatureExecutionWindowStrategy> strategies;
 
@@ -58,28 +56,26 @@ public final class ExecutionWindowPlanner {
 
     private Map<String, FeatureExecutionWindowStrategy> registrarStrategies() {
         final Map<String, FeatureExecutionWindowStrategy> registradas = new LinkedHashMap<>();
-        registrarReplay(registradas, ConstantesEntidades.COLETAS);
-        registrarReplay(registradas, ConstantesEntidades.MANIFESTOS);
-        registradas.put(ConstantesEntidades.FRETES, new FretesExecutionWindowStrategy());
-        registrarReplay(registradas, ConstantesEntidades.COTACOES);
-        registradas.put(ConstantesEntidades.LOCALIZACAO_CARGAS, new LocalizacaoCargasExecutionWindowStrategy());
-        registrarReplay(registradas, ConstantesEntidades.FATURAS_POR_CLIENTE);
+        final int intradiaLookbackOffsetDias = ConfigEtl.obterIntradiaLookbackOffsetDias();
+        registrarLookbackIntradia(registradas, ConstantesEntidades.COLETAS, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.MANIFESTOS, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.FRETES, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.COTACOES, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.LOCALIZACAO_CARGAS, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.FATURAS_POR_CLIENTE, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.CONTAS_A_PAGAR, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.INVENTARIO, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.SINISTROS, intradiaLookbackOffsetDias);
+        registrarLookbackIntradia(registradas, ConstantesEntidades.RASTER_VIAGENS, intradiaLookbackOffsetDias);
 
         registradas.put(ConstantesEntidades.USUARIOS_SISTEMA, new UsuariosExecutionWindowStrategy());
-        registrarJanelaDiaria(registradas, ConstantesEntidades.CONTAS_A_PAGAR);
-        registrarJanelaDiaria(registradas, ConstantesEntidades.INVENTARIO);
-        registrarJanelaDiaria(registradas, ConstantesEntidades.SINISTROS);
         return Map.copyOf(registradas);
     }
 
-    private void registrarReplay(final Map<String, FeatureExecutionWindowStrategy> registradas,
-                                 final String entidade) {
-        registradas.put(entidade, new RegisteredExecutionWindowStrategy(entidade, REPLAY_MINIMO_DIAS, true));
-    }
-
-    private void registrarJanelaDiaria(final Map<String, FeatureExecutionWindowStrategy> registradas,
-                                       final String entidade) {
-        registradas.put(entidade, new RegisteredExecutionWindowStrategy(entidade, 2, true));
+    private void registrarLookbackIntradia(final Map<String, FeatureExecutionWindowStrategy> registradas,
+                                           final String entidade,
+                                           final int lookbackOffsetDias) {
+        registradas.put(entidade, new IntradiaLookbackExecutionWindowStrategy(entidade, lookbackOffsetDias));
     }
 
     private List<String> entidadesPadrao() {
@@ -93,21 +89,19 @@ public final class ExecutionWindowPlanner {
             ConstantesEntidades.INVENTARIO,
             ConstantesEntidades.SINISTROS,
             ConstantesEntidades.CONTAS_A_PAGAR,
-            ConstantesEntidades.FATURAS_POR_CLIENTE
+            ConstantesEntidades.FATURAS_POR_CLIENTE,
+            ConstantesEntidades.RASTER_VIAGENS
         );
     }
 
-    private static final class RegisteredExecutionWindowStrategy implements FeatureExecutionWindowStrategy {
+    private static final class IntradiaLookbackExecutionWindowStrategy implements FeatureExecutionWindowStrategy {
         private final String entidade;
-        private final int consultaDiasMinimos;
-        private final boolean expandirConsultaAteWatermark;
+        private final int lookbackOffsetDias;
 
-        private RegisteredExecutionWindowStrategy(final String entidade,
-                                                  final int consultaDiasMinimos,
-                                                  final boolean expandirConsultaAteWatermark) {
+        private IntradiaLookbackExecutionWindowStrategy(final String entidade,
+                                                       final int lookbackOffsetDias) {
             this.entidade = entidade;
-            this.consultaDiasMinimos = Math.max(1, consultaDiasMinimos);
-            this.expandirConsultaAteWatermark = expandirConsultaAteWatermark;
+            this.lookbackOffsetDias = Math.max(0, lookbackOffsetDias);
         }
 
         @Override
@@ -118,13 +112,7 @@ public final class ExecutionWindowPlanner {
         @Override
         public ExecutionWindowPlan planejar(final LocalDate dataReferenciaFim,
                                             final Optional<java.time.LocalDateTime> watermarkConfirmado) {
-            final LocalDate consultaMinima = dataReferenciaFim.minusDays(consultaDiasMinimos - 1L);
-            final LocalDate consultaInicio = expandirConsultaAteWatermark
-                ? watermarkConfirmado
-                    .map(java.time.LocalDateTime::toLocalDate)
-                    .map(data -> data.isBefore(consultaMinima) ? data : consultaMinima)
-                    .orElse(consultaMinima)
-                : consultaMinima;
+            final LocalDate consultaInicio = dataReferenciaFim.minusDays(lookbackOffsetDias);
             final java.time.LocalDateTime confirmacaoFim = dataReferenciaFim.atTime(LocalTime.MAX);
             final java.time.LocalDateTime confirmacaoInicio = resolverConfirmacaoInicio(
                 watermarkConfirmado,

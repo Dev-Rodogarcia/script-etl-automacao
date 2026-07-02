@@ -29,6 +29,8 @@ import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 public final class ConfigEtl {
     private static final Logger logger = LoggerFactory.getLogger(ConfigEtl.class);
+    private static final long DAEMON_INTERVALO_MINUTOS_PADRAO = 60L;
+    private static final int INTRADIA_LOOKBACK_OFFSET_MAX_DIAS = 31;
     private static final int FRETES_LOOKBACK_MAX_DIAS = 30;
     private static final String FRETES_LOOKBACK_MODO_NORMAL = "normal";
     private static final String FRETES_LOOKBACK_MODO_MICRO_BATCH = "micro_batch";
@@ -65,6 +67,34 @@ public final class ConfigEtl {
     );
 
     private ConfigEtl() {
+    }
+
+    public static int obterIntradiaLookbackOffsetDias() {
+        return ConfigValueParser.parseInt(
+            ConfigSource.obterConfiguracao(
+                "ETL_INTRADIA_LOOKBACK_OFFSET_DIAS",
+                "etl.intradia.lookback.offset.dias"
+            ),
+            7,
+            value -> value >= 0 && value <= INTRADIA_LOOKBACK_OFFSET_MAX_DIAS,
+            logger,
+            "etl.intradia.lookback.offset.dias",
+            "0 a " + INTRADIA_LOOKBACK_OFFSET_MAX_DIAS + " dias"
+        );
+    }
+
+    public static long obterIntervaloMinutosDaemon() {
+        return ConfigValueParser.parseLong(
+            ConfigSource.obterConfiguracao(
+                "ETL_DAEMON_INTERVALO_MINUTOS",
+                "etl.daemon.intervalo.minutos"
+            ),
+            DAEMON_INTERVALO_MINUTOS_PADRAO,
+            value -> value > 0L,
+            logger,
+            "etl.daemon.intervalo.minutos",
+            DAEMON_INTERVALO_MINUTOS_PADRAO + " minutos"
+        );
     }
 
     public static List<String> obterMaterializacaoFatosBiProcedures() {

@@ -280,6 +280,7 @@ public class Main {
         return switch (nomeComando.toLowerCase()) {
             case "--fluxo-completo",
                 "--extracao-intervalo",
+                "--fechamento-mensal",
                 "--recovery",
                 "--expurgo-orfaos",
                 "--sincronizar-usuarios",

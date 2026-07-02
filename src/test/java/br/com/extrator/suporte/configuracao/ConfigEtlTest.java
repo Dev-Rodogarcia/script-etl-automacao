@@ -198,6 +198,42 @@ class ConfigEtlTest {
     }
 
     @Test
+    void deveUsarIntervaloPadraoDeSessentaMinutosParaDaemon() {
+        assumeTrue(
+            System.getenv("ETL_DAEMON_INTERVALO_MINUTOS") == null
+                || System.getenv("ETL_DAEMON_INTERVALO_MINUTOS").isBlank(),
+            "Variavel de ambiente ETL_DAEMON_INTERVALO_MINUTOS sobrescreve o default neste ambiente."
+        );
+
+        final String envAnterior = System.getProperty("ETL_DAEMON_INTERVALO_MINUTOS");
+        final String chaveAnterior = System.getProperty("etl.daemon.intervalo.minutos");
+        try {
+            System.clearProperty("ETL_DAEMON_INTERVALO_MINUTOS");
+            System.clearProperty("etl.daemon.intervalo.minutos");
+
+            assertEquals(60L, ConfigEtl.obterIntervaloMinutosDaemon());
+        } finally {
+            restaurarPropriedade("ETL_DAEMON_INTERVALO_MINUTOS", envAnterior);
+            restaurarPropriedade("etl.daemon.intervalo.minutos", chaveAnterior);
+        }
+    }
+
+    @Test
+    void deveRespeitarOverrideDoIntervaloDaemon() {
+        final String envAnterior = System.getProperty("ETL_DAEMON_INTERVALO_MINUTOS");
+        final String chaveAnterior = System.getProperty("etl.daemon.intervalo.minutos");
+        try {
+            System.clearProperty("ETL_DAEMON_INTERVALO_MINUTOS");
+            System.setProperty("etl.daemon.intervalo.minutos", "90");
+
+            assertEquals(90L, ConfigEtl.obterIntervaloMinutosDaemon());
+        } finally {
+            restaurarPropriedade("ETL_DAEMON_INTERVALO_MINUTOS", envAnterior);
+            restaurarPropriedade("etl.daemon.intervalo.minutos", chaveAnterior);
+        }
+    }
+
+    @Test
     void deveLerPruneAusentesFretesDoArquivoDeConfiguracao() {
         assumeTrue(
             System.getenv("ETL_FRETES_PRUNE_AUSENTES") == null

@@ -82,12 +82,15 @@ O sistema é operado inteiramente através da CLI. A tabela abaixo documenta tod
 | --- | --- | --- |
 | `[Nenhum]` ou `--fluxo-completo` | Executa o pipeline core diário de ponta a ponta. Realiza pré-backfill de coletas, executa GraphQL e Data Export, roda validações financeiras e finaliza atualizando Watermarks de sucesso. | `D-1..D` (Corrente) |
 | `--extracao-intervalo` | Permite extrações sob demanda dividindo períodos longos em lotes automáticos de até 30 dias para evitar timeouts. | Customizado por CLI |
+| `--fechamento-mensal` | Reprocessa automaticamente o mês anterior fechado usando o fluxo de extração por intervalo. | Mês anterior completo |
 | `--recovery` | Aciona o replay manual/backfill idempotente para cobrir lacunas no banco de dados. | Customizado por CLI |
 | `--testar-api` | Roda um pipeline reduzido para validar conectividade e chaves com a GraphQL e DataExport da ESL. | Teste de Preflight |
 | `--loop-daemon-run` | Executa um ciclo individual contínuo do Daemon de extração em loop. | Automático (Reconciliação) |
 | `--loop-daemon-start` | Inicializa o daemon em processo de segundo plano gravando o PID e gerando ciclos automáticos. | Contínuo / Daemon |
 | `--loop-daemon-stop` | Solicita uma parada graciosa e segura do daemon ativo. | Parada Controlada |
 | `--loop-daemon-status` | Exibe o status do daemon (RUNNING/STOPPED), PID ativo e integridade do JAR. | Diagnóstico |
+
+**Agendamento recomendado:** no Windows Task Scheduler, agende `scripts/windows/15-fechamento-mensal.ps1` para executar no dia 1º de cada mês, durante a madrugada e após a publicação do `target/extrator.jar`. O script executa `--fechamento-mensal` e grava o exit code em `logs/fechamento-mensal`.
 
 ### Comandos de Auditoria & Validação Extrema
 * `--validar-api-banco-24h`: Gera relatório simples comparando contagens da API e banco de dados para as últimas 24h.

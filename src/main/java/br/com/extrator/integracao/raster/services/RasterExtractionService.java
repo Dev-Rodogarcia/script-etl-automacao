@@ -10,6 +10,8 @@ import br.com.extrator.integracao.raster.RasterViagemExtractor;
 import br.com.extrator.persistencia.entidade.LogExtracaoEntity;
 import br.com.extrator.persistencia.repositorio.LogExtracaoRepository;
 import br.com.extrator.plataforma.auditoria.aplicacao.ExecutionAuditRecorder;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionPlanContext;
+import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.configuracao.ConfigRaster;
 import br.com.extrator.suporte.tempo.RelogioSistema;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
@@ -41,8 +43,13 @@ public class RasterExtractionService {
 
     public ExtractionResult executar(final LocalDate dataInicio, final LocalDate dataFim) {
         final LocalDate fim = dataFim != null ? dataFim : RelogioSistema.hoje();
-        final LocalDate inicio = dataInicio != null ? dataInicio : fim.minusDays(ConfigRaster.obterLookbackDays());
-        final ExtractionResult result = logger.executeWithLogging(extractor, inicio, fim, extractor.getEmoji());
+        final ExecutionWindowPlan plano = ExecutionPlanContext.getPlano(ConstantesEntidades.RASTER_VIAGENS)
+            .orElse(null);
+        final LocalDate inicio = plano != null
+            ? plano.consultaDataInicio()
+            : dataInicio != null ? dataInicio : fim.minusDays(ConfigRaster.obterLookbackDays());
+        final LocalDate fimEfetivo = plano != null ? plano.consultaDataFim() : fim;
+        final ExtractionResult result = logger.executeWithLogging(extractor, inicio, fimEfetivo, extractor.getEmoji());
         registrarLogExtracao(result);
         return result;
     }

@@ -4,7 +4,7 @@ Classe  : FluxoCompletoUseCase (class)
 Pacote  : br.com.extrator.aplicacao.extracao
 Modulo  : Use Case - Extracao
 
-Papel   : Orquestra fluxo ETL completo da janela principal D-1..D: extracao, validacao de completude e integridade, data quality.
+Papel   : Orquestra fluxo ETL completo da janela principal intradia: extracao, validacao de completude e integridade, data quality.
 
 Conecta com:
 - PreBackfillReferencialColetasUseCase (pre-backfill orfaos)
@@ -15,7 +15,7 @@ Conecta com:
 - RelogioSistema (marca tempo de execucao)
 
 Fluxo geral:
-1) executar() orquestra extracao completa da janela principal diaria D-1..D.
+1) executar() orquestra extracao completa da janela principal intradia.
 2) Executa pre-backfill de referencial de coletas (orfaos dinamicos).
 3) Orquestra pipeline (GraphQL + DataExport + Data Quality).
 4) Valida completude (origem x destino), integridade e data quality.
@@ -141,8 +141,8 @@ public class FluxoCompletoUseCase {
         log.console("\n" + "=".repeat(60));
         log.console("INICIANDO PROCESSO DE EXTRACAO DE DADOS");
         log.console("=".repeat(60));
-        log.console("Modo: JANELA PRINCIPAL DIARIA D-1..D");
-        log.console("Observacao: a janela principal nao representa 24h corridas.");
+        log.console("Modo: JANELA INTRADIA COM LOOKBACK D-{}..D0", ConfigEtl.obterIntradiaLookbackOffsetDias());
+        log.console("Observacao: a janela principal e planejada por entidade.");
         log.console("Observacao: coletas executa pre-backfill e pos-hidratacao referencial fora da janela principal.");
         if (modoLoopDaemon) {
             log.console("Contexto: LOOP DAEMON (integridade final nao bloqueante)");
@@ -566,11 +566,17 @@ public class FluxoCompletoUseCase {
         log.console("=".repeat(60));
         final Set<String> entidadesRegistradas = new LinkedHashSet<>();
         for (final String entidade : entidadesResumoPlano()) {
+            if (deveOmitirPlanoDoResumo(entidade)) {
+                continue;
+            }
             if (registrarLinhaPlano(entidade, planosExecucao.get(entidade))) {
                 entidadesRegistradas.add(entidade);
             }
         }
         for (final String entidade : planosExecucao.keySet()) {
+            if (deveOmitirPlanoDoResumo(entidade)) {
+                continue;
+            }
             if (!entidadesRegistradas.contains(entidade)
                 && registrarLinhaPlano(entidade, planosExecucao.get(entidade))) {
                 entidadesRegistradas.add(entidade);
@@ -595,6 +601,11 @@ public class FluxoCompletoUseCase {
         );
     }
 
+    private boolean deveOmitirPlanoDoResumo(final String entidade) {
+        return ConstantesEntidades.RASTER_VIAGENS.equals(entidade)
+            && !ConfigRaster.isHabilitadoParaExecucao();
+    }
+
     private boolean registrarLinhaPlano(final String entidade, final ExecutionWindowPlan plano) {
         if (plano == null) {
             return false;
@@ -612,6 +623,9 @@ public class FluxoCompletoUseCase {
 
     private void registrarPlanoRasterSeHabilitado(final Map<String, ExecutionWindowPlan> planosExecucao) {
         if (!ConfigRaster.isHabilitadoParaExecucao()) {
+            return;
+        }
+        if (planosExecucao.containsKey(ConstantesEntidades.RASTER_VIAGENS)) {
             return;
         }
 

@@ -21,7 +21,7 @@ Metodos principais:
 - ehFalhaIntegridadeOperacional(...1 args): detecta falha de integridade no encadeamento.
 Atributos-chave:
 - FLAG_MODO_LOOP_DAEMON: flag interna para modo daemon.
-- INTERVALO_MINUTOS_PADRAO: intervalo padrao entre ciclos.
+- INTERVALO_MINUTOS_FALLBACK: fallback do intervalo entre ciclos.
 [DOC-FILE-END]============================================================== */
 
 package br.com.extrator.comandos.cli.extracao.daemon;
@@ -32,7 +32,7 @@ import java.nio.file.Files;
 public final class LoopDaemonHandlerSupport {
     public static final String FLAG_MODO_LOOP_DAEMON = "--modo-loop-daemon";
     public static final String MENSAGEM_FALHA_INTEGRIDADE = "Fluxo completo interrompido por falha de integridade";
-    public static final long INTERVALO_MINUTOS_PADRAO = 30L;
+    public static final long INTERVALO_MINUTOS_FALLBACK = 60L;
 
     private LoopDaemonHandlerSupport() {
     }

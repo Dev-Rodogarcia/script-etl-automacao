@@ -26,6 +26,7 @@ Atributos-chave:
 - PID_FILE: campo de estado para "pid file".
 - STATE_FILE: campo de estado para "state file".
 - RECONCILIACAO_STATE_FILE: campo de estado para "reconciliacao state file".
+- FECHAMENTO_MENSAL_STATE_FILE: campo de estado para "fechamento mensal state file".
 - STOP_FILE: campo de estado para "stop file".
 - FORCE_RUN_FILE: campo de estado para "force run file".
 - DAEMON_STDOUT_FILE: campo de estado para "daemon stdout file".
@@ -50,6 +51,7 @@ public final class DaemonPaths {
     public static final Path PID_FILE = RUNTIME_DIR.resolve("loop_daemon.pid");
     public static final Path STATE_FILE = RUNTIME_DIR.resolve("loop_daemon.state");
     public static final Path RECONCILIACAO_STATE_FILE = RUNTIME_DIR.resolve("loop_reconciliation.state");
+    public static final Path FECHAMENTO_MENSAL_STATE_FILE = RUNTIME_DIR.resolve("fechamento_mensal.state");
     public static final Path STOP_FILE = RUNTIME_DIR.resolve("loop_daemon.stop");
     public static final Path FORCE_RUN_FILE = RUNTIME_DIR.resolve("loop_daemon.force_run");
     public static final Path DAEMON_STDOUT_FILE = RUNTIME_DIR.resolve("loop_daemon_console.log");

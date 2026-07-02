@@ -10,6 +10,8 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest.ModoExecucao;
@@ -19,9 +21,26 @@ import br.com.extrator.plataforma.auditoria.dominio.ExecutionWindowPlan;
 import br.com.extrator.suporte.validacao.ConstantesEntidades;
 
 class ExecutionWindowPlannerTest {
+    private static final String PROP_LOOKBACK_INTRADIA = "etl.intradia.lookback.offset.dias";
+    private String lookbackAnterior;
+
+    @BeforeEach
+    void configurarLookbackIntradia() {
+        lookbackAnterior = System.getProperty(PROP_LOOKBACK_INTRADIA);
+        System.setProperty(PROP_LOOKBACK_INTRADIA, "7");
+    }
+
+    @AfterEach
+    void restaurarLookbackIntradia() {
+        if (lookbackAnterior == null) {
+            System.clearProperty(PROP_LOOKBACK_INTRADIA);
+            return;
+        }
+        System.setProperty(PROP_LOOKBACK_INTRADIA, lookbackAnterior);
+    }
 
     @Test
-    void devePlanejarReplayDeSeteDiasParaEntidadesCriticas() {
+    void devePlanejarLookbackIntradiaD7InclusivoParaEntidadesCriticas() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 
         final ExecutionWindowPlan planoColetas = planner.planejarEntidade(
@@ -37,15 +56,29 @@ class ExecutionWindowPlannerTest {
             LocalDate.of(2026, 3, 25)
         );
 
-        assertEquals(LocalDate.of(2026, 3, 19), planoColetas.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), planoColetas.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), planoColetas.consultaDataFim());
-        assertEquals(LocalDate.of(2026, 3, 19), planoManifestos.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), planoManifestos.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), planoManifestos.consultaDataFim());
-        assertEquals(LocalDate.of(2026, 3, 19), planoCotacoes.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), planoCotacoes.consultaDataInicio());
     }
 
     @Test
-    void devePlanejarFretesComJanelaNormalDeDoisDias() {
+    void deveRespeitarOffsetLookbackIntradiaConfigurado() {
+        System.setProperty(PROP_LOOKBACK_INTRADIA, "3");
+        final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
+
+        final ExecutionWindowPlan plano = planner.planejarEntidade(
+            ConstantesEntidades.RASTER_VIAGENS,
+            LocalDate.of(2026, 3, 25)
+        );
+
+        assertEquals(LocalDate.of(2026, 3, 22), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
+    }
+
+    @Test
+    void devePlanejarFretesComLookbackIntradiaPadronizado() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 
         final ExecutionWindowPlan plano = planner.planejarEntidade(
@@ -53,7 +86,7 @@ class ExecutionWindowPlannerTest {
             LocalDate.of(2026, 3, 25)
         );
 
-        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
     }
 
@@ -68,7 +101,7 @@ class ExecutionWindowPlannerTest {
         );
 
         assertEquals(watermark, plano.confirmacaoInicio());
-        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
         assertEquals(LocalDateTime.of(2026, 3, 25, LocalTime.MAX.getHour(), LocalTime.MAX.getMinute(), LocalTime.MAX.getSecond(), LocalTime.MAX.getNano()), plano.confirmacaoFim());
     }
 
@@ -95,7 +128,7 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
-    void devePlanejarJanelaDeNoventaDiasParaLocalizacaoCargas() {
+    void devePlanejarLocalizacaoCargasComLookbackIntradiaPadronizado() {
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort());
 
         final ExecutionWindowPlan plano = planner.planejarEntidade(
@@ -104,12 +137,12 @@ class ExecutionWindowPlannerTest {
             ModoExecucao.INTERVALO
         );
 
-        assertEquals(LocalDate.of(2025, 12, 26), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
     }
 
     @Test
-    void deveLimitarLocalizacaoCargasNoMicroBatchMesmoComWatermarkAntigo() {
+    void deveManterLocalizacaoCargasEmD7MesmoComWatermarkAntigo() {
         final LocalDateTime watermark = LocalDateTime.of(2026, 1, 1, 5, 30);
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
 
@@ -119,7 +152,7 @@ class ExecutionWindowPlannerTest {
             ModoExecucao.MICRO_BATCH
         );
 
-        assertEquals(LocalDate.of(2026, 3, 24), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
         assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
         assertEquals(watermark, plano.confirmacaoInicio());
     }
@@ -134,6 +167,17 @@ class ExecutionWindowPlannerTest {
         assertTrue(planos.containsKey(ConstantesEntidades.SINISTROS));
         assertTrue(planos.containsKey(ConstantesEntidades.CONTAS_A_PAGAR));
         assertTrue(planos.containsKey(ConstantesEntidades.FATURAS_POR_CLIENTE));
+        assertTrue(planos.containsKey(ConstantesEntidades.RASTER_VIAGENS));
+        assertJanelaD7(planos.get(ConstantesEntidades.COLETAS));
+        assertJanelaD7(planos.get(ConstantesEntidades.FRETES));
+        assertJanelaD7(planos.get(ConstantesEntidades.MANIFESTOS));
+        assertJanelaD7(planos.get(ConstantesEntidades.COTACOES));
+        assertJanelaD7(planos.get(ConstantesEntidades.LOCALIZACAO_CARGAS));
+        assertJanelaD7(planos.get(ConstantesEntidades.INVENTARIO));
+        assertJanelaD7(planos.get(ConstantesEntidades.SINISTROS));
+        assertJanelaD7(planos.get(ConstantesEntidades.CONTAS_A_PAGAR));
+        assertJanelaD7(planos.get(ConstantesEntidades.FATURAS_POR_CLIENTE));
+        assertJanelaD7(planos.get(ConstantesEntidades.RASTER_VIAGENS));
     }
 
     @Test
@@ -167,7 +211,7 @@ class ExecutionWindowPlannerTest {
     }
 
     @Test
-    void deveUsarWatermarkMaisAntigoQueReplayComoInicioDaConsulta() {
+    void deveManterConsultaD7MesmoComWatermarkMaisAntigo() {
         final LocalDateTime watermark = LocalDateTime.of(2026, 3, 10, 5, 30);
         final ExecutionWindowPlanner planner = new ExecutionWindowPlanner(new StubExecutionAuditPort(watermark));
 
@@ -176,7 +220,7 @@ class ExecutionWindowPlannerTest {
             LocalDate.of(2026, 3, 25)
         );
 
-        assertEquals(LocalDate.of(2026, 3, 10), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
         assertEquals(watermark, plano.confirmacaoInicio());
     }
 
@@ -188,6 +232,11 @@ class ExecutionWindowPlannerTest {
             IllegalArgumentException.class,
             () -> planner.planejarEntidade("entidade_desconhecida", LocalDate.of(2026, 3, 25))
         );
+    }
+
+    private static void assertJanelaD7(final ExecutionWindowPlan plano) {
+        assertEquals(LocalDate.of(2026, 3, 18), plano.consultaDataInicio());
+        assertEquals(LocalDate.of(2026, 3, 25), plano.consultaDataFim());
     }
 
     private static final class StubExecutionAuditPort implements ExecutionAuditPort {

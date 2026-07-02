@@ -40,6 +40,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  (sem argumentos)      Executa extracao completa de todas as APIs");
         System.out.println("  --extracao-intervalo  Executa extracao por intervalo");
         System.out.println("                        Uso: --extracao-intervalo YYYY-MM-DD YYYY-MM-DD [api] [entidade] [--retrofit]");
+        System.out.println("  --fechamento-mensal   Reprocessa automaticamente o mes anterior fechado");
         System.out.println("  --recovery            Replay/backfill idempotente por intervalo");
         System.out.println("                        Uso: --recovery YYYY-MM-DD YYYY-MM-DD [--api graphql|dataexport] [--entidade nome]");
         System.out.println("  --expurgo-orfaos      Executa reconciliacao noturna Sweep and Prune para DataExport");
@@ -89,6 +90,7 @@ public class ExibirAjudaComando implements Comando {
         System.out.println("  java -jar extrator.jar --auth-check RUN_EXTRACAO_COMPLETA");
         System.out.println("  java -jar extrator.jar --fluxo-completo");
         System.out.println("  java -jar extrator.jar --extracao-intervalo 2026-01-01 2026-01-31");
+        System.out.println("  java -jar extrator.jar --fechamento-mensal");
         System.out.println("  java -jar extrator.jar --extracao-intervalo 2026-01-01 2026-01-31 --retrofit");
         System.out.println("  java -jar extrator.jar --recovery 2026-01-01 2026-01-31 --api graphql --entidade coletas");
         System.out.println("  java -jar extrator.jar --expurgo-orfaos --periodo 2026-05-29 2026-05-30 --dry-run");

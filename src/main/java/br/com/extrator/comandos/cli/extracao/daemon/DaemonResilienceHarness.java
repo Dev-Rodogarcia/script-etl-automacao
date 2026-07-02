@@ -84,7 +84,7 @@ public final class DaemonResilienceHarness {
             cicloLog -> () -> {
             },
             () -> 7777L,
-            30L,
+            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK,
             false,
             cycleTimeoutProvider
         );

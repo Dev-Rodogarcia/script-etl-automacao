@@ -40,6 +40,7 @@ class CommandRegistryTest {
     void deveConterComandosEssenciais() {
         final Map<String, Comando> comandos = CommandRegistry.criarMapaComandos();
         assertTrue(comandos.containsKey("--fluxo-completo"));
+        assertTrue(comandos.containsKey("--fechamento-mensal"));
         assertTrue(comandos.containsKey("--recovery"));
         assertTrue(comandos.containsKey("--expurgo-orfaos"));
         assertTrue(comandos.containsKey("--loop-daemon-run"));

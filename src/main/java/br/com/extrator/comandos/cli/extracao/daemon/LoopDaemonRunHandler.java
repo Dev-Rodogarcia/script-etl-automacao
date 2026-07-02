@@ -31,14 +31,23 @@ Atributos-chave:
 package br.com.extrator.comandos.cli.extracao.daemon;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import br.com.extrator.aplicacao.extracao.ExecutionLockBusyException;
+import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloRequest;
+import br.com.extrator.aplicacao.extracao.ExtracaoPorIntervaloUseCase;
 import br.com.extrator.aplicacao.extracao.FluxoCompletoUseCase;
 import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoProcedureResultado;
 import br.com.extrator.aplicacao.materializacao.FatoMaterializacaoResumo;
@@ -49,8 +58,15 @@ import br.com.extrator.suporte.concorrencia.ExecutionTimeoutException;
 import br.com.extrator.suporte.concorrencia.OperationTimeoutGuard;
 import br.com.extrator.suporte.configuracao.ConfigEtl;
 import br.com.extrator.suporte.observabilidade.ExecutionContext;
+import br.com.extrator.suporte.tempo.RelogioSistema;
 
 public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
+    private static final String FECHAMENTO_STATUS_RUNNING = "RUNNING";
+    private static final String FECHAMENTO_STATUS_SUCCESS = "SUCCESS";
+    private static final String FECHAMENTO_STATUS_ERROR = "ERROR";
+    private static final String FECHAMENTO_PROP_COMPETENCIA = "last_attempted_competencia";
+    private static final String FECHAMENTO_PROP_STATUS = "status";
+
     @FunctionalInterface
     public interface FluxoExecutor {
         void executar() throws Exception;
@@ -59,6 +75,11 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     @FunctionalInterface
     public interface MaterializacaoProcessor {
         FatoMaterializacaoResumo processar() throws Exception;
+    }
+
+    @FunctionalInterface
+    public interface FechamentoMensalProcessor {
+        void executar(LocalDate dataInicio, LocalDate dataFim) throws Exception;
     }
 
     @FunctionalInterface
@@ -95,7 +116,10 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
     private final LongSupplier pidSupplier;
     private final long intervaloMinutos;
     private final boolean registrarShutdownHook;
-    private final java.util.function.Supplier<Duration> cycleTimeoutProvider;
+    private final Supplier<Duration> cycleTimeoutProvider;
+    private final FechamentoMensalProcessor fechamentoMensalProcessor;
+    private final Supplier<LocalDate> hojeSupplier;
+    private final Path fechamentoMensalStateFile;
 
     public LoopDaemonRunHandler(final DaemonStateStore stateStore, final DaemonHistoryWriter historyWriter) {
         this(
@@ -107,9 +131,12 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             LoopDaemonRunHandler::aguardarProximoCicloPadrao,
             LoopDaemonRunHandler::iniciarTeeCicloPadrao,
             () -> ProcessHandle.current().pid(),
-            LoopDaemonHandlerSupport.INTERVALO_MINUTOS_PADRAO,
+            ConfigEtl.obterIntervaloMinutosDaemon(),
             true,
-            ConfigEtl::obterTimeoutCicloDaemon
+            ConfigEtl::obterTimeoutCicloDaemon,
+            criarProcessadorFechamentoMensalPadrao(),
+            RelogioSistema::hoje,
+            DaemonPaths.FECHAMENTO_MENSAL_STATE_FILE
         );
     }
 
@@ -122,7 +149,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                          final LongSupplier pidSupplier,
                          final long intervaloMinutos,
                          final boolean registrarShutdownHook,
-                         final java.util.function.Supplier<Duration> cycleTimeoutProvider) {
+                         final Supplier<Duration> cycleTimeoutProvider) {
         this(
             stateStore,
             historyWriter,
@@ -134,7 +161,10 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             pidSupplier,
             intervaloMinutos,
             registrarShutdownHook,
-            cycleTimeoutProvider
+            cycleTimeoutProvider,
+            LoopDaemonRunHandler::ignorarFechamentoMensal,
+            () -> LocalDate.of(1970, 1, 2),
+            null
         );
     }
 
@@ -148,7 +178,39 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
                          final LongSupplier pidSupplier,
                          final long intervaloMinutos,
                          final boolean registrarShutdownHook,
-                         final java.util.function.Supplier<Duration> cycleTimeoutProvider) {
+                         final Supplier<Duration> cycleTimeoutProvider) {
+        this(
+            stateStore,
+            historyWriter,
+            fluxoExecutor,
+            materializacaoProcessor,
+            reconciliationProcessor,
+            waitStrategy,
+            teeFactory,
+            pidSupplier,
+            intervaloMinutos,
+            registrarShutdownHook,
+            cycleTimeoutProvider,
+            LoopDaemonRunHandler::ignorarFechamentoMensal,
+            () -> LocalDate.of(1970, 1, 2),
+            null
+        );
+    }
+
+    LoopDaemonRunHandler(final DaemonStateStore stateStore,
+                         final DaemonHistoryWriter historyWriter,
+                         final FluxoExecutor fluxoExecutor,
+                         final MaterializacaoProcessor materializacaoProcessor,
+                         final ReconciliationProcessor reconciliationProcessor,
+                         final CycleWaitStrategy waitStrategy,
+                         final TeeFactory teeFactory,
+                         final LongSupplier pidSupplier,
+                         final long intervaloMinutos,
+                         final boolean registrarShutdownHook,
+                         final Supplier<Duration> cycleTimeoutProvider,
+                         final FechamentoMensalProcessor fechamentoMensalProcessor,
+                         final Supplier<LocalDate> hojeSupplier,
+                         final Path fechamentoMensalStateFile) {
         this.stateStore = stateStore;
         this.historyWriter = historyWriter;
         this.fluxoExecutor = fluxoExecutor;
@@ -157,9 +219,14 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         this.waitStrategy = waitStrategy;
         this.teeFactory = teeFactory;
         this.pidSupplier = pidSupplier;
-        this.intervaloMinutos = intervaloMinutos;
+        this.intervaloMinutos = intervaloMinutos > 0L
+            ? intervaloMinutos
+            : LoopDaemonHandlerSupport.INTERVALO_MINUTOS_FALLBACK;
         this.registrarShutdownHook = registrarShutdownHook;
         this.cycleTimeoutProvider = cycleTimeoutProvider;
+        this.fechamentoMensalProcessor = fechamentoMensalProcessor;
+        this.hojeSupplier = hojeSupplier;
+        this.fechamentoMensalStateFile = fechamentoMensalStateFile;
     }
 
     @Override
@@ -212,6 +279,7 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
             String detalhe = "Ciclo concluido com sucesso.";
             try {
                 try (AutoCloseable ignored = teeFactory.abrir(cicloLog)) {
+                    executarFechamentoMensalSeNecessario();
                     resumoMaterializacao = executarPipelineComWatchdog();
                 }
             } catch (final Error e) {
@@ -369,6 +437,125 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
         return false;
     }
 
+    private void executarFechamentoMensalSeNecessario() {
+        if (fechamentoMensalProcessor == null || hojeSupplier == null || fechamentoMensalStateFile == null) {
+            return;
+        }
+
+        final LocalDate hoje = hojeSupplier.get();
+        if (hoje == null || hoje.getDayOfMonth() != 1) {
+            return;
+        }
+
+        final YearMonth competenciaAlvo = YearMonth.from(hoje).minusMonths(1);
+        final Properties estadoAtual = carregarEstadoFechamentoMensal();
+        if (deveIgnorarFechamentoMensal(estadoAtual, competenciaAlvo)) {
+            return;
+        }
+
+        final LocalDate dataInicio = competenciaAlvo.atDay(1);
+        final LocalDate dataFim = competenciaAlvo.atEndOfMonth();
+        if (!salvarEstadoFechamentoMensal(competenciaAlvo, FECHAMENTO_STATUS_RUNNING, dataInicio, dataFim, null)) {
+            System.err.println(
+                "ALERTA LOOP: fechamento mensal ignorado porque nao foi possivel gravar estado RUNNING."
+            );
+            return;
+        }
+
+        try {
+            System.out.println(
+                "FECHAMENTO MENSAL: executando competencia "
+                    + competenciaAlvo
+                    + " | periodo="
+                    + dataInicio
+                    + " a "
+                    + dataFim
+            );
+            fechamentoMensalProcessor.executar(dataInicio, dataFim);
+            salvarEstadoFechamentoMensal(competenciaAlvo, FECHAMENTO_STATUS_SUCCESS, dataInicio, dataFim, null);
+            System.out.println("FECHAMENTO MENSAL: competencia " + competenciaAlvo + " concluida com sucesso.");
+        } catch (final Exception e) {
+            final String detalheErro = historyWriter.summarizeMessage(e.getMessage());
+            salvarEstadoFechamentoMensal(competenciaAlvo, FECHAMENTO_STATUS_ERROR, dataInicio, dataFim, detalheErro);
+            System.err.println(
+                "ALERTA LOOP: fechamento mensal da competencia "
+                    + competenciaAlvo
+                    + " falhou e o ciclo intradia seguira normalmente: "
+                    + detalheErro
+            );
+        }
+    }
+
+    private boolean deveIgnorarFechamentoMensal(final Properties estadoAtual, final YearMonth competenciaAlvo) {
+        if (estadoAtual == null || competenciaAlvo == null) {
+            return false;
+        }
+        final String competencia = estadoAtual.getProperty(FECHAMENTO_PROP_COMPETENCIA, "").trim();
+        if (!competenciaAlvo.toString().equals(competencia)) {
+            return false;
+        }
+        final String status = estadoAtual.getProperty(FECHAMENTO_PROP_STATUS, "").trim();
+        return FECHAMENTO_STATUS_SUCCESS.equalsIgnoreCase(status)
+            || FECHAMENTO_STATUS_RUNNING.equalsIgnoreCase(status);
+    }
+
+    private Properties carregarEstadoFechamentoMensal() {
+        final Properties properties = new Properties();
+        if (!Files.isRegularFile(fechamentoMensalStateFile)) {
+            return properties;
+        }
+        try (var reader = Files.newBufferedReader(fechamentoMensalStateFile, StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        } catch (final IOException e) {
+            System.err.println(
+                "ALERTA LOOP: falha ao ler estado de fechamento mensal '"
+                    + fechamentoMensalStateFile.toAbsolutePath()
+                    + "': "
+                    + historyWriter.summarizeMessage(e.getMessage())
+            );
+        }
+        return properties;
+    }
+
+    private boolean salvarEstadoFechamentoMensal(final YearMonth competencia,
+                                                 final String status,
+                                                 final LocalDate dataInicio,
+                                                 final LocalDate dataFim,
+                                                 final String detalheErro) {
+        final Properties properties = new Properties();
+        properties.setProperty(FECHAMENTO_PROP_COMPETENCIA, competencia == null ? "" : competencia.toString());
+        properties.setProperty(FECHAMENTO_PROP_STATUS, status == null ? "" : status);
+        properties.setProperty("data_inicio", dataInicio == null ? "" : dataInicio.toString());
+        properties.setProperty("data_fim", dataFim == null ? "" : dataFim.toString());
+        properties.setProperty("updated_at", RelogioSistema.agora().toString());
+        properties.setProperty("last_error", detalheErro == null ? "" : detalheErro);
+
+        try {
+            final Path parent = fechamentoMensalStateFile.getParent();
+            if (parent != null && !Files.exists(parent)) {
+                Files.createDirectories(parent);
+            }
+            try (var writer = Files.newBufferedWriter(
+                fechamentoMensalStateFile,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            )) {
+                properties.store(writer, "fechamento-mensal-state");
+            }
+            return true;
+        } catch (final IOException e) {
+            System.err.println(
+                "ALERTA LOOP: falha ao gravar estado de fechamento mensal '"
+                    + fechamentoMensalStateFile.toAbsolutePath()
+                    + "': "
+                    + historyWriter.summarizeMessage(e.getMessage())
+            );
+            return false;
+        }
+    }
+
     private ReconciliationSummary processarReconciliacao(final LocalDateTime inicio,
                                                          final LocalDateTime fimExtracao,
                                                          final boolean cicloSucesso,
@@ -439,6 +626,24 @@ public final class LoopDaemonRunHandler implements LoopDaemonModeHandler {
 
     private static void executarFluxoCompletoPadrao() throws Exception {
         new FluxoCompletoUseCase().executar(true);
+    }
+
+    private static void ignorarFechamentoMensal(final LocalDate dataInicio, final LocalDate dataFim) {
+        // Injetado por testes/harness para evitar efeitos colaterais no runtime real.
+    }
+
+    private static FechamentoMensalProcessor criarProcessadorFechamentoMensalPadrao() {
+        return (dataInicio, dataFim) -> new ExtracaoPorIntervaloUseCase().executar(
+            new ExtracaoPorIntervaloRequest(
+                dataInicio,
+                dataFim,
+                null,
+                null,
+                false,
+                false,
+                ExtracaoPorIntervaloRequest.ModoExecucao.INTERVALO
+            )
+        );
     }
 
     private static MaterializacaoProcessor criarProcessadorMaterializacaoPadrao() {

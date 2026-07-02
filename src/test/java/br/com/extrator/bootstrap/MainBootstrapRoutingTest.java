@@ -20,6 +20,7 @@ class MainBootstrapRoutingTest {
     @Test
     void comandosDeExecucaoDevemInicializarContexto() {
         assertTrue(Main.requerInicializacaoContexto("--fluxo-completo"));
+        assertTrue(Main.requerInicializacaoContexto("--fechamento-mensal"));
         assertTrue(Main.requerInicializacaoContexto("--recovery"));
         assertTrue(Main.requerInicializacaoContexto("--loop-daemon-run"));
         assertTrue(Main.requerInicializacaoContexto("--executar-step-isolado"));
