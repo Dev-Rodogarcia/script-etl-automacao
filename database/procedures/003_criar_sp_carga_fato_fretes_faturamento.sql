@@ -14,7 +14,7 @@ GO
 CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_fretes_faturamento
     @DataInicio DATE = NULL,
     @DataFimExclusivo DATE = NULL,
-    @MarcarAusentesComoExcluidos BIT = 1,
+    @MarcarAusentesComoExcluidos BIT = 0,
     @SnapshotEm DATETIME2(0) = NULL
 AS
 BEGIN
@@ -36,14 +36,13 @@ BEGIN
     IF OBJECT_ID(N'dbo.dim_calendario', N'U') IS NULL
         THROW 51048, 'Tabela dbo.dim_calendario nao encontrada. Execute a migration 039 antes da carga.', 1;
 
-    IF (@DataInicio IS NULL AND @DataFimExclusivo IS NOT NULL)
-       OR (@DataInicio IS NOT NULL AND @DataFimExclusivo IS NULL)
-        THROW 51044, 'Informe @DataInicio e @DataFimExclusivo juntos ou deixe ambos nulos para carga completa.', 1;
+    SET @DataInicio = COALESCE(@DataInicio, CAST(DATEADD(DAY, -3, SYSUTCDATETIME()) AS DATE));
+    SET @DataFimExclusivo = COALESCE(@DataFimExclusivo, CAST(DATEADD(DAY, 1, SYSUTCDATETIME()) AS DATE));
 
-    IF @DataInicio IS NOT NULL AND @DataInicio >= @DataFimExclusivo
+    IF @DataInicio >= @DataFimExclusivo
         THROW 51045, '@DataInicio deve ser menor que @DataFimExclusivo.', 1;
 
-    DECLARE @cargaCompleta BIT = CASE WHEN @DataInicio IS NULL AND @DataFimExclusivo IS NULL THEN 1 ELSE 0 END;
+    DECLARE @cargaCompleta BIT = 0;
     DECLARE @InicioOffset DATETIMEOFFSET = CASE WHEN @DataInicio IS NULL THEN NULL ELSE CONVERT(DATETIMEOFFSET, @DataInicio) END;
     DECLARE @FimOffset DATETIMEOFFSET = CASE WHEN @DataFimExclusivo IS NULL THEN NULL ELSE CONVERT(DATETIMEOFFSET, @DataFimExclusivo) END;
 

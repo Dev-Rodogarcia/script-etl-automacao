@@ -100,7 +100,19 @@ class AuditoriaConfiabilidadeCodeInspectionTest {
     }
 
     private String lerArquivo(final String... segmentos) throws IOException {
-        return Files.readString(Path.of("", segmentos));
+        Path path = Path.of("", segmentos);
+        if (!Files.exists(path)
+                && segmentos.length >= 3
+                && "database".equals(segmentos[0])
+                && "migrations".equals(segmentos[1])) {
+            final String[] historico = new String[segmentos.length + 1];
+            historico[0] = "database";
+            historico[1] = "migrations";
+            historico[2] = "historico_arquivado";
+            System.arraycopy(segmentos, 2, historico, 3, segmentos.length - 2);
+            path = Path.of("", historico);
+        }
+        return Files.readString(path);
     }
 
     private String normalizarEspacos(final String texto) {

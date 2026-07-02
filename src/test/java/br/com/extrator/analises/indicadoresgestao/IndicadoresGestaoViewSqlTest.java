@@ -210,7 +210,10 @@ class IndicadoresGestaoViewSqlTest {
         assertContem(sql, "validacao\\045_validar_fato_gestao_vista_manifestos.sql");
         assertContem(sql, "validacao\\036_validar_volumes_fretes_faturamento.sql");
         assertContem(sql, "validacao\\042_validar_contrato_dashboard_performance.sql");
-        assertContem(sql, "Cargas materializadas BI ignoradas");
+        assertContem(sql, "Deseja reprocessar as tabelas Fato agora");
+        assertContem(sql, "Modo silencioso sem --com-cargas: cargas BI ignoradas");
+        assertContem(sql, "LOCK_TIMEOUT das cargas BI: 10000 ms");
+        assertContem(sql, "SET LOCK_TIMEOUT 10000;");
         assertContem(validacaoPerformance, "Responsável Região Destino Key");
         assertContem(validacaoPerformance, "THROW 53002");
         assertContem(validacao, "019_adicionar_comprovante_fretes_performance");

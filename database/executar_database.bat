@@ -100,7 +100,7 @@ if "%MODO_RECRIAR%"=="1" (
 if "%MODO_COM_CARGAS%"=="1" (
     echo   Cargas BI: ATIVADAS ^(--com-cargas^)
 ) else (
-    echo   Cargas BI: ignoradas ^(use --com-cargas para materializar^)
+    echo   Cargas BI: perguntar ao final ^(CI/CD assume N sem --com-cargas^)
 )
 echo.
 
@@ -204,6 +204,16 @@ echo [OK] Master SQL executado.
 echo.
 
 del /q "%MASTER_SQL%" >nul 2>nul
+
+if /i "%MODO_COM_CARGAS%"=="0" (
+    call :PROMPT_CARGAS_POS_DDL
+    if errorlevel 1 (
+        set "SQLCMDPASSWORD="
+        if /i not "%EXTRATOR_DB_SILENT%"=="1" pause
+        exit /b 1
+    )
+)
+
 set "SQLCMDPASSWORD="
 
 echo ============================================
@@ -231,7 +241,7 @@ echo Uso:
 echo   executar_database.bat
 echo      Atualiza um banco existente. Publica tabelas, migrations novas da raiz,
 echo      indices, views, procedures e contrato critico em uma unica sessao sqlcmd.
-echo      Nao executa cargas BI por padrao.
+echo      Ao final pergunta se deve executar cargas BI. Em modo silencioso assume N.
 echo.
 echo   executar_database.bat --com-cargas
 echo      Executa o fluxo acima e, ao final, materializa as 5 fatos BI e roda
@@ -239,8 +249,8 @@ echo      validacoes de leitura. Use com o daemon parado ou em janela controlada
 echo.
 echo   executar_database.bat --recriar
 echo      Apaga e recria o banco definido em config.bat ^(ex.: ETL_SISTEMA^).
-echo      Depois publica o schema em lote unico. Nao executa cargas BI sem
-echo      --com-cargas. Requer digitacao de RECRIAR para confirmar.
+echo      Depois publica o schema em lote unico. Sem --com-cargas, pergunta
+echo      interativamente se deve executar cargas BI. Requer digitacao de RECRIAR.
 echo      Use --force junto com --recriar para automacoes controladas.
 echo.
 echo Configuracao:
@@ -397,6 +407,8 @@ for %%F in (
 if /i "%MODO_COM_CARGAS%"=="1" (
     echo [ETAPA] Cargas materializadas BI
     >> "%MASTER_SQL%" echo PRINT N'[ETAPA] Cargas materializadas BI';
+    >> "%MASTER_SQL%" echo PRINT N'[INFO] LOCK_TIMEOUT das cargas BI: 10000 ms';
+    >> "%MASTER_SQL%" echo SET LOCK_TIMEOUT 10000;
     >> "%MASTER_SQL%" echo GO
     call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_fretes"
     call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_coletores"
@@ -425,9 +437,55 @@ if /i "%MODO_COM_CARGAS%"=="1" (
         if errorlevel 1 exit /b 1
     )
 ) else (
-    call :MASTER_ADD_INFO "Cargas materializadas BI ignoradas. Reexecute com --com-cargas para materializar fatos."
+    call :MASTER_ADD_INFO "Cargas materializadas BI nao incluidas no master DDL. Confirme no prompt pos-DDL ou use --com-cargas."
 )
 
+exit /b 0
+
+:PROMPT_CARGAS_POS_DDL
+set "RESPOSTA_CARGAS=N"
+if /i "%EXTRATOR_DB_SILENT%"=="1" (
+    echo [INFO] Modo silencioso sem --com-cargas: cargas BI ignoradas ^(assumido N^).
+    exit /b 0
+)
+echo.
+set /p "RESPOSTA_CARGAS=Deseja reprocessar as tabelas Fato agora (Recomendado apos alterar regras de negocio)? (S/N): "
+if /i "%RESPOSTA_CARGAS%"=="S" (
+    set "MODO_COM_CARGAS=1"
+    call :EXECUTAR_CARGAS_POS_DDL
+    if errorlevel 1 exit /b 1
+    exit /b 0
+)
+echo [INFO] Cargas BI ignoradas por escolha do usuario.
+exit /b 0
+
+:EXECUTAR_CARGAS_POS_DDL
+echo.
+echo [ETAPA] Montando master SQL temporario para cargas BI...
+if exist "%MASTER_SQL%" del /q "%MASTER_SQL%" >nul 2>nul
+> "%MASTER_SQL%" echo :ON ERROR EXIT
+>> "%MASTER_SQL%" echo SET NOCOUNT ON;
+>> "%MASTER_SQL%" echo SET LOCK_TIMEOUT 10000;
+>> "%MASTER_SQL%" echo GO
+>> "%MASTER_SQL%" echo PRINT N'[ETAPA] Cargas materializadas BI';
+>> "%MASTER_SQL%" echo PRINT N'[INFO] LOCK_TIMEOUT das cargas BI: 10000 ms';
+>> "%MASTER_SQL%" echo GO
+call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_fretes"
+call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_coletores"
+call :MASTER_ADD_EXEC "dbo.sp_carga_fato_fretes_faturamento"
+call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_faturas"
+call :MASTER_ADD_EXEC "dbo.sp_carga_fato_gestao_vista_manifestos"
+
+echo [ETAPA] Executando cargas BI em uma unica sessao sqlcmd...
+sqlcmd %SQLCMD_FLAGS% -S "%DB_SERVER_TARGET%" -d "%DB_NAME%" %AUTH_CMD% -i "%MASTER_SQL%" -b
+if errorlevel 1 (
+    echo [ERRO] Falha na execucao das cargas BI.
+    echo [INFO] Master preservado para diagnostico: %MASTER_SQL%
+    exit /b 1
+)
+del /q "%MASTER_SQL%" >nul 2>nul
+echo [OK] Cargas BI executadas.
+echo.
 exit /b 0
 
 :MASTER_ADD_RECRIAR
@@ -466,7 +524,8 @@ if not exist "%~1" (
     exit /b 0
 )
 call :MASTER_ADD_REQUIRED "%~1"
-exit /b %ERRORLEVEL%
+if errorlevel 1 exit /b 1
+exit /b 0
 
 :MASTER_ADD_REQUIRED
 if not exist "%~1" (

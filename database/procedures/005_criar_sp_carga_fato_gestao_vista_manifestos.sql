@@ -14,7 +14,7 @@ GO
 CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_gestao_vista_manifestos
     @DataInicio DATE = NULL,
     @DataFimExclusivo DATE = NULL,
-    @MarcarAusentesComoExcluidos BIT = 1,
+    @MarcarAusentesComoExcluidos BIT = 0,
     @SnapshotEm DATETIME2(0) = NULL
 AS
 BEGIN
@@ -33,14 +33,13 @@ BEGIN
     IF OBJECT_ID(N'dbo.fretes', N'U') IS NULL
         THROW 51073, 'Tabela dbo.fretes nao encontrada. Carga da fato de manifestos abortada.', 1;
 
-    IF (@DataInicio IS NULL AND @DataFimExclusivo IS NOT NULL)
-       OR (@DataInicio IS NOT NULL AND @DataFimExclusivo IS NULL)
-        THROW 51074, 'Informe @DataInicio e @DataFimExclusivo juntos ou deixe ambos nulos para carga completa.', 1;
+    SET @DataInicio = COALESCE(@DataInicio, CAST(DATEADD(DAY, -3, SYSUTCDATETIME()) AS DATE));
+    SET @DataFimExclusivo = COALESCE(@DataFimExclusivo, CAST(DATEADD(DAY, 1, SYSUTCDATETIME()) AS DATE));
 
-    IF @DataInicio IS NOT NULL AND @DataInicio >= @DataFimExclusivo
+    IF @DataInicio >= @DataFimExclusivo
         THROW 51075, '@DataInicio deve ser menor que @DataFimExclusivo.', 1;
 
-    DECLARE @cargaCompleta BIT = CASE WHEN @DataInicio IS NULL AND @DataFimExclusivo IS NULL THEN 1 ELSE 0 END;
+    DECLARE @cargaCompleta BIT = 0;
     SET @SnapshotEm = COALESCE(@SnapshotEm, SYSUTCDATETIME());
 
     DECLARE @lockResult INT;

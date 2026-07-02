@@ -14,7 +14,7 @@ GO
 CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_gestao_vista_faturas
     @DataInicio DATE = NULL,
     @DataFimExclusivo DATE = NULL,
-    @MarcarAusentesComoExcluidos BIT = 1,
+    @MarcarAusentesComoExcluidos BIT = 0,
     @SnapshotEm DATETIME2(0) = NULL
 AS
 BEGIN
@@ -27,14 +27,13 @@ BEGIN
     IF OBJECT_ID(N'dbo.faturas_por_cliente', N'U') IS NULL
         THROW 51051, 'Tabela dbo.faturas_por_cliente nao encontrada. Carga da fato de faturas abortada.', 1;
 
-    IF (@DataInicio IS NULL AND @DataFimExclusivo IS NOT NULL)
-       OR (@DataInicio IS NOT NULL AND @DataFimExclusivo IS NULL)
-        THROW 51052, 'Informe @DataInicio e @DataFimExclusivo juntos ou deixe ambos nulos para carga completa.', 1;
+    SET @DataInicio = COALESCE(@DataInicio, CAST(DATEADD(DAY, -3, SYSUTCDATETIME()) AS DATE));
+    SET @DataFimExclusivo = COALESCE(@DataFimExclusivo, CAST(DATEADD(DAY, 1, SYSUTCDATETIME()) AS DATE));
 
-    IF @DataInicio IS NOT NULL AND @DataInicio >= @DataFimExclusivo
+    IF @DataInicio >= @DataFimExclusivo
         THROW 51053, '@DataInicio deve ser menor que @DataFimExclusivo.', 1;
 
-    DECLARE @cargaCompleta BIT = CASE WHEN @DataInicio IS NULL AND @DataFimExclusivo IS NULL THEN 1 ELSE 0 END;
+    DECLARE @cargaCompleta BIT = 0;
     SET @SnapshotEm = COALESCE(@SnapshotEm, SYSUTCDATETIME());
 
     DECLARE @hoje DATE = CAST(@SnapshotEm AS DATE);

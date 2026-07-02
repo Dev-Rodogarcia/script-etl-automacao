@@ -14,7 +14,7 @@ GO
 CREATE OR ALTER PROCEDURE dbo.sp_carga_fato_gestao_vista_fretes
     @DataInicio DATE = NULL,
     @DataFimExclusivo DATE = NULL,
-    @MarcarAusentesComoExcluidos BIT = 1,
+    @MarcarAusentesComoExcluidos BIT = 0,
     @SnapshotEm DATETIME2(0) = NULL
 AS
 BEGIN
@@ -27,14 +27,13 @@ BEGIN
     IF OBJECT_ID(N'dbo.fretes', N'U') IS NULL
         THROW 51030, 'Tabela dbo.fretes nao encontrada. Carga da fato de Gestao a Vista abortada.', 1;
 
-    IF (@DataInicio IS NULL AND @DataFimExclusivo IS NOT NULL)
-       OR (@DataInicio IS NOT NULL AND @DataFimExclusivo IS NULL)
-        THROW 51031, 'Informe @DataInicio e @DataFimExclusivo juntos ou deixe ambos nulos para carga completa.', 1;
+    SET @DataInicio = COALESCE(@DataInicio, CAST(DATEADD(DAY, -3, SYSUTCDATETIME()) AS DATE));
+    SET @DataFimExclusivo = COALESCE(@DataFimExclusivo, CAST(DATEADD(DAY, 1, SYSUTCDATETIME()) AS DATE));
 
-    IF @DataInicio IS NOT NULL AND @DataInicio >= @DataFimExclusivo
+    IF @DataInicio >= @DataFimExclusivo
         THROW 51032, '@DataInicio deve ser menor que @DataFimExclusivo.', 1;
 
-    DECLARE @cargaCompleta BIT = CASE WHEN @DataInicio IS NULL AND @DataFimExclusivo IS NULL THEN 1 ELSE 0 END;
+    DECLARE @cargaCompleta BIT = 0;
     SET @SnapshotEm = COALESCE(@SnapshotEm, SYSUTCDATETIME());
 
     DECLARE @lockResult INT;
@@ -581,10 +580,16 @@ BEGIN
                 source.hash_linha
             )
         WHEN NOT MATCHED BY SOURCE
-         AND @cargaCompleta = 1
          AND @MarcarAusentesComoExcluidos = 1
          AND target.indicador_codigo IN ('PE', 'CB')
          AND target.excluido_na_origem = 0
+         AND (
+                @cargaCompleta = 1
+             OR (
+                    target.data_referencia >= @DataInicio
+                AND target.data_referencia < @DataFimExclusivo
+             )
+         )
             THEN UPDATE SET
                 excluido_na_origem = 1,
                 is_linha_valida_indicador = 0,
