@@ -4,6 +4,12 @@ Você atua como Engenheiro de Software Principal neste repositório (Java 17 CLI
 
 ---
 
+## 📚 Garantia de Contexto Antes de Agir
+* **Leitura obrigatória:** Antes de qualquer planejamento, análise ou escrita de código, leia este `AGENTS.md`, o `states.md` local e o `CONTEXTO_GLOBAL.md` do ecossistema.
+* **Hierarquia de regras:** O `CONTEXTO_GLOBAL.md` dita as regras imutáveis do ecossistema; este `AGENTS.md` dita as regras locais do ETL; o `states.md` registra o estado atual e as tarefas pendentes. Em caso de conflito, preserve a integridade arquitetural e explicite a decisão.
+
+---
+
 ## 🟢 Permissão de Escrita e Preparação de Banco
 
 * **Owner Estrutural:** Este repositório é o único dono do banco/schema `ETL_SISTEMA` (`esl_cloud`). Você tem permissão total para criar e alterar tabelas base, migrations, índices, views operacionais (`dbo.vw_*_powerbi`) e views dimensionais.
@@ -27,7 +33,7 @@ Você atua como Engenheiro de Software Principal neste repositório (Java 17 CLI
 * **SARGability Crítica:** É proibido usar funções no lado esquerdo das cláusulas `WHERE` em colunas indexadas, principalmente datas (ex: `YEAR(coluna)`, `MONTH(coluna)`, `TRY_CONVERT(coluna)`, `COALESCE(coluna, ...)`). Filtros temporais devem ser construídos por intervalos diretos e sargable: `coluna >= :inicio AND coluna < :fimExclusivo`.
 * **Clean Code e Pacotes:** Respeite a arquitetura em camadas. O pacote `service` é exclusivo para classes com comportamento de serviço; repositórios e gateways SQL ficam em `repository`/`database`, utilitários puros em `util`, configurações em `config`, políticas em `policy`, jobs em pacotes próprios e scripts SQL em `database`. Cada macaco no seu galho.
 * **Materialização Obrigatória:** Regras de BI complexas, filtros de elegibilidade pesados ou cruzamentos textuais não devem ser processados sob demanda dentro das views de apresentação. Realize o processamento textual pesado e as validações durante a carga (Load) no Java e salve o resultado em colunas físicas (ex: `BIT`, `TINYINT`) indexadas nas tabelas base.
-* **Exclusão Lógica (Soft Delete):** Dados extraídos das APIs e cadastros de suporte não podem sofrer `TRUNCATE` ou `DELETE` físico em rotinas comuns. Use controle de vigência ou inativação para preservar históricos e auditorias de BI.
+* **🚨 Exclusão Lógica (Soft Delete Obrigatório):** É ESTRITAMENTE PROIBIDO o uso de exclusão física (Hard Delete / `DELETE FROM` / `TRUNCATE`) em rotinas comuns para dados extraídos, cadastros de suporte, fatos, auditoria ou histórico de BI. Use flags como `excluido_na_origem = 1`, `ativo = 0`, `deleted_at` ou controle de vigência. Views operacionais, views analíticas e materializações devem filtrar registros excluídos logicamente por padrão, exceto em consultas declaradamente de auditoria/reconciliação.
 
 ## Modelo Aditivo com Expurgo Logico (Sweep and Prune)
 

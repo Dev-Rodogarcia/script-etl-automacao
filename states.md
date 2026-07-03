@@ -20,6 +20,7 @@
 - `observabilidade` e `plataforma` concentram logs estruturados, auditoria, data quality, validação, métricas e relatórios.
 - Banco canônico em `database/tabelas`, `views`, `views-dimensao`, `procedures`, `indices`, `validacao`, `seguranca` e `migrations`; migrations consolidadas ficam em `database/migrations/historico_arquivado`.
 - Padrão de dados: carga aditiva, upsert idempotente, expurgo lógico noturno, auditoria por página/execução e materialização SQL de fatos BI.
+- Dados extraídos, cadastros de suporte, fatos, auditoria e histórico de BI usam exclusão lógica obrigatória. Hard delete/`DELETE FROM`/`TRUNCATE` em rotinas comuns é proibido; quando houver ausência na origem, use `excluido_na_origem`, `ativo`, `deleted_at` ou vigência, e filtre inativos nas views/materializações por padrão.
 
 ## Fluxo de Dados e Integrações
 - Comando padrão sem argumentos ou `--fluxo-completo` executa o ciclo intradia planejado por entidade.
@@ -56,6 +57,8 @@
 - UTF-8 é obrigatório para Java, SQL, logs e arquivos de configuração; mojibake deve ser corrigido na origem.
 
 ## Protocolo de Planejamento de Requisições
+- Antes de iniciar qualquer planejamento ou escrita de código, a IA DEVE OBRIGATORIAMENTE ler `AGENTS.md` do projeto local e `CONTEXTO_GLOBAL.md`.
+- O `CONTEXTO_GLOBAL.md` dita as regras do ecossistema e o `AGENTS.md` dita as regras locais. Falhar em ler e aplicar essas regras resulta em quebra arquitetural.
 - Ao receber uma nova requisição para este projeto, atuar como Arquiteto de Software e usar este `states.md` como ESTADO ATUAL.
 - A análise deve respeitar a stack, a arquitetura, as fronteiras de banco e os contratos de dados descritos neste arquivo.
 - A resposta de planejamento deve retornar somente o bloco `## Tarefas Pendentes`, formatado em Markdown.
@@ -63,4 +66,4 @@
 - É proibido incluir saudações, conclusões, explicações fora dos bullets ou reescrever outras seções durante a resposta de planejamento.
 
 ## Tarefas Pendentes
-- Nenhuma. (Deixe esta seção vazia por enquanto).
+- Nenhuma tarefa pendente registrada.
