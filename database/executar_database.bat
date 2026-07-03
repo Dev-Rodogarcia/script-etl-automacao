@@ -329,6 +329,7 @@ for %%F in (
     "tabelas\031_criar_tabela_fato_gestao_vista_faturas.sql"
     "tabelas\032_criar_tabela_fato_gestao_vista_manifestos.sql"
     "tabelas\033_criar_tabela_regras_atribuicao_filial.sql"
+    "tabelas\034_criar_tabela_dim_regiao_logistica_rules.sql"
 ) do (
     call :MASTER_ADD_REQUIRED "%%~F"
     if errorlevel 1 exit /b 1
@@ -358,6 +359,7 @@ call :MASTER_ADD_SECTION "Indices de performance"
 for %%F in (
     "indices\001_criar_indices_performance.sql"
     "indices\002_criar_indices_fato_gestao_vista_manifestos.sql"
+    "indices\003_criar_indices_dim_regiao_logistica.sql"
 ) do (
     call :MASTER_ADD_OPTIONAL "%%~F"
     if errorlevel 1 exit /b 1

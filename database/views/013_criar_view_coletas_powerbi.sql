@@ -39,6 +39,15 @@ SELECT
     c.uf_coleta AS [UF],
     c.cep_coleta AS [CEP],
     c.pick_region AS [Região da Coleta],
+    COALESCE(
+        regra_cep.regiao_logistica,
+        regra_cidade.regiao_logistica,
+        CONCAT(
+            COALESCE(coleta_local.cidade_limpa, N'Sem cidade'),
+            N' - ',
+            COALESCE(coleta_local.uf_limpa, N'Sem UF')
+        )
+    ) AS [Região Logística],
     c.filial_id AS [Filial ID],
     c.filial_nome AS [Filial],
     c.usuario_nome AS [Usuario],
@@ -64,5 +73,34 @@ LEFT JOIN dbo.dim_usuarios u_cancel
 LEFT JOIN dbo.dim_usuarios u_destroy
     ON c.destroy_user_id = u_destroy.user_id
    AND COALESCE(u_destroy.excluido_na_origem, 0) = 0
+OUTER APPLY (
+    SELECT
+        NULLIF(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(CONVERT(VARCHAR(20), c.cep_coleta))), '-', ''), '.', ''), ' ', ''), '') AS cep_limpo,
+        NULLIF(LTRIM(RTRIM(CONVERT(NVARCHAR(255), c.cidade_coleta))), N'') AS cidade_limpa,
+        NULLIF(UPPER(LTRIM(RTRIM(CONVERT(VARCHAR(2), c.uf_coleta)))), '') AS uf_limpa
+) coleta_local
+OUTER APPLY (
+    SELECT TOP (1)
+        r.regiao_logistica
+    FROM dbo.dim_regiao_logistica_rules r
+    WHERE coleta_local.cep_limpo IS NOT NULL
+      AND LEN(coleta_local.cep_limpo) = 8
+      AND coleta_local.cep_limpo NOT LIKE '%[^0-9]%'
+      AND r.cep_inicio IS NOT NULL
+      AND r.cep_fim IS NOT NULL
+      AND coleta_local.cep_limpo BETWEEN r.cep_inicio AND r.cep_fim
+    ORDER BY r.cep_inicio DESC, r.cep_fim ASC, r.id ASC
+) regra_cep
+OUTER APPLY (
+    SELECT TOP (1)
+        r.regiao_logistica
+    FROM dbo.dim_regiao_logistica_rules r
+    WHERE regra_cep.regiao_logistica IS NULL
+      AND coleta_local.cidade_limpa IS NOT NULL
+      AND coleta_local.uf_limpa IS NOT NULL
+      AND r.cidade = coleta_local.cidade_limpa
+      AND r.uf = coleta_local.uf_limpa
+    ORDER BY r.id ASC
+) regra_cidade
 WHERE COALESCE(c.excluido_na_origem, 0) = 0;
 GO

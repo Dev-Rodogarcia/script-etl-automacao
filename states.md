@@ -21,6 +21,7 @@
 - Banco canônico em `database/tabelas`, `views`, `views-dimensao`, `procedures`, `indices`, `validacao`, `seguranca` e `migrations`; migrations consolidadas ficam em `database/migrations/historico_arquivado`.
 - Padrão de dados: carga aditiva, upsert idempotente, expurgo lógico noturno, auditoria por página/execução e materialização SQL de fatos BI.
 - Dados extraídos, cadastros de suporte, fatos, auditoria e histórico de BI usam exclusão lógica obrigatória. Hard delete/`DELETE FROM`/`TRUNCATE` em rotinas comuns é proibido; quando houver ausência na origem, use `excluido_na_origem`, `ativo`, `deleted_at` ou vigência, e filtre inativos nas views/materializações por padrão.
+- A dimensão governada `dbo.dim_regiao_logistica_rules` resolve macro-regiões de Coletas por faixa de CEP ou Cidade/UF. O baseline usa `database/tabelas/034_criar_tabela_dim_regiao_logistica_rules.sql`, a migration ativa é `database/migrations/049_criar_dim_regiao_logistica_rules.sql` e os índices ficam em `database/indices/003_criar_indices_dim_regiao_logistica.sql`.
 
 ## Fluxo de Dados e Integrações
 - Comando padrão sem argumentos ou `--fluxo-completo` executa o ciclo intradia planejado por entidade.
@@ -31,10 +32,10 @@
 - Data Export extrai `manifestos`, `cotacoes`, `localizacao_cargas`, `contas_a_pagar`, `faturas_por_cliente`, `inventario` e `sinistros`.
 - Templates DataExport configurados incluem `manifestos=6399`, `localizacao=8656`, `cotacoes=6906`, além dos limites específicos para templates `8656`, `4924`, `6399`, `6389`, `6906` e `8636`.
 - Raster, quando habilitado por `RASTER_ENABLED`, consulta viagens e paradas e persiste `dbo.raster_viagens` e `dbo.raster_viagem_paradas`.
-- Persistência operacional inclui `dbo.coletas`, `dbo.fretes`, `dbo.manifestos`, `dbo.cotacoes`, `dbo.localizacao_cargas`, `dbo.contas_a_pagar`, `dbo.faturas_por_cliente`, `dbo.inventario`, `dbo.sinistros`, `dbo.dim_usuarios`, `dbo.dim_calendario` e tabelas Raster.
+- Persistência operacional inclui `dbo.coletas`, `dbo.fretes`, `dbo.manifestos`, `dbo.cotacoes`, `dbo.localizacao_cargas`, `dbo.contas_a_pagar`, `dbo.faturas_por_cliente`, `dbo.inventario`, `dbo.sinistros`, `dbo.dim_usuarios`, `dbo.dim_calendario`, `dbo.dim_regiao_logistica_rules` e tabelas Raster.
 - Auditoria e controle incluem `dbo.log_extracoes`, `dbo.page_audit`, `dbo.sys_execution_history`, `dbo.sys_execution_audit`, `dbo.sys_execution_watermark`, `dbo.schema_migrations`, `dbo.etl_invalid_records` e `dbo.sys_reconciliation_quarantine`.
 - Procedures de materialização BI: `dbo.sp_carga_fato_gestao_vista_fretes`, `dbo.sp_carga_fato_gestao_vista_coletores`, `dbo.sp_carga_fato_fretes_faturamento`, `dbo.sp_carga_fato_gestao_vista_faturas` e `dbo.sp_carga_fato_gestao_vista_manifestos`.
-- Contratos publicados ao Dashboard/Power BI: `dbo.vw_coletas_powerbi`, `dbo.vw_fretes_powerbi`, `dbo.vw_manifestos_powerbi`, `dbo.vw_localizacao_cargas_powerbi`, `dbo.vw_contas_a_pagar_powerbi`, `dbo.vw_cotacoes_powerbi`, `dbo.vw_faturas_por_cliente_powerbi`, `dbo.vw_inventario_powerbi`, `dbo.vw_sinistros_powerbi`, `dbo.vw_fato_manifestos_dash`, `dbo.vw_raster_sm_transit_time` e `dbo.vw_dim_*`.
+- Contratos publicados ao Dashboard/Power BI: `dbo.vw_coletas_powerbi`, `dbo.vw_fretes_powerbi`, `dbo.vw_manifestos_powerbi`, `dbo.vw_localizacao_cargas_powerbi`, `dbo.vw_contas_a_pagar_powerbi`, `dbo.vw_cotacoes_powerbi`, `dbo.vw_faturas_por_cliente_powerbi`, `dbo.vw_inventario_powerbi`, `dbo.vw_sinistros_powerbi`, `dbo.vw_fato_manifestos_dash`, `dbo.vw_raster_sm_transit_time` e `dbo.vw_dim_*`. A view de coletas publica `[Região Logística]` com precedência Faixa de CEP -> Cidade/UF -> Cidade - UF.
 
 ## Regras de Negócio Consolidadas
 - Este projeto é o único dono estrutural de `ETL_SISTEMA`/`esl_cloud`; criação de tabelas, índices, constraints, procedures, fatos e views analíticas deve acontecer aqui.
@@ -46,6 +47,7 @@
 - Agregações, totalizações, rankings, contagens e cruzamentos de BI devem ser executados no SQL Server, não em memória Java.
 - Filtros temporais devem ser sargable, sem funções no lado esquerdo de colunas indexadas.
 - Regras pesadas de BI devem ser materializadas durante carga ou em procedures/tabelas fato, não calculadas sob demanda em views de apresentação.
+- A resolução de Região Logística de Coletas deve permanecer no ETL: `dbo.vw_coletas_powerbi` cruza `dbo.dim_regiao_logistica_rules` primeiro por CEP limpo de 8 dígitos entre `cep_inicio`/`cep_fim`, depois por correspondência exata de `cidade`/`uf`, e finalmente preserva `Cidade - UF` para não retornar nulo ao Dashboard.
 - O fluxo completo usa lock transacional SQL Server (`sp_getapplock`) para evitar execuções concorrentes.
 - GraphQL usa política de falha `ABORT_PIPELINE`; DataExport, Raster e Data Quality podem degradar conforme configuração.
 - Data Quality valida unicidade, completude, freshness, integridade referencial e schema.

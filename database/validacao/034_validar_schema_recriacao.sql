@@ -42,7 +42,8 @@ INSERT INTO @tabelas (nome) VALUES
     (N'fato_fretes_faturamento'),
     (N'fato_gestao_vista_faturas'),
     (N'fato_gestao_vista_manifestos'),
-    (N'regras_atribuicao_filial');
+    (N'regras_atribuicao_filial'),
+    (N'dim_regiao_logistica_rules');
 
 INSERT INTO @falhas (tipo, nome, detalhe)
 SELECT N'TABELA', t.nome, N'Tabela dbo.' + t.nome + N' ausente'
@@ -123,7 +124,8 @@ INSERT INTO @migrations (migration_id) VALUES
     (N'045_criar_indice_manifestos_competencia_operacional'),
     (N'046_reclassificar_tipo_contrato_manifestos'),
     (N'047_criar_tabela_regras_atribuicao_filial'),
-    (N'048_inserir_regra_frigelar_cwb');
+    (N'048_inserir_regra_frigelar_cwb'),
+    (N'049_criar_dim_regiao_logistica_rules');
 
 IF OBJECT_ID(N'dbo.schema_migrations', N'U') IS NOT NULL
 BEGIN
@@ -172,6 +174,43 @@ BEGIN
           AND ativo = 1
     )
         INSERT INTO @falhas VALUES (N'DADO', N'dbo.regras_atribuicao_filial.FRIGELAR', N'Regra ativa FRIGELAR -> CWB ausente ou fora do contrato');
+END;
+
+IF OBJECT_ID(N'dbo.dim_regiao_logistica_rules', N'U') IS NOT NULL
+BEGIN
+    DECLARE @colunasRegiaoLogistica TABLE (nome SYSNAME NOT NULL);
+    INSERT INTO @colunasRegiaoLogistica (nome) VALUES
+        (N'id'),
+        (N'cep_inicio'),
+        (N'cep_fim'),
+        (N'cidade'),
+        (N'uf'),
+        (N'regiao_logistica');
+
+    INSERT INTO @falhas (tipo, nome, detalhe)
+    SELECT N'COLUNA', N'dbo.dim_regiao_logistica_rules.' + c.nome, N'Coluna essencial da dimensao de regiao logistica ausente'
+    FROM @colunasRegiaoLogistica c
+    WHERE COL_LENGTH(N'dbo.dim_regiao_logistica_rules', c.nome) IS NULL;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_dim_regiao_logistica_rules_cep_range'
+          AND object_id = OBJECT_ID(N'dbo.dim_regiao_logistica_rules')
+          AND filter_definition LIKE N'%cep_inicio%'
+          AND filter_definition LIKE N'%cep_fim%'
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'IX_dim_regiao_logistica_rules_cep_range', N'Indice filtrado de faixa de CEP da dimensao logistica ausente');
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.indexes
+        WHERE name = N'IX_dim_regiao_logistica_rules_cidade_uf'
+          AND object_id = OBJECT_ID(N'dbo.dim_regiao_logistica_rules')
+          AND filter_definition LIKE N'%cidade%'
+          AND filter_definition LIKE N'%uf%'
+    )
+        INSERT INTO @falhas VALUES (N'INDICE', N'IX_dim_regiao_logistica_rules_cidade_uf', N'Indice filtrado de Cidade/UF da dimensao logistica ausente');
 END;
 
 IF COL_LENGTH(N'dbo.coletas', N'request_hour') IS NULL
@@ -853,6 +892,18 @@ IF EXISTS (
       AND IS_NULLABLE = 'YES'
 )
     INSERT INTO @falhas VALUES (N'COLUNA', N'dbo.coletas.sequence_code', N'Deve estar NOT NULL apos migration 010');
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.vw_coletas_powerbi')
+      AND name = N'Região Logística'
+)
+    INSERT INTO @falhas VALUES (N'VIEW_COLUNA', N'dbo.vw_coletas_powerbi.[Região Logística]', N'View de coletas deve publicar regiao logistica resolvida pelo ETL');
+
+IF OBJECT_ID(N'dbo.vw_coletas_powerbi', N'V') IS NOT NULL
+   AND OBJECT_DEFINITION(OBJECT_ID(N'dbo.vw_coletas_powerbi')) NOT LIKE N'%dim_regiao_logistica_rules%'
+    INSERT INTO @falhas VALUES (N'VIEW_DEFINICAO', N'dbo.vw_coletas_powerbi', N'View de coletas deve resolver regiao logistica pela dimensao governada');
 
 IF EXISTS (
     SELECT 1

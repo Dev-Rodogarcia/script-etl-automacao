@@ -98,6 +98,7 @@ ORDER BY data_extracao DESC;
 | `dbo.raster_viagem_paradas` | Negócio | Raster `getEventoFimViagem.ColetasEntregas` | 1 linha por parada da viagem | `cod_solicitacao`, `ordem` |
 | `dbo.dim_usuarios` | Referência | GraphQL `individual` | 1 linha por usuário | `user_id` |
 | `dbo.dim_usuarios_historico` | Auditoria | Snapshot de usuários | 1 linha por mudança de estado | `id` |
+| `dbo.dim_regiao_logistica_rules` | Referência | Regras operacionais internas | 1 regra por faixa de CEP ou Cidade/UF | `id` |
 | `dbo.log_extracoes` | Auditoria | Runtime ETL | 1 linha por execução de entidade | `id` |
 | `dbo.page_audit` | Auditoria | Runtime ETL | 1 linha por página requisitada | `id` |
 | `dbo.sys_execution_history` | Auditoria | Runtime ETL | 1 linha por execução do pipeline | `id` |
@@ -127,6 +128,7 @@ ORDER BY data_extracao DESC;
 - `dbo.fato_gestao_vista_faturas.unique_id = dbo.faturas_por_cliente.unique_id`; a carga materializa datas, status, valor operacional e cliente para Aging/Tabela.
 - `dbo.fato_gestao_vista_manifestos.sequence_code = dbo.manifestos.sequence_code`; a carga resolve a receita por `coletas.pick_items_ids` + `fretes.pick_item_id` e publica `dbo.vw_fato_manifestos_dash` sem `OPENJSON` sob demanda.
 - `dbo.coletas.cancellation_user_id` e `dbo.coletas.destroy_user_id` podem ser ligados a `dbo.dim_usuarios.user_id`
+- `dbo.vw_coletas_powerbi.[Região Logística]` é resolvida por `dbo.dim_regiao_logistica_rules`: primeiro por faixa de CEP limpo, depois por Cidade/UF, e por fim por `cidade_coleta + ' - ' + uf_coleta`
 - `dbo.raster_viagem_paradas.cod_solicitacao = dbo.raster_viagens.cod_solicitacao`
 - `dbo.dim_usuarios_historico.user_id = dbo.dim_usuarios.user_id`
 - `dbo.page_audit.execution_uuid` conversa com `dbo.sys_execution_audit.execution_uuid`
@@ -789,6 +791,22 @@ ORDER BY data_extracao DESC;
 | `origem_atualizado_em` | `DATETIME2` | Data/hora de atualização vinda da origem, quando disponível. |
 | `ultima_extracao_em` | `DATETIME2` | Último momento em que o usuário apareceu na sincronização. |
 | `hash_linha` | `VARBINARY(32)` | Hash SHA-256 do estado de negócio usado para idempotência e detecção de delta. |
+
+### `dbo.dim_regiao_logistica_rules`
+
+- Fonte: regras operacionais internas
+- Grão: 1 linha por regra de resolução de região logística
+- Chaves: PK `id`
+- Observação importante: a view `dbo.vw_coletas_powerbi` usa a precedência faixa de CEP limpo, Cidade/UF e fallback `Cidade - UF` para publicar `[Região Logística]` sem valores nulos no Dashboard.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `id` | `INT IDENTITY` | Identificador técnico da regra. |
+| `cep_inicio` | `VARCHAR(8)` | CEP inicial da faixa, sem máscara. |
+| `cep_fim` | `VARCHAR(8)` | CEP final da faixa, sem máscara. |
+| `cidade` | `NVARCHAR(255)` | Cidade usada no fallback exato por localidade. |
+| `uf` | `VARCHAR(2)` | UF usada no fallback exato por localidade. |
+| `regiao_logistica` | `NVARCHAR(100)` | Macro-região logística publicada para os dashboards. |
 
 ## Tabelas técnicas, auditoria e controle
 

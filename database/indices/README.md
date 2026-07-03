@@ -46,6 +46,10 @@ executar_indices.bat
 - `IX_coletas_service_date` - Otimiza busca por data de serviço
 - `IX_coletas_request_date_dashboard` - Otimiza dashboard de Coletas por solicitação, status, região e cidade
 
+### Dimensões logísticas
+- `IX_dim_regiao_logistica_rules_cep_range` - Otimiza a resolução de região logística por faixa de CEP
+- `IX_dim_regiao_logistica_rules_cidade_uf` - Otimiza o fallback de região logística por Cidade/UF
+
 ### Fretes
 - `IX_fretes_data_extracao` - Otimiza queries de auditoria
 - `IX_fretes_servico_em` - Otimiza busca por data de serviço
