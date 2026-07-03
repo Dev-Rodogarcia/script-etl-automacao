@@ -74,7 +74,7 @@ echo            by: @valentelucass
 echo ================================================================
 echo.
 echo 01. Extracao completa operacional ^(D-1..D + replay/validacao + Raster se habilitada^)
-echo 02. Loop de extracao 30 minutos ^(inclui inventario, sinistros e Raster se habilitada^)
+echo 02. Loop daemon de extracao 60 minutos ^(inclui inventario, sinistros e Raster se habilitada^)
 echo 03. Backfill Completo ^(90 dias^) - Schema Ja Pronto
 echo 04. Extracao por intervalo ^(inclui inventario, sinistros e Raster se habilitada^)
 echo 05. Testar API especifica ^(GraphQL, DataExport ou Raster^)

@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 REM ==[DOC-FILE]===============================================================
 REM Arquivo : 05-loop_extracao_30min.bat
 REM Tipo    : Script operacional Windows (.bat)
-REM Papel   : Automatiza a rotina "05-loop extracao 30min" para uso operacional.
+REM Papel   : Automatiza a rotina do loop daemon de extracao para uso operacional.
 REM
 REM Conecta com:
 REM - call: %~dp0mvn.bat
@@ -34,7 +34,7 @@ set "JAR_PATH=%REPO_ROOT%\target\extrator.jar"
 set "LOOP_LOG=%REPO_ROOT%\logs\daemon\runtime\loop_daemon_console.log"
 
 echo ================================================================
-echo GERENCIAR LOOP DE EXTRACAO ^(30 minutos^)
+echo GERENCIAR LOOP DAEMON DE EXTRACAO ^(60 minutos^)
 echo ================================================================
 echo.
 echo Cobertura do loop:
