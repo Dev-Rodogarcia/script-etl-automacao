@@ -43,3 +43,10 @@ O job `Sweep and Prune` deve rodar fora do horario de pico, com paginacao por or
 
 * **Testes e Sanidade:** Antes de dar a tarefa por concluída, execute a suíte de testes locais (`src/test`) e os scripts de validação de schema (`database/validacao`). Nenhuma alteração estrutural pode subir sem validação de quebra de contrato.
 * **Encoding e Mojibake:** Todo o ecossistema (código Java, drivers JDBC, scripts SQL e arquivos de log) opera estritamente em UTF-8. Não aceite aliases ou dados de tabelas com caracteres corrompidos.
+
+## Diretrizes de Sincronização de Estado (states.md)
+1. Antes de iniciar a implementação de qualquer código, você DEVE ler o arquivo `states.md` para compreender o contexto arquitetural e as regras de negócio vigentes, garantindo que as novas implementações não quebrem o estado atual.
+2. Leia a seção "Tarefas Pendentes" no `states.md` para entender o escopo exato do que precisa ser desenvolvido.
+3. Após finalizar a escrita e modificação do código, você DEVE atualizar o arquivo `states.md`.
+4. A atualização consiste em: remover a tarefa concluída da seção "Tarefas Pendentes" e atualizar as seções "Arquitetura e Padrões", "Fluxo de Dados" ou "Regras de Negócio Consolidadas" refletindo exatamente o novo estado do sistema.
+5. NUNCA entregue ou finalize uma modificação de código sem antes reescrever e atualizar o `states.md` para refletir o presente.

@@ -89,7 +89,7 @@ class ConfigEtlTest {
             System.clearProperty(propriedadeLegada);
             System.clearProperty(propriedadeEnv);
 
-            assertEquals(Duration.ofMinutes(15), ConfigEtl.obterTimeoutEntidadeGraphQL("fretes"));
+            assertEquals(Duration.ofMinutes(30), ConfigEtl.obterTimeoutEntidadeGraphQL("fretes"));
         } finally {
             restaurarPropriedade(propriedadeLegada, valorLegadoAnterior);
             restaurarPropriedade(propriedadeEnv, valorEnvAnterior);
