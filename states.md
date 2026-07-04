@@ -68,4 +68,28 @@
 - É proibido incluir saudações, conclusões, explicações fora dos bullets ou reescrever outras seções durante a resposta de planejamento.
 
 ## Tarefas Pendentes
-- Nenhuma tarefa pendente registrada.
+# 📋 TAREFA TÉCNICA: Carga de Regras na Dimensão de Regiões Logísticas
+
+**Atenção, Codex:** Atue como Engenheiro de Dados. A estrutura da tabela `dbo.dim_regiao_logistica_rules` já foi criada no repositório `etl-extracao-dados`, mas ela está vazia. Precisamos popular essa tabela com as regras de negócio fornecidas pelo gestor para que a view de Coletas passe a cruzar a informação corretamente.
+
+Antes de prosseguir, certifique-se de estar operando no contexto do repositório `etl-extracao-dados` e respeite as regras de `AGENTS.md` e `CONTEXTO_GLOBAL.md`.
+
+## 🛠️ Escopo da Tarefa
+
+1. **Analisar a Lista de Regras:** Leia a lista de "De/Para" abaixo fornecida pela operação. Identifique o que é regra de Faixa de CEP e o que é regra de fallback por Cidade/UF.
+
+[COLE AQUI A SUA LISTA, TEXTO OU RESUMO DO EXCEL COM AS REGRAS]
+
+2. **Criar Script SQL Idempotente:**
+Crie um novo arquivo de script SQL na pasta correspondente de migrações ou scripts de carga (ex: `database/migrations/050_carga_inicial_dim_regiao_logistica.sql` ou similar, seguindo a numeração atual). 
+
+O script deve conter instruções de `INSERT` com verificação de não-existência (idempotente) ou usar `MERGE` para inserir as regras de forma segura, alimentando as colunas corretas:
+- `cep_inicio` e `cep_fim` (para faixas de CEP, mantendo apenas números).
+- `cidade` e `uf` (para regras de município).
+- `regiao_logistica` (A Macro-Região final).
+
+## 🚦 Critérios de Aceite
+* O script SQL deve ser gerado com sintaxe válida para SQL Server (T-SQL).
+* Valores de CEP devem ser inseridos limpos (sem hífen, formato VARCHAR(8)).
+* Nenhuma alteração estrutural (DDL) deve ser feita, apenas inserção de dados (DML).
+* Apresente o código SQL final pronto para ser executado no banco `ETL_SISTEMA`.
